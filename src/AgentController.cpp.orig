@@ -1,0 +1,419 @@
+#include "AgentController.h"
+#include "settings/Settings.h"
+#include "util/Diff.h"
+#include "util/Logger.h"
+
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QTimer>
+
+namespace Qcai2
+{
+
+AgentController::AgentController(QObject *parent) : QObject(parent)
+{
+}
+
+void AgentController::setProvider(IAIProvider *provider)
+{
+    m_provider = provider;
+}
+void AgentController::setProviders(const QList<IAIProvider *> &providers)
+{
+    m_allProviders = providers;
+}
+void AgentController::setToolRegistry(ToolRegistry *registry)
+{
+    m_toolRegistry = registry;
+}
+void AgentController::setEditorContext(EditorContext *ctx)
+{
+    m_editorContext = ctx;
+}
+void AgentController::setSafetyPolicy(SafetyPolicy *policy)
+{
+    m_safetyPolicy = policy;
+}
+
+QString AgentController::buildSystemPrompt() const
+{
+    QString sys;
+    sys += QStringLiteral(
+        "You are an AI coding agent inside Qt Creator. You help the user accomplish coding tasks "
+        "by using available tools. You MUST respond in JSON with one of these types:\n"
+        "1) {\"type\":\"plan\", \"steps\":[\"step description\", ...]}\n"
+        "2) {\"type\":\"tool_call\", \"name\":\"tool_name\", \"args\":{...}}\n"
+        "3) {\"type\":\"final\", \"summary\":\"what was done\", \"diff\":\"optional unified "
+        "diff\"}\n"
+        "4) {\"type\":\"need_approval\", \"action\":\"what\", \"reason\":\"why\", "
+        "\"preview\":\"details\"}\n\n");
+
+    // Available tools
+    if (m_toolRegistry)
+    {
+        QJsonDocument toolsDoc(m_toolRegistry->toolDescriptionsJson());
+        sys += QStringLiteral("Available tools:\n%1\n\n")
+                   .arg(QString::fromUtf8(toolsDoc.toJson(QJsonDocument::Indented)));
+    }
+
+    // Editor context
+    if (m_editorContext)
+    {
+        sys += QStringLiteral("Current editor context:\n%1\n")
+                   .arg(m_editorContext->toPromptFragment());
+
+        // Include file contents from open editors
+        const QString files = m_editorContext->fileContentsFragment(60000);
+        if (!files.isEmpty())
+            sys += QStringLiteral("File contents (from open tabs):\n%1\n").arg(files);
+    }
+
+    // Safety info
+    if (m_dryRun)
+    {
+        sys += QStringLiteral(
+            "MODE: DRY-RUN. Do NOT apply patches; only produce diffs for preview.\n");
+    }
+
+    return sys;
+}
+
+void AgentController::start(const QString &goal, bool dryRun)
+{
+    if (m_running)
+        return;
+
+    // Re-select and reconfigure provider from current settings
+    const auto &s = settings();
+    if (!m_allProviders.isEmpty()) {
+        m_provider = nullptr;
+        QCAI_DEBUG("Agent", QStringLiteral("Selecting provider '%1' from %2 available")
+            .arg(s.provider).arg(m_allProviders.size()));
+        for (auto *p : m_allProviders) {
+            if (p->id() == s.provider) {
+                m_provider = p;
+                break;
+            }
+        }
+        if (!m_provider)
+            m_provider = m_allProviders.first();
+
+        // Reconfigure the selected provider
+        if (s.provider == QStringLiteral("openai")) {
+            m_provider->setBaseUrl(s.baseUrl);
+            m_provider->setApiKey(s.apiKey);
+        } else if (s.provider == QStringLiteral("local")) {
+            m_provider->setBaseUrl(s.localBaseUrl);
+            m_provider->setApiKey(s.apiKey);
+        } else if (s.provider == QStringLiteral("ollama")) {
+            m_provider->setBaseUrl(s.ollamaBaseUrl);
+        }
+    }
+
+    if (!m_provider)
+    {
+        emit errorOccurred(QStringLiteral("No AI provider configured."));
+        return;
+    }
+
+    m_running = true;
+    m_dryRun = dryRun;
+    m_iteration = 0;
+    m_toolCallCount = 0;
+    m_textRetries = 0;
+    m_goal = goal;
+    m_plan.clear();
+    m_accumulatedDiff.clear();
+    m_pendingApprovals.clear();
+    m_messages.clear();
+
+    QCAI_INFO("Agent", QStringLiteral("Starting agent — provider: %1, model: %2, thinking: %3, dryRun: %4, goal: %5")
+        .arg(m_provider->id(), s.modelName, s.thinkingLevel,
+             dryRun ? QStringLiteral("yes") : QStringLiteral("no"),
+             goal.left(100)));
+
+    // System prompt
+    m_messages.append({QStringLiteral("system"), buildSystemPrompt()});
+
+    if (s.thinkingLevel == QStringLiteral("low") ||
+        s.thinkingLevel == QStringLiteral("medium") ||
+        s.thinkingLevel == QStringLiteral("high"))
+        m_messages.append({QStringLiteral("system"),
+                           QStringLiteral("Use %1 thinking/reasoning effort for this task.").arg(s.thinkingLevel)});
+
+    // User goal
+    m_messages.append({QStringLiteral("user"), goal});
+
+    emit logMessage(QStringLiteral("▶ Agent started. Goal: %1").arg(goal));
+    runNextIteration();
+}
+
+void AgentController::stop()
+{
+    if (!m_running)
+        return;
+    m_running = false;
+    QCAI_INFO("Agent", QStringLiteral("Agent stopped by user at iteration %1, tool calls: %2")
+        .arg(m_iteration).arg(m_toolCallCount));
+    if (m_provider)
+        m_provider->cancel();
+    emit logMessage(QStringLiteral("⏹ Agent stopped by user."));
+    emit stopped(QStringLiteral("Stopped by user at iteration %1.").arg(m_iteration));
+}
+
+void AgentController::runNextIteration()
+{
+    if (!m_running)
+        return;
+
+    // Check limits
+    const int maxIter =
+        m_safetyPolicy ? m_safetyPolicy->maxIterations() : settings().maxIterations;
+    if (m_iteration >= maxIter)
+    {
+        m_running = false;
+        emit logMessage(QStringLiteral("⚠ Max iterations reached (%1).").arg(maxIter));
+        emit stopped(QStringLiteral("Max iterations reached."));
+        return;
+    }
+
+    ++m_iteration;
+    emit iterationChanged(m_iteration);
+    emit logMessage(QStringLiteral("── Iteration %1 ──").arg(m_iteration));
+
+    const auto &s = settings();
+    QCAI_DEBUG("Agent", QStringLiteral("Iteration %1: sending %2 messages to %3 (model: %4, thinking: %5, temp: %6)")
+        .arg(m_iteration).arg(m_messages.size()).arg(m_provider->id(), s.modelName)
+        .arg(s.thinkingLevel).arg(s.temperature));
+
+    m_provider->complete(m_messages, s.modelName, s.temperature, s.maxTokens,
+                         [this](const QString &response, const QString &error) {
+                             QTimer::singleShot(0, this, [this, response, error]() {
+                                 handleResponse(response, error);
+                             });
+                         },
+                         [this](const QString &delta) {
+                             if (!delta.isEmpty())
+                                 emit streamingToken(delta);
+                         });
+}
+
+void AgentController::handleResponse(const QString &response, const QString &error)
+{
+    if (!m_running)
+        return;
+
+    if (!error.isEmpty())
+    {
+        QCAI_ERROR("Agent", QStringLiteral("Provider error: %1").arg(error));
+        emit logMessage(QStringLiteral("❌ Provider error: %1").arg(error));
+        emit errorOccurred(error);
+        m_running = false;
+        emit stopped(QStringLiteral("Provider error."));
+        return;
+    }
+
+    // Add assistant message to history
+    m_messages.append({QStringLiteral("assistant"), response});
+
+    // Parse response
+    AgentResponse parsed = AgentResponse::parse(response);
+    QCAI_DEBUG("Agent", QStringLiteral("Parsed response type: %1, length: %2")
+        .arg(static_cast<int>(parsed.type)).arg(response.length()));
+
+    // Reset text retry counter on valid JSON
+    if (parsed.type != ResponseType::Text && parsed.type != ResponseType::Error)
+        m_textRetries = 0;
+
+    switch (parsed.type)
+    {
+        case ResponseType::Plan:
+            m_plan = parsed.steps;
+            emit planUpdated(m_plan);
+            emit logMessage(QStringLiteral("📋 Plan with %1 step(s) received.").arg(m_plan.size()));
+            // Ask model to start executing the plan
+            m_messages.append(
+                {QStringLiteral("user"),
+                 QStringLiteral("Good plan. Now execute step 1 using the available tools.")});
+            runNextIteration();
+            break;
+
+        case ResponseType::ToolCall:
+            executeTool(parsed.toolName, parsed.toolArgs);
+            break;
+
+        case ResponseType::Final:
+            emit logMessage(QStringLiteral("✅ Agent finished: %1").arg(parsed.summary));
+            if (!parsed.diff.isEmpty())
+            {
+                m_accumulatedDiff = Diff::normalize(parsed.diff);
+                emit diffAvailable(m_accumulatedDiff);
+            }
+            m_running = false;
+            emit stopped(parsed.summary);
+            break;
+
+        case ResponseType::NeedApproval: {
+            PendingApproval pa;
+            pa.id = m_nextApprovalId++;
+            pa.toolName = parsed.approvalAction;
+            m_pendingApprovals.append(pa);
+            emit approvalRequested(pa.id, parsed.approvalAction, parsed.approvalReason,
+                                   parsed.approvalPreview);
+            emit logMessage(
+                QStringLiteral("⏸ Waiting for approval: %1").arg(parsed.approvalAction));
+            break;
+        }
+
+        case ResponseType::Text:
+        case ResponseType::Error:
+            // If model keeps responding with text, treat it as final answer
+            if (m_textRetries >= 1)
+            {
+                if (settings().agentDebug)
+                    emit logMessage(QStringLiteral("💬 %1").arg(response.left(1000)));
+                else
+                    emit logMessage(
+                        QStringLiteral("💬 Agent finished with unstructured response."));
+                m_running = false;
+                emit stopped(QStringLiteral("Agent finished (text response)."));
+            }
+            else
+            {
+                ++m_textRetries;
+                emit logMessage(QStringLiteral("ℹ Raw text response, asking for JSON format."));
+                m_messages.append({QStringLiteral("user"),
+                                   QStringLiteral("Please respond in the required JSON format "
+                                                  "(plan, tool_call, final, or need_approval).")});
+                runNextIteration();
+            }
+            break;
+    }
+}
+
+void AgentController::executeTool(const QString &name, const QJsonObject &args)
+{
+    if (!m_running)
+        return;
+
+    const int maxCalls = m_safetyPolicy ? m_safetyPolicy->maxToolCalls() : settings().maxToolCalls;
+    if (m_toolCallCount >= maxCalls)
+    {
+        m_running = false;
+        emit logMessage(QStringLiteral("⚠ Max tool calls reached (%1).").arg(maxCalls));
+        emit stopped(QStringLiteral("Max tool calls reached."));
+        return;
+    }
+
+    ITool *tool = m_toolRegistry ? m_toolRegistry->tool(name) : nullptr;
+    if (!tool)
+    {
+        m_messages.append(
+            {QStringLiteral("user"),
+             QStringLiteral("Error: unknown tool '%1'. Use one of the available tools.")
+                 .arg(name)});
+        runNextIteration();
+        return;
+    }
+
+    // Check if approval is required
+    if (tool->requiresApproval() && !m_dryRun)
+    {
+        QString reason = m_safetyPolicy ? m_safetyPolicy->requiresApproval(name)
+                                        : QStringLiteral("Tool requires approval.");
+
+        if (!reason.isEmpty())
+        {
+            PendingApproval pa;
+            pa.id = m_nextApprovalId++;
+            pa.toolName = name;
+            pa.toolArgs = args;
+            m_pendingApprovals.append(pa);
+            emit approvalRequested(
+                pa.id, name, reason,
+                QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)));
+            emit logMessage(
+                QStringLiteral("⏸ Approval required for '%1': %2").arg(name, reason));
+            return;
+        }
+    }
+
+    // Execute
+    ++m_toolCallCount;
+    const bool suppressReadFileLog = (name == QStringLiteral("read_file"));
+    if (!suppressReadFileLog) emit logMessage(QStringLiteral("🔧 Executing tool: %1").arg(name));
+    QCAI_DEBUG("Agent", QStringLiteral("Tool call #%1: %2, args: %3")
+        .arg(m_toolCallCount).arg(name,
+             QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Compact)).left(200)));
+
+    // Get workDir from editor context
+    QString workDir;
+    if (m_editorContext)
+    {
+        auto snap = m_editorContext->capture();
+        workDir = snap.projectDir;
+    }
+
+    QString result = tool->execute(args, workDir);
+    if (!suppressReadFileLog)
+        emit logMessage(QStringLiteral("   Result: %1").arg(result.left(300)));
+    QCAI_DEBUG("Agent", QStringLiteral("Tool '%1' result length: %2").arg(name).arg(result.length()));
+
+    // Feed result back to LLM
+    m_messages.append({QStringLiteral("user"),
+                       QStringLiteral("Tool '%1' returned:\n%2\n\nContinue with the next step.")
+                           .arg(name, result)});
+    runNextIteration();
+}
+
+void AgentController::approveAction(int approvalId)
+{
+    for (int i = 0; i < m_pendingApprovals.size(); ++i)
+    {
+        if (m_pendingApprovals[i].id == approvalId)
+        {
+            auto pa = m_pendingApprovals.takeAt(i);
+            emit logMessage(QStringLiteral("✅ Approved: %1").arg(pa.toolName));
+
+            if (!pa.toolName.isEmpty() && m_toolRegistry)
+            {
+                ITool *tool = m_toolRegistry->tool(pa.toolName);
+                if (tool)
+                {
+                    ++m_toolCallCount;
+                    QString workDir;
+                    if (m_editorContext)
+                        workDir = m_editorContext->capture().projectDir;
+                    QString result = tool->execute(pa.toolArgs, workDir);
+                    m_messages.append(
+                        {QStringLiteral("user"),
+                         QStringLiteral("Approved and executed '%1'. Result:\n%2\n\nContinue.")
+                             .arg(pa.toolName, result)});
+                }
+            }
+            runNextIteration();
+            return;
+        }
+    }
+}
+
+void AgentController::denyAction(int approvalId)
+{
+    for (int i = 0; i < m_pendingApprovals.size(); ++i)
+    {
+        if (m_pendingApprovals[i].id == approvalId)
+        {
+            auto pa = m_pendingApprovals.takeAt(i);
+            emit logMessage(QStringLiteral("❌ Denied: %1").arg(pa.toolName));
+            m_messages.append(
+                {QStringLiteral("user"),
+                 QStringLiteral(
+                     "The user denied the action '%1'. Find an alternative approach or finish.")
+                     .arg(pa.toolName)});
+            runNextIteration();
+            return;
+        }
+    }
+}
+
+}  // namespace Qcai2

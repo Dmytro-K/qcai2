@@ -1,0 +1,95 @@
+#include "FileTools.h"
+#include "../util/Diff.h"
+
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonObject>
+#include <QTextStream>
+
+namespace Qcai2
+{
+
+// ---------------------------------------------------------------------------
+// ReadFileTool
+// ---------------------------------------------------------------------------
+
+QJsonObject ReadFileTool::argsSchema() const
+{
+    return QJsonObject{{"path", QJsonObject{{"type", "string"}, {"required", true}}},
+                       {"start_line", QJsonObject{{"type", "integer"}}},
+                       {"end_line", QJsonObject{{"type", "integer"}}}};
+}
+
+QString ReadFileTool::execute(const QJsonObject &args, const QString &workDir)
+{
+    const QString relPath = args.value("path").toString();
+    if (relPath.isEmpty())
+        return QStringLiteral("Error: 'path' argument is required.");
+
+    const QString absPath = QDir(workDir).absoluteFilePath(relPath);
+
+    // Sandbox check: must stay within workDir
+    if (!QFileInfo(absPath).canonicalFilePath().startsWith(QDir(workDir).canonicalPath()))
+        return QStringLiteral("Error: path is outside the project directory.");
+
+    QFile file(absPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return QStringLiteral("Error: cannot open file: %1").arg(file.errorString());
+
+    QTextStream in(&file);
+    const QString content = in.readAll();
+
+    int startLine = args.value("start_line").toInt(0);
+    int endLine = args.value("end_line").toInt(0);
+
+    if (startLine > 0 || endLine > 0)
+    {
+        const QStringList lines = content.split('\n');
+        if (startLine < 1)
+            startLine = 1;
+        if (endLine < 1 || endLine > lines.size())
+            endLine = static_cast<int>(lines.size());
+        QStringList slice;
+        for (int i = startLine - 1; i < endLine && i < lines.size(); ++i)
+            slice.append(QStringLiteral("%1: %2").arg(i + 1).arg(lines[i]));
+        return slice.join('\n');
+    }
+
+    return content;
+}
+
+// ---------------------------------------------------------------------------
+// ApplyPatchTool
+// ---------------------------------------------------------------------------
+
+QJsonObject ApplyPatchTool::argsSchema() const
+{
+    return QJsonObject{{"diff", QJsonObject{{"type", "string"}, {"required", true}}}};
+}
+
+QString ApplyPatchTool::execute(const QJsonObject &args, const QString &workDir)
+{
+    const QString diff = args.value("diff").toString();
+    if (diff.isEmpty())
+        return QStringLiteral("Error: 'diff' argument is required.");
+
+    auto val = Diff::validate(diff);
+    if (!val.valid)
+        return QStringLiteral("Error: invalid diff: %1").arg(val.error);
+
+    // First do a dry run
+    QString errorMsg;
+    if (!Diff::applyPatch(diff, workDir, /*dryRun=*/true, errorMsg))
+        return QStringLiteral("Error: dry run failed: %1").arg(errorMsg);
+
+    // Then apply for real
+    if (!Diff::applyPatch(diff, workDir, /*dryRun=*/false, errorMsg))
+        return QStringLiteral("Error: apply failed: %1").arg(errorMsg);
+
+    return QStringLiteral("Patch applied successfully. %1 lines changed across %2 file(s).")
+        .arg(val.linesChanged)
+        .arg(val.filesChanged);
+}
+
+}  // namespace Qcai2

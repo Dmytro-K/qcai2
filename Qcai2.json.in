@@ -1,0 +1,14 @@
+{
+    "Id" : "qcai2",
+    "Name" : "Qcai2",
+    "Version" : "0.0.1",
+    "CompatVersion" : "0.0.1",
+    "Vendor" : "Dmytro Kosmii",
+    "VendorId" : "dmytrokosmii",
+    "Copyright" : "(C) Dmytro Kosmii",
+    "License" : "BSD-2",
+    "Description" : "AI Agent plugin for Qt Creator: autonomous coding agent with tool-calling, multi-provider LLM support, and safety-first design",
+    "Url" : "https://www.dmytrokosmii.com",
+    "DocumentationUrl" : "",
+    ${IDE_PLUGIN_DEPENDENCIES}
+}

@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/qcai2">
+        <file>ai-agent-icon.svg</file>
+    </qresource>
+</RCC>
