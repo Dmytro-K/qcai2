@@ -65,3 +65,5 @@ pnpm-debug.log*
 .gdb_history
 *.orig
 *.rej
+
+build
