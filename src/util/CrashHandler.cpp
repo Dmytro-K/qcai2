@@ -20,12 +20,6 @@
 #include <unistd.h>
 #endif
 
-#ifdef Q_OS_WIN
-#include <dbghelp.h>
-#include <windows.h>
-#pragma comment(lib, "dbghelp.lib")
-#endif
-
 namespace qcai2
 {
 

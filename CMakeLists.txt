@@ -69,7 +69,6 @@ elseif("${COMPILER_ID}" STREQUAL "GNU")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -pg")
     # set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -ggdb3")
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -ggdb3")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Map=${PROJECT_NAME}.map")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,-O2,--sort-common,--as-needed,-z,relro,-z,now,--copy-dt-needed-entries,-flto")
     #target_link_libraries(${PROJECT_NAME} stdc++fs)
     add_definitions(-D__GNU_GCC__)
@@ -78,8 +77,17 @@ elseif("${COMPILER_ID}" STREQUAL "Intel")
 elseif("${COMPILER_ID}" STREQUAL "MSVC")
     # using Visual Studio C++
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MAP:${PROJECT_NAME}.map")
 endif("${COMPILER_ID}" STREQUAL "Clang")
+
+function(qcai2_enable_linker_map target)
+    if (MSVC)
+        target_link_options(${target} PRIVATE
+            "/MAP:${CMAKE_CURRENT_BINARY_DIR}/${target}.map")
+    elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_link_options(${target} PRIVATE
+            "LINKER:-Map,${CMAKE_CURRENT_BINARY_DIR}/${target}.map")
+    endif ()
+endfunction()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
 set(CMAKE_CXX_FLAGS_INIT "${CMAKE_C_FLAGS_INIT}")
@@ -189,6 +197,8 @@ add_qtc_plugin(qcai2
     src/diff/InlineDiffManager.h
     src/diff/InlineDiffManager.cpp
 )
+
+qcai2_enable_linker_map(qcai2)
 
 set(QCAI2_PLUGIN_INSTALL_DIR "plugins/${IDE_VERSION}")
 set(QCAI2_SIDECAR_INSTALL_DIR "${QCAI2_PLUGIN_INSTALL_DIR}/qcai2/sidecar")
