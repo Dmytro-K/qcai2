@@ -20,30 +20,37 @@ private slots:
      * @brief Reads a string through nested object keys.
      */
     void getString_readsNestedObjectPath();
+
     /**
      * @brief Reads a string through an object key followed by an array index.
      */
     void getString_readsArrayPath();
+
     /**
      * @brief Falls back when a path is missing, mistyped, or not indexable.
      */
     void getString_returnsDefaultForMissingOrWrongType();
+
     /**
      * @brief Converts numeric JSON values to integers.
      */
     void getInt_readsNumericValue();
+
     /**
      * @brief Returns the provided default for missing or non-numeric values.
      */
     void getInt_returnsDefaultForMissingValue();
+
     /**
      * @brief Builds the expected one-field error payload.
      */
     void errorObject_buildsExpectedPayload();
+
     /**
      * @brief Visits only object entries when arrays contain mixed value types.
      */
     void forEachObject_skipsNonObjects();
+
 };
 
 void JsonTest::getString_readsNestedObjectPath()

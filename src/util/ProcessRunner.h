@@ -27,14 +27,19 @@ public:
     {
         /** @brief True when the process exits normally with code zero. */
         bool success = false;
+
         /** @brief Exit code reported by the child process. */
         int exitCode = -1;
+
         /** @brief Captured standard output. */
         QString stdOut;
+
         /** @brief Captured standard error. */
         QString stdErr;
+
         /** @brief QProcess error text such as startup failures. */
         QString errorString;
+
     };
 
     /**
@@ -86,6 +91,7 @@ private:
 
     /** @brief Buffered partial line for async stdout parsing. */
     QString m_pendingLine;
+
 };
 
 }  // namespace qcai2

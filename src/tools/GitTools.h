@@ -18,6 +18,7 @@ public:
     {
         return QStringLiteral("git_status");
     }
+
     /**
      * Returns the prompt description for the tool.
      */
@@ -25,6 +26,7 @@ public:
     {
         return QStringLiteral("Show git status (read-only). No args required.");
     }
+
     /**
      * Returns the empty schema for this no-argument tool.
      */
@@ -32,12 +34,14 @@ public:
     {
         return {};
     }
+
     /**
      * Runs git status in the project directory.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
     QString execute(const QJsonObject &args, const QString &workDir) override;
+
 };
 
 /**
@@ -53,6 +57,7 @@ public:
     {
         return QStringLiteral("git_diff");
     }
+
     /**
      * Returns the prompt description for the tool.
      */
@@ -60,16 +65,19 @@ public:
     {
         return QStringLiteral("Show git diff (read-only). Args: path (optional, specific file).");
     }
+
     /**
      * Returns the JSON schema for optional diff arguments.
      */
     QJsonObject argsSchema() const override;
+
     /**
      * Runs git diff in the project directory.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
     QString execute(const QJsonObject &args, const QString &workDir) override;
+
 };
 
 }  // namespace qcai2

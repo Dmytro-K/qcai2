@@ -20,14 +20,17 @@ private slots:
      * @brief Omits result fields until a tool call has actually executed.
      */
     void toJson_omitsOptionalFieldsUntilExecuted();
+
     /**
      * @brief Serializes execution state, result text, and error details.
      */
     void toJson_includesExecutionResultAndError();
+
     /**
      * @brief Restores identifiers, tool names, and arguments from JSON input.
      */
     void fromJson_readsIdNameAndArgs();
+
 };
 
 void ToolCallTest::toJson_omitsOptionalFieldsUntilExecuted()

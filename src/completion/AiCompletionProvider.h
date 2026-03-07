@@ -80,10 +80,13 @@ public:
 private:
     /** Non-owning AI backend used for completion requests. */
     IAIProvider *m_provider = nullptr;
+
     /** Default model name used when no completion-specific model is configured. */
     QString m_model;
+
     /** Enables or disables the provider. */
     bool m_enabled = true;
+
 };
 
 }  // namespace qcai2

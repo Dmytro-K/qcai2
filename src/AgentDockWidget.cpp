@@ -139,6 +139,7 @@ private:
     QTextCharFormat m_hunkFormat;
     QTextCharFormat m_fileHeaderFormat;
     QTextCharFormat m_metaFormat;
+
 };
 
 class DiffPreviewEdit;
@@ -155,6 +156,7 @@ protected:
 
 private:
     DiffPreviewEdit *m_editor;
+
 };
 
 class DiffPreviewEdit final : public QPlainTextEdit
@@ -208,6 +210,7 @@ public:
                    line.startsWith(QStringLiteral("Index: ")) ||
                    (line.startsWith(QStringLiteral("--- ")) &&
                     next.startsWith(QStringLiteral("+++ ")));
+
         };
 
         QStringList outputLines;
@@ -224,6 +227,7 @@ public:
             fileHeaderLines.clear();
             keptHunkLines.clear();
             inFileSection = false;
+
         };
 
         int i = 0;
@@ -443,6 +447,7 @@ private:
     QSet<int> m_approvableLines;
     QSet<int> m_approvedLines;
     std::function<void(qsizetype, qsizetype)> m_approvalChangedCallback;
+
 };
 
 DiffLineNumberArea::DiffLineNumberArea(DiffPreviewEdit *editor) : QWidget(editor), m_editor(editor)
@@ -723,6 +728,7 @@ void AgentDockWidget::setupUi()
         selectAllShortcut->setContext(Qt::WidgetShortcut);
         QObject::connect(selectAllShortcut, &QShortcut::activated, edit,
                          &QPlainTextEdit::selectAll);
+
     };
     auto addCopyShortcutRich = [](QTextEdit *edit) {
         auto *copyShortcut = new QShortcut(QKeySequence::Copy, edit);
@@ -731,6 +737,7 @@ void AgentDockWidget::setupUi()
         auto *selectAllShortcut = new QShortcut(QKeySequence::SelectAll, edit);
         selectAllShortcut->setContext(Qt::WidgetShortcut);
         QObject::connect(selectAllShortcut, &QShortcut::activated, edit, &QTextEdit::selectAll);
+
     };
     addCopyShortcutRich(m_logView);
     addCopyShortcut(m_diffView);

@@ -51,16 +51,22 @@ private:
 
     /** Non-owning provider used to invoke completion. */
     AiCompletionProvider *m_provider;
+
     /** Shared debounce timer for delayed auto-trigger requests. */
     QTimer m_timer;
+
     /** Startup guard used to suppress triggers during initial editor loading. */
     QElapsedTimer m_startupTimer;
+
     /** Editor waiting for the current debounce timeout. */
     TextEditor::TextEditorWidget *m_pendingEditor = nullptr;
+
     /** Editors already connected to change notifications. */
     QSet<TextEditor::TextEditorWidget *> m_attached;
+
     /** Editors that have emitted their first post-attach contentsChanged signal. */
     QSet<TextEditor::TextEditorWidget *> m_initialized;
+
 };
 
 }  // namespace Qcai2

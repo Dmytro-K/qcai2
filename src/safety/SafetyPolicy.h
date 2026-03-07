@@ -121,17 +121,22 @@ public:
 private:
     /** Commands allowed to run automatically. */
     QSet<QString> m_allowedCommands;
+
     /** Tools that always require user approval. */
     QSet<QString> m_approvalRequiredTools;
 
     /** Maximum agent loop iterations. */
     int m_maxIterations = 8;
+
     /** Maximum number of tool calls per request. */
     int m_maxToolCalls = 25;
+
     /** Maximum changed lines allowed without approval. */
     int m_maxDiffLines = 300;
+
     /** Maximum changed files allowed without approval. */
     int m_maxChangedFiles = 10;
+
 };
 
 }  // namespace qcai2

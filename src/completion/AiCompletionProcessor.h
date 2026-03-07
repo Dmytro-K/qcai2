@@ -49,14 +49,19 @@ protected:
 private:
     /** Non-owning AI backend used for completion requests. */
     IAIProvider *m_provider;
+
     /** Model name passed to the provider. */
     QString m_model;
+
     /** True while an async request is in flight. */
     bool m_running = false;
+
     /** True after cancellation was requested. */
     bool m_cancelled = false;
+
     /** Guards callbacks against use-after-free after the processor is destroyed. */
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
+
 };
 
 }  // namespace qcai2

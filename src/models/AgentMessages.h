@@ -18,6 +18,7 @@ struct ChatMessage
      * Message role such as "system", "user", or "assistant".
      */
     QString role;
+
     /**
      * Plain text content for the message.
      */
@@ -27,11 +28,13 @@ struct ChatMessage
      * Serializes the message to provider-friendly JSON.
      */
     QJsonObject toJson() const;
+
     /**
      * Deserializes one chat message from JSON.
      * @param obj JSON object to convert.
      */
     static ChatMessage fromJson(const QJsonObject &obj);
+
 };
 
 /**
@@ -41,10 +44,13 @@ struct PlanStep
 {
     /** Zero-based step index in the plan list. */
     int index;
+
     /** Human-readable step description. */
     QString description;
+
     /** True when the UI should present the step as completed. */
     bool completed = false;
+
 };
 
 /**
@@ -79,18 +85,22 @@ struct AgentResponse
 
     /** Tool name for ResponseType::ToolCall. */
     QString toolName;
+
     /** Tool arguments for ResponseType::ToolCall. */
     QJsonObject toolArgs;
 
     /** Final summary for ResponseType::Final. */
     QString summary;
+
     /** Unified diff preview for ResponseType::Final. */
     QString diff;
 
     /** Action name for ResponseType::NeedApproval. */
     QString approvalAction;
+
     /** Reason presented to the user for approval. */
     QString approvalReason;
+
     /** Preview payload shown with the approval request. */
     QString approvalPreview;
 
@@ -109,6 +119,7 @@ private:
      * @param obj JSON object to convert.
      */
     static AgentResponse parseJson(const QJsonObject &obj);
+
 };
 
 }  // namespace qcai2

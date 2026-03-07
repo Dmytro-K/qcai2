@@ -95,6 +95,7 @@ private:
         QMessageBox::information(ICore::dialogParent(), Tr::tr("Action Triggered"),
                                  Tr::tr("This is an action from Qcai2."));
     }
+
 };
 
 }  // namespace Qcai2::Internal

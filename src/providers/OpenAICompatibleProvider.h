@@ -29,6 +29,7 @@ public:
     {
         return QStringLiteral("openai");
     }
+
     /**
      * Returns the user-visible provider name.
      */
@@ -64,6 +65,7 @@ public:
     {
         m_baseUrl = url;
     }
+
     /**
      * Sets the bearer token used for Authorization headers.
      * @param key API key or access token.
@@ -90,18 +92,25 @@ private:
 
     /** Network access manager shared by provider requests. */
     QNetworkAccessManager m_nam;
+
     /** Active reply for the current request, or null when idle. */
     QNetworkReply *m_currentReply = nullptr;
+
     /** Base URL for the remote API endpoint. */
     QString m_baseUrl = QStringLiteral("https://api.openai.com");
+
     /** Bearer token sent in Authorization headers. */
     QString m_apiKey;
+
     /** Extra raw headers appended to each request. */
     QMap<QString, QString> m_extraHeaders;
+
     /** Partial SSE data waiting for a complete line. */
     QByteArray m_sseBuffer;
+
     /** Accumulated streamed text returned to the caller at completion. */
     QString m_streamAccum;
+
 };
 
 }  // namespace qcai2

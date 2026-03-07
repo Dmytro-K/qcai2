@@ -23,6 +23,7 @@ public:
      * @param parent Parent QObject that owns this instance.
      */
     explicit CopilotProvider(QObject *parent = nullptr);
+
     /**
      * Stops the sidecar process and clears pending requests.
      */
@@ -35,6 +36,7 @@ public:
     {
         return QStringLiteral("copilot");
     }
+
     /**
      * Returns the user-visible provider name.
      */
@@ -56,6 +58,7 @@ public:
     void complete(const QList<ChatMessage> &messages, const QString &model, double temperature,
                   int maxTokens, const QString &reasoningEffort, CompletionCallback callback,
                   StreamCallback streamCallback = nullptr) override;
+
     /**
      * Receives the model list or an error returned by the sidecar.
      * @param models Model identifiers to store.
@@ -100,6 +103,7 @@ public:
     {
         m_sidecarPath = path;
     }
+
     /**
      * Sets the Node.js executable used to launch the sidecar.
      * @param path Path value.
@@ -114,19 +118,23 @@ private:
      * Ensures the sidecar process is running and ready for requests.
      */
     bool ensureSidecar();
+
     /**
      * Sends a JSON Lines request to the sidecar process.
      * @param req Request payload to send to the sidecar.
      */
     void sendRequest(const QJsonObject &req);
+
     /**
      * Parses and dispatches sidecar output lines.
      */
     void handleSidecarOutput();
+
     /**
      * Stops the sidecar process and resets provider state.
      */
     void stopSidecar();
+
     /**
      * Finds the sidecar script using configured and standard installation paths.
      */
@@ -134,25 +142,34 @@ private:
 
     /** Running sidecar process, or null when not started. */
     QProcess *m_process = nullptr;
+
     /** Explicit sidecar script path, if configured. */
     QString m_sidecarPath;
+
     /** Node.js executable used to launch the sidecar. */
     QString m_nodePath = QStringLiteral("node");
+
     /** Next JSON-RPC-style request identifier. */
     int m_nextId = 1;
+
     /** True after the sidecar has accepted a start request. */
     bool m_clientStarted = false;
 
     /** Final-response callbacks keyed by request id. */
     QMap<int, CompletionCallback> m_pending;
+
     /** Streaming callbacks keyed by request id. */
     QMap<int, StreamCallback> m_streamCallbacks;
+
     /** Model-list callbacks keyed by request id. */
     QMap<int, ModelListCallback> m_modelListCallbacks;
+
     /** Partial stdout data waiting for a full JSON line. */
     QByteArray m_readBuffer;
+
     /** Most recent stderr output collected from the sidecar. */
     QString m_lastStderr;
+
 };
 
 }  // namespace qcai2

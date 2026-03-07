@@ -28,11 +28,13 @@ public:
      * @param tool Tool instance to register.
      */
     void registerTool(std::shared_ptr<ITool> tool);
+
     /**
      * Looks up a tool by name.
      * @param name Name value.
      */
     ITool *tool(const QString &name) const;
+
     /**
      * Returns all registered tools in map order.
      */
@@ -46,6 +48,7 @@ public:
 private:
     /** Registered tools keyed by stable tool name. */
     QMap<QString, std::shared_ptr<ITool>> m_tools;
+
 };
 
 }  // namespace qcai2

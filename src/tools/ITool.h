@@ -47,6 +47,7 @@ public:
     {
         return false;
     }
+
 };
 
 }  // namespace qcai2

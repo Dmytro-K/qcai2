@@ -157,6 +157,7 @@ AgentResponse AgentResponse::parse(const QString &raw)
 
         out = parseJson(obj);
         return true;
+
     };
 
     AgentResponse parsed;

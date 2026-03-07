@@ -30,18 +30,22 @@ public:
          * Active document path, or empty when no editor is focused.
          */
         QString filePath;
+
         /**
          * Current text selection from the active editor.
          */
         QString selectedText;
+
         /**
          * 1-based cursor line in the active editor.
          */
         int cursorLine = -1;
+
         /**
          * 1-based cursor column in the active editor.
          */
         int cursorColumn = -1;
+
         /**
          * Paths for all open documents.
          */
@@ -51,38 +55,47 @@ public:
          * Startup project display name.
          */
         QString projectName;
+
         /**
          * Startup project directory.
          */
         QString projectDir;
+
         /**
          * Project file path reported by Qt Creator.
          */
         QString projectFilePath;
+
         /**
          * Active build directory, when available.
          */
         QString buildDir;
+
         /**
          * Active build type such as Debug or Release.
          */
         QString buildType;
+
         /**
          * Active kit name.
          */
         QString kitName;
+
         /**
          * Active C++ compiler display name.
          */
         QString compilerName;
+
         /**
          * Active C++ compiler executable path.
          */
         QString compilerPath;
+
         /**
          * Active target display name.
          */
         QString targetName;
+
     };
 
     /**
@@ -100,6 +113,7 @@ public:
      * @param maxChars Maximum number of characters to include.
      */
     QString fileContentsFragment(int maxChars = 60000) const;
+
 };
 
 }  // namespace qcai2

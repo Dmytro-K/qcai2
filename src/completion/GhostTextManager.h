@@ -89,16 +89,22 @@ private:
 
     /** Non-owning AI backend used for inline suggestions. */
     IAIProvider *m_provider = nullptr;
+
     /** Default model name used when settings do not override it. */
     QString m_model;
+
     /** Enables or disables inline suggestions globally. */
     bool m_enabled = true;
+
     /** Per-editor debounce timers keyed by editor widget. */
     QHash<TextEditor::TextEditorWidget *, QTimer *> m_debounceTimers;
+
     /** Last edit position recorded for each attached editor. */
     QHash<TextEditor::TextEditorWidget *, int> m_lastEditPositions;
+
     /** Guards async callbacks against use-after-free after destruction. */
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
+
 };
 
 }  // namespace qcai2

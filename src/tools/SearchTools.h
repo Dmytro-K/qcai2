@@ -18,6 +18,7 @@ public:
     {
         return QStringLiteral("search_repo");
     }
+
     /**
      * Returns the prompt description for the tool.
      */
@@ -27,10 +28,12 @@ public:
                               "Args: pattern (required), glob (optional file glob), max_results "
                               "(optional, default 30).");
     }
+
     /**
      * Returns the JSON schema for repository search arguments.
      */
     QJsonObject argsSchema() const override;
+
     /**
      * Searches the repository and returns matching lines.
      * @param args Tool arguments.
@@ -48,6 +51,7 @@ private:
      */
     QString searchWithRipgrep(const QString &pattern, const QString &glob, int maxResults,
                               const QString &workDir);
+
     /**
      * Uses QDirIterator and QRegularExpression when ripgrep is unavailable.
      * @param pattern Regular expression pattern to search for.
@@ -57,6 +61,7 @@ private:
      */
     QString searchFallback(const QString &pattern, const QString &glob, int maxResults,
                            const QString &workDir);
+
 };
 
 }  // namespace qcai2

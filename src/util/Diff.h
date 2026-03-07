@@ -17,12 +17,16 @@ struct ValidationResult
 {
     /** @brief True when the diff passes all checks. */
     bool valid = false;
+
     /** @brief Added plus removed hunk lines. */
     int linesChanged = 0;
+
     /** @brief Number of distinct files referenced by the diff. */
     int filesChanged = 0;
+
     /** @brief Validation failure message when @c valid is false. */
     QString error;
+
 };
 
 /**
@@ -68,10 +72,13 @@ struct NewFileResult
 {
     /** @brief Remaining unified diff after new-file blocks are removed. */
     QString remainingDiff;
+
     /** @brief Relative paths created or that would be created. */
     QStringList createdFiles;
+
     /** @brief Error message when extraction or creation fails. */
     QString error;
+
 };
 
 /**

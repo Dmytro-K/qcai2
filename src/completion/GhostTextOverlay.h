@@ -78,10 +78,13 @@ private:
 
     /** Non-owning editor whose viewport hosts the overlay. */
     TextEditor::TextEditorWidget *m_editor;
+
     /** Current ghost-text content. */
     QString m_ghostText;
+
     /** Cursor position the current suggestion is anchored to. */
     int m_cursorPosition = -1;
+
 };
 
 }  // namespace qcai2

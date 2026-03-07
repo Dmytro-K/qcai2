@@ -32,6 +32,7 @@ public:
      * @param parent Optional parent widget.
      */
     explicit AgentDockWidget(AgentController *controller, QWidget *parent = nullptr);
+
     /**
      * Persists the current chat session before the widget is destroyed.
      */
@@ -42,18 +43,22 @@ private slots:
      * Starts a run using the current goal, model, and dry-run settings.
      */
     void onRunClicked();
+
     /**
      * Stops the active run and re-enables editing controls.
      */
     void onStopClicked();
+
     /**
      * Applies the currently approved subset of the diff preview.
      */
     void onApplyPatchClicked();
+
     /**
      * Reverts the last applied diff preview.
      */
     void onRevertPatchClicked();
+
     /**
      * Copies the rendered plan list to the clipboard.
      */
@@ -64,16 +69,19 @@ private slots:
      * @param msg Log message text.
      */
     void onLogMessage(const QString &msg);
+
     /**
      * Rebuilds the plan tab from the latest plan steps.
      * @param steps Plan steps to display.
      */
     void onPlanUpdated(const QList<PlanStep> &steps);
+
     /**
      * Refreshes diff preview widgets and inline diff markers.
      * @param diff Unified diff text.
      */
     void onDiffAvailable(const QString &diff);
+
     /**
      * Records and prompts for a tool approval request.
      * @param id Identifier value.
@@ -83,11 +91,13 @@ private slots:
      */
     void onApprovalRequested(int id, const QString &action, const QString &reason,
                              const QString &preview);
+
     /**
      * Updates the status summary for the latest iteration.
      * @param iteration Current iteration number.
      */
     void onIterationChanged(int iteration);
+
     /**
      * Restores idle UI state after a run finishes.
      * @param summary Short completion summary.
@@ -99,25 +109,30 @@ private:
      * Builds the dock widget layout and wires local UI actions.
      */
     void setupUi();
+
     /**
      * Enables or disables controls based on controller run state.
      * @param running True when the UI should show a running state.
      */
     void updateRunState(bool running);
+
     /**
      * Handles keyboard shortcuts from the goal editor.
      * @param obj JSON object to convert.
      * @param event Event being filtered.
      */
     bool eventFilter(QObject *obj, QEvent *event) override;
+
     /**
      * Flushes buffered log text into the visible log widget.
      */
     void renderLog();
+
     /**
      * Saves the current goal, logs, plan, and diff preview to settings.
      */
     void saveChat();
+
     /**
      * Restores the last saved goal, logs, plan, and diff preview.
      */
@@ -151,18 +166,25 @@ private:
 
     /** Full diff currently shown in the preview tab. */
     QString m_currentDiff;
+
     /** Diff most recently applied so it can be reverted. */
     QString m_appliedDiff;
+
     /** Completed log text already committed to the log view. */
     QString m_logMarkdown;
+
     /** Streaming log text buffered until the throttle timer fires. */
     QString m_streamingMarkdown;
+
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> m_approvalItems;
+
     /** Short timer that batches frequent log renders while streaming. */
     QTimer *m_renderThrottle;
+
     /** Manages inline editor markers for diff hunks. */
     InlineDiffManager *m_inlineDiffManager;
+
 };
 
 }  // namespace qcai2

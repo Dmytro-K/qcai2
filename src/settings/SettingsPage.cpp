@@ -301,6 +301,7 @@ public:
             row->addWidget(new QLabel(label), 0);
             row->addWidget(w, 1);
             l->addLayout(row);
+
         };
 
         auto *tabs = new QTabWidget;
@@ -457,6 +458,7 @@ private:
     QComboBox *m_completionReasoningCombo;
     QCheckBox *m_debugLoggingCheck;
     QCheckBox *m_agentDebugCheck;
+
 };
 
 SettingsPage::SettingsPage()

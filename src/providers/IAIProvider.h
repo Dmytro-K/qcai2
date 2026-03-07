@@ -36,6 +36,7 @@ public:
      * @param delta Streamed text chunk from the provider.
      */
     using StreamCallback = std::function<void(const QString &delta)>;
+
     /**
      * Receives the final response text or an error message.
      * @param response Provider response text.
@@ -74,6 +75,7 @@ public:
      * @param key API key or access token.
      */
     virtual void setApiKey(const QString &key) = 0;
+
 };
 
 }  // namespace qcai2

@@ -18,6 +18,7 @@ public:
     {
         return QStringLiteral("read_file");
     }
+
     /**
      * Returns the prompt description for the tool.
      */
@@ -26,16 +27,19 @@ public:
         return QStringLiteral(
             "Read contents of a file. Args: path (required), start_line, end_line (optional).");
     }
+
     /**
      * Returns the JSON schema for file-read arguments.
      */
     QJsonObject argsSchema() const override;
+
     /**
      * Reads the requested file contents from the sandboxed work tree.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
     QString execute(const QJsonObject &args, const QString &workDir) override;
+
 };
 
 /**
@@ -51,6 +55,7 @@ public:
     {
         return QStringLiteral("apply_patch");
     }
+
     /**
      * Returns the prompt description for the tool.
      */
@@ -59,16 +64,19 @@ public:
         return QStringLiteral(
             "Apply a unified diff patch to files in the project. Args: diff (required string).");
     }
+
     /**
      * Returns the JSON schema for patch application arguments.
      */
     QJsonObject argsSchema() const override;
+
     /**
      * Validates and applies the requested diff inside the sandbox.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
     QString execute(const QJsonObject &args, const QString &workDir) override;
+
     /**
      * Marks patch application as an approval-gated operation.
      */
@@ -76,6 +84,7 @@ public:
     {
         return true;
     }
+
 };
 
 }  // namespace qcai2

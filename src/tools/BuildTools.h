@@ -18,6 +18,7 @@ public:
     {
         return QStringLiteral("run_build");
     }
+
     /**
      * Returns the prompt description for the tool.
      */
@@ -26,10 +27,12 @@ public:
         return QStringLiteral(
             "Build the project using cmake --build. No args required (uses project build dir).");
     }
+
     /**
      * Returns the JSON schema for optional build arguments.
      */
     QJsonObject argsSchema() const override;
+
     /**
      * Executes a project build and returns combined output.
      * @param args Tool arguments.
@@ -51,6 +54,7 @@ private:
      * Build directory used for cmake and ctest commands.
      */
     QString m_buildDir;
+
 };
 
 /**
@@ -66,6 +70,7 @@ public:
     {
         return QStringLiteral("run_tests");
     }
+
     /**
      * Returns the prompt description for the tool.
      */
@@ -73,10 +78,12 @@ public:
     {
         return QStringLiteral("Run project tests using ctest. No args required.");
     }
+
     /**
      * Returns the JSON schema for optional test filter arguments.
      */
     QJsonObject argsSchema() const override;
+
     /**
      * Executes project tests and returns combined output.
      * @param args Tool arguments.
@@ -98,6 +105,7 @@ private:
      * Build directory used for ctest commands.
      */
     QString m_buildDir;
+
 };
 
 /**
@@ -113,6 +121,7 @@ public:
     {
         return QStringLiteral("show_diagnostics");
     }
+
     /**
      * Returns the prompt description for the tool.
      */
@@ -120,10 +129,12 @@ public:
     {
         return QStringLiteral("Show last build diagnostics (errors and warnings).");
     }
+
     /**
      * Returns the empty schema for this no-argument tool.
      */
     QJsonObject argsSchema() const override;
+
     /**
      * Extracts diagnostic lines from the last recorded build output.
      * @param args Tool arguments.
@@ -143,6 +154,7 @@ public:
 private:
     /** Cached build output scanned by show_diagnostics. */
     QString m_lastBuildOutput;
+
 };
 
 }  // namespace qcai2

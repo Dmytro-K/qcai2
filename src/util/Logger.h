@@ -135,12 +135,16 @@ private:
 
     /** @brief Guards access to the retained entries buffer. */
     mutable QMutex m_mutex;
+
     /** @brief Ring buffer of formatted log lines. */
     QStringList m_entries;
+
     /** @brief Enables non-error logging when true. */
     bool m_enabled = false;
+
     /** @brief Maximum retained log entries. */
     static constexpr int kMaxEntries = 5000;
+
 };
 
 /** @brief Shortcut for the process-wide logger singleton. */

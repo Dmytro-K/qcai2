@@ -25,6 +25,7 @@ public:
     {
         return QStringLiteral("ollama");
     }
+
     /**
      * Returns the user-visible provider name.
      */
@@ -32,6 +33,7 @@ public:
     {
         return QStringLiteral("Ollama (Local)");
     }
+
 };
 
 }  // namespace qcai2

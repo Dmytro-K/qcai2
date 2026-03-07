@@ -21,20 +21,28 @@ struct DiffHunk
 {
     /** Relative file path extracted from the diff header. */
     QString filePath;
+
     /** First affected line in the original file. */
     int startLineOld = 0;
+
     /** Number of lines covered in the original file. */
     int countOld = 0;
+
     /** First affected line in the patched file. */
     int startLineNew = 0;
+
     /** Number of lines covered in the patched file. */
     int countNew = 0;
+
     /** Raw @@ header line for the hunk. */
     QString hunkHeader;
+
     /** Unified diff body containing context and changed lines. */
     QString hunkBody;
+
     /** Self-contained mini-patch with file headers for this hunk. */
     QString fullPatch;
+
 };
 
 /**
@@ -49,6 +57,7 @@ public:
      * @param parent Parent QObject that owns this instance.
      */
     explicit InlineDiffManager(QObject *parent = nullptr);
+
     /**
      * Removes any remaining markers before destruction.
      */
@@ -95,6 +104,7 @@ public:
     {
         return !m_hunks.isEmpty();
     }
+
     /**
      * Returns the number of parsed hunks in the current diff.
      */
@@ -102,6 +112,7 @@ public:
     {
         return m_hunks.size();
     }
+
     /**
      * Returns the number of hunks already accepted or rejected.
      */
@@ -117,12 +128,14 @@ signals:
      * @param filePath Path of the affected file.
      */
     void hunkAccepted(int index, const QString &filePath);
+
     /**
      * Emitted after one hunk is rejected and removed from the gutter.
      * @param index Index value.
      * @param filePath Path of the affected file.
      */
     void hunkRejected(int index, const QString &filePath);
+
     /**
      * Emitted after every hunk in the current diff is resolved.
      */
@@ -136,8 +149,10 @@ private:
     {
         /** Parsed diff payload for the entry. */
         DiffHunk hunk;
+
         /** Live marker shown in the editor gutter, or null when resolved. */
         TextEditor::TextMark *mark = nullptr;
+
     };
 
     /**
@@ -145,6 +160,7 @@ private:
      * @param unifiedDiff Unified diff text to process.
      */
     static QList<DiffHunk> parseDiff(const QString &unifiedDiff);
+
     /**
      * Creates the gutter marker and actions for one hunk entry.
      * @param index Index value.
@@ -153,10 +169,13 @@ private:
 
     /** Parsed hunks for the current diff preview. */
     QList<HunkEntry> m_hunks;
+
     /** Hunk indexes that were already accepted or rejected. */
     QSet<int> m_resolved;
+
     /** Project directory used to resolve relative file paths. */
     QString m_projectDir;
+
 };
 
 }  // namespace qcai2

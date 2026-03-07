@@ -15,6 +15,7 @@ public:
      * Creates and registers the settings page metadata.
      */
     SettingsPage();
+
 };
 
 }  // namespace qcai2

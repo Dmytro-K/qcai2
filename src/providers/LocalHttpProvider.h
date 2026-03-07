@@ -30,6 +30,7 @@ public:
     {
         return QStringLiteral("local");
     }
+
     /**
      * Returns the user-visible provider name.
      */
@@ -65,6 +66,7 @@ public:
     {
         m_baseUrl = url;
     }
+
     /**
      * Sets the bearer token sent with requests.
      * @param key API key or access token.
@@ -104,18 +106,25 @@ public:
 private:
     /** Network access manager used for local requests. */
     QNetworkAccessManager m_nam;
+
     /** Active reply for the current request, or null when idle. */
     QNetworkReply *m_currentReply = nullptr;
+
     /** Base URL of the local server. */
     QString m_baseUrl = QStringLiteral("http://localhost:8080");
+
     /** Optional bearer token for authenticated local endpoints. */
     QString m_apiKey;
+
     /** Request path appended to the base URL. */
     QString m_endpointPath = QStringLiteral("/v1/chat/completions");
+
     /** True when the backend expects a single prompt string. */
     bool m_simpleMode = false;
+
     /** Additional request headers forwarded to the backend. */
     QMap<QString, QString> m_customHeaders;
+
 };
 
 }  // namespace qcai2
