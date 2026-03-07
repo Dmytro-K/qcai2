@@ -322,17 +322,28 @@ endif()
 
 set(SRC_IDE
     .clang-format
+    .github/workflows/README.md
+    .github/workflows/build_cmake.yml
     ai-prompt.txt
     ai-todo-errors.txt
     ai-context.md
+    CMakeLists.txt
+    LICENSE
     README.md
     .gitignore
+    cmake_install.cmake
     format-changed-files.cmake
     build-docs.cmake
     docs/Doxyfile.in
     docs/conf.py.in
     docs/index.rst
     docs/overview.rst
+    install-sidecar-deps.cmake
+    qcai2.json.in
+    qcai2_uk_UA.ts
+    sidecar/copilot-sidecar.js
+    sidecar/package.json
+    tests/CMakeLists.txt
 )
 
 add_custom_target(target_for_ide SOURCES ${SRC_IDE})
