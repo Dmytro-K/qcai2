@@ -1,3 +1,4 @@
+/*! Implements prompt context capture from the active editor and startup project. */
 #include "EditorContext.h"
 #include "../util/Logger.h"
 

@@ -20,11 +20,17 @@ namespace qcai2
 namespace
 {
 
+/**
+ * Returns the Qt Creator version segment used in per-version plugin paths.
+ */
 QString qtCreatorVersionSegment()
 {
     return QStringLiteral(QCAI2_QTCREATOR_IDE_VERSION);
 }
 
+/**
+ * Returns the per-user plugin installation root for the current platform.
+ */
 QString defaultUserPluginRoot()
 {
 #if defined(Q_OS_WIN)
@@ -49,12 +55,18 @@ QString defaultUserPluginRoot()
 #endif
 }
 
+/**
+ * Returns the default sidecar script path inside the user plugin tree.
+ */
 QString defaultUserSidecarScriptPath()
 {
     return QDir(defaultUserPluginRoot())
         .filePath(QStringLiteral("qcai2/sidecar/copilot-sidecar.js"));
 }
 
+/**
+ * Returns the absolute path of the currently loaded plugin library.
+ */
 QString currentPluginLibraryPath()
 {
 #if defined(Q_OS_WIN)
@@ -86,6 +98,9 @@ QString currentPluginLibraryPath()
 #endif
 }
 
+/**
+ * Returns the sidecar script path relative to an installed plugin library.
+ */
 QString installedSidecarScriptPath()
 {
     const QString pluginLibraryPath = currentPluginLibraryPath();
@@ -96,6 +111,10 @@ QString installedSidecarScriptPath()
         .filePath(QStringLiteral(QCAI2_INSTALLED_SIDECAR_RELATIVE_PATH));
 }
 
+/**
+ * Returns the directory shown in sidecar installation guidance messages.
+ * @param scriptPath Sidecar script path selected by the caller.
+ */
 QString sidecarInstallHintDir(const QString &scriptPath = {})
 {
     if (!scriptPath.isEmpty())
@@ -110,15 +129,25 @@ QString sidecarInstallHintDir(const QString &scriptPath = {})
 
 }  // namespace
 
+/**
+ * Creates a Copilot provider with deferred sidecar startup.
+ * @param parent Parent QObject that owns this instance.
+ */
 CopilotProvider::CopilotProvider(QObject *parent) : QObject(parent)
 {
 }
 
+/**
+ * Stops the sidecar process before the provider is destroyed.
+ */
 CopilotProvider::~CopilotProvider()
 {
     stopSidecar();
 }
 
+/**
+ * Returns the first sidecar script path that exists on disk.
+ */
 QString CopilotProvider::findSidecarScript() const
 {
     // Try configured path first
@@ -146,6 +175,9 @@ QString CopilotProvider::findSidecarScript() const
     return {};
 }
 
+/**
+ * Starts the sidecar process on demand and hooks up its signal handlers.
+ */
 bool CopilotProvider::ensureSidecar()
 {
     if (m_process && m_process->state() == QProcess::Running)
@@ -212,6 +244,10 @@ bool CopilotProvider::ensureSidecar()
     return true;
 }
 
+/**
+ * Writes one compact JSON request line to the running sidecar process.
+ * @param req Request payload to send to the sidecar.
+ */
 void CopilotProvider::sendRequest(const QJsonObject &req)
 {
     if (!m_process)
@@ -221,6 +257,9 @@ void CopilotProvider::sendRequest(const QJsonObject &req)
     m_process->write(data);
 }
 
+/**
+ * Consumes JSON Lines output from the sidecar and dispatches callbacks.
+ */
 void CopilotProvider::handleSidecarOutput()
 {
     if (!m_process)
@@ -339,6 +378,16 @@ void CopilotProvider::handleSidecarOutput()
     }
 }
 
+/**
+ * Sends a completion request through the Copilot sidecar.
+ * @param messages Conversation history forwarded to the sidecar.
+ * @param model Copilot model identifier.
+ * @param temperature Sampling temperature.
+ * @param maxTokens Maximum completion token count.
+ * @param reasoningEffort Optional reasoning hint forwarded to the sidecar.
+ * @param callback Receives the final response text or an error.
+ * @param streamCallback Receives streamed deltas; an empty string ends the stream.
+ */
 void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString &model,
                                double temperature, int maxTokens, const QString &reasoningEffort,
                                CompletionCallback callback, StreamCallback streamCallback)
@@ -396,6 +445,10 @@ void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString
     sendRequest(req);
 }
 
+/**
+ * Requests the list of models exposed by the sidecar.
+ * @param callback Receives available model ids or an error string.
+ */
 void CopilotProvider::listModels(ModelListCallback callback)
 {
     if (!ensureSidecar())
@@ -428,6 +481,9 @@ void CopilotProvider::listModels(ModelListCallback callback)
     sendRequest(req);
 }
 
+/**
+ * Cancels all queued provider callbacks and forwards cancel to the sidecar.
+ */
 void CopilotProvider::cancel()
 {
     // Fail all pending callbacks on the plugin side (copy first for re-entrancy safety)
@@ -447,6 +503,9 @@ void CopilotProvider::cancel()
     }
 }
 
+/**
+ * Stops the sidecar process and clears all pending provider state.
+ */
 void CopilotProvider::stopSidecar()
 {
     if (!m_process)

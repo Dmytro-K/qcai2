@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements the dock widget UI for chat, diff review, and approval handling.
+*/
+
 #include "AgentDockWidget.h"
 #include "settings/Settings.h"
 #include "util/Diff.h"

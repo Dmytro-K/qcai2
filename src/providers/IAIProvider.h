@@ -10,33 +10,69 @@
 namespace qcai2
 {
 
-// Abstract interface for AI model providers.
+/**
+ * Abstract interface implemented by AI model providers.
+ */
 class IAIProvider
 {
 public:
+    /**
+     * Destroys the provider interface.
+     */
     virtual ~IAIProvider() = default;
 
-    // Unique provider identifier (e.g. "openai", "local", "ollama")
+    /**
+     * Returns the stable provider identifier, such as "openai" or "ollama".
+     */
     virtual QString id() const = 0;
 
-    // Human-readable display name
+    /**
+     * Returns the user-facing provider name.
+     */
     virtual QString displayName() const = 0;
 
-    // Called for each streaming token (delta text). Empty string = stream finished.
+    /**
+     * Receives streamed output chunks; an empty string marks the end of the stream.
+     * @param delta Streamed text chunk from the provider.
+     */
     using StreamCallback = std::function<void(const QString &delta)>;
-    // Called when the full response is complete (or on error).
+    /**
+     * Receives the final response text or an error message.
+     * @param response Provider response text.
+     * @param error Error text.
+     */
     using CompletionCallback = std::function<void(const QString &response, const QString &error)>;
 
+    /**
+     * Starts a completion request.
+     * @param messages Conversation history to send to the provider.
+     * @param model Provider-specific model identifier.
+     * @param temperature Sampling temperature.
+     * @param maxTokens Maximum completion token count.
+     * @param reasoningEffort Optional reasoning hint for providers that support it.
+     * @param callback Called once with the full response or an error.
+     * @param streamCallback Called for streamed deltas when streaming is available.
+     */
     virtual void complete(const QList<ChatMessage> &messages, const QString &model,
                           double temperature, int maxTokens, const QString &reasoningEffort,
                           CompletionCallback callback,
                           StreamCallback streamCallback = nullptr) = 0;
 
-    // Cancel any in-flight request.
+    /**
+     * Cancels any in-flight request owned by the provider.
+     */
     virtual void cancel() = 0;
 
-    // Configure the provider (base URL, API key, etc.)
+    /**
+     * Sets the provider base URL when the backend supports custom endpoints.
+     * @param url Base URL to use.
+     */
     virtual void setBaseUrl(const QString &url) = 0;
+
+    /**
+     * Sets the provider API key or access token.
+     * @param key API key or access token.
+     */
     virtual void setApiKey(const QString &key) = 0;
 };
 

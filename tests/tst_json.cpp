@@ -1,20 +1,48 @@
+/*! @file
+    @brief Unit tests for JSON path helpers used by provider adapters.
+*/
+
 #include <QtTest>
 
 #include "src/util/Json.h"
 
 using namespace qcai2;
 
+/**
+ * @brief Exercises nested-path access, defaults, and array filtering helpers.
+ */
 class JsonTest : public QObject
 {
     Q_OBJECT
 
 private slots:
+    /**
+     * @brief Reads a string through nested object keys.
+     */
     void getString_readsNestedObjectPath();
+    /**
+     * @brief Reads a string through an object key followed by an array index.
+     */
     void getString_readsArrayPath();
+    /**
+     * @brief Falls back when a path is missing, mistyped, or not indexable.
+     */
     void getString_returnsDefaultForMissingOrWrongType();
+    /**
+     * @brief Converts numeric JSON values to integers.
+     */
     void getInt_readsNumericValue();
+    /**
+     * @brief Returns the provided default for missing or non-numeric values.
+     */
     void getInt_returnsDefaultForMissingValue();
+    /**
+     * @brief Builds the expected one-field error payload.
+     */
     void errorObject_buildsExpectedPayload();
+    /**
+     * @brief Visits only object entries when arrays contain mixed value types.
+     */
     void forEachObject_skipsNonObjects();
 };
 

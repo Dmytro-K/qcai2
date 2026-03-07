@@ -7,79 +7,144 @@
 namespace qcai2
 {
 
-// Persistent settings for the AI Agent plugin.
-// Stored via QSettings (Qt Creator settings).
+/**
+ * Stores persistent plugin settings loaded from QSettings.
+ */
 struct Settings
 {
-    // Provider settings
+    /** Selected backend identifier. */
     QString provider = QStringLiteral("openai");
+    /** Base URL for OpenAI-compatible providers. */
     QString baseUrl = QStringLiteral("https://api.openai.com");
+    /** API key for the active remote provider. */
     QString apiKey;
+    /** Default model used for agent requests. */
     QString modelName = QStringLiteral("gpt-5.2");
-    QString thinkingLevel = QStringLiteral("medium");  // off|low|medium|high
+    /** Provider thinking level: off, low, medium, or high. */
+    QString thinkingLevel = QStringLiteral("medium");
+    /** Sampling temperature for agent requests. */
     double temperature = 0.2;
+    /** Maximum token budget for agent responses. */
     int maxTokens = 4096;
 
-    // Local provider
+    /** Base URL for the local HTTP provider. */
     QString localBaseUrl = QStringLiteral("http://localhost:8080");
+    /** Endpoint path appended to the local provider base URL. */
     QString localEndpointPath = QStringLiteral("/v1/chat/completions");
+    /** Sends local requests in simplified prompt mode when true. */
     bool localSimpleMode = false;
+    /** Extra HTTP headers for the local provider. */
     QString localCustomHeaders;
 
-    // Ollama
+    /** Base URL for the Ollama server. */
     QString ollamaBaseUrl = QStringLiteral("http://localhost:11434");
+    /** Default Ollama model name. */
     QString ollamaModel = QStringLiteral("llama4");
 
-    // GitHub Copilot (via Node.js sidecar + @github/copilot-sdk)
+    /** Optional cached Copilot token. */
     QString copilotToken;
+    /** Default model exposed by the Copilot sidecar. */
     QString copilotModel = QStringLiteral("gpt-4o");
-    QString copilotNodePath;     // path to node binary (empty = "node" from PATH)
-    QString copilotSidecarPath;  // path to copilot-sidecar.js (empty = auto-detect)
+    /** Path to the Node.js executable used to launch the sidecar. */
+    QString copilotNodePath;
+    /** Optional explicit path to the Copilot sidecar script. */
+    QString copilotSidecarPath;
 
-    // Safety limits
+    /** Maximum agent loop iterations allowed per request. */
     int maxIterations = 8;
+    /** Maximum number of tool calls allowed per request. */
     int maxToolCalls = 25;
+    /** Maximum allowed changed lines before approval is required. */
     int maxDiffLines = 300;
+    /** Maximum allowed changed files before approval is required. */
     int maxChangedFiles = 10;
 
-    // Behavior
+    /** Starts the agent in dry-run mode by default when true. */
     bool dryRunDefault = true;
+    /** Enables AI completion features inside the editor. */
     bool aiCompletionEnabled = true;
+    /** Enables plugin debug logging. */
     bool debugLogging = false;
+    /** Shows raw agent JSON payloads in chat when true. */
     bool agentDebug = false;
 
-    // AI Completion trigger
-    int completionMinChars = 3;   // trigger after N chars of a word
-    int completionDelayMs = 500;  // debounce delay in milliseconds
-    QString completionModel;      // model for completion (empty = same as agent model)
-    QString completionThinkingLevel = QStringLiteral("off");    // off|low|medium|high
-    QString completionReasoningEffort = QStringLiteral("off");  // off|low|medium|high
+    /** Minimum identifier length that triggers auto-completion. */
+    int completionMinChars = 3;
+    /** Debounce delay for automatic completion requests, in milliseconds. */
+    int completionDelayMs = 500;
+    /** Optional model override for code completion requests. */
+    QString completionModel;
+    /** Completion thinking level: off, low, medium, or high. */
+    QString completionThinkingLevel = QStringLiteral("off");
+    /** Completion reasoning effort: off, low, medium, or high. */
+    QString completionReasoningEffort = QStringLiteral("off");
 
+    /**
+     * Loads settings from QSettings.
+     */
     void load();
+
+    /**
+     * Saves settings to QSettings.
+     */
     void save() const;
 };
 
-// Global singleton accessor
+/**
+ * Returns the process-wide settings singleton.
+ * @return Shared settings instance.
+ */
 Settings &settings();
 
+/**
+ * Tracks user-visible model choices for provider-specific UIs.
+ */
 class ModelCatalog : public QObject
 {
     Q_OBJECT
 public:
+    /**
+     * Creates a model catalog.
+     * @param parent Owning QObject.
+     */
     explicit ModelCatalog(QObject *parent = nullptr);
 
+    /**
+     * Returns the current Copilot model list.
+     * @return Normalized model names shown in the settings UI.
+     */
     QStringList copilotModels() const;
+
+    /**
+     * Replaces the Copilot model list.
+     * @param models Candidate model names.
+     */
     void setCopilotModels(const QStringList &models);
 
+    /**
+     * Returns the built-in default Copilot models.
+     * @return Default model names used when no runtime list is available.
+     */
     static QStringList defaultCopilotModels();
 
 signals:
+    /**
+     * Emitted after the Copilot model list changes.
+     * @param models Normalized model names exposed to the UI.
+     */
     void copilotModelsChanged(const QStringList &models);
 
 private:
+    /**
+     * Current normalized Copilot model list.
+     */
     QStringList m_copilotModels;
 };
 
+/**
+ * Returns the process-wide model catalog singleton.
+ * @return Shared model catalog instance.
+ */
 ModelCatalog &modelCatalog();
 
 }  // namespace qcai2

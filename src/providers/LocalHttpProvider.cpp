@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements local HTTP completion requests.
+*/
+
 #include "LocalHttpProvider.h"
 #include "../util/Json.h"
 #include "../util/Logger.h"

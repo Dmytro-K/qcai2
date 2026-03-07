@@ -6,10 +6,12 @@
 namespace qcai2
 {
 
-// ---------------------------------------------------------------------------
-// GitStatusTool
-// ---------------------------------------------------------------------------
-
+/**
+ * Runs git status --porcelain in the project directory.
+ * @param args Unused.
+ * @param workDir Repository root for the git command.
+ * @return Porcelain status output or an error string.
+ */
 QString GitStatusTool::execute(const QJsonObject & /*args*/, const QString &workDir)
 {
     const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));
@@ -25,16 +27,21 @@ QString GitStatusTool::execute(const QJsonObject & /*args*/, const QString &work
     return res.stdOut.isEmpty() ? QStringLiteral("Working tree clean.") : res.stdOut;
 }
 
-// ---------------------------------------------------------------------------
-// GitDiffTool
-// ---------------------------------------------------------------------------
-
+/**
+ * Returns the JSON schema for optional git diff arguments.
+ */
 QJsonObject GitDiffTool::argsSchema() const
 {
     return QJsonObject{
         {"path", QJsonObject{{"type", "string"}, {"description", "Optional file path to diff"}}}};
 }
 
+/**
+ * Runs git diff for the whole tree or a single path.
+ * @param args JSON object containing an optional path.
+ * @param workDir Repository root for the git command.
+ * @return Diff text or an error string.
+ */
 QString GitDiffTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));

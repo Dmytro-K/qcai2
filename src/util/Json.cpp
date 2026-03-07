@@ -1,8 +1,18 @@
+/*! @file
+    @brief Implements path-based accessors for JSON objects and arrays.
+*/
+
 #include "Json.h"
 
 namespace qcai2::Json
 {
 
+/**
+ * @brief Traverses nested object keys and array indexes from a root object.
+ * @param root Root JSON object used as the traversal starting point.
+ * @param parts Ordered path segments split from a slash-delimited path.
+ * @return Resolved JSON value, or an undefined value when traversal fails.
+ */
 static QJsonValue traverse(const QJsonObject &root, const QStringList &parts)
 {
     QJsonValue cur = root;

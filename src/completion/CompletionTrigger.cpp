@@ -1,16 +1,21 @@
+/*! @file
+    @brief Implements delayed auto-triggering for editor AI completion.
+*/
+
 #include "CompletionTrigger.h"
-#include "AiCompletionProvider.h"
 #include "../settings/Settings.h"
 #include "../util/Logger.h"
+#include "AiCompletionProvider.h"
 
-#include <texteditor/texteditor.h>
 #include <texteditor/codeassist/assistenums.h>
+#include <texteditor/texteditor.h>
 
+#include <QPlainTextEdit>
 #include <QTextCursor>
 #include <QTextDocument>
-#include <QPlainTextEdit>
 
-namespace Qcai2 {
+namespace Qcai2
+{
 
 CompletionTrigger::CompletionTrigger(AiCompletionProvider *provider, QObject *parent)
     : QObject(parent), m_provider(provider)
@@ -23,22 +28,26 @@ CompletionTrigger::CompletionTrigger(AiCompletionProvider *provider, QObject *pa
             return;
 
         // Don't trigger during startup (first 10 seconds)
-        if (m_startupTimer.elapsed() < 10000) {
+        if (m_startupTimer.elapsed() < 10000)
+        {
             m_pendingEditor = nullptr;
             return;
         }
 
         // Safety: editor must be visible and have focus
-        if (!m_pendingEditor->isVisible() || !m_pendingEditor->hasFocus()) {
+        if (!m_pendingEditor->isVisible() || !m_pendingEditor->hasFocus())
+        {
             m_pendingEditor = nullptr;
             return;
         }
 
         const auto &s = settings();
         const int wordLen = wordLengthAtCursor(m_pendingEditor);
-        if (wordLen >= s.completionMinChars) {
-            QCAI_DEBUG("Trigger", QStringLiteral("Auto-triggering completion: %1 chars at cursor")
-                .arg(wordLen));
+        if (wordLen >= s.completionMinChars)
+        {
+            QCAI_DEBUG(
+                "Trigger",
+                QStringLiteral("Auto-triggering completion: %1 chars at cursor").arg(wordLen));
             // Pass our provider explicitly to avoid nullptr dereference in CodeAssistant
             m_pendingEditor->invokeAssist(TextEditor::Completion, m_provider);
         }
@@ -55,15 +64,16 @@ void CompletionTrigger::attachToEditor(TextEditor::TextEditorWidget *editor)
 
     // Use contentsChanged — safe with FakeVim and other event filter plugins.
     // Use QueuedConnection to avoid triggering during initial document load.
-    connect(editor->document(), &QTextDocument::contentsChanged, this, [this, editor]() {
-        onTextChanged(editor);
-    }, Qt::QueuedConnection);
+    connect(
+        editor->document(), &QTextDocument::contentsChanged, this,
+        [this, editor]() { onTextChanged(editor); }, Qt::QueuedConnection);
 
     // Clean up when editor is destroyed
     connect(editor, &QObject::destroyed, this, [this, editor]() {
         m_attached.remove(editor);
         m_initialized.remove(editor);
-        if (m_pendingEditor == editor) {
+        if (m_pendingEditor == editor)
+        {
             m_pendingEditor = nullptr;
             m_timer.stop();
         }
@@ -75,7 +85,8 @@ void CompletionTrigger::attachToEditor(TextEditor::TextEditorWidget *editor)
 void CompletionTrigger::onTextChanged(TextEditor::TextEditorWidget *editor)
 {
     // Skip the first contentsChanged per editor (initial document load)
-    if (!m_initialized.contains(editor)) {
+    if (!m_initialized.contains(editor))
+    {
         m_initialized.insert(editor);
         return;
     }
@@ -100,7 +111,8 @@ int CompletionTrigger::wordLengthAtCursor(TextEditor::TextEditorWidget *editor) 
 
     // Count word chars backwards from cursor position
     int len = 0;
-    for (int i = col - 1; i >= 0; --i) {
+    for (int i = col - 1; i >= 0; --i)
+    {
         const QChar c = lineText.at(i);
         if (c.isLetterOrNumber() || c == QLatin1Char('_'))
             ++len;
@@ -110,4 +122,4 @@ int CompletionTrigger::wordLengthAtCursor(TextEditor::TextEditorWidget *editor) 
     return len;
 }
 
-} // namespace Qcai2
+}  // namespace Qcai2

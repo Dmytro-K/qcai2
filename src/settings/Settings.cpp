@@ -3,14 +3,22 @@
 
 #include <QSettings>
 
+/*! Implements persistent plugin settings and model catalog helpers. */
+
 namespace qcai2
 {
 
+/** QSettings group used for all plugin settings. */
 static const QLatin1String kGroup("qcai2");
 
 namespace
 {
 
+/**
+ * Trims, deduplicates, and preserves model names for editable combo boxes.
+ * @param models Candidate model names.
+ * @return Normalized model names with empty entries removed.
+ */
 QStringList normalizeModelList(const QStringList &models)
 {
     QStringList normalized;

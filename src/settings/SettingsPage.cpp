@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements the Qt Creator settings page for the plugin.
+*/
+
 #include "SettingsPage.h"
 #include "../../qcai2tr.h"
 #include "../util/Logger.h"

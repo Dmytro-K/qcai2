@@ -11,10 +11,24 @@
 namespace qcai2
 {
 
+/**
+ * Creates an OpenAI-compatible provider instance.
+ * @param parent Parent QObject that owns this instance.
+ */
 OpenAICompatibleProvider::OpenAICompatibleProvider(QObject *parent) : QObject(parent)
 {
 }
 
+/**
+ * Serializes a chat request and sends it to the configured endpoint.
+ * @param messages Conversation history to send.
+ * @param model Remote model identifier.
+ * @param temperature Sampling temperature.
+ * @param maxTokens Maximum completion token count.
+ * @param reasoningEffort Optional reasoning hint forwarded when enabled.
+ * @param callback Receives the final response text or an error.
+ * @param streamCallback Receives streamed SSE deltas when streaming is enabled.
+ */
 void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, const QString &model,
                                         double temperature, int maxTokens,
                                         const QString &reasoningEffort,
@@ -215,6 +229,9 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
     }
 }
 
+/**
+ * Aborts the active network reply, if one is running.
+ */
 void OpenAICompatibleProvider::cancel()
 {
     if (m_currentReply)

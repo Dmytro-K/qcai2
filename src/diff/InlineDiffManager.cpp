@@ -1,3 +1,4 @@
+/*! Implements parsing and inline presentation of unified diff hunks. */
 #include "InlineDiffManager.h"
 #include "../util/Diff.h"
 #include "../util/Logger.h"
@@ -14,6 +15,7 @@
 namespace qcai2
 {
 
+/** Text mark category used for AI-generated diff hunks. */
 static const TextEditor::TextMarkCategory kDiffCategory{QStringLiteral("AI Diff"),
                                                         Utils::Id("qcai2.DiffHunk")};
 

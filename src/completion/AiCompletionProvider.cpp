@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements the AI completion assist provider.
+*/
+
 #include "AiCompletionProvider.h"
 #include "../settings/Settings.h"
 #include "../util/Logger.h"

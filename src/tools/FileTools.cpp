@@ -10,10 +10,9 @@
 namespace qcai2
 {
 
-// ---------------------------------------------------------------------------
-// ReadFileTool
-// ---------------------------------------------------------------------------
-
+/**
+ * Returns the JSON schema for read_file arguments.
+ */
 QJsonObject ReadFileTool::argsSchema() const
 {
     return QJsonObject{{"path", QJsonObject{{"type", "string"}, {"required", true}}},
@@ -21,6 +20,12 @@ QJsonObject ReadFileTool::argsSchema() const
                        {"end_line", QJsonObject{{"type", "integer"}}}};
 }
 
+/**
+ * Reads a project file, optionally limited to a line range.
+ * @param args JSON object containing path and optional line limits.
+ * @param workDir Project root used for sandbox validation.
+ * @return File contents, a numbered slice, or an error string.
+ */
 QString ReadFileTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString relPath = args.value("path").toString();
@@ -59,15 +64,20 @@ QString ReadFileTool::execute(const QJsonObject &args, const QString &workDir)
     return content;
 }
 
-// ---------------------------------------------------------------------------
-// ApplyPatchTool
-// ---------------------------------------------------------------------------
-
+/**
+ * Returns the JSON schema for apply_patch arguments.
+ */
 QJsonObject ApplyPatchTool::argsSchema() const
 {
     return QJsonObject{{"diff", QJsonObject{{"type", "string"}, {"required", true}}}};
 }
 
+/**
+ * Validates and applies a unified diff inside the project tree.
+ * @param args JSON object containing the diff text.
+ * @param workDir Project root used for file creation and patch application.
+ * @return A success summary or an error string.
+ */
 QString ApplyPatchTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString diff = args.value("diff").toString();

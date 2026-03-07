@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements unified diff normalization, validation, and patch helpers.
+*/
+
 #include "Diff.h"
 #include "ProcessRunner.h"
 
@@ -8,6 +12,17 @@
 
 namespace qcai2::Diff
 {
+
+/**
+ * @brief Runs the patch executable with a normalized diff payload.
+ * @param unifiedDiff Diff text passed on stdin to @c patch.
+ * @param workDir Working directory used as the patch root.
+ * @param extraArgs Additional patch command arguments such as @c --dry-run.
+ * @param errorMsg Receives stderr or process error text on failure.
+ * @return True when the patch command exits with code zero.
+ */
+static bool runPatchCmd(const QString &unifiedDiff, const QString &workDir,
+                        const QStringList &extraArgs, QString &errorMsg);
 
 QString normalize(const QString &unifiedDiff)
 {

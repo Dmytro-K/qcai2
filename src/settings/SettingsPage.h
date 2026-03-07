@@ -5,10 +5,15 @@
 namespace qcai2
 {
 
-// Qt Creator Options page: Tools > Options > AI Agent
+/**
+ * Registers the plugin settings page in Qt Creator options.
+ */
 class SettingsPage : public Core::IOptionsPage
 {
 public:
+    /**
+     * Creates and registers the settings page metadata.
+     */
     SettingsPage();
 };
 

@@ -1,3 +1,4 @@
+/*! Implements JSON serialization helpers for one agent tool invocation. */
 #include "ToolCall.h"
 #include <QJsonDocument>
 

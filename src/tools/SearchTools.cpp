@@ -11,6 +11,9 @@
 namespace qcai2
 {
 
+/**
+ * Returns the JSON schema for search_repo arguments.
+ */
 QJsonObject SearchRepoTool::argsSchema() const
 {
     return QJsonObject{{"pattern", QJsonObject{{"type", "string"}, {"required", true}}},
@@ -18,6 +21,12 @@ QJsonObject SearchRepoTool::argsSchema() const
                        {"max_results", QJsonObject{{"type", "integer"}}}};
 }
 
+/**
+ * Searches repository files for a regex pattern.
+ * @param args JSON object containing the pattern and optional filters.
+ * @param workDir Project root used as the search scope.
+ * @return Matching lines or an error string.
+ */
 QString SearchRepoTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString pattern = args.value("pattern").toString();
@@ -37,6 +46,14 @@ QString SearchRepoTool::execute(const QJsonObject &args, const QString &workDir)
     return searchFallback(pattern, glob, maxResults, workDir);
 }
 
+/**
+ * Uses ripgrep to search the repository when the executable is available.
+ * @param pattern Regular expression to search for.
+ * @param glob Optional ripgrep glob filter.
+ * @param maxResults Maximum matches to return.
+ * @param workDir Project root used as the search scope.
+ * @return Matching lines or an error string.
+ */
 QString SearchRepoTool::searchWithRipgrep(const QString &pattern, const QString &glob,
                                           int maxResults, const QString &workDir)
 {
@@ -60,6 +77,14 @@ QString SearchRepoTool::searchWithRipgrep(const QString &pattern, const QString 
     return result.stdOut;
 }
 
+/**
+ * Uses Qt file iteration and regex matching as a ripgrep fallback.
+ * @param pattern Regular expression to search for.
+ * @param glob Optional name filter applied during iteration.
+ * @param maxResults Maximum matches to return.
+ * @param workDir Project root used as the search scope.
+ * @return Matching lines or an error string.
+ */
 QString SearchRepoTool::searchFallback(const QString &pattern, const QString &glob, int maxResults,
                                        const QString &workDir)
 {

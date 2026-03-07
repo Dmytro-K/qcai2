@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements painting for inline ghost-text overlays.
+*/
+
 #include "GhostTextOverlay.h"
 
 #include <texteditor/texteditor.h>

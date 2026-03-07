@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements the plan-act-observe loop that drives one agent session.
+*/
+
 #include "AgentController.h"
 #include "settings/Settings.h"
 #include "util/Diff.h"

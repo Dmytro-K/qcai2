@@ -1,3 +1,4 @@
+/*! Implements parsing helpers for chat messages and structured agent responses. */
 #include "AgentMessages.h"
 
 #include <QJsonArray>
@@ -10,6 +11,10 @@ namespace qcai2
 namespace
 {
 
+/**
+ * Extracts top-level JSON objects from mixed text while respecting strings and escapes.
+ * @param raw Raw completion text.
+ */
 QList<QString> extractTopLevelObjects(const QString &raw)
 {
     QList<QString> objects;

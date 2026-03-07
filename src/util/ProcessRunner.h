@@ -1,5 +1,9 @@
 #pragma once
 
+/*! @file
+    @brief Thin wrapper around QProcess for bounded command execution.
+*/
+
 #include <QObject>
 #include <QProcess>
 #include <QString>
@@ -9,38 +13,78 @@
 namespace qcai2
 {
 
-// Synchronous QProcess wrapper with timeout and allowlist enforcement.
-// All destructive commands must pass through this wrapper.
+/**
+ * @brief Runs external commands with timeout handling for plugin tools.
+ */
 class ProcessRunner : public QObject
 {
     Q_OBJECT
 public:
-    explicit ProcessRunner(QObject *parent = nullptr);
-
+    /**
+     * @brief Describes the outcome of a completed process.
+     */
     struct Result
     {
+        /** @brief True when the process exits normally with code zero. */
         bool success = false;
+        /** @brief Exit code reported by the child process. */
         int exitCode = -1;
+        /** @brief Captured standard output. */
         QString stdOut;
+        /** @brief Captured standard error. */
         QString stdErr;
-        QString errorString;  // QProcess error string (e.g. "No such file or directory")
+        /** @brief QProcess error text such as startup failures. */
+        QString errorString;
     };
 
-    // Run a command synchronously. workDir defaults to QDir::currentPath().
-    // timeoutMs defaults to 30 000 ms.
+    /**
+     * @brief Creates a process runner owned by an optional parent object.
+     * @param parent QObject parent for lifecycle management.
+     */
+    explicit ProcessRunner(QObject *parent = nullptr);
+
+    /**
+     * @brief Runs a command synchronously.
+     * @param program Executable name or path.
+     * @param args Command-line arguments.
+     * @param workDir Optional working directory for the child process.
+     * @param timeoutMs Maximum wait time before the process is killed.
+     * @param stdinData Optional text written to the process stdin.
+     * @return Captured process result including stdout, stderr, and exit code.
+     */
     Result run(const QString &program, const QStringList &args, const QString &workDir = {},
                int timeoutMs = 30000, const QString &stdinData = {});
 
-    // Same but asynchronous: emits finished() when done.
+    /**
+     * @brief Starts a command asynchronously.
+     * @param program Executable name or path.
+     * @param args Command-line arguments.
+     * @param workDir Optional working directory for the child process.
+     * @param timeoutMs Maximum runtime before the child process is killed.
+     */
     void runAsync(const QString &program, const QStringList &args, const QString &workDir = {},
                   int timeoutMs = 30000);
 
 signals:
+    /**
+     * @brief Emitted when an asynchronous process finishes.
+     * @param result Captured process outcome.
+     */
     void finished(const ProcessRunner::Result &result);
-    void outputLine(const QString &line);  // progressive stdout lines
+
+    /**
+     * @brief Reserved signal for line-oriented asynchronous output.
+     * @param line Parsed stdout line.
+     */
+    void outputLine(const QString &line);
 
 private:
+    /**
+     * @brief Placeholder hook for parsing asynchronous stdout.
+     */
     void handleReadyRead();
+
+    /** @brief Buffered partial line for async stdout parsing. */
     QString m_pendingLine;
 };
 

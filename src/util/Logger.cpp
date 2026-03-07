@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements the plugin's bounded in-memory logger.
+*/
+
 #include "Logger.h"
 
 #include <QDateTime>
@@ -5,6 +9,9 @@
 namespace qcai2
 {
 
+/**
+ * @brief Constructs the logger with logging disabled by default.
+ */
 Logger::Logger() = default;
 
 Logger &Logger::instance()
@@ -84,6 +91,13 @@ QString Logger::levelStr(Level level)
     return QStringLiteral("???");
 }
 
+/**
+ * @brief Builds the final stored log line.
+ * @param level Severity level for the message.
+ * @param category Source category shown in the line.
+ * @param message Message payload to append after the metadata.
+ * @return Timestamped, formatted log entry.
+ */
 QString Logger::format(Level level, const QString &category, const QString &message) const
 {
     return QStringLiteral("[%1] [%2] [%3] %4")

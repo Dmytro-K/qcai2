@@ -7,16 +7,21 @@
 namespace qcai2
 {
 
-// ---------------------------------------------------------------------------
-// RunBuildTool
-// ---------------------------------------------------------------------------
-
+/**
+ * Returns the JSON schema for optional build arguments.
+ */
 QJsonObject RunBuildTool::argsSchema() const
 {
     return QJsonObject{
         {"target", QJsonObject{{"type", "string"}, {"description", "Optional build target"}}}};
 }
 
+/**
+ * Runs cmake --build in the configured build directory.
+ * @param args JSON object containing an optional build target.
+ * @param workDir Project root used as the command working directory.
+ * @return Combined build output with a success or failure prefix.
+ */
 QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString buildDir = m_buildDir.isEmpty() ? workDir : m_buildDir;
@@ -48,16 +53,21 @@ QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
     return output;
 }
 
-// ---------------------------------------------------------------------------
-// RunTestsTool
-// ---------------------------------------------------------------------------
-
+/**
+ * Returns the JSON schema for optional test filter arguments.
+ */
 QJsonObject RunTestsTool::argsSchema() const
 {
     return QJsonObject{
         {"filter", QJsonObject{{"type", "string"}, {"description", "ctest -R filter regex"}}}};
 }
 
+/**
+ * Runs ctest in the configured build directory.
+ * @param args JSON object containing an optional ctest filter.
+ * @param workDir Project root used as the command working directory.
+ * @return Combined test output with a success or failure prefix.
+ */
 QString RunTestsTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString buildDir = m_buildDir.isEmpty() ? workDir : m_buildDir;
@@ -84,15 +94,20 @@ QString RunTestsTool::execute(const QJsonObject &args, const QString &workDir)
     return output;
 }
 
-// ---------------------------------------------------------------------------
-// ShowDiagnosticsTool
-// ---------------------------------------------------------------------------
-
+/**
+ * Returns the empty schema for show_diagnostics.
+ */
 QJsonObject ShowDiagnosticsTool::argsSchema() const
 {
     return QJsonObject{};
 }
 
+/**
+ * Extracts diagnostic lines from cached build output.
+ * @param args Unused.
+ * @param workDir Unused.
+ * @return Matching error, warning, or note lines.
+ */
 QString ShowDiagnosticsTool::execute(const QJsonObject & /*args*/, const QString & /*workDir*/)
 {
     if (m_lastBuildOutput.isEmpty())

@@ -1,16 +1,32 @@
+/*! @file
+    @brief Unit tests for ToolCall JSON serialization and parsing.
+*/
+
 #include <QtTest>
 
 #include "src/models/ToolCall.h"
 
 using namespace qcai2;
 
+/**
+ * @brief Verifies the JSON contract used to exchange tool call state.
+ */
 class ToolCallTest : public QObject
 {
     Q_OBJECT
 
 private slots:
+    /**
+     * @brief Omits result fields until a tool call has actually executed.
+     */
     void toJson_omitsOptionalFieldsUntilExecuted();
+    /**
+     * @brief Serializes execution state, result text, and error details.
+     */
     void toJson_includesExecutionResultAndError();
+    /**
+     * @brief Restores identifiers, tool names, and arguments from JSON input.
+     */
     void fromJson_readsIdNameAndArgs();
 };
 

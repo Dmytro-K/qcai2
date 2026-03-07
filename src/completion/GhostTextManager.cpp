@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements debounced inline ghost-text completion requests.
+*/
+
 #include "GhostTextManager.h"
 #include "../models/AgentMessages.h"
 #include "../providers/IAIProvider.h"

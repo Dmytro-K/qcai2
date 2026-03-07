@@ -10,6 +10,9 @@
 namespace qcai2
 {
 
+/**
+ * Returns the JSON schema for open_file_at_location arguments.
+ */
 QJsonObject OpenFileAtLocationTool::argsSchema() const
 {
     return QJsonObject{{"path", QJsonObject{{"type", "string"}, {"required", true}}},
@@ -17,6 +20,12 @@ QJsonObject OpenFileAtLocationTool::argsSchema() const
                        {"column", QJsonObject{{"type", "integer"}}}};
 }
 
+/**
+ * Opens a project file in Qt Creator at the requested location.
+ * @param args JSON object containing the file path and optional cursor position.
+ * @param workDir Project root used for sandbox validation.
+ * @return A short success message or an error string.
+ */
 QString OpenFileAtLocationTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString relPath = args.value("path").toString();

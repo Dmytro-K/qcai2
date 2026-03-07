@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements command, tool, and workspace safety checks.
+*/
+
 #include "SafetyPolicy.h"
 #include "../util/Logger.h"
 

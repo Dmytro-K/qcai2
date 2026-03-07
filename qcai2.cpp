@@ -1,3 +1,4 @@
+/*! Implements the legacy sample plugin entry point generated for Qcai2. */
 #include "qcai2constants.h"
 #include "qcai2tr.h"
 
@@ -20,6 +21,7 @@ using namespace Core;
 namespace Qcai2::Internal
 {
 
+/** Minimal sample plugin that exposes one placeholder Tools action. */
 class Qcai2Plugin final : public ExtensionSystem::IPlugin
 {
     Q_OBJECT
@@ -34,6 +36,9 @@ public:
         // Other cleanup, if needed.
     }
 
+    /**
+     * Registers the sample menu and action.
+     */
     void initialize() final
     {
         // Set up this plugin's factories, if needed.
@@ -59,6 +64,9 @@ public:
             .addOnTriggered(this, &Qcai2Plugin::triggerAction);
     }
 
+    /**
+     * Completes startup after dependent plugins initialize.
+     */
     void extensionsInitialized() final
     {
         // Retrieve objects from the plugin manager's object pool, if needed. (rare)
@@ -67,6 +75,9 @@ public:
         // extensionsInitialized() phase.
     }
 
+    /**
+     * Returns synchronous shutdown because the sample plugin has no background work.
+     */
     ShutdownFlag aboutToShutdown() final
     {
         // Save settings
@@ -76,6 +87,9 @@ public:
     }
 
 private:
+    /**
+     * Shows the placeholder action dialog.
+     */
     void triggerAction()
     {
         QMessageBox::information(ICore::dialogParent(), Tr::tr("Action Triggered"),

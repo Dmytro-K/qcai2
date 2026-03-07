@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements asynchronous AI completion proposal generation.
+*/
+
 #include "AiCompletionProcessor.h"
 #include "../models/AgentMessages.h"
 #include "../providers/IAIProvider.h"

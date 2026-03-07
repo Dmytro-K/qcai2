@@ -7,27 +7,45 @@
 namespace qcai2
 {
 
+/**
+ * Creates an empty tool registry.
+ * @param parent Parent QObject that owns this instance.
+ */
 ToolRegistry::ToolRegistry(QObject *parent) : QObject(parent)
 {
 }
 
+/**
+ * Registers or replaces a tool using its stable name as the key.
+ * @param tool Tool instance to register.
+ */
 void ToolRegistry::registerTool(std::shared_ptr<ITool> tool)
 {
     QCAI_DEBUG("Tools", QStringLiteral("Registered tool: %1").arg(tool->name()));
     m_tools.insert(tool->name(), std::move(tool));
 }
 
+/**
+ * Looks up a registered tool by name.
+ * @param name Name value.
+ */
 ITool *ToolRegistry::tool(const QString &name) const
 {
     auto it = m_tools.find(name);
     return (it != m_tools.end()) ? it->get() : nullptr;
 }
 
+/**
+ * Returns all registered tools.
+ */
 QList<std::shared_ptr<ITool>> ToolRegistry::allTools() const
 {
     return m_tools.values();
 }
 
+/**
+ * Serializes registered tool metadata for the agent prompt.
+ */
 QJsonArray ToolRegistry::toolDescriptionsJson() const
 {
     QJsonArray arr;

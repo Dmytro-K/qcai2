@@ -1,3 +1,4 @@
+/*! Implements plugin setup for providers, tools, completion hooks, and the dock UI. */
 #include "AiAgentPlugin.h"
 #include "../qcai2constants.h"
 #include "../qcai2tr.h"

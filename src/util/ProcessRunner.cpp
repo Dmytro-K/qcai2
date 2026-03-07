@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements synchronous and asynchronous process execution helpers.
+*/
+
 #include "ProcessRunner.h"
 #include "Logger.h"
 
@@ -8,6 +12,10 @@
 namespace qcai2
 {
 
+/**
+ * @brief Creates a process runner bound to an optional QObject parent.
+ * @param parent Parent QObject that owns this instance.
+ */
 ProcessRunner::ProcessRunner(QObject *parent) : QObject(parent)
 {
 }
@@ -93,6 +101,9 @@ void ProcessRunner::runAsync(const QString &program, const QStringList &args,
     proc->start(program, args);
 }
 
+/**
+ * @brief Placeholder for future line-oriented async stdout handling.
+ */
 void ProcessRunner::handleReadyRead()
 {
     // Not wired to a specific process here; streaming is handled in runAsync lambda above

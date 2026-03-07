@@ -1,3 +1,7 @@
+/*! @file
+    @brief Implements fatal-signal logging for post-mortem diagnostics.
+*/
+
 #include "CrashHandler.h"
 #include "Logger.h"
 
@@ -25,8 +29,14 @@
 namespace qcai2
 {
 
+/** Maximum number of stack frames captured for a crash report. */
 static constexpr int kMaxFrames = 64;
 
+/**
+ * @brief Returns a readable label for a signal number.
+ * @param sig Signal number received by the process.
+ * @return Static signal description suitable for logs and crash files.
+ */
 static const char *signalName(int sig)
 {
     switch (sig)
@@ -46,7 +56,12 @@ static const char *signalName(int sig)
     }
 }
 
-// Write crash info to a file (signal-safe on Unix using write())
+/**
+ * @brief Persists the captured crash information to disk and stderr.
+ * @param sig Signal number that triggered the crash handler.
+ * @param frames Captured stack frame addresses.
+ * @param frameCount Number of valid entries in @p frames.
+ */
 static void writeCrashFile(int sig, void **frames, int frameCount)
 {
     // Build path: ~/.local/share/qcai2/crash.log
@@ -97,6 +112,10 @@ static void writeCrashFile(int sig, void **frames, int frameCount)
     }
 }
 
+/**
+ * @brief Handles fatal signals, records diagnostics, and re-raises the signal.
+ * @param sig Signal number delivered by the operating system.
+ */
 static void crashSignalHandler(int sig)
 {
     // Capture stack trace
@@ -109,7 +128,7 @@ static void crashSignalHandler(int sig)
 
     writeCrashFile(sig, frames, frameCount);
 
-    // Try to log via Logger (best effort — may not be safe in signal handler
+    // Try to log via Logger (best effort; may not be safe in signal handler
     // but Logger::instance() is a static local, already constructed)
     {
         QString trace;
