@@ -1,9 +1,9 @@
 #include "CrashHandler.h"
 #include "Logger.h"
 
-#include <QStandardPaths>
 #include <QDateTime>
 #include <QDir>
+#include <QStandardPaths>
 
 #include <csignal>
 #include <cstdio>
@@ -12,30 +12,37 @@
 
 #ifdef Q_OS_UNIX
 #include <execinfo.h>
-#include <unistd.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #ifdef Q_OS_WIN
-#include <windows.h>
 #include <dbghelp.h>
+#include <windows.h>
 #pragma comment(lib, "dbghelp.lib")
 #endif
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 static constexpr int kMaxFrames = 64;
 
 static const char *signalName(int sig)
 {
-    switch (sig) {
-    case SIGSEGV: return "SIGSEGV (Segmentation fault)";
-    case SIGABRT: return "SIGABRT (Abort)";
-    case SIGFPE:  return "SIGFPE (Floating point exception)";
+    switch (sig)
+    {
+        case SIGSEGV:
+            return "SIGSEGV (Segmentation fault)";
+        case SIGABRT:
+            return "SIGABRT (Abort)";
+        case SIGFPE:
+            return "SIGFPE (Floating point exception)";
 #ifdef SIGBUS
-    case SIGBUS:  return "SIGBUS (Bus error)";
+        case SIGBUS:
+            return "SIGBUS (Bus error)";
 #endif
-    default:      return "Unknown signal";
+        default:
+            return "Unknown signal";
     }
 }
 
@@ -45,7 +52,8 @@ static void writeCrashFile(int sig, void **frames, int frameCount)
     // Build path: ~/.local/share/qcai2/crash.log
     // We can't use Qt in signal handler safely, so use a fixed path
     const char *home = getenv("HOME");
-    if (!home) home = "/tmp";
+    if (!home)
+        home = "/tmp";
 
     char path[512];
     snprintf(path, sizeof(path), "%s/.local/share/qcai2", home);
@@ -58,16 +66,19 @@ static void writeCrashFile(int sig, void **frames, int frameCount)
     snprintf(path, sizeof(path), "%s/.local/share/qcai2/crash.log", home);
 
     FILE *f = fopen(path, "a");
-    if (!f) f = stderr;
+    if (!f)
+        f = stderr;
 
     fprintf(f, "\n=== QCAI2 CRASH === Signal: %s (%d) ===\n", signalName(sig), sig);
 
 #ifdef Q_OS_UNIX
     // backtrace_symbols_fd is async-signal-safe
-    if (f != stderr) {
+    if (f != stderr)
+    {
         // Write symbols to file
         char **symbols = backtrace_symbols(frames, frameCount);
-        if (symbols) {
+        if (symbols)
+        {
             for (int i = 0; i < frameCount; ++i)
                 fprintf(f, "  #%d %s\n", i, symbols[i]);
             free(symbols);
@@ -79,7 +90,8 @@ static void writeCrashFile(int sig, void **frames, int frameCount)
     fprintf(stderr, "Crash log written to: %s\n", path);
 #endif
 
-    if (f != stderr) {
+    if (f != stderr)
+    {
         fprintf(f, "=== END CRASH ===\n");
         fclose(f);
     }
@@ -103,19 +115,21 @@ static void crashSignalHandler(int sig)
         QString trace;
 #ifdef Q_OS_UNIX
         char **symbols = backtrace_symbols(frames, frameCount);
-        if (symbols) {
-            for (int i = 0; i < frameCount; ++i) {
-                if (!trace.isEmpty()) trace += QLatin1Char('\n');
+        if (symbols)
+        {
+            for (int i = 0; i < frameCount; ++i)
+            {
+                if (!trace.isEmpty())
+                    trace += QLatin1Char('\n');
                 trace += QString::fromUtf8(symbols[i]);
             }
             free(symbols);
         }
 #endif
-        Logger::instance().error(
-            QStringLiteral("CRASH"),
-            QStringLiteral("Signal %1 (%2)\n%3")
-                .arg(sig)
-                .arg(QString::fromUtf8(signalName(sig)), trace));
+        Logger::instance().error(QStringLiteral("CRASH"),
+                                 QStringLiteral("Signal %1 (%2)\n%3")
+                                     .arg(sig)
+                                     .arg(QString::fromUtf8(signalName(sig)), trace));
     }
 
     // Re-raise with default handler
@@ -127,12 +141,12 @@ void installCrashHandler()
 {
     signal(SIGSEGV, crashSignalHandler);
     signal(SIGABRT, crashSignalHandler);
-    signal(SIGFPE,  crashSignalHandler);
+    signal(SIGFPE, crashSignalHandler);
 #ifdef SIGBUS
-    signal(SIGBUS,  crashSignalHandler);
+    signal(SIGBUS, crashSignalHandler);
 #endif
 
     QCAI_INFO("CrashHandler", QStringLiteral("Crash handler installed"));
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

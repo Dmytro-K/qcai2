@@ -4,19 +4,18 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
-#include <QTextStream>
 #include <QRegularExpression>
 #include <QStandardPaths>
+#include <QTextStream>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 QJsonObject SearchRepoTool::argsSchema() const
 {
-    return QJsonObject{
-        {"pattern",     QJsonObject{{"type", "string"}, {"required", true}}},
-        {"glob",        QJsonObject{{"type", "string"}}},
-        {"max_results", QJsonObject{{"type", "integer"}}}
-    };
+    return QJsonObject{{"pattern", QJsonObject{{"type", "string"}, {"required", true}}},
+                       {"glob", QJsonObject{{"type", "string"}}},
+                       {"max_results", QJsonObject{{"type", "integer"}}}};
 }
 
 QString SearchRepoTool::execute(const QJsonObject &args, const QString &workDir)
@@ -27,7 +26,8 @@ QString SearchRepoTool::execute(const QJsonObject &args, const QString &workDir)
 
     const QString glob = args.value("glob").toString();
     int maxResults = args.value("max_results").toInt(30);
-    if (maxResults < 1) maxResults = 30;
+    if (maxResults < 1)
+        maxResults = 30;
 
     // Try ripgrep first
     const QString rgPath = QStandardPaths::findExecutable(QStringLiteral("rg"));
@@ -38,11 +38,10 @@ QString SearchRepoTool::execute(const QJsonObject &args, const QString &workDir)
 }
 
 QString SearchRepoTool::searchWithRipgrep(const QString &pattern, const QString &glob,
-                                           int maxResults, const QString &workDir)
+                                          int maxResults, const QString &workDir)
 {
     QStringList args;
-    args << QStringLiteral("--no-heading")
-         << QStringLiteral("--line-number")
+    args << QStringLiteral("--no-heading") << QStringLiteral("--line-number")
          << QStringLiteral("--max-count") << QString::number(maxResults);
 
     if (!glob.isEmpty())
@@ -61,8 +60,8 @@ QString SearchRepoTool::searchWithRipgrep(const QString &pattern, const QString 
     return result.stdOut;
 }
 
-QString SearchRepoTool::searchFallback(const QString &pattern, const QString &glob,
-                                        int maxResults, const QString &workDir)
+QString SearchRepoTool::searchFallback(const QString &pattern, const QString &glob, int maxResults,
+                                       const QString &workDir)
 {
     QRegularExpression re(pattern);
     if (!re.isValid())
@@ -72,22 +71,27 @@ QString SearchRepoTool::searchFallback(const QString &pattern, const QString &gl
     if (!glob.isEmpty())
         nameFilters << glob;
 
-    QDirIterator it(workDir, nameFilters.isEmpty() ? QStringList{QStringLiteral("*")} : nameFilters,
+    QDirIterator it(workDir,
+                    nameFilters.isEmpty() ? QStringList{QStringLiteral("*")} : nameFilters,
                     QDir::Files, QDirIterator::Subdirectories);
 
     QStringList results;
     int count = 0;
-    while (it.hasNext() && count < maxResults) {
+    while (it.hasNext() && count < maxResults)
+    {
         it.next();
         QFile file(it.filePath());
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+            continue;
 
         QTextStream in(&file);
         int lineNum = 0;
-        while (!in.atEnd() && count < maxResults) {
+        while (!in.atEnd() && count < maxResults)
+        {
             ++lineNum;
             const QString line = in.readLine();
-            if (re.match(line).hasMatch()) {
+            if (re.match(line).hasMatch())
+            {
                 const QString rel = QDir(workDir).relativeFilePath(it.filePath());
                 results.append(QStringLiteral("%1:%2:%3").arg(rel).arg(lineNum).arg(line));
                 ++count;
@@ -98,4 +102,4 @@ QString SearchRepoTool::searchFallback(const QString &pattern, const QString &gl
     return results.isEmpty() ? QStringLiteral("No matches found.") : results.join('\n');
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

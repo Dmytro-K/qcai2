@@ -5,7 +5,8 @@
 #include <QString>
 #include <memory>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 class IAIProvider;
 
@@ -31,4 +32,4 @@ private:
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

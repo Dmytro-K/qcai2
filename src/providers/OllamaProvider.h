@@ -2,7 +2,8 @@
 
 #include "OpenAICompatibleProvider.h"
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // Adapter for Ollama (http://localhost:11434).
 // Ollama supports the OpenAI-compatible /v1/chat/completions endpoint.
@@ -12,8 +13,14 @@ class OllamaProvider : public OpenAICompatibleProvider
 public:
     explicit OllamaProvider(QObject *parent = nullptr);
 
-    QString id() const override { return QStringLiteral("ollama"); }
-    QString displayName() const override { return QStringLiteral("Ollama (Local)"); }
+    QString id() const override
+    {
+        return QStringLiteral("ollama");
+    }
+    QString displayName() const override
+    {
+        return QStringLiteral("Ollama (Local)");
+    }
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

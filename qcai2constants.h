@@ -1,9 +1,9 @@
 #pragma once
 
-namespace Qcai2::Constants
+namespace qcai2::Constants
 {
 
-const char ACTION_ID[] = "Qcai2.ShowAgent";
-const char MENU_ID[]   = "Qcai2.Menu";
+const char ACTION_ID[] = "qcai2.ShowAgent";
+const char MENU_ID[] = "qcai2.Menu";
 
-}  // namespace Qcai2::Constants
+}  // namespace qcai2::Constants

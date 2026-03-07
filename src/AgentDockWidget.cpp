@@ -7,21 +7,23 @@
 #include <utils/filepath.h>
 #include <utils/link.h>
 
-#include <QDir>
 #include <QClipboard>
 #include <QColor>
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QMouseEvent>
-#include <QFile>
 #include <QPaintEvent>
 #include <QPainter>
+#include <QRegularExpression>
 #include <QSet>
 #include <QSettings>
 #include <QShortcut>
+#include <QSignalBlocker>
 #include <QSplitter>
 #include <QSyntaxHighlighter>
 #include <QTextBlock>
@@ -30,12 +32,57 @@
 #include <QVBoxLayout>
 
 #include <functional>
+#include <limits>
 
-namespace Qcai2
+namespace qcai2
 {
 
 namespace
 {
+
+int boundedInt(qsizetype value)
+{
+    return static_cast<int>(std::min(value, qsizetype(std::numeric_limits<int>::max())));
+}
+
+QStringList openAiAgentModels()
+{
+    return {
+        QStringLiteral("gpt-5.2"),
+        QStringLiteral("gpt-5.3-codex"),
+        QStringLiteral("gpt-5-mini"),
+        QStringLiteral("gpt-4.1"),
+        QStringLiteral("o3"),
+        QStringLiteral("o4-mini"),
+        QStringLiteral("claude-opus-4.6"),
+        QStringLiteral("claude-sonnet-4.6"),
+        QStringLiteral("gemini-3-flash"),
+    };
+}
+
+void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
+                             const QString &selectedText)
+{
+    QStringList uniqueItems;
+    uniqueItems.reserve(items.size() + 1);
+
+    for (const QString &item : items)
+    {
+        const QString trimmed = item.trimmed();
+        if (trimmed.isEmpty() || uniqueItems.contains(trimmed))
+            continue;
+        uniqueItems.append(trimmed);
+    }
+
+    const QString selected = selectedText.trimmed();
+    if (!selected.isEmpty() && !uniqueItems.contains(selected))
+        uniqueItems.append(selected);
+
+    const QSignalBlocker blocker(combo);
+    combo->clear();
+    combo->addItems(uniqueItems);
+    combo->setCurrentText(selected);
+}
 
 class DiffHighlighter final : public QSyntaxHighlighter
 {
@@ -68,18 +115,18 @@ protected:
     void highlightBlock(const QString &text) override
     {
         if (text.startsWith(QStringLiteral("@@")))
-            return setFormat(0, text.size(), m_hunkFormat);
+            return setFormat(0, boundedInt(text.size()), m_hunkFormat);
         if (text.startsWith(QStringLiteral("+++ ")) || text.startsWith(QStringLiteral("--- ")))
-            return setFormat(0, text.size(), m_fileHeaderFormat);
+            return setFormat(0, boundedInt(text.size()), m_fileHeaderFormat);
         if (text.startsWith(QStringLiteral("diff --")) ||
             text.startsWith(QStringLiteral("index ")) ||
             text.startsWith(QStringLiteral("new file")) ||
             text.startsWith(QStringLiteral("deleted file")))
-            return setFormat(0, text.size(), m_metaFormat);
+            return setFormat(0, boundedInt(text.size()), m_metaFormat);
         if (text.startsWith(QLatin1Char('+')))
-            return setFormat(0, text.size(), m_addedFormat);
+            return setFormat(0, boundedInt(text.size()), m_addedFormat);
         if (text.startsWith(QLatin1Char('-')))
-            return setFormat(0, text.size(), m_removedFormat);
+            return setFormat(0, boundedInt(text.size()), m_removedFormat);
     }
 
 private:
@@ -125,6 +172,11 @@ public:
         return m_approvableLines.isEmpty() || m_approvedLines.size() == m_approvableLines.size();
     }
 
+    bool hasApprovedChanges() const
+    {
+        return !m_approvedLines.isEmpty();
+    }
+
     void setDiffText(const QString &diff)
     {
         setPlainText(diff);
@@ -133,10 +185,118 @@ public:
         m_lineNumberArea->update();
     }
 
-    void setApprovalChangedCallback(std::function<void(int, int)> callback)
+    void setApprovalChangedCallback(std::function<void(qsizetype, qsizetype)> callback)
     {
         m_approvalChangedCallback = std::move(callback);
         notifyApprovalChanged();
+    }
+
+    QString approvedDiff() const
+    {
+        const QStringList lines = toPlainText().split('\n');
+        if (lines.isEmpty())
+            return QString();
+
+        auto isFileStart = [&lines](int index) {
+            const QString &line = lines[index];
+            const QString next = index + 1 < lines.size() ? lines[index + 1] : QString();
+            return line.startsWith(QStringLiteral("diff --git ")) ||
+                   line.startsWith(QStringLiteral("Index: ")) ||
+                   (line.startsWith(QStringLiteral("--- ")) &&
+                    next.startsWith(QStringLiteral("+++ ")));
+        };
+
+        QStringList outputLines;
+        QStringList fileHeaderLines;
+        QStringList keptHunkLines;
+        bool inFileSection = false;
+
+        auto flushFileSection = [&]() {
+            if (!keptHunkLines.isEmpty())
+            {
+                outputLines.append(fileHeaderLines);
+                outputLines.append(keptHunkLines);
+            }
+            fileHeaderLines.clear();
+            keptHunkLines.clear();
+            inFileSection = false;
+        };
+
+        int i = 0;
+        while (i < lines.size())
+        {
+            if (isFileStart(i))
+            {
+                if (inFileSection)
+                    flushFileSection();
+                inFileSection = true;
+                fileHeaderLines.append(lines[i]);
+                ++i;
+                continue;
+            }
+
+            if (!inFileSection)
+            {
+                outputLines.append(lines[i]);
+                ++i;
+                continue;
+            }
+
+            if (!lines[i].startsWith(QStringLiteral("@@ ")))
+            {
+                fileHeaderLines.append(lines[i]);
+                ++i;
+                continue;
+            }
+
+            QStringList candidateHunk;
+            bool hunkHasApprovedChanges = false;
+            candidateHunk.append(lines[i]);
+            ++i;
+
+            while (i < lines.size() && !lines[i].startsWith(QStringLiteral("@@ ")) &&
+                   !isFileStart(i))
+            {
+                const QString &hunkLine = lines[i];
+                const int lineNumber = i + 1;
+
+                if (hunkLine.startsWith(QLatin1Char('+')) &&
+                    !hunkLine.startsWith(QStringLiteral("+++ ")))
+                {
+                    if (m_approvedLines.contains(lineNumber))
+                    {
+                        candidateHunk.append(hunkLine);
+                        hunkHasApprovedChanges = true;
+                    }
+                }
+                else if (hunkLine.startsWith(QLatin1Char('-')) &&
+                         !hunkLine.startsWith(QStringLiteral("--- ")))
+                {
+                    if (m_approvedLines.contains(lineNumber))
+                    {
+                        candidateHunk.append(hunkLine);
+                        hunkHasApprovedChanges = true;
+                    }
+                    else
+                    {
+                        candidateHunk.append(QStringLiteral(" ") + hunkLine.mid(1));
+                    }
+                }
+                else
+                {
+                    candidateHunk.append(hunkLine);
+                }
+                ++i;
+            }
+
+            if (hunkHasApprovedChanges)
+                keptHunkLines.append(candidateHunk);
+        }
+
+        if (inFileSection)
+            flushFileSection();
+
+        return Diff::normalize(outputLines.join('\n'));
     }
 
     void lineNumberAreaMousePressEvent(QMouseEvent *event)
@@ -278,7 +438,7 @@ private:
     DiffHighlighter m_highlighter;
     QSet<int> m_approvableLines;
     QSet<int> m_approvedLines;
-    std::function<void(int, int)> m_approvalChangedCallback;
+    std::function<void(qsizetype, qsizetype)> m_approvalChangedCallback;
 };
 
 DiffLineNumberArea::DiffLineNumberArea(DiffPreviewEdit *editor) : QWidget(editor), m_editor(editor)
@@ -304,7 +464,9 @@ AgentDockWidget::AgentDockWidget(AgentController *controller, QWidget *parent)
 {
     setupUi();
 
-    // Throttle rendering during streaming to avoid O(n²) setMarkdown() calls
+    m_inlineDiffManager = new InlineDiffManager(this);
+
+    // Throttle rendering during streaming to avoid O(n²) setPlainText() calls
     m_renderThrottle = new QTimer(this);
     m_renderThrottle->setSingleShot(true);
     m_renderThrottle->setInterval(50);
@@ -388,7 +550,17 @@ void AgentDockWidget::restoreChat()
     const QString logMarkdown = s.value(QStringLiteral("logMarkdown")).toString();
     if (!logMarkdown.isEmpty())
     {
+        // Close any unclosed code fences from interrupted streaming
         m_logMarkdown = logMarkdown;
+        int fenceCount = 0;
+        const auto lines = m_logMarkdown.split('\n');
+        for (const auto &line : lines)
+        {
+            if (line.trimmed().startsWith(QStringLiteral("```")))
+                ++fenceCount;
+        }
+        if (fenceCount % 2 != 0)
+            m_logMarkdown += QStringLiteral("\n```\n");
         m_streamingMarkdown.clear();
         renderLog();
     }
@@ -403,11 +575,13 @@ void AgentDockWidget::restoreChat()
     }
 
     m_currentDiff = s.value(QStringLiteral("diff")).toString();
+    m_appliedDiff.clear();
     if (!m_currentDiff.isEmpty())
     {
         auto *diffPreview = static_cast<DiffPreviewEdit *>(m_diffView);
         diffPreview->setDiffText(m_currentDiff);
-        m_applyPatchBtn->setEnabled(diffPreview->allChangesApproved());
+        m_applyPatchBtn->setEnabled(diffPreview->hasApprovedChanges());
+        m_revertPatchBtn->setEnabled(false);
     }
 
     const QString status = s.value(QStringLiteral("status")).toString();
@@ -467,6 +641,7 @@ void AgentDockWidget::setupUi()
         static_cast<DiffPreviewEdit *>(m_diffView)->setDiffText(QString());
         m_approvalList->clear();
         m_approvalItems.clear();
+        m_appliedDiff.clear();
         m_currentDiff.clear();
         m_statusLabel->setText(tr("Ready"));
         m_applyPatchBtn->setEnabled(false);
@@ -503,11 +678,26 @@ void AgentDockWidget::setupUi()
     m_diffView->setReadOnly(true);
     m_diffView->setLineWrapMode(QPlainTextEdit::NoWrap);
     m_diffView->setFont(QFont(QStringLiteral("monospace")));
-    m_tabs->addTab(m_diffView, tr("Diff Preview"));
+
+    m_diffFileList = new QListWidget;
+    m_diffFileList->setMaximumHeight(100);
+    m_diffFileList->setStyleSheet(QStringLiteral(
+        "QListWidget::item { padding: 2px 6px; color: #4078c0; }"
+        "QListWidget::item:hover { text-decoration: underline; background: #e8f0fe; }"));
+    m_diffFileList->setCursor(Qt::PointingHandCursor);
+
+    auto *diffPage = new QWidget;
+    auto *diffLayout = new QVBoxLayout(diffPage);
+    diffLayout->setContentsMargins(0, 0, 0, 0);
+    diffLayout->setSpacing(0);
+    diffLayout->addWidget(m_diffFileList);
+    diffLayout->addWidget(m_diffView, 1);
+    m_tabs->addTab(diffPage, tr("Diff Preview"));
+
     static_cast<DiffPreviewEdit *>(m_diffView)
-        ->setApprovalChangedCallback([this](int approved, int total) {
-            const bool allApproved = (total == 0 || approved == total);
-            m_applyPatchBtn->setEnabled(!m_currentDiff.isEmpty() && allApproved);
+        ->setApprovalChangedCallback([this](qsizetype approved, qsizetype total) {
+            Q_UNUSED(total);
+            m_applyPatchBtn->setEnabled(!m_currentDiff.isEmpty() && approved > 0);
         });
 
     m_approvalList = new QListWidget;
@@ -563,12 +753,16 @@ void AgentDockWidget::setupUi()
 
     m_modelCombo = new QComboBox;
     m_modelCombo->setEditable(true);
-    m_modelCombo->addItems({QStringLiteral("gpt-5.2"), QStringLiteral("gpt-5.3-codex"),
-                            QStringLiteral("gpt-5-mini"), QStringLiteral("gpt-4.1"),
-                            QStringLiteral("o3"), QStringLiteral("o4-mini"),
-                            QStringLiteral("claude-opus-4.6"), QStringLiteral("claude-sonnet-4.6"),
-                            QStringLiteral("gemini-3-flash")});
-    m_modelCombo->setCurrentText(settings().modelName);
+    const bool useCopilotModels = settings().provider == QStringLiteral("copilot");
+    repopulateEditableCombo(
+        m_modelCombo, useCopilotModels ? modelCatalog().copilotModels() : openAiAgentModels(),
+        settings().modelName);
+    connect(&modelCatalog(), &ModelCatalog::copilotModelsChanged, this,
+            [this](const QStringList &models) {
+                if (settings().provider != QStringLiteral("copilot"))
+                    return;
+                repopulateEditableCombo(m_modelCombo, models, m_modelCombo->currentText());
+            });
 
     m_thinkingCombo = new QComboBox;
     m_thinkingCombo->addItem(tr("Off"), QStringLiteral("off"));
@@ -588,6 +782,22 @@ void AgentDockWidget::setupUi()
 
     connect(m_runBtn, &QPushButton::clicked, this, &AgentDockWidget::onRunClicked);
     connect(m_stopBtn, &QPushButton::clicked, this, &AgentDockWidget::onStopClicked);
+
+    // Persist model/thinking selection immediately on change
+    connect(m_modelCombo, &QComboBox::currentTextChanged, this, [](const QString &text) {
+        auto &cfg = settings();
+        const QString model = text.trimmed();
+        if (!model.isEmpty())
+        {
+            cfg.modelName = model;
+            cfg.save();
+        }
+    });
+    connect(m_thinkingCombo, &QComboBox::currentIndexChanged, this, [this](int /*index*/) {
+        auto &cfg = settings();
+        cfg.thinkingLevel = m_thinkingCombo->currentData().toString();
+        cfg.save();
+    });
 
     btnColumn->addWidget(new QLabel(tr("Model")));
     btnColumn->addWidget(m_modelCombo);
@@ -644,11 +854,18 @@ void AgentDockWidget::onApplyPatchClicked()
         return;
 
     auto *diffPreview = static_cast<DiffPreviewEdit *>(m_diffView);
-    if (!diffPreview->allChangesApproved())
+    if (!diffPreview->hasApprovedChanges())
     {
         QMessageBox::information(
             this, tr("Apply Patch"),
-            tr("Approve each changed diff line in the gutter before applying."));
+            tr("Approve at least one changed diff line in the gutter before applying."));
+        return;
+    }
+
+    const QString diffToApply = diffPreview->approvedDiff().trimmed();
+    if (diffToApply.isEmpty())
+    {
+        QMessageBox::information(this, tr("Apply Patch"), tr("No approved changes to apply."));
         return;
     }
 
@@ -656,6 +873,7 @@ void AgentDockWidget::onApplyPatchClicked()
     QString workDir;
     if (auto *ctx = m_controller->editorContext())
         workDir = ctx->capture().projectDir;
+
     if (workDir.isEmpty())
     {
         QMessageBox::warning(this, tr("Apply Patch"), tr("No project directory found."));
@@ -663,8 +881,9 @@ void AgentDockWidget::onApplyPatchClicked()
     }
 
     QString errorMsg;
-    if (Diff::applyPatch(m_currentDiff, workDir, false, errorMsg))
+    if (Diff::applyPatch(diffToApply, workDir, false, errorMsg))
     {
+        m_appliedDiff = diffToApply;
         m_revertPatchBtn->setEnabled(true);
         onLogMessage(tr("✅ Patch applied successfully."));
     }
@@ -676,7 +895,8 @@ void AgentDockWidget::onApplyPatchClicked()
 
 void AgentDockWidget::onRevertPatchClicked()
 {
-    if (m_currentDiff.isEmpty())
+    const QString diffToRevert = m_appliedDiff.isEmpty() ? m_currentDiff : m_appliedDiff;
+    if (diffToRevert.isEmpty())
         return;
 
     QString workDir;
@@ -684,8 +904,9 @@ void AgentDockWidget::onRevertPatchClicked()
         workDir = ctx->capture().projectDir;
 
     QString errorMsg;
-    if (Diff::revertPatch(m_currentDiff, workDir, errorMsg))
+    if (Diff::revertPatch(diffToRevert, workDir, errorMsg))
     {
+        m_appliedDiff.clear();
         m_revertPatchBtn->setEnabled(false);
         onLogMessage(tr("↩ Patch reverted successfully."));
     }
@@ -731,21 +952,23 @@ void AgentDockWidget::onLogMessage(const QString &msg)
 
 void AgentDockWidget::renderLog()
 {
-    QString markdown = m_logMarkdown;
+    QString text = m_logMarkdown;
     if (!m_streamingMarkdown.isEmpty())
     {
-        if (!markdown.isEmpty())
-            markdown += QStringLiteral("\n\n");
-        markdown += m_streamingMarkdown;
+        if (!text.isEmpty())
+            text += QStringLiteral("\n\n");
+        text += m_streamingMarkdown;
     }
 
-    m_logView->setMarkdown(markdown);
-    if (!markdown.trimmed().isEmpty() && m_logView->toPlainText().trimmed().isEmpty())
-        m_logView->setPlainText(markdown);
-    QTextCursor cursor = m_logView->textCursor();
-    cursor.movePosition(QTextCursor::End);
-    m_logView->setTextCursor(cursor);
-    m_logView->ensureCursorVisible();
+    m_logView->setPlainText(text);
+
+    // Defer scroll to allow document layout to complete
+    QTimer::singleShot(0, m_logView, [this]() {
+        QTextCursor cursor = m_logView->textCursor();
+        cursor.movePosition(QTextCursor::End);
+        m_logView->setTextCursor(cursor);
+        m_logView->ensureCursorVisible();
+    });
 }
 
 void AgentDockWidget::onPlanUpdated(const QList<PlanStep> &steps)
@@ -762,24 +985,56 @@ void AgentDockWidget::onPlanUpdated(const QList<PlanStep> &steps)
 void AgentDockWidget::onDiffAvailable(const QString &diff)
 {
     m_currentDiff = diff;
+    m_appliedDiff.clear();
     auto *diffPreview = static_cast<DiffPreviewEdit *>(m_diffView);
     diffPreview->setDiffText(diff);
-    m_applyPatchBtn->setEnabled(!diff.isEmpty() && diffPreview->allChangesApproved());
-    m_tabs->setCurrentWidget(m_diffView);
+    m_applyPatchBtn->setEnabled(!diff.isEmpty() && diffPreview->hasApprovedChanges());
 
-    // Open the diff in Qt Creator's main text editor
-    if (!diff.isEmpty()) {
-        const QString tempPath = QDir::tempPath() + QStringLiteral("/qcai2_agent.diff");
-        QFile f(tempPath);
-        if (f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
-            f.write(diff.toUtf8());
-            f.close();
-            Utils::Link link(Utils::FilePath::fromString(tempPath), 0, 0);
-            QMetaObject::invokeMethod(Core::EditorManager::instance(), [link]() {
-                Core::EditorManager::openEditorAt(link);
-            }, Qt::QueuedConnection);
+    // Switch to Diff tab (m_diffView is inside a container page)
+    if (auto *page = m_diffView->parentWidget())
+        m_tabs->setCurrentWidget(page);
+
+    // Populate file list from diff headers
+    m_diffFileList->clear();
+    QString workDir;
+    if (auto *ctx = m_controller->editorContext())
+        workDir = ctx->capture().projectDir;
+
+    if (!diff.isEmpty())
+    {
+        // Extract file paths from "--- a/..." headers
+        static const QRegularExpression reFile(QStringLiteral(R"(^--- a/(.+)$)"),
+                                               QRegularExpression::MultilineOption);
+        auto it = reFile.globalMatch(diff);
+        QStringList files;
+        while (it.hasNext())
+        {
+            const QString f = it.next().captured(1);
+            if (!files.contains(f))
+                files.append(f);
         }
+
+        for (const auto &f : files)
+        {
+            auto *item = new QListWidgetItem(f);
+            item->setData(Qt::UserRole, QDir(workDir).absoluteFilePath(f));
+            m_diffFileList->addItem(item);
+        }
+
+        // Click → open in editor
+        disconnect(m_diffFileList, &QListWidget::itemClicked, nullptr, nullptr);
+        connect(m_diffFileList, &QListWidget::itemClicked, this, [](QListWidgetItem *item) {
+            const QString absPath = item->data(Qt::UserRole).toString();
+            Core::EditorManager::openEditorAt(
+                Utils::Link(Utils::FilePath::fromString(absPath), 0, 0));
+        });
+
+        // Show inline diff markers in code editors
+        if (!workDir.isEmpty())
+            m_inlineDiffManager->showDiff(diff, workDir);
     }
+
+    m_diffFileList->setVisible(!m_diffFileList->count() == 0);
 }
 
 void AgentDockWidget::onApprovalRequested(int id, const QString &action, const QString &reason,
@@ -861,4 +1116,4 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-}  // namespace Qcai2
+}  // namespace qcai2

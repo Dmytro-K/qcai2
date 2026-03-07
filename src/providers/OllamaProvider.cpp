@@ -1,12 +1,12 @@
 #include "OllamaProvider.h"
 
-namespace Qcai2 {
+namespace qcai2
+{
 
-OllamaProvider::OllamaProvider(QObject *parent)
-    : OpenAICompatibleProvider(parent)
+OllamaProvider::OllamaProvider(QObject *parent) : OpenAICompatibleProvider(parent)
 {
     // Default Ollama endpoint
     setBaseUrl(QStringLiteral("http://localhost:11434"));
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

@@ -1,15 +1,17 @@
 #pragma once
 
-#include <QString>
-#include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonObject>
 #include <QList>
+#include <QString>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // Single chat message (role + content)
-struct ChatMessage {
-    QString role;    // "system", "user", "assistant"
+struct ChatMessage
+{
+    QString role;  // "system", "user", "assistant"
     QString content;
 
     QJsonObject toJson() const;
@@ -17,23 +19,26 @@ struct ChatMessage {
 };
 
 // A step in the agent plan
-struct PlanStep {
-    int     index;
+struct PlanStep
+{
+    int index;
     QString description;
-    bool    completed = false;
+    bool completed = false;
 };
 
 // Possible response types from the LLM
-enum class ResponseType {
-    Plan,         // {"type":"plan", "steps":[...]}
-    ToolCall,     // {"type":"tool_call", "name":"...", "args":{...}}
-    Final,        // {"type":"final", "summary":"...", "diff":"..."}
-    NeedApproval, // {"type":"need_approval", "action":"...", "reason":"...", "preview":"..."}
-    Text,         // raw text (fallback)
+enum class ResponseType
+{
+    Plan,          // {"type":"plan", "steps":[...]}
+    ToolCall,      // {"type":"tool_call", "name":"...", "args":{...}}
+    Final,         // {"type":"final", "summary":"...", "diff":"..."}
+    NeedApproval,  // {"type":"need_approval", "action":"...", "reason":"...", "preview":"..."}
+    Text,          // raw text (fallback)
     Error
 };
 
-struct AgentResponse {
+struct AgentResponse
+{
     ResponseType type = ResponseType::Error;
 
     // Plan
@@ -62,4 +67,4 @@ private:
     static AgentResponse parseJson(const QJsonObject &obj);
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

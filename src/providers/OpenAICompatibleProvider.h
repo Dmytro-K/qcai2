@@ -2,11 +2,12 @@
 
 #include "IAIProvider.h"
 
-#include <QObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QObject>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // Provider that talks to OpenAI-compatible REST endpoints.
 // Works with OpenAI, Azure OpenAI, vLLM, LMStudio, text-generation-webui, etc.
@@ -16,23 +17,35 @@ class OpenAICompatibleProvider : public QObject, public IAIProvider
 public:
     explicit OpenAICompatibleProvider(QObject *parent = nullptr);
 
-    QString id() const override { return QStringLiteral("openai"); }
-    QString displayName() const override { return QStringLiteral("OpenAI-Compatible"); }
+    QString id() const override
+    {
+        return QStringLiteral("openai");
+    }
+    QString displayName() const override
+    {
+        return QStringLiteral("OpenAI-Compatible");
+    }
 
-    void complete(const QList<ChatMessage> &messages,
-                  const QString &model,
-                  double temperature,
-                  int maxTokens,
-                  CompletionCallback callback,
+    void complete(const QList<ChatMessage> &messages, const QString &model, double temperature,
+                  int maxTokens, const QString &reasoningEffort, CompletionCallback callback,
                   StreamCallback streamCallback = nullptr) override;
 
     void cancel() override;
 
-    void setBaseUrl(const QString &url) override { m_baseUrl = url; }
-    void setApiKey(const QString &key) override  { m_apiKey = key; }
+    void setBaseUrl(const QString &url) override
+    {
+        m_baseUrl = url;
+    }
+    void setApiKey(const QString &key) override
+    {
+        m_apiKey = key;
+    }
 
     // Custom headers (e.g. for Azure)
-    void setExtraHeaders(const QMap<QString, QString> &headers) { m_extraHeaders = headers; }
+    void setExtraHeaders(const QMap<QString, QString> &headers)
+    {
+        m_extraHeaders = headers;
+    }
 
 private:
     void handleStreamChunk();
@@ -46,4 +59,4 @@ private:
     QString m_streamAccum;
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

@@ -2,7 +2,8 @@
 
 #include <QDateTime>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 Logger::Logger() = default;
 
@@ -69,11 +70,16 @@ void Logger::clear()
 
 QString Logger::levelStr(Level level)
 {
-    switch (level) {
-    case Debug:   return QStringLiteral("DBG");
-    case Info:    return QStringLiteral("INF");
-    case Warning: return QStringLiteral("WRN");
-    case Error:   return QStringLiteral("ERR");
+    switch (level)
+    {
+        case Debug:
+            return QStringLiteral("DBG");
+        case Info:
+            return QStringLiteral("INF");
+        case Warning:
+            return QStringLiteral("WRN");
+        case Error:
+            return QStringLiteral("ERR");
     }
     return QStringLiteral("???");
 }
@@ -82,9 +88,7 @@ QString Logger::format(Level level, const QString &category, const QString &mess
 {
     return QStringLiteral("[%1] [%2] [%3] %4")
         .arg(QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss.zzz")),
-             levelStr(level),
-             category,
-             message);
+             levelStr(level), category, message);
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

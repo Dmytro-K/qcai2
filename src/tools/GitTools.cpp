@@ -3,7 +3,8 @@
 
 #include <QStandardPaths>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // ---------------------------------------------------------------------------
 // GitStatusTool
@@ -31,8 +32,7 @@ QString GitStatusTool::execute(const QJsonObject & /*args*/, const QString &work
 QJsonObject GitDiffTool::argsSchema() const
 {
     return QJsonObject{
-        {"path", QJsonObject{{"type", "string"}, {"description", "Optional file path to diff"}}}
-    };
+        {"path", QJsonObject{{"type", "string"}, {"description", "Optional file path to diff"}}}};
 }
 
 QString GitDiffTool::execute(const QJsonObject &args, const QString &workDir)
@@ -55,4 +55,4 @@ QString GitDiffTool::execute(const QJsonObject &args, const QString &workDir)
     return res.stdOut.isEmpty() ? QStringLiteral("No differences.") : res.stdOut;
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

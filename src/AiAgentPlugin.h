@@ -2,7 +2,8 @@
 
 #include <extensionsystem/iplugin.h>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 class AgentController;
 class AgentDockWidget;
@@ -11,13 +12,16 @@ class ToolRegistry;
 class SafetyPolicy;
 class IAIProvider;
 class AiCompletionProvider;
+class GhostTextManager;
+class CopilotProvider;
 
-namespace Internal {
+namespace Internal
+{
 
 class AiAgentPlugin final : public ExtensionSystem::IPlugin
 {
     Q_OBJECT
-    Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QtCreatorPlugin" FILE "Qcai2.json")
+    Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QtCreatorPlugin" FILE "qcai2.json")
 
 public:
     AiAgentPlugin();
@@ -30,18 +34,21 @@ public:
 private:
     void createDockWidget();
     void setupProviders();
+    void refreshCopilotModels();
     void registerTools();
 
-    AgentController  *m_controller    = nullptr;
-    EditorContext    *m_editorContext  = nullptr;
-    ToolRegistry     *m_toolRegistry  = nullptr;
-    SafetyPolicy     *m_safetyPolicy  = nullptr;
-    IAIProvider      *m_currentProvider = nullptr;
+    AgentController *m_controller = nullptr;
+    EditorContext *m_editorContext = nullptr;
+    ToolRegistry *m_toolRegistry = nullptr;
+    SafetyPolicy *m_safetyPolicy = nullptr;
+    IAIProvider *m_currentProvider = nullptr;
 
     // Provider instances
     QList<IAIProvider *> m_providers;
+    CopilotProvider *m_copilotProvider = nullptr;
     AiCompletionProvider *m_completionProvider = nullptr;
+    GhostTextManager *m_ghostTextManager = nullptr;
 };
 
-} // namespace Internal
-} // namespace Qcai2
+}  // namespace Internal
+}  // namespace qcai2

@@ -2,17 +2,25 @@
 
 #include "ITool.h"
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // git_status: runs "git status --porcelain" in the project directory.
 class GitStatusTool : public ITool
 {
 public:
-    QString name() const override { return QStringLiteral("git_status"); }
-    QString description() const override {
+    QString name() const override
+    {
+        return QStringLiteral("git_status");
+    }
+    QString description() const override
+    {
         return QStringLiteral("Show git status (read-only). No args required.");
     }
-    QJsonObject argsSchema() const override { return {}; }
+    QJsonObject argsSchema() const override
+    {
+        return {};
+    }
     QString execute(const QJsonObject &args, const QString &workDir) override;
 };
 
@@ -20,12 +28,16 @@ public:
 class GitDiffTool : public ITool
 {
 public:
-    QString name() const override { return QStringLiteral("git_diff"); }
-    QString description() const override {
+    QString name() const override
+    {
+        return QStringLiteral("git_diff");
+    }
+    QString description() const override
+    {
         return QStringLiteral("Show git diff (read-only). Args: path (optional, specific file).");
     }
     QJsonObject argsSchema() const override;
     QString execute(const QJsonObject &args, const QString &workDir) override;
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

@@ -4,7 +4,8 @@
 #include <QDir>
 #include <QRegularExpression>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // ---------------------------------------------------------------------------
 // RunBuildTool
@@ -13,8 +14,7 @@ namespace Qcai2 {
 QJsonObject RunBuildTool::argsSchema() const
 {
     return QJsonObject{
-        {"target", QJsonObject{{"type", "string"}, {"description", "Optional build target"}}}
-    };
+        {"target", QJsonObject{{"type", "string"}, {"description", "Optional build target"}}}};
 }
 
 QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
@@ -33,9 +33,12 @@ QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
     auto result = runner.run(QStringLiteral("cmake"), cmakeArgs, workDir, 120000);
 
     QString output;
-    if (result.success) {
+    if (result.success)
+    {
         output = QStringLiteral("Build succeeded.\n");
-    } else {
+    }
+    else
+    {
         output = QStringLiteral("Build FAILED (exit code %1).\n").arg(result.exitCode);
     }
     output += result.stdOut;
@@ -52,15 +55,15 @@ QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
 QJsonObject RunTestsTool::argsSchema() const
 {
     return QJsonObject{
-        {"filter", QJsonObject{{"type", "string"}, {"description", "ctest -R filter regex"}}}
-    };
+        {"filter", QJsonObject{{"type", "string"}, {"description", "ctest -R filter regex"}}}};
 }
 
 QString RunTestsTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString buildDir = m_buildDir.isEmpty() ? workDir : m_buildDir;
 
-    QStringList ctestArgs = {QStringLiteral("--test-dir"), buildDir, QStringLiteral("--output-on-failure")};
+    QStringList ctestArgs = {QStringLiteral("--test-dir"), buildDir,
+                             QStringLiteral("--output-on-failure")};
 
     const QString filter = args.value("filter").toString();
     if (!filter.isEmpty())
@@ -96,12 +99,13 @@ QString ShowDiagnosticsTool::execute(const QJsonObject & /*args*/, const QString
         return QStringLiteral("No build output available.");
 
     // Extract lines containing error/warning patterns
-    static const QRegularExpression diagRe(
-        R"((?:error|warning|note):\s.*)", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression diagRe(R"((?:error|warning|note):\s.*)",
+                                           QRegularExpression::CaseInsensitiveOption);
 
     const QStringList lines = m_lastBuildOutput.split('\n');
     QStringList diags;
-    for (const QString &line : lines) {
+    for (const QString &line : lines)
+    {
         if (diagRe.match(line).hasMatch())
             diags.append(line);
     }
@@ -109,4 +113,4 @@ QString ShowDiagnosticsTool::execute(const QJsonObject & /*args*/, const QString
     return diags.isEmpty() ? QStringLiteral("No diagnostics found.") : diags.join('\n');
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

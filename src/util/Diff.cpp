@@ -1,9 +1,12 @@
 #include "Diff.h"
 #include "ProcessRunner.h"
 
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QRegularExpression>
 
-namespace Qcai2::Diff
+namespace qcai2::Diff
 {
 
 QString normalize(const QString &unifiedDiff)
@@ -163,4 +166,79 @@ bool revertPatch(const QString &unifiedDiff, const QString &workDir, QString &er
     return runPatchCmd(normalize(unifiedDiff), workDir, {QStringLiteral("-R")}, errorMsg);
 }
 
-}  // namespace Qcai2::Diff
+NewFileResult extractAndCreateNewFiles(const QString &patchText, const QString &workDir,
+                                       bool dryRun)
+{
+    NewFileResult result;
+
+    static const QRegularExpression newFileHeader(R"(^=== NEW FILE:\s*(.+?)\s*===$)");
+
+    const QStringList lines = patchText.split('\n');
+    QStringList diffLines;
+    int i = 0;
+
+    while (i < lines.size())
+    {
+        const auto m = newFileHeader.match(lines[i]);
+        if (!m.hasMatch())
+        {
+            diffLines.append(lines[i]);
+            ++i;
+            continue;
+        }
+
+        const QString relPath = m.captured(1);
+        ++i;
+
+        // Collect file content until next section or end
+        QStringList contentLines;
+        while (i < lines.size())
+        {
+            if (newFileHeader.match(lines[i]).hasMatch())
+                break;
+            if (lines[i].startsWith(QStringLiteral("=== MODIFIED:")))
+                break;
+            contentLines.append(lines[i]);
+            ++i;
+        }
+
+        // Trim trailing empty lines
+        while (!contentLines.isEmpty() && contentLines.last().trimmed().isEmpty())
+            contentLines.removeLast();
+
+        const QString content = contentLines.join('\n') + QLatin1Char('\n');
+
+        // Sandbox check
+        const QDir dir(workDir);
+        const QString absPath = dir.absoluteFilePath(relPath);
+        if (!QFileInfo(absPath).absoluteFilePath().startsWith(dir.canonicalPath()))
+        {
+            result.error = QStringLiteral("New file path outside project: %1").arg(relPath);
+            return result;
+        }
+
+        if (!dryRun)
+        {
+            // Create parent directories
+            QFileInfo fi(absPath);
+            if (!fi.dir().exists())
+                QDir().mkpath(fi.absolutePath());
+
+            QFile f(absPath);
+            if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
+            {
+                result.error =
+                    QStringLiteral("Cannot create file %1: %2").arg(relPath, f.errorString());
+                return result;
+            }
+            f.write(content.toUtf8());
+        }
+
+        result.createdFiles.append(relPath);
+    }
+
+    result.remainingDiff = diffLines.join('\n');
+    return result;
+}
+
+}  // namespace qcai2::Diff

@@ -1,38 +1,43 @@
 #include "EditorContext.h"
 #include "../util/Logger.h"
 
+#include <coreplugin/documentmanager.h>
 #include <coreplugin/editormanager/editormanager.h>
 #include <coreplugin/editormanager/ieditor.h>
 #include <coreplugin/idocument.h>
-#include <coreplugin/documentmanager.h>
-#include <texteditor/texteditor.h>
-#include <projectexplorer/project.h>
-#include <projectexplorer/projectmanager.h>
-#include <projectexplorer/target.h>
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/buildmanager.h>
 #include <projectexplorer/kit.h>
+#include <projectexplorer/project.h>
+#include <projectexplorer/projectmanager.h>
+#include <projectexplorer/target.h>
 #include <projectexplorer/toolchain.h>
 #include <projectexplorer/toolchainkitaspect.h>
+#include <texteditor/texteditor.h>
 
 #include <QTextCursor>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
-EditorContext::EditorContext(QObject *parent) : QObject(parent) {}
+EditorContext::EditorContext(QObject *parent) : QObject(parent)
+{
+}
 
 EditorContext::Snapshot EditorContext::capture() const
 {
     Snapshot s;
 
     // Current editor file & selection
-    if (Core::IEditor *editor = Core::EditorManager::currentEditor()) {
+    if (Core::IEditor *editor = Core::EditorManager::currentEditor())
+    {
         if (Core::IDocument *doc = editor->document())
             s.filePath = doc->filePath().toUrlishString();
 
-        if (auto *textEditor = qobject_cast<TextEditor::BaseTextEditor *>(editor)) {
+        if (auto *textEditor = qobject_cast<TextEditor::BaseTextEditor *>(editor))
+        {
             QTextCursor tc = textEditor->textCursor();
-            s.cursorLine   = tc.blockNumber() + 1;
+            s.cursorLine = tc.blockNumber() + 1;
             s.cursorColumn = tc.columnNumber() + 1;
             s.selectedText = tc.selectedText();
         }
@@ -44,22 +49,27 @@ EditorContext::Snapshot EditorContext::capture() const
         s.openFiles.append(doc->filePath().toUrlishString());
 
     // Project & build directories
-    if (auto *project = ProjectExplorer::ProjectManager::startupProject()) {
+    if (auto *project = ProjectExplorer::ProjectManager::startupProject())
+    {
         s.projectName = project->displayName();
         s.projectDir = project->projectDirectory().toUrlishString();
         s.projectFilePath = project->projectFilePath().toUrlishString();
 
-        if (auto *target = project->activeTarget()) {
+        if (auto *target = project->activeTarget())
+        {
             s.targetName = target->displayName();
 
-            if (auto *bc = target->activeBuildConfiguration()) {
+            if (auto *bc = target->activeBuildConfiguration())
+            {
                 s.buildDir = bc->buildDirectory().toUrlishString();
                 s.buildType = ProjectExplorer::BuildConfiguration::buildTypeName(bc->buildType());
             }
 
-            if (auto *kit = target->kit()) {
+            if (auto *kit = target->kit())
+            {
                 s.kitName = kit->displayName();
-                if (auto *tc = ProjectExplorer::ToolchainKitAspect::cxxToolchain(kit)) {
+                if (auto *tc = ProjectExplorer::ToolchainKitAspect::cxxToolchain(kit))
+                {
                     s.compilerName = tc->displayName();
                     s.compilerPath = tc->compilerCommand().toUrlishString();
                 }
@@ -67,11 +77,12 @@ EditorContext::Snapshot EditorContext::capture() const
         }
     }
 
-    QCAI_DEBUG("Context", QStringLiteral("Captured: file=%1 line=%2 project=%3 openFiles=%4")
-        .arg(s.filePath.isEmpty() ? QStringLiteral("(none)") : s.filePath)
-        .arg(s.cursorLine)
-        .arg(s.projectDir.isEmpty() ? QStringLiteral("(none)") : s.projectDir)
-        .arg(s.openFiles.size()));
+    QCAI_DEBUG("Context",
+               QStringLiteral("Captured: file=%1 line=%2 project=%3 openFiles=%4")
+                   .arg(s.filePath.isEmpty() ? QStringLiteral("(none)") : s.filePath)
+                   .arg(s.cursorLine)
+                   .arg(s.projectDir.isEmpty() ? QStringLiteral("(none)") : s.projectDir)
+                   .arg(s.openFiles.size()));
 
     return s;
 }
@@ -120,12 +131,14 @@ QString EditorContext::fileContentsFragment(int maxChars) const
         ordered.append(activeDoc);
 
     const auto docs = Core::DocumentModel::openedDocuments();
-    for (Core::IDocument *doc : docs) {
+    for (Core::IDocument *doc : docs)
+    {
         if (doc != activeDoc)
             ordered.append(doc);
     }
 
-    for (Core::IDocument *doc : ordered) {
+    for (Core::IDocument *doc : ordered)
+    {
         if (remaining <= 0)
             break;
 
@@ -136,8 +149,10 @@ QString EditorContext::fileContentsFragment(int maxChars) const
         // Read content from the editor buffer (in-memory, no disk I/O)
         QString content;
         const auto editors = Core::DocumentModel::editorsForDocument(doc);
-        if (!editors.isEmpty()) {
-            if (auto *te = qobject_cast<TextEditor::BaseTextEditor *>(editors.first())) {
+        if (!editors.isEmpty())
+        {
+            if (auto *te = qobject_cast<TextEditor::BaseTextEditor *>(editors.first()))
+            {
                 if (auto *tw = te->editorWidget())
                     content = tw->toPlainText();
             }
@@ -147,7 +162,8 @@ QString EditorContext::fileContentsFragment(int maxChars) const
             continue;
 
         // Truncate if needed
-        if (content.length() > remaining) {
+        if (content.length() > remaining)
+        {
             content = content.left(remaining);
             content += QStringLiteral("\n... (truncated)");
         }
@@ -156,12 +172,14 @@ QString EditorContext::fileContentsFragment(int maxChars) const
         remaining -= static_cast<int>(content.length());
     }
 
-    if (!result.isEmpty()) {
+    if (!result.isEmpty())
+    {
         QCAI_DEBUG("Context", QStringLiteral("File contents: %1 files, %2 chars")
-            .arg(ordered.size()).arg(maxChars - remaining));
+                                  .arg(ordered.size())
+                                  .arg(maxChars - remaining));
     }
 
     return result;
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

@@ -1,18 +1,22 @@
 #include "ToolCall.h"
 #include <QJsonDocument>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 QJsonObject ToolCall::toJson() const
 {
     QJsonObject o;
-    if (!id.isEmpty())   o["id"]     = id;
-    o["name"]   = name;
-    o["args"]   = args;
-    if (executed) {
-        o["result"]   = result;
-        o["failed"]   = failed;
-        if (failed) o["error"] = errorMsg;
+    if (!id.isEmpty())
+        o["id"] = id;
+    o["name"] = name;
+    o["args"] = args;
+    if (executed)
+    {
+        o["result"] = result;
+        o["failed"] = failed;
+        if (failed)
+            o["error"] = errorMsg;
     }
     return o;
 }
@@ -20,10 +24,10 @@ QJsonObject ToolCall::toJson() const
 ToolCall ToolCall::fromJson(const QJsonObject &obj)
 {
     ToolCall tc;
-    tc.id   = obj.value("id").toString();
+    tc.id = obj.value("id").toString();
     tc.name = obj.value("name").toString();
     tc.args = obj.value("args").toObject();
     return tc;
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

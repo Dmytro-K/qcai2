@@ -2,7 +2,8 @@
 
 #include <texteditor/codeassist/completionassistprovider.h>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 class IAIProvider;
 
@@ -13,16 +14,28 @@ class AiCompletionProvider : public TextEditor::CompletionAssistProvider
 public:
     explicit AiCompletionProvider(QObject *parent = nullptr);
 
-    TextEditor::IAssistProcessor *createProcessor(
-        const TextEditor::AssistInterface *assistInterface) const override;
+    TextEditor::IAssistProcessor *
+    createProcessor(const TextEditor::AssistInterface *assistInterface) const override;
 
     int activationCharSequenceLength() const override;
     bool isActivationCharSequence(const QString &sequence) const override;
 
-    void setAiProvider(IAIProvider *provider) { m_provider = provider; }
-    void setModel(const QString &model) { m_model = model; }
-    void setEnabled(bool enabled) { m_enabled = enabled; }
-    bool isEnabled() const { return m_enabled; }
+    void setAiProvider(IAIProvider *provider)
+    {
+        m_provider = provider;
+    }
+    void setModel(const QString &model)
+    {
+        m_model = model;
+    }
+    void setEnabled(bool enabled)
+    {
+        m_enabled = enabled;
+    }
+    bool isEnabled() const
+    {
+        return m_enabled;
+    }
 
 private:
     IAIProvider *m_provider = nullptr;
@@ -30,4 +43,4 @@ private:
     bool m_enabled = true;
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

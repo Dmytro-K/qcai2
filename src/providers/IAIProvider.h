@@ -2,12 +2,13 @@
 
 #include "../models/AgentMessages.h"
 
+#include <QList>
 #include <QObject>
 #include <QString>
-#include <QList>
 #include <functional>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // Abstract interface for AI model providers.
 class IAIProvider
@@ -22,14 +23,12 @@ public:
     virtual QString displayName() const = 0;
 
     // Called for each streaming token (delta text). Empty string = stream finished.
-    using StreamCallback     = std::function<void(const QString &delta)>;
+    using StreamCallback = std::function<void(const QString &delta)>;
     // Called when the full response is complete (or on error).
     using CompletionCallback = std::function<void(const QString &response, const QString &error)>;
 
-    virtual void complete(const QList<ChatMessage> &messages,
-                          const QString &model,
-                          double temperature,
-                          int maxTokens,
+    virtual void complete(const QList<ChatMessage> &messages, const QString &model,
+                          double temperature, int maxTokens, const QString &reasoningEffort,
                           CompletionCallback callback,
                           StreamCallback streamCallback = nullptr) = 0;
 
@@ -38,7 +37,7 @@ public:
 
     // Configure the provider (base URL, API key, etc.)
     virtual void setBaseUrl(const QString &url) = 0;
-    virtual void setApiKey(const QString &key)  = 0;
+    virtual void setApiKey(const QString &key) = 0;
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

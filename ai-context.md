@@ -1,4 +1,4 @@
-# Qcai2 — AI Agent Plugin for Qt Creator
+# qcai2 — AI Agent Plugin for Qt Creator
 
 ## Контекст для продовження розробки
 
@@ -9,7 +9,7 @@
 
 ## Огляд
 
-**Qcai2** — повнофункціональний AI Agent плагін для Qt Creator (Qt 6, C++23).
+**qcai2** — повнофункціональний AI Agent плагін для Qt Creator (Qt 6, C++23).
 Реалізує автономний агентський цикл: plan → act (tools) → observe → verify → iterate.
 
 ### Ключові можливості
@@ -45,7 +45,7 @@ qcai2/
 ├── CMakeLists.txt              — збірка плагіна (add_qtc_plugin)
 ├── qcai2constants.h            — константи (menu/action ID)
 ├── qcai2tr.h                   — макрос перекладу
-├── Qcai2.json.in               — метадані плагіна
+├── qcai2.json.in               — метадані плагіна
 ├── ai-prompt.txt               — оригінальна специфікація
 ├── resources/
 │   └── aiagentplugin.qrc       — ресурси (іконки)

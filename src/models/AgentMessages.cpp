@@ -1,12 +1,14 @@
 #include "AgentMessages.h"
 
-#include <QJsonDocument>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QRegularExpression>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
-namespace {
+namespace
+{
 
 QList<QString> extractTopLevelObjects(const QString &raw)
 {
@@ -16,35 +18,46 @@ QList<QString> extractTopLevelObjects(const QString &raw)
     bool inString = false;
     bool escaped = false;
 
-    for (int i = 0; i < raw.size(); ++i) {
+    for (int i = 0; i < raw.size(); ++i)
+    {
         const QChar ch = raw.at(i);
 
-        if (inString) {
-            if (escaped) {
+        if (inString)
+        {
+            if (escaped)
+            {
                 escaped = false;
-            } else if (ch == QLatin1Char('\\')) {
+            }
+            else if (ch == QLatin1Char('\\'))
+            {
                 escaped = true;
-            } else if (ch == QLatin1Char('"')) {
+            }
+            else if (ch == QLatin1Char('"'))
+            {
                 inString = false;
             }
             continue;
         }
 
-        if (ch == QLatin1Char('"')) {
+        if (ch == QLatin1Char('"'))
+        {
             inString = true;
             continue;
         }
 
-        if (ch == QLatin1Char('{')) {
+        if (ch == QLatin1Char('{'))
+        {
             if (depth == 0)
                 start = i;
             ++depth;
             continue;
         }
 
-        if (ch == QLatin1Char('}') && depth > 0) {
+        if (ch == QLatin1Char('}') && depth > 0)
+        {
             --depth;
-            if (depth == 0 && start >= 0) {
+            if (depth == 0 && start >= 0)
+            {
                 objects.append(raw.mid(start, i - start + 1));
                 start = -1;
             }
@@ -54,7 +67,7 @@ QList<QString> extractTopLevelObjects(const QString &raw)
     return objects;
 }
 
-} // namespace
+}  // namespace
 
 // ---------------------------------------------------------------------------
 // ChatMessage
@@ -79,38 +92,42 @@ AgentResponse AgentResponse::parseJson(const QJsonObject &obj)
     AgentResponse r;
     const QString type = obj.value("type").toString();
 
-    if (type == "plan") {
+    if (type == "plan")
+    {
         r.type = ResponseType::Plan;
         const QJsonArray arr = obj.value("steps").toArray();
-        for (int i = 0; i < arr.size(); ++i) {
+        for (int i = 0; i < arr.size(); ++i)
+        {
             PlanStep s;
             s.index = i;
-            s.description = arr[i].isString()
-                                ? arr[i].toString()
-                                : arr[i].toObject().value("description").toString();
+            s.description = arr[i].isString() ? arr[i].toString()
+                                              : arr[i].toObject().value("description").toString();
             r.steps.append(s);
         }
         return r;
     }
 
-    if (type == "tool_call") {
-        r.type     = ResponseType::ToolCall;
+    if (type == "tool_call")
+    {
+        r.type = ResponseType::ToolCall;
         r.toolName = obj.value("name").toString();
         r.toolArgs = obj.value("args").toObject();
         return r;
     }
 
-    if (type == "final") {
-        r.type    = ResponseType::Final;
+    if (type == "final")
+    {
+        r.type = ResponseType::Final;
         r.summary = obj.value("summary").toString();
-        r.diff    = obj.value("diff").toString();
+        r.diff = obj.value("diff").toString();
         return r;
     }
 
-    if (type == "need_approval") {
-        r.type            = ResponseType::NeedApproval;
-        r.approvalAction  = obj.value("action").toString();
-        r.approvalReason  = obj.value("reason").toString();
+    if (type == "need_approval")
+    {
+        r.type = ResponseType::NeedApproval;
+        r.approvalAction = obj.value("action").toString();
+        r.approvalReason = obj.value("reason").toString();
         r.approvalPreview = obj.value("preview").toString();
         return r;
     }
@@ -148,12 +165,12 @@ AgentResponse AgentResponse::parse(const QString &raw)
     if (err.error == QJsonParseError::NoError && doc.isObject())
         return parseJson(doc.object());
 
-    static const QRegularExpression fencedJsonRe(
-        R"(```(?:json)?\s*(\{[\s\S]*?\})\s*```)",
-        QRegularExpression::MultilineOption);
+    static const QRegularExpression fencedJsonRe(R"(```(?:json)?\s*(\{[\s\S]*?\})\s*```)",
+                                                 QRegularExpression::MultilineOption);
 
     QRegularExpressionMatchIterator it = fencedJsonRe.globalMatch(raw);
-    while (it.hasNext()) {
+    while (it.hasNext())
+    {
         const QRegularExpressionMatch m = it.next();
         if (tryParseTypedResponse(m.captured(1), parsed))
             return parsed;
@@ -162,7 +179,8 @@ AgentResponse AgentResponse::parse(const QString &raw)
     // Handle multiple JSON objects in one message, e.g.
     // {"type":"tool_call",...}{"type":"final",...}
     const QList<QString> objects = extractTopLevelObjects(raw);
-    for (const QString &candidate : objects) {
+    for (const QString &candidate : objects)
+    {
         if (tryParseTypedResponse(candidate, parsed))
             return parsed;
     }
@@ -174,4 +192,4 @@ AgentResponse AgentResponse::parse(const QString &raw)
     return r;
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

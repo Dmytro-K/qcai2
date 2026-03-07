@@ -3,7 +3,33 @@ cmake_minimum_required(VERSION 3.28)
 # Remove when sharing with others.
 list(APPEND CMAKE_PREFIX_PATH "/usr")
 
-project(Qcai2)
+project(qcai2)
+
+include(GNUInstallDirs)
+
+set(QCAI2_FORMAT_CHANGED_SCRIPT
+    "${CMAKE_CURRENT_SOURCE_DIR}/format-changed-files.cmake")
+
+if (WIN32)
+    if (DEFINED ENV{LOCALAPPDATA} AND NOT "$ENV{LOCALAPPDATA}" STREQUAL "")
+        set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{LOCALAPPDATA}/QtProject/qtcreator")
+    else ()
+        set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{HOME}/AppData/Local/QtProject/qtcreator")
+    endif ()
+elseif (APPLE)
+    set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{HOME}/Library/Application Support/QtProject/Qt Creator")
+else ()
+    if (DEFINED ENV{XDG_DATA_HOME} AND NOT "$ENV{XDG_DATA_HOME}" STREQUAL "")
+        set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{XDG_DATA_HOME}/data/QtProject/qtcreator")
+    else ()
+        set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{HOME}/.local/share/data/QtProject/qtcreator")
+    endif ()
+endif ()
+
+if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "${QCAI2_DEFAULT_INSTALL_PREFIX}" CACHE PATH
+        "Install path prefix, prepended onto install directories." FORCE)
+endif ()
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -29,7 +55,7 @@ if("${COMPILER_ID}" STREQUAL "Clang")
     # using Clang
 elseif("${COMPILER_ID}" STREQUAL "GNU")
     # using GCC
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wconversion")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wconversion -pedantic -Werror")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -g0 -O3 -march=native -mtune=native -ftree-vectorize -funroll-loops -flto -flto-partition=none -ffat-lto-objects")
     # set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -ftree-parallelize-loops=32")
     # set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -fopenmp")
@@ -82,9 +108,13 @@ if(WITH_TESTS)
 
   # Enable ctest for auto tests.
   enable_testing()
+
+  add_subdirectory(tests)
 endif()
 
-add_qtc_plugin(Qcai2
+add_qtc_plugin(qcai2
+  PLUGIN_PATH
+    plugins/${IDE_VERSION}
   PLUGIN_DEPENDS
     QtCreator::Core
     QtCreator::TextEditor
@@ -152,23 +182,57 @@ add_qtc_plugin(Qcai2
     src/completion/AiCompletionProvider.cpp
     src/completion/AiCompletionProcessor.h
     src/completion/AiCompletionProcessor.cpp
+    src/completion/GhostTextManager.h
+    src/completion/GhostTextManager.cpp
+    src/diff/InlineDiffManager.h
+    src/diff/InlineDiffManager.cpp
 )
 
+set(QCAI2_PLUGIN_INSTALL_DIR "plugins/${IDE_VERSION}")
+set(QCAI2_SIDECAR_INSTALL_DIR "${QCAI2_PLUGIN_INSTALL_DIR}/qcai2/sidecar")
+
 # Sidecar path for development builds
-target_compile_definitions(Qcai2 PRIVATE
+target_compile_definitions(qcai2 PRIVATE
     QCAI2_SIDECAR_PATH="${CMAKE_CURRENT_SOURCE_DIR}/sidecar/copilot-sidecar.js"
+    QCAI2_QTCREATOR_IDE_VERSION="${IDE_VERSION}"
+    QCAI2_INSTALLED_SIDECAR_RELATIVE_PATH="qcai2/sidecar/copilot-sidecar.js"
 )
 
 # Install sidecar files alongside the plugin
 install(FILES
     sidecar/copilot-sidecar.js
     sidecar/package.json
-    DESTINATION share/qtcreator/qcai2/sidecar
+    sidecar/package-lock.json
+    DESTINATION ${QCAI2_SIDECAR_INSTALL_DIR}
 )
-# Install node_modules if they exist (after npm install)
-install(DIRECTORY sidecar/node_modules/
-    DESTINATION share/qtcreator/qcai2/sidecar/node_modules
-    OPTIONAL
+
+set(QCAI2_INSTALL_SIDECAR_DEPS_SCRIPT
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake/install-sidecar-deps.cmake")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/install-sidecar-deps.cmake"
+    "${QCAI2_INSTALL_SIDECAR_DEPS_SCRIPT}"
+    @ONLY
+)
+install(SCRIPT "${QCAI2_INSTALL_SIDECAR_DEPS_SCRIPT}")
+
+find_program(QCAI2_CLANG_FORMAT_EXECUTABLE NAMES clang-format clang-format-18 clang-format-17)
+find_program(QCAI2_GIT_EXECUTABLE NAMES git)
+
+file(RELATIVE_PATH QCAI2_BINARY_DIR_RELATIVE
+    "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}")
+set(QCAI2_FORMAT_EXCLUDED_PREFIXES
+    "${QCAI2_BINARY_DIR_RELATIVE};build/;cmake-build-debug/;cmake-build-release/;cmake-build-relwithdebinfo/;cmake-build-minsizerel/")
+
+add_custom_target(format-changed-files
+    COMMAND ${CMAKE_COMMAND}
+        -DCLANG_FORMAT_EXECUTABLE=${QCAI2_CLANG_FORMAT_EXECUTABLE}
+        -DGIT_EXECUTABLE=${QCAI2_GIT_EXECUTABLE}
+        -DQCAI2_FORMAT_WORKTREE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        "-DQCAI2_FORMAT_EXCLUDED_PREFIXES=${QCAI2_FORMAT_EXCLUDED_PREFIXES}"
+        -P "${QCAI2_FORMAT_CHANGED_SCRIPT}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    COMMENT "Formatting changed project files with clang-format"
 )
 
 # Enable the Run button in Qt Creator
@@ -183,13 +247,21 @@ find_program(QtCreatorExecutable
 )
 if (QtCreatorExecutable)
   add_custom_target(RunQtCreator
-    COMMAND ${QtCreatorExecutable} -pluginpath $<TARGET_FILE_DIR:Qcai2>
-    DEPENDS Qcai2
+    COMMAND ${QtCreatorExecutable} -pluginpath $<TARGET_FILE_DIR:qcai2>
+    DEPENDS qcai2
   )
   set_target_properties(RunQtCreator PROPERTIES FOLDER "qtc_runnable")
 endif()
 
 
-set(SRC_IDE .clang-format ai-prompt.txt ai-todo-errors.txt ai-context.md README.md)
+set(SRC_IDE
+    .clang-format
+    ai-prompt.txt
+    ai-todo-errors.txt
+    ai-context.md
+    README.md
+    .gitignore
+    format-changed-files.cmake
+)
 
 add_custom_target(target_for_ide SOURCES ${SRC_IDE})

@@ -1,21 +1,30 @@
 #include "Json.h"
 
-namespace Qcai2::Json {
+namespace qcai2::Json
+{
 
 static QJsonValue traverse(const QJsonObject &root, const QStringList &parts)
 {
     QJsonValue cur = root;
-    for (const QString &part : parts) {
-        if (cur.isObject()) {
+    for (const QString &part : parts)
+    {
+        if (cur.isObject())
+        {
             cur = cur.toObject().value(part);
-        } else if (cur.isArray()) {
+        }
+        else if (cur.isArray())
+        {
             bool ok;
             int idx = part.toInt(&ok);
-            if (!ok) return {};
+            if (!ok)
+                return {};
             const QJsonArray arr = cur.toArray();
-            if (idx < 0 || idx >= arr.size()) return {};
+            if (idx < 0 || idx >= arr.size())
+                return {};
             cur = arr.at(idx);
-        } else {
+        }
+        else
+        {
             return {};
         }
     }
@@ -39,4 +48,4 @@ QJsonObject errorObject(const QString &message)
     return QJsonObject{{"error", message}};
 }
 
-} // namespace Qcai2::Json
+}  // namespace qcai2::Json

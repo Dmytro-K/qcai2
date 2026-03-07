@@ -4,6 +4,7 @@
 #include "AgentController.h"
 #include "AgentDockWidget.h"
 #include "completion/AiCompletionProvider.h"
+#include "completion/GhostTextManager.h"
 // CompletionTrigger removed — completion triggers via isActivationCharSequence instead
 #include "context/EditorContext.h"
 #include "providers/CopilotProvider.h"
@@ -19,8 +20,8 @@
 #include "tools/IdeTools.h"
 #include "tools/SearchTools.h"
 #include "tools/ToolRegistry.h"
-#include "util/Logger.h"
 #include "util/CrashHandler.h"
+#include "util/Logger.h"
 
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
@@ -38,7 +39,7 @@
 
 using namespace Core;
 
-namespace Qcai2::Internal
+namespace qcai2::Internal
 {
 
 AiAgentPlugin::AiAgentPlugin() = default;
@@ -56,7 +57,7 @@ void AiAgentPlugin::initialize()
     // Configure debug logging
     Logger::instance().setEnabled(settings().debugLogging);
     installCrashHandler();
-    QCAI_INFO("Plugin", QStringLiteral("Qcai2 plugin initializing"));
+    QCAI_INFO("Plugin", QStringLiteral("qcai2 plugin initializing"));
 
     // Create components
     m_editorContext = new EditorContext(this);
@@ -74,6 +75,7 @@ void AiAgentPlugin::initialize()
     // Set up tools and providers
     registerTools();
     setupProviders();
+    QMetaObject::invokeMethod(this, &AiAgentPlugin::refreshCopilotModels, Qt::QueuedConnection);
     QCAI_DEBUG("Plugin", QStringLiteral("Registered %1 tools, %2 providers")
                              .arg(m_toolRegistry->allTools().size())
                              .arg(m_providers.size()));
@@ -92,21 +94,34 @@ void AiAgentPlugin::initialize()
                              .arg(s.aiCompletionEnabled ? QStringLiteral("enabled")
                                                         : QStringLiteral("disabled"),
                                   s.completionModel.isEmpty() ? s.modelName : s.completionModel));
-    
+
+    // Set up ghost-text overlay completion
+    m_ghostTextManager = new GhostTextManager(this);
+    m_ghostTextManager->setProvider(m_currentProvider);
+    m_ghostTextManager->setModel(s.completionModel.isEmpty() ? s.modelName : s.completionModel);
+    m_ghostTextManager->setEnabled(s.aiCompletionEnabled);
+
     // Attach completion provider to every text editor
     connect(Core::EditorManager::instance(), &Core::EditorManager::editorOpened, this,
             [this](Core::IEditor *editor) {
                 if (auto *textEditor = qobject_cast<TextEditor::BaseTextEditor *>(editor))
                 {
                     // Defer attachment to next event loop iteration to let editor fully init
-                    QMetaObject::invokeMethod(this, [this, textEditor]() {
-                        if (auto *doc = textEditor->textDocument())
-                        {
-                            doc->setCompletionAssistProvider(m_completionProvider);
-                            QCAI_DEBUG("Plugin", QStringLiteral("Attached AI completion to: %1")
-                                                     .arg(doc->filePath().toUrlishString()));
-                        }
-                    }, Qt::QueuedConnection);
+                    QMetaObject::invokeMethod(
+                        this,
+                        [this, textEditor]() {
+                            if (auto *doc = textEditor->textDocument())
+                            {
+                                doc->setCompletionAssistProvider(m_completionProvider);
+                                QCAI_DEBUG("Plugin",
+                                           QStringLiteral("Attached AI completion to: %1")
+                                               .arg(doc->filePath().toUrlishString()));
+                                // Attach ghost-text overlay to the editor widget
+                                if (auto *widget = textEditor->editorWidget())
+                                    m_ghostTextManager->attachToEditor(widget);
+                            }
+                        },
+                        Qt::QueuedConnection);
                 }
             });
 
@@ -147,8 +162,10 @@ void AiAgentPlugin::createDockWidget()
     created = true;
 
     QMainWindow *mw = ICore::mainWindow();
-    if (!mw) {
-        QCAI_ERROR("Plugin", QStringLiteral("Main window not available yet, deferring dock creation"));
+    if (!mw)
+    {
+        QCAI_ERROR("Plugin",
+                   QStringLiteral("Main window not available yet, deferring dock creation"));
         created = false;
         // Retry later
         QMetaObject::invokeMethod(this, &AiAgentPlugin::createDockWidget, Qt::QueuedConnection);
@@ -156,7 +173,7 @@ void AiAgentPlugin::createDockWidget()
     }
 
     auto *dockWidget = new QDockWidget(Tr::tr("AI Agent"), mw);
-    dockWidget->setObjectName(QStringLiteral("Qcai2.AgentDock"));
+    dockWidget->setObjectName(QStringLiteral("qcai2.AgentDock"));
     auto *agentWidget = new AgentDockWidget(m_controller, dockWidget);
     dockWidget->setWidget(agentWidget);
     mw->addDockWidget(Qt::RightDockWidgetArea, dockWidget);
@@ -193,6 +210,7 @@ void AiAgentPlugin::setupProviders()
         copilot->setNodePath(s.copilotNodePath);
     if (!s.copilotSidecarPath.isEmpty())
         copilot->setSidecarPath(s.copilotSidecarPath);
+    m_copilotProvider = copilot;
     m_providers.append(copilot);
 
     // Select active provider
@@ -217,6 +235,28 @@ void AiAgentPlugin::setupProviders()
                  m_currentProvider ? m_currentProvider->displayName() : QStringLiteral("none")));
 }
 
+void AiAgentPlugin::refreshCopilotModels()
+{
+    if (!m_copilotProvider)
+        return;
+
+    m_copilotProvider->listModels([](const QStringList &models, const QString &error) {
+        if (!error.isEmpty())
+        {
+            QCAI_WARN("Plugin", QStringLiteral("Copilot model refresh failed: %1").arg(error));
+            return;
+        }
+
+        if (models.isEmpty())
+        {
+            QCAI_WARN("Plugin", QStringLiteral("Copilot model refresh returned no models"));
+            return;
+        }
+
+        modelCatalog().setCopilotModels(models);
+    });
+}
+
 void AiAgentPlugin::registerTools()
 {
     m_toolRegistry->registerTool(std::make_shared<ReadFileTool>());
@@ -235,4 +275,4 @@ void AiAgentPlugin::registerTools()
     m_toolRegistry->registerTool(std::make_shared<OpenFileAtLocationTool>());
 }
 
-}  // namespace Qcai2::Internal
+}  // namespace qcai2::Internal

@@ -2,12 +2,13 @@
 
 #include "ITool.h"
 
-#include <QObject>
-#include <QMap>
 #include <QList>
+#include <QMap>
+#include <QObject>
 #include <memory>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // Central registry of available tools.
 class ToolRegistry : public QObject
@@ -27,4 +28,4 @@ private:
     QMap<QString, std::shared_ptr<ITool>> m_tools;
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

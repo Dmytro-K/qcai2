@@ -2,12 +2,14 @@
 
 #include "IAIProvider.h"
 
+#include <QMap>
 #include <QObject>
 #include <QProcess>
-#include <QMap>
+#include <QStringList>
 #include <functional>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // Provider for GitHub Copilot via Node.js sidecar using @github/copilot-sdk.
 // Spawns a child Node.js process and communicates over JSON Lines (stdin/stdout).
@@ -18,24 +20,42 @@ public:
     explicit CopilotProvider(QObject *parent = nullptr);
     ~CopilotProvider() override;
 
-    QString id() const override { return QStringLiteral("copilot"); }
-    QString displayName() const override { return QStringLiteral("GitHub Copilot"); }
+    QString id() const override
+    {
+        return QStringLiteral("copilot");
+    }
+    QString displayName() const override
+    {
+        return QStringLiteral("GitHub Copilot");
+    }
 
-    void complete(const QList<ChatMessage> &messages,
-                  const QString &model,
-                  double temperature,
-                  int maxTokens,
-                  CompletionCallback callback,
+    void complete(const QList<ChatMessage> &messages, const QString &model, double temperature,
+                  int maxTokens, const QString &reasoningEffort, CompletionCallback callback,
                   StreamCallback streamCallback = nullptr) override;
+    using ModelListCallback = std::function<void(const QStringList &models, const QString &error)>;
+
+    void listModels(ModelListCallback callback);
 
     void cancel() override;
 
-    void setBaseUrl(const QString &url) override { Q_UNUSED(url); }
-    void setApiKey(const QString &key) override  { Q_UNUSED(key); }
+    void setBaseUrl(const QString &url) override
+    {
+        Q_UNUSED(url);
+    }
+    void setApiKey(const QString &key) override
+    {
+        Q_UNUSED(key);
+    }
 
     // Path to sidecar script (auto-detected if empty)
-    void setSidecarPath(const QString &path) { m_sidecarPath = path; }
-    void setNodePath(const QString &path)    { m_nodePath = path; }
+    void setSidecarPath(const QString &path)
+    {
+        m_sidecarPath = path;
+    }
+    void setNodePath(const QString &path)
+    {
+        m_nodePath = path;
+    }
 
 private:
     bool ensureSidecar();
@@ -53,8 +73,9 @@ private:
     // Pending callbacks keyed by request id
     QMap<int, CompletionCallback> m_pending;
     QMap<int, StreamCallback> m_streamCallbacks;
+    QMap<int, ModelListCallback> m_modelListCallbacks;
     QByteArray m_readBuffer;
     QString m_lastStderr;
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

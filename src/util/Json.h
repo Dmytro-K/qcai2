@@ -1,11 +1,12 @@
 #pragma once
 
-#include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonObject>
 #include <QJsonValue>
 #include <QString>
 
-namespace Qcai2::Json {
+namespace qcai2::Json
+{
 
 // Get a string from a nested path, e.g. path="choices/0/message/content"
 QString getString(const QJsonObject &root, const QString &path, const QString &def = {});
@@ -17,11 +18,11 @@ int getInt(const QJsonObject &root, const QString &path, int def = 0);
 QJsonObject errorObject(const QString &message);
 
 // Safe array iteration helper
-template<typename Fn>
-void forEachObject(const QJsonArray &arr, Fn &&fn)
+template <typename Fn> void forEachObject(const QJsonArray &arr, Fn &&fn)
 {
     for (const QJsonValue &v : arr)
-        if (v.isObject()) fn(v.toObject());
+        if (v.isObject())
+            fn(v.toObject());
 }
 
-} // namespace Qcai2::Json
+}  // namespace qcai2::Json

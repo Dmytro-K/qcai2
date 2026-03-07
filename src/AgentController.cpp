@@ -7,7 +7,7 @@
 #include <QJsonDocument>
 #include <QTimer>
 
-namespace Qcai2
+namespace qcai2
 {
 
 AgentController::AgentController(QObject *parent) : QObject(parent)
@@ -89,12 +89,16 @@ void AgentController::start(const QString &goal, bool dryRun)
 
     // Re-select and reconfigure provider from current settings
     const auto &s = settings();
-    if (!m_allProviders.isEmpty()) {
+    if (!m_allProviders.isEmpty())
+    {
         m_provider = nullptr;
         QCAI_DEBUG("Agent", QStringLiteral("Selecting provider '%1' from %2 available")
-            .arg(s.provider).arg(m_allProviders.size()));
-        for (auto *p : m_allProviders) {
-            if (p->id() == s.provider) {
+                                .arg(s.provider)
+                                .arg(m_allProviders.size()));
+        for (auto *p : m_allProviders)
+        {
+            if (p->id() == s.provider)
+            {
                 m_provider = p;
                 break;
             }
@@ -103,13 +107,18 @@ void AgentController::start(const QString &goal, bool dryRun)
             m_provider = m_allProviders.first();
 
         // Reconfigure the selected provider
-        if (s.provider == QStringLiteral("openai")) {
+        if (s.provider == QStringLiteral("openai"))
+        {
             m_provider->setBaseUrl(s.baseUrl);
             m_provider->setApiKey(s.apiKey);
-        } else if (s.provider == QStringLiteral("local")) {
+        }
+        else if (s.provider == QStringLiteral("local"))
+        {
             m_provider->setBaseUrl(s.localBaseUrl);
             m_provider->setApiKey(s.apiKey);
-        } else if (s.provider == QStringLiteral("ollama")) {
+        }
+        else if (s.provider == QStringLiteral("ollama"))
+        {
             m_provider->setBaseUrl(s.ollamaBaseUrl);
         }
     }
@@ -131,19 +140,20 @@ void AgentController::start(const QString &goal, bool dryRun)
     m_pendingApprovals.clear();
     m_messages.clear();
 
-    QCAI_INFO("Agent", QStringLiteral("Starting agent — provider: %1, model: %2, thinking: %3, dryRun: %4, goal: %5")
-        .arg(m_provider->id(), s.modelName, s.thinkingLevel,
-             dryRun ? QStringLiteral("yes") : QStringLiteral("no"),
-             goal.left(100)));
+    QCAI_INFO("Agent",
+              QStringLiteral(
+                  "Starting agent — provider: %1, model: %2, thinking: %3, dryRun: %4, goal: %5")
+                  .arg(m_provider->id(), s.modelName, s.thinkingLevel,
+                       dryRun ? QStringLiteral("yes") : QStringLiteral("no"), goal.left(100)));
 
     // System prompt
     m_messages.append({QStringLiteral("system"), buildSystemPrompt()});
 
-    if (s.thinkingLevel == QStringLiteral("low") ||
-        s.thinkingLevel == QStringLiteral("medium") ||
+    if (s.thinkingLevel == QStringLiteral("low") || s.thinkingLevel == QStringLiteral("medium") ||
         s.thinkingLevel == QStringLiteral("high"))
         m_messages.append({QStringLiteral("system"),
-                           QStringLiteral("Use %1 thinking/reasoning effort for this task.").arg(s.thinkingLevel)});
+                           QStringLiteral("Use %1 thinking/reasoning effort for this task.")
+                               .arg(s.thinkingLevel)});
 
     // User goal
     m_messages.append({QStringLiteral("user"), goal});
@@ -158,7 +168,8 @@ void AgentController::stop()
         return;
     m_running = false;
     QCAI_INFO("Agent", QStringLiteral("Agent stopped by user at iteration %1, tool calls: %2")
-        .arg(m_iteration).arg(m_toolCallCount));
+                           .arg(m_iteration)
+                           .arg(m_toolCallCount));
     if (m_provider)
         m_provider->cancel();
     emit logMessage(QStringLiteral("⏹ Agent stopped by user."));
@@ -186,20 +197,25 @@ void AgentController::runNextIteration()
     emit logMessage(QStringLiteral("── Iteration %1 ──").arg(m_iteration));
 
     const auto &s = settings();
-    QCAI_DEBUG("Agent", QStringLiteral("Iteration %1: sending %2 messages to %3 (model: %4, thinking: %5, temp: %6)")
-        .arg(m_iteration).arg(m_messages.size()).arg(m_provider->id(), s.modelName)
-        .arg(s.thinkingLevel).arg(s.temperature));
+    QCAI_DEBUG("Agent",
+               QStringLiteral(
+                   "Iteration %1: sending %2 messages to %3 (model: %4, thinking: %5, temp: %6)")
+                   .arg(m_iteration)
+                   .arg(m_messages.size())
+                   .arg(m_provider->id(), s.modelName)
+                   .arg(s.thinkingLevel)
+                   .arg(s.temperature));
 
-    m_provider->complete(m_messages, s.modelName, s.temperature, s.maxTokens,
-                         [this](const QString &response, const QString &error) {
-                             QTimer::singleShot(0, this, [this, response, error]() {
-                                 handleResponse(response, error);
-                             });
-                         },
-                         [this](const QString &delta) {
-                             if (!delta.isEmpty())
-                                 emit streamingToken(delta);
-                         });
+    m_provider->complete(
+        m_messages, s.modelName, s.temperature, s.maxTokens, s.thinkingLevel,
+        [this](const QString &response, const QString &error) {
+            QTimer::singleShot(0, this,
+                               [this, response, error]() { handleResponse(response, error); });
+        },
+        [this](const QString &delta) {
+            if (!delta.isEmpty())
+                emit streamingToken(delta);
+        });
 }
 
 void AgentController::handleResponse(const QString &response, const QString &error)
@@ -223,7 +239,8 @@ void AgentController::handleResponse(const QString &response, const QString &err
     // Parse response
     AgentResponse parsed = AgentResponse::parse(response);
     QCAI_DEBUG("Agent", QStringLiteral("Parsed response type: %1, length: %2")
-        .arg(static_cast<int>(parsed.type)).arg(response.length()));
+                            .arg(static_cast<int>(parsed.type))
+                            .arg(response.length()));
 
     // Reset text retry counter on valid JSON
     if (parsed.type != ResponseType::Text && parsed.type != ResponseType::Error)
@@ -234,7 +251,8 @@ void AgentController::handleResponse(const QString &response, const QString &err
         case ResponseType::Plan:
             m_plan = parsed.steps;
             emit planUpdated(m_plan);
-            emit logMessage(QStringLiteral("📋 Plan with %1 step(s) received.").arg(m_plan.size()));
+            emit logMessage(
+                QStringLiteral("📋 Plan with %1 step(s) received.").arg(m_plan.size()));
             // Ask model to start executing the plan
             m_messages.append(
                 {QStringLiteral("user"),
@@ -250,8 +268,12 @@ void AgentController::handleResponse(const QString &response, const QString &err
             emit logMessage(QStringLiteral("✅ Agent finished: %1").arg(parsed.summary));
             if (!parsed.diff.isEmpty())
             {
-                m_accumulatedDiff = Diff::normalize(parsed.diff);
-                emit diffAvailable(m_accumulatedDiff);
+                // Strip "=== NEW FILE:" blocks — only show unified diff of modified files
+                auto nf = Diff::extractAndCreateNewFiles(parsed.diff, QString(), /*dryRun=*/true);
+                const QString cleanDiff = nf.remainingDiff.trimmed();
+                m_accumulatedDiff = Diff::normalize(cleanDiff);
+                if (!m_accumulatedDiff.isEmpty())
+                    emit diffAvailable(m_accumulatedDiff);
             }
             m_running = false;
             emit stopped(parsed.summary);
@@ -336,8 +358,7 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
             emit approvalRequested(
                 pa.id, name, reason,
                 QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)));
-            emit logMessage(
-                QStringLiteral("⏸ Approval required for '%1': %2").arg(name, reason));
+            emit logMessage(QStringLiteral("⏸ Approval required for '%1': %2").arg(name, reason));
             return;
         }
     }
@@ -345,10 +366,14 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
     // Execute
     ++m_toolCallCount;
     const bool suppressReadFileLog = (name == QStringLiteral("read_file"));
-    if (!suppressReadFileLog) emit logMessage(QStringLiteral("🔧 Executing tool: %1").arg(name));
-    QCAI_DEBUG("Agent", QStringLiteral("Tool call #%1: %2, args: %3")
-        .arg(m_toolCallCount).arg(name,
-             QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Compact)).left(200)));
+    if (!suppressReadFileLog)
+        emit logMessage(QStringLiteral("🔧 Executing tool: %1").arg(name));
+    QCAI_DEBUG(
+        "Agent",
+        QStringLiteral("Tool call #%1: %2, args: %3")
+            .arg(m_toolCallCount)
+            .arg(name,
+                 QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Compact)).left(200)));
 
     // Get workDir from editor context
     QString workDir;
@@ -361,13 +386,16 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
     QString result = tool->execute(args, workDir);
     if (!suppressReadFileLog)
         emit logMessage(QStringLiteral("   Result: %1").arg(result.left(300)));
-    QCAI_DEBUG("Agent", QStringLiteral("Tool '%1' result length: %2").arg(name).arg(result.length()));
+    QCAI_DEBUG("Agent",
+               QStringLiteral("Tool '%1' result length: %2").arg(name).arg(result.length()));
 
     // Feed result back to LLM
     const int maxResultLen = 15000;
-    const QString truncatedResult = result.length() > maxResultLen
-        ? result.left(maxResultLen) + QStringLiteral("\n... [truncated, %1 chars total]").arg(result.length())
-        : result;
+    const QString truncatedResult =
+        result.length() > maxResultLen
+            ? result.left(maxResultLen) +
+                  QStringLiteral("\n... [truncated, %1 chars total]").arg(result.length())
+            : result;
     m_messages.append({QStringLiteral("user"),
                        QStringLiteral("Tool '%1' returned:\n%2\n\nContinue with the next step.")
                            .arg(name, truncatedResult)});
@@ -424,4 +452,4 @@ void AgentController::denyAction(int approvalId)
     }
 }
 
-}  // namespace Qcai2
+}  // namespace qcai2

@@ -1,9 +1,10 @@
 #pragma once
 
-#include <QString>
 #include <QJsonObject>
+#include <QString>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
 // Abstract interface for agent tools.
 class ITool
@@ -25,7 +26,10 @@ public:
     virtual QString execute(const QJsonObject &args, const QString &workDir) = 0;
 
     // Whether this tool needs user approval before execution
-    virtual bool requiresApproval() const { return false; }
+    virtual bool requiresApproval() const
+    {
+        return false;
+    }
 };
 
-} // namespace Qcai2
+}  // namespace qcai2

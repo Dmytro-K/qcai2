@@ -3,6 +3,11 @@
 #include "util/Diff.h"
 #include "util/Logger.h"
 
+#include <coreplugin/editormanager/editormanager.h>
+#include <utils/filepath.h>
+#include <utils/link.h>
+
+#include <QDir>
 #include <QClipboard>
 #include <QColor>
 #include <QDateTime>
@@ -11,6 +16,7 @@
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QFile>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QSet>
@@ -25,7 +31,7 @@
 
 #include <functional>
 
-namespace Qcai2
+namespace qcai2
 {
 
 namespace
@@ -382,7 +388,16 @@ void AgentDockWidget::restoreChat()
     const QString logMarkdown = s.value(QStringLiteral("logMarkdown")).toString();
     if (!logMarkdown.isEmpty())
     {
+        // Close any unclosed code fences from interrupted streaming
         m_logMarkdown = logMarkdown;
+        int fenceCount = 0;
+        const auto lines = m_logMarkdown.split('\n');
+        for (const auto &line : lines) {
+            if (line.trimmed().startsWith(QStringLiteral("```")))
+                ++fenceCount;
+        }
+        if (fenceCount % 2 != 0)
+            m_logMarkdown += QStringLiteral("\n```\n");
         m_streamingMarkdown.clear();
         renderLog();
     }
@@ -583,6 +598,21 @@ void AgentDockWidget::setupUi()
     connect(m_runBtn, &QPushButton::clicked, this, &AgentDockWidget::onRunClicked);
     connect(m_stopBtn, &QPushButton::clicked, this, &AgentDockWidget::onStopClicked);
 
+    // Persist model/thinking selection immediately on change
+    connect(m_modelCombo, &QComboBox::currentTextChanged, this, [](const QString &text) {
+        auto &cfg = settings();
+        const QString model = text.trimmed();
+        if (!model.isEmpty()) {
+            cfg.modelName = model;
+            cfg.save();
+        }
+    });
+    connect(m_thinkingCombo, &QComboBox::currentIndexChanged, this, [this](int /*index*/) {
+        auto &cfg = settings();
+        cfg.thinkingLevel = m_thinkingCombo->currentData().toString();
+        cfg.save();
+    });
+
     btnColumn->addWidget(new QLabel(tr("Model")));
     btnColumn->addWidget(m_modelCombo);
     btnColumn->addWidget(new QLabel(tr("Thinking")));
@@ -736,10 +766,14 @@ void AgentDockWidget::renderLog()
     m_logView->setMarkdown(markdown);
     if (!markdown.trimmed().isEmpty() && m_logView->toPlainText().trimmed().isEmpty())
         m_logView->setPlainText(markdown);
-    QTextCursor cursor = m_logView->textCursor();
-    cursor.movePosition(QTextCursor::End);
-    m_logView->setTextCursor(cursor);
-    m_logView->ensureCursorVisible();
+
+    // Defer scroll to allow document layout to complete after setMarkdown()
+    QTimer::singleShot(0, m_logView, [this]() {
+        QTextCursor cursor = m_logView->textCursor();
+        cursor.movePosition(QTextCursor::End);
+        m_logView->setTextCursor(cursor);
+        m_logView->ensureCursorVisible();
+    });
 }
 
 void AgentDockWidget::onPlanUpdated(const QList<PlanStep> &steps)
@@ -760,6 +794,20 @@ void AgentDockWidget::onDiffAvailable(const QString &diff)
     diffPreview->setDiffText(diff);
     m_applyPatchBtn->setEnabled(!diff.isEmpty() && diffPreview->allChangesApproved());
     m_tabs->setCurrentWidget(m_diffView);
+
+    // Open the diff in Qt Creator's main text editor
+    if (!diff.isEmpty()) {
+        const QString tempPath = QDir::tempPath() + QStringLiteral("/qcai2_agent.diff");
+        QFile f(tempPath);
+        if (f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+            f.write(diff.toUtf8());
+            f.close();
+            Utils::Link link(Utils::FilePath::fromString(tempPath), 0, 0);
+            QMetaObject::invokeMethod(Core::EditorManager::instance(), [link]() {
+                Core::EditorManager::openEditorAt(link);
+            }, Qt::QueuedConnection);
+        }
+    }
 }
 
 void AgentDockWidget::onApprovalRequested(int id, const QString &action, const QString &reason,
@@ -841,4 +889,4 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-}  // namespace Qcai2
+}  // namespace qcai2

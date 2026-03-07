@@ -4,9 +4,12 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
-namespace Qcai2 {
+namespace qcai2
+{
 
-ToolRegistry::ToolRegistry(QObject *parent) : QObject(parent) {}
+ToolRegistry::ToolRegistry(QObject *parent) : QObject(parent)
+{
+}
 
 void ToolRegistry::registerTool(std::shared_ptr<ITool> tool)
 {
@@ -28,14 +31,15 @@ QList<std::shared_ptr<ITool>> ToolRegistry::allTools() const
 QJsonArray ToolRegistry::toolDescriptionsJson() const
 {
     QJsonArray arr;
-    for (auto it = m_tools.begin(); it != m_tools.end(); ++it) {
+    for (auto it = m_tools.begin(); it != m_tools.end(); ++it)
+    {
         QJsonObject desc;
-        desc["name"]        = it.value()->name();
+        desc["name"] = it.value()->name();
         desc["description"] = it.value()->description();
-        desc["args"]        = it.value()->argsSchema();
+        desc["args"] = it.value()->argsSchema();
         arr.append(desc);
     }
     return arr;
 }
 
-} // namespace Qcai2
+}  // namespace qcai2

@@ -7,7 +7,7 @@
 #include <QJsonObject>
 #include <QTextStream>
 
-namespace Qcai2
+namespace qcai2
 {
 
 // ---------------------------------------------------------------------------
@@ -74,22 +74,53 @@ QString ApplyPatchTool::execute(const QJsonObject &args, const QString &workDir)
     if (diff.isEmpty())
         return QStringLiteral("Error: 'diff' argument is required.");
 
-    auto val = Diff::validate(diff);
-    if (!val.valid)
-        return QStringLiteral("Error: invalid diff: %1").arg(val.error);
+    // Extract and create new files first
+    auto nf = Diff::extractAndCreateNewFiles(diff, workDir, /*dryRun=*/false);
+    if (!nf.error.isEmpty())
+        return QStringLiteral("Error creating new file: %1").arg(nf.error);
 
-    // First do a dry run
-    QString errorMsg;
-    if (!Diff::applyPatch(diff, workDir, /*dryRun=*/true, errorMsg))
-        return QStringLiteral("Error: dry run failed: %1").arg(errorMsg);
+    // Strip "=== MODIFIED: ..." header lines from the remaining diff
+    const QStringList lines = nf.remainingDiff.split('\n');
+    QStringList cleanLines;
+    for (const QString &line : lines)
+    {
+        if (!line.startsWith(QStringLiteral("=== MODIFIED:")))
+            cleanLines.append(line);
+    }
+    const QString unifiedDiff = cleanLines.join('\n').trimmed();
 
-    // Then apply for real
-    if (!Diff::applyPatch(diff, workDir, /*dryRun=*/false, errorMsg))
-        return QStringLiteral("Error: apply failed: %1").arg(errorMsg);
+    int patchLines = 0;
+    int patchFiles = 0;
 
-    return QStringLiteral("Patch applied successfully. %1 lines changed across %2 file(s).")
-        .arg(val.linesChanged)
-        .arg(val.filesChanged);
+    if (!unifiedDiff.isEmpty())
+    {
+        auto val = Diff::validate(unifiedDiff);
+        if (!val.valid)
+            return QStringLiteral("Error: invalid diff: %1").arg(val.error);
+
+        patchLines = val.linesChanged;
+        patchFiles = val.filesChanged;
+
+        // First do a dry run
+        QString errorMsg;
+        if (!Diff::applyPatch(unifiedDiff, workDir, /*dryRun=*/true, errorMsg))
+            return QStringLiteral("Error: dry run failed: %1").arg(errorMsg);
+
+        // Then apply for real
+        if (!Diff::applyPatch(unifiedDiff, workDir, /*dryRun=*/false, errorMsg))
+            return QStringLiteral("Error: apply failed: %1").arg(errorMsg);
+    }
+
+    QStringList parts;
+    if (patchLines > 0 || patchFiles > 0)
+        parts.append(
+            QStringLiteral("%1 lines changed across %2 file(s)").arg(patchLines).arg(patchFiles));
+    if (!nf.createdFiles.isEmpty())
+        parts.append(QStringLiteral("%1 new file(s) created: %2")
+                         .arg(nf.createdFiles.size())
+                         .arg(nf.createdFiles.join(QStringLiteral(", "))));
+
+    return QStringLiteral("Patch applied successfully. %1.").arg(parts.join(QStringLiteral("; ")));
 }
 
-}  // namespace Qcai2
+}  // namespace qcai2

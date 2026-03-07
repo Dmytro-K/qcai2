@@ -4,19 +4,15 @@
 //
 // Request:  {"id":N,"method":"start"|"complete"|"cancel"|"stop","params":{...}}
 // Response: {"id":N,"result":{...}} or {"id":N,"error":"msg"}
+// Streaming: {"id":N,"stream_delta":"text"}
 
 import { CopilotClient } from "@github/copilot-sdk";
 import { createInterface } from "node:readline";
 
 let client = null;
-let activeRequestId = null;
-let isProcessing = false;    // true while sendAndWait is in progress
 
-// Session cache: reuse sessions for sequential requests (same model).
-// Sessions track conversation history, so multi-turn agent chats work naturally.
-let session = null;
-let sessionModel = null;
-let sessionStreaming = null;
+// Active requests: id -> { cancelled: false }
+const activeRequests = new Map();
 
 function send(obj) {
     process.stdout.write(JSON.stringify(obj) + "\n");
@@ -34,57 +30,26 @@ function sendError(id, message) {
     send({ id, error: message });
 }
 
-// ── Request queue ──────────────────────────────────────────────
-// Readline async callbacks can overlap (await yields control).
-// We serialize all requests through a queue to prevent races.
-const requestQueue = [];
-let processingQueue = false;
-
-function enqueue(method, id, params) {
-    // Cancel is handled immediately (synchronous, just sets flags)
-    if (method === "cancel") {
-        handleCancel(id, params);
-        return;
-    }
-    requestQueue.push({ method, id, params });
-    drainQueue();
-}
-
-async function drainQueue() {
-    if (processingQueue) return;
-    processingQueue = true;
-    while (requestQueue.length > 0) {
-        const { method, id, params } = requestQueue.shift();
-        try {
-            switch (method) {
-                case "start":
-                    await handleStart(id, params);
-                    break;
-                case "complete":
-                    await handleComplete(id, params);
-                    break;
-                case "stop":
-                    await handleStop(id);
-                    break;
-                default:
-                    sendError(id, `Unknown method: ${method}`);
-            }
-        } catch (e) {
-            log(`Unhandled error in ${method}: ${e.message}`);
-            sendError(id, e.message);
-        }
-    }
-    processingQueue = false;
-}
-
 // ── Handlers ───────────────────────────────────────────────────
 
-async function handleStart(id, params) {
-    try {
+let clientStarting = null; // promise for in-progress start
+
+async function ensureClient() {
+    if (client) return;
+    if (clientStarting) { await clientStarting; return; }
+    clientStarting = (async () => {
         log("Starting CopilotClient...");
-        client = new CopilotClient();
+        client = new CopilotClient({logLevel: "debug", cliArgs: ["--log-dir", "/tmp/qcai2/log"]});
         await client.start();
         log("CopilotClient started OK");
+    })();
+    await clientStarting;
+    clientStarting = null;
+}
+
+async function handleStart(id) {
+    try {
+        await ensureClient();
         sendResult(id, { status: "ready" });
     } catch (e) {
         log(`CopilotClient start failed: ${e.message}`);
@@ -93,101 +58,93 @@ async function handleStart(id, params) {
 }
 
 async function handleComplete(id, params) {
-    if (!client) {
-        sendError(id, "Client not started. Send 'start' first.");
+    try {
+        await ensureClient();
+    } catch (e) {
+        sendError(id, `Client not ready: ${e.message}`);
         return;
     }
 
-    const { messages, model, temperature, maxTokens, streaming } = params;
+    const { messages, model, temperature, maxTokens, streaming, reasoningEffort } = params;
     const requestedModel = model || "gpt-4.1";
-    const useStreaming = streaming === true;
 
-    isProcessing = true;
-    activeRequestId = id;
+    const state = { cancelled: false };
+    activeRequests.set(id, state);
 
+    let session = null;
     try {
-        // Reuse session if model and streaming mode match
-        const needNew = !session
-            || sessionModel !== requestedModel
-            || sessionStreaming !== useStreaming;
+        log(`Request #${id}: creating session model=${requestedModel} reasoningEffort=${reasoningEffort || "default"}`);
+        const sessionOpts = {
+            model: requestedModel,
+            streaming: true,
+            availableTools: [],
+            systemMessage: { mode: "replace", content: "" },
+        };
+        if (reasoningEffort)
+            sessionOpts.reasoningEffort = reasoningEffort;
+        session = await client.createSession(sessionOpts);
 
-        if (needNew) {
-            // Destroy old session if exists
-            if (session) {
-                try { await session.destroy(); } catch (_) {}
-                session = null;
-            }
-            log(`Creating session: model=${requestedModel} streaming=${useStreaming}`);
-            session = await client.createSession({
-                model: requestedModel,
-                streaming: useStreaming,
-                availableTools: [],
-                systemMessage: { mode: "replace", content: "" },
-            });
-            sessionModel = requestedModel;
-            sessionStreaming = useStreaming;
-            log("Session created OK");
-        } else {
-            log(`Reusing session: model=${requestedModel}`);
+        if (state.cancelled) {
+            log(`Request #${id} cancelled during session creation`);
+            return;
         }
 
         const prompt = formatMessages(messages);
-        log(`Request #${id}: sending prompt (${prompt.length} chars)...`);
+        log(`Request #${id}: sending prompt (${prompt.length} chars), active=${activeRequests.size}`);
 
-        if (useStreaming) {
-            let fullContent = "";
-
-            const unsubscribe = session.on("assistant.message_delta", (event) => {
-                if (activeRequestId !== id) return;
-                const delta = event.data?.deltaContent || "";
-                if (delta) {
-                    fullContent += delta;
-                    send({ id, stream_delta: delta });
-                }
-            });
-
-            await session.sendAndWait({ prompt }, 300000);
-            unsubscribe();
-
-            if (activeRequestId === id) {
-                log(`Request #${id} streaming done: ${fullContent.length} chars`);
-                sendResult(id, { content: fullContent });
-            } else {
-                log(`Request #${id} streaming done but stale (active=${activeRequestId})`);
+        const seenEventIds = new Set();
+        const unsubscribe = session.on("assistant.message_delta", (event) => {
+            if (state.cancelled) return;
+            // Deduplicate — SDK may dispatch the same event twice
+            if (event.id && seenEventIds.has(event.id)) return;
+            if (event.id) seenEventIds.add(event.id);
+            const delta = event.data?.deltaContent || "";
+            if (delta && streaming) {
+                send({ id, stream_delta: delta });
             }
+        });
+
+        const response = await session.sendAndWait({ prompt }, 300000);
+        unsubscribe();
+
+        if (!state.cancelled) {
+            const content = response?.data?.content || "";
+            log(`Request #${id} done: ${content.length} chars`);
+            sendResult(id, { content });
         } else {
-            const response = await session.sendAndWait({ prompt }, 300000);
-            if (activeRequestId === id) {
-                const content = response?.data?.content || "";
-                log(`Request #${id} done: ${content.length} chars`);
-                sendResult(id, { content });
-            } else {
-                log(`Request #${id} done but stale (active=${activeRequestId})`);
-            }
+            log(`Request #${id} done but was cancelled`);
         }
     } catch (e) {
-        log(`Request #${id} error: ${e.message}`);
-        // Invalidate session on error
-        session = null;
-        sessionModel = null;
-        sessionStreaming = null;
-        sendError(id, `Completion error: ${e.message}`);
+        if (!state.cancelled) {
+            log(`Request #${id} error: ${e.message}`);
+            sendError(id, `Completion error: ${e.message}`);
+        }
     } finally {
-        activeRequestId = null;
-        isProcessing = false;
+        activeRequests.delete(id);
+        if (session) {
+            try { await session.destroy(); } catch (_) {}
+        }
+    }
+}
+
+async function handleListModels(id) {
+    try {
+        await ensureClient();
+        const models = await client.listModels();
+        sendResult(id, { models: models.map(model => model.id) });
+    } catch (e) {
+        log(`Request #${id} list_models error: ${e.message}`);
+        sendError(id, `Model listing error: ${e.message}`);
     }
 }
 
 function formatMessages(messages) {
     if (!messages || messages.length === 0) return "";
 
-    // If there's only one user message, return it directly
     if (messages.length === 1 && messages[0].role === "user") {
         return messages[0].content;
     }
 
-    // For multi-turn conversations, format as structured text
-    // so the model understands the conversation context
     const parts = [];
     for (const msg of messages) {
         const role = msg.role || "user";
@@ -204,14 +161,11 @@ function formatMessages(messages) {
 
 async function handleStop(id) {
     try {
-        activeRequestId = null;
-        isProcessing = false;
-        if (session) {
-            try { await session.destroy(); } catch (_) {}
-            session = null;
-            sessionModel = null;
-            sessionStreaming = null;
+        for (const [, state] of activeRequests) {
+            state.cancelled = true;
         }
+        activeRequests.clear();
+
         if (client) {
             await client.stop();
             client = null;
@@ -224,12 +178,57 @@ async function handleStop(id) {
 }
 
 function handleCancel(id, params) {
-    // Mark active request as stale (will be discarded when sendAndWait returns)
-    if (activeRequestId !== null) {
-        log(`Marking active request #${activeRequestId} as stale`);
-        activeRequestId = null;
+    const targetId = params?.requestId;
+    if (targetId !== undefined) {
+        const state = activeRequests.get(targetId);
+        if (state) {
+            state.cancelled = true;
+            log(`Cancelled request #${targetId}`);
+        }
+    } else {
+        // Cancel all active requests
+        for (const [reqId, state] of activeRequests) {
+            state.cancelled = true;
+            log(`Cancelled request #${reqId}`);
+        }
     }
     sendResult(id, { status: "cancelled" });
+}
+
+// ── Dispatch ───────────────────────────────────────────────────
+
+function dispatch(method, id, params) {
+    switch (method) {
+        case "cancel":
+            handleCancel(id, params);
+            break;
+        case "start":
+            handleStart(id).catch(e => {
+                log(`Unhandled error in start: ${e.message}`);
+                sendError(id, e.message);
+            });
+            break;
+        case "complete":
+            handleComplete(id, params).catch(e => {
+                log(`Unhandled error in complete #${id}: ${e.message}`);
+                sendError(id, e.message);
+            });
+            break;
+        case "list_models":
+            handleListModels(id).catch(e => {
+                log(`Unhandled error in list_models #${id}: ${e.message}`);
+                sendError(id, e.message);
+            });
+            break;
+        case "stop":
+            handleStop(id).catch(e => {
+                log(`Unhandled error in stop: ${e.message}`);
+                sendError(id, e.message);
+            });
+            break;
+        default:
+            sendError(id, `Unknown method: ${method}`);
+    }
 }
 
 // ── Main loop ──────────────────────────────────────────────────
@@ -248,11 +247,10 @@ rl.on("line", (line) => {
     }
 
     const { id, method, params } = req;
-    enqueue(method, id, params || {});
+    dispatch(method, id, params || {});
 });
 
 rl.on("close", () => {
-    // stdin closed — clean up
     if (client) client.stop().catch(() => {});
     process.exit(0);
 });

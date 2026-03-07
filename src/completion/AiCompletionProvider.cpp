@@ -1,13 +1,13 @@
 #include "AiCompletionProvider.h"
-#include "AiCompletionProcessor.h"
 #include "../settings/Settings.h"
 #include "../util/Logger.h"
+#include "AiCompletionProcessor.h"
 
 #include <texteditor/texteditor.h>
 
 #include <QTextCursor>
 
-namespace Qcai2
+namespace qcai2
 {
 
 AiCompletionProvider::AiCompletionProvider(QObject *parent) : CompletionAssistProvider(parent)
@@ -23,8 +23,9 @@ TextEditor::IAssistProcessor *AiCompletionProvider::createProcessor(
     // Use completion-specific model if set, otherwise fall back to agent model
     const auto &s = settings();
     const QString model = s.completionModel.isEmpty() ? m_model : s.completionModel;
-    QCAI_DEBUG("Completion", QStringLiteral("createProcessor: completionModel='%1' agentModel='%2' using='%3'")
-        .arg(s.completionModel, m_model, model));
+    QCAI_DEBUG("Completion",
+               QStringLiteral("createProcessor: completionModel='%1' agentModel='%2' using='%3'")
+                   .arg(s.completionModel, m_model, model));
     return new AiCompletionProcessor(m_provider, model);
 }
 
@@ -41,8 +42,8 @@ bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) con
     const QChar c = sequence.at(sequence.length() - 1);
 
     // Traditional trigger chars
-    if (c == QLatin1Char('.') || c == QLatin1Char('>') || c == QLatin1Char(':')
-        || c == QLatin1Char('(') || c == QLatin1Char('\n'))
+    if (c == QLatin1Char('.') || c == QLatin1Char('>') || c == QLatin1Char(':') ||
+        c == QLatin1Char('(') || c == QLatin1Char('\n'))
         return true;
 
     // Word-boundary activation: trigger when word length reaches completionMinChars
@@ -50,7 +51,8 @@ bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) con
     if (!s.aiCompletionEnabled || s.completionMinChars <= 0)
         return false;
 
-    if (c.isLetterOrNumber() || c == QLatin1Char('_')) {
+    if (c.isLetterOrNumber() || c == QLatin1Char('_'))
+    {
         auto *editor = TextEditor::TextEditorWidget::currentTextEditorWidget();
         if (!editor)
             return false;
@@ -60,7 +62,8 @@ bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) con
         const int col = tc.positionInBlock();
 
         int wordLen = 0;
-        for (int i = col - 1; i >= 0; --i) {
+        for (int i = col - 1; i >= 0; --i)
+        {
             const QChar ch = lineText.at(i);
             if (ch.isLetterOrNumber() || ch == QLatin1Char('_'))
                 ++wordLen;
@@ -68,7 +71,8 @@ bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) con
                 break;
         }
 
-        if (wordLen == s.completionMinChars) {
+        if (wordLen == s.completionMinChars)
+        {
             QCAI_DEBUG("Completion",
                        QStringLiteral("Word activation: %1 chars at cursor").arg(wordLen));
             return true;
@@ -78,4 +82,4 @@ bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) con
     return false;
 }
 
-}  // namespace Qcai2
+}  // namespace qcai2

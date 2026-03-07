@@ -1,4 +1,4 @@
-# Qcai2 — AI Agent Plugin for Qt Creator
+# qcai2 — AI Agent Plugin for Qt Creator
 
 An autonomous AI coding agent plugin for Qt Creator (Qt 6, C++17/20).
 It implements a full plan → act → observe → verify → iterate loop with tool-calling capabilities,
@@ -68,6 +68,54 @@ cmake --build .
 ```
 
 Where `<path_to_qtcreator>` is the path to a Qt Creator build/install directory.
+
+### Tests
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DWITH_TESTS=ON
+cmake --build build -j4
+ctest --test-dir build --output-on-failure
+```
+
+This currently builds and runs the QtTest-based unit tests under `tests/`.
+
+### Format Changed Files
+
+```bash
+cmake -P format-changed-files.cmake
+```
+
+If you already have a configured build directory, the equivalent CMake target is:
+
+```bash
+cmake --build build --target format-changed-files
+```
+
+This formats changed C/C++/Objective-C source files with the repository `.clang-format`
+and skips common build directories.
+
+### Install
+
+```bash
+cmake --install build
+```
+
+By default this installs into the current user's Qt Creator plugin area:
+
+- Linux: `~/.local/share/data/QtProject/qtcreator/plugins/18.0.2`
+
+The install step deploys the plugin and Node.js sidecar there and runs `npm install`
+in the installed sidecar directory so `@github/copilot-sdk` is available.
+
+To use a different destination, override the install prefix:
+
+```bash
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/path/to/qtcreator-user-root
+# or:
+cmake --install build --prefix /path/to/qtcreator-user-root
+```
+
+The custom prefix should be the Qt Creator root that contains the versioned `plugins/<qtcreator-version>/` directory.
 
 ### Run
 

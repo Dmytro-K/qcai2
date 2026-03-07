@@ -1,6 +1,7 @@
 #include "AiCompletionProcessor.h"
 #include "../models/AgentMessages.h"
 #include "../providers/IAIProvider.h"
+#include "../settings/Settings.h"
 #include "../util/Logger.h"
 
 #include <texteditor/codeassist/assistinterface.h>
@@ -9,7 +10,7 @@
 
 #include <QTextDocument>
 
-namespace Qcai2
+namespace qcai2
 {
 
 static const int kContextBefore = 2000;  // chars before cursor
@@ -88,7 +89,7 @@ TextEditor::IAssistProposal *AiCompletionProcessor::perform()
     // Async: send request, deliver proposal when ready
     auto alive = m_alive;  // capture shared_ptr for safe use-after-free check
     m_provider->complete(
-        messages, m_model, 0.0, 256,
+        messages, m_model, 0.0, 128, settings().completionReasoningEffort,
         [this, pos, alive](const QString &response, const QString &error) {
             if (!*alive)
                 return;  // processor was destroyed, bail out
@@ -163,4 +164,4 @@ TextEditor::IAssistProposal *AiCompletionProcessor::perform()
     return nullptr;  // async — proposal delivered via setAsyncProposalAvailable
 }
 
-}  // namespace Qcai2
+}  // namespace qcai2
