@@ -9,6 +9,8 @@ include(GNUInstallDirs)
 
 set(QCAI2_FORMAT_CHANGED_SCRIPT
     "${CMAKE_CURRENT_SOURCE_DIR}/format-changed-files.cmake")
+set(QCAI2_BUILD_DOCS_SCRIPT
+    "${CMAKE_CURRENT_SOURCE_DIR}/build-docs.cmake")
 
 if (WIN32)
     if (DEFINED ENV{LOCALAPPDATA} AND NOT "$ENV{LOCALAPPDATA}" STREQUAL "")
@@ -235,6 +237,70 @@ add_custom_target(format-changed-files
     COMMENT "Formatting changed project files with clang-format"
 )
 
+find_package(Doxygen QUIET)
+find_package(Python3 COMPONENTS Interpreter QUIET)
+find_program(QCAI2_SPHINX_EXECUTABLE NAMES sphinx-build)
+
+set(QCAI2_DOCS_TEMPLATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs")
+set(QCAI2_DOCS_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
+set(QCAI2_DOCS_SPHINX_SOURCE_DIR "${QCAI2_DOCS_BUILD_DIR}/sphinx")
+set(QCAI2_DOCS_SPHINX_HTML_DIR "${QCAI2_DOCS_BUILD_DIR}/html")
+set(QCAI2_DOCS_DOXYGEN_OUTPUT_DIR "${QCAI2_DOCS_BUILD_DIR}/doxygen")
+set(QCAI2_DOCS_DOXYGEN_XML_DIR "${QCAI2_DOCS_DOXYGEN_OUTPUT_DIR}/xml")
+
+file(MAKE_DIRECTORY "${QCAI2_DOCS_SPHINX_SOURCE_DIR}")
+
+set(QCAI2_DOXYGEN_INPUT_PATHS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/qcai2constants.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/qcai2tr.h"
+)
+set(QCAI2_DOXYGEN_INPUTS "")
+foreach(qcai2_doxygen_input IN LISTS QCAI2_DOXYGEN_INPUT_PATHS)
+    string(APPEND QCAI2_DOXYGEN_INPUTS " \"${qcai2_doxygen_input}\"")
+endforeach()
+string(STRIP "${QCAI2_DOXYGEN_INPUTS}" QCAI2_DOXYGEN_INPUTS)
+
+cmake_path(CONVERT "${QCAI2_DOCS_DOXYGEN_XML_DIR}" TO_CMAKE_PATH_LIST
+    QCAI2_DOCS_DOXYGEN_XML_DIR_PY)
+cmake_path(CONVERT "${CMAKE_CURRENT_SOURCE_DIR}" TO_CMAKE_PATH_LIST
+    QCAI2_PROJECT_SOURCE_DIR_PY)
+
+configure_file(
+    "${QCAI2_DOCS_TEMPLATE_DIR}/Doxyfile.in"
+    "${QCAI2_DOCS_BUILD_DIR}/Doxyfile"
+    @ONLY
+)
+configure_file(
+    "${QCAI2_DOCS_TEMPLATE_DIR}/conf.py.in"
+    "${QCAI2_DOCS_SPHINX_SOURCE_DIR}/conf.py"
+    @ONLY
+)
+configure_file(
+    "${QCAI2_DOCS_TEMPLATE_DIR}/index.rst"
+    "${QCAI2_DOCS_SPHINX_SOURCE_DIR}/index.rst"
+    COPYONLY
+)
+configure_file(
+    "${QCAI2_DOCS_TEMPLATE_DIR}/overview.rst"
+    "${QCAI2_DOCS_SPHINX_SOURCE_DIR}/overview.rst"
+    COPYONLY
+)
+
+add_custom_target(doc
+    COMMAND ${CMAKE_COMMAND}
+        -DDOXYGEN_EXECUTABLE=${DOXYGEN_EXECUTABLE}
+        -DSPHINX_EXECUTABLE=${QCAI2_SPHINX_EXECUTABLE}
+        -DPYTHON_EXECUTABLE=${Python3_EXECUTABLE}
+        -DDOXYFILE_PATH=${QCAI2_DOCS_BUILD_DIR}/Doxyfile
+        -DSPHINX_SOURCE_DIR=${QCAI2_DOCS_SPHINX_SOURCE_DIR}
+        -DSPHINX_OUTPUT_DIR=${QCAI2_DOCS_SPHINX_HTML_DIR}
+        -P "${QCAI2_BUILD_DOCS_SCRIPT}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    COMMENT "Generating documentation with Doxygen, Sphinx, Breathe, and Exhale"
+)
+
 # Enable the Run button in Qt Creator
 get_target_property(QtCreatorCorePath QtCreator::Core LOCATION)
 find_program(QtCreatorExecutable
@@ -262,6 +328,11 @@ set(SRC_IDE
     README.md
     .gitignore
     format-changed-files.cmake
+    build-docs.cmake
+    docs/Doxyfile.in
+    docs/conf.py.in
+    docs/index.rst
+    docs/overview.rst
 )
 
 add_custom_target(target_for_ide SOURCES ${SRC_IDE})

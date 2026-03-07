@@ -1,0 +1,36 @@
+project = "qcai2"
+author = "Dmytro Kosmii"
+
+extensions = [
+    "breathe",
+    "exhale",
+]
+
+exclude_patterns = ["_build"]
+primary_domain = "cpp"
+highlight_language = "cpp"
+html_theme = "classic"
+
+breathe_projects = {
+    "qcai2": "@QCAI2_DOCS_DOXYGEN_XML_DIR_PY@",
+}
+breathe_default_project = "qcai2"
+breathe_domain_by_extension = {
+    "h": "cpp",
+    "hh": "cpp",
+    "hpp": "cpp",
+    "hxx": "cpp",
+    "c": "cpp",
+    "cc": "cpp",
+    "cpp": "cpp",
+    "cxx": "cpp",
+}
+
+exhale_args = {
+    "containmentFolder": "./api",
+    "rootFileName": "library_root.rst",
+    "rootFileTitle": "API reference",
+    "doxygenStripFromPath": "@QCAI2_PROJECT_SOURCE_DIR_PY@",
+    "createTreeView": True,
+    "exhaleExecutesDoxygen": False,
+}

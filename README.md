@@ -117,6 +117,16 @@ cmake --install build --prefix /path/to/qtcreator-user-root
 
 The custom prefix should be the Qt Creator root that contains the versioned `plugins/<qtcreator-version>/` directory.
 
+### Documentation
+
+```bash
+cmake --build build --target doc
+```
+
+This generates Doxygen XML plus Sphinx HTML output under `build/docs/html/`.
+The target expects `doxygen`, `sphinx-build`, and the Python packages `breathe`
+and `exhale` to be installed in the Sphinx environment.
+
 ### Run
 
 ```bash
