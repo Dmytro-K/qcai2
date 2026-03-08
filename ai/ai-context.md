@@ -55,9 +55,7 @@ qcai2/
 │   │   ├── completion/
 │   │   │   ├── AiCompletionProvider.h/.cpp
 │   │   │   ├── AiCompletionProcessor.h/.cpp
-│   │   │   ├── CompletionTrigger.h/.cpp     — present in the tree, but not included in the CMake target
 │   │   │   ├── GhostTextManager.h/.cpp
-│   │   │   └── GhostTextOverlay.h/.cpp      — present in the tree, but not included in the CMake target
 │   │   ├── context/
 │   │   │   └── EditorContext.h/.cpp
 │   │   ├── diff/
