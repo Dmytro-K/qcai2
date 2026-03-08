@@ -223,6 +223,8 @@ jobs:
     needs: [build]
 
     steps:
+    - uses: actions/checkout@v4
+
     - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
@@ -233,6 +235,47 @@ jobs:
         mkdir release
         mv release-with-dirs/*/* release/
 
+    - name: Extract release notes
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        from pathlib import Path
+        import re
+        import sys
+
+        changelog_path = Path("CHANGELOG.md")
+        if not changelog_path.exists():
+            print("::error::CHANGELOG.md not found", file=sys.stderr)
+            raise SystemExit(1)
+
+        lines = changelog_path.read_text(encoding="utf-8").splitlines()
+        version_heading = re.compile(r"^## \[(?!Unreleased\])[^]]+\]")
+
+        start = None
+        end = len(lines)
+        for index, line in enumerate(lines):
+            if version_heading.match(line):
+                start = index + 1
+                break
+
+        if start is None:
+            print("::error::No released version entry found in CHANGELOG.md", file=sys.stderr)
+            raise SystemExit(1)
+
+        for index in range(start, len(lines)):
+            if version_heading.match(lines[index]):
+                end = index
+                break
+
+        release_notes = "\n".join(lines[start:end]).strip()
+        if not release_notes:
+            print("::error::Latest CHANGELOG.md version entry is empty", file=sys.stderr)
+            raise SystemExit(1)
+
+        Path("release-notes.md").write_text(release_notes + "\n", encoding="utf-8")
+        PY
+
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v2
@@ -240,6 +283,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v${{ needs.build.outputs.tag }}
+        body_path: release-notes.md
         files: |
           release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Linux-arm64.tar.xz
           release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Linux-x64.tar.xz

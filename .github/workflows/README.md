@@ -40,7 +40,7 @@ For each matrix entry, the build job currently:
 8. Builds the plugin with `cmake --build build --parallel`
 9. Runs tests with `ctest --test-dir build --output-on-failure`
 10. Installs into a temporary package root with `cmake --install`
-11. Zips the installed payload and uploads it as a GitHub Actions artifact
+11. Archives the installed payload and uploads it as a GitHub Actions artifact
 
 ## Release behavior
 
@@ -48,11 +48,14 @@ When the ref is a tag like `v1.2.3`, the `release` job:
 
 - downloads all uploaded artifacts,
 - flattens them into a `release/` directory,
+- extracts the newest released version notes from `CHANGELOG.md`,
 - creates a GitHub release with `softprops/action-gh-release@v2`,
-- attaches the zip files for all supported platforms.
+- uses those extracted notes as the release description,
+- attaches the packaged files for all supported platforms.
 
 ## Notes for maintenance
 
 - Linux Qt installs currently include the `icu` archive because the workflow needs those runtime pieces for Qt tools.
 - Packaging is based on `cmake --install`, so sidecar files and any install-time scripts are included automatically.
+- Release notes are derived from the first released version section in `CHANGELOG.md`; keep the newest release entry at the top of the file.
 - If the plugin gains new runtime files, ensure they are installed by CMake; the workflow packages whatever `cmake --install` produces.
