@@ -8,9 +8,9 @@ project(qcai2)
 include(GNUInstallDirs)
 
 set(QCAI2_FORMAT_CHANGED_SCRIPT
-    "${CMAKE_CURRENT_SOURCE_DIR}/format-changed-files.cmake")
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/format-changed-files.cmake")
 set(QCAI2_BUILD_DOCS_SCRIPT
-    "${CMAKE_CURRENT_SOURCE_DIR}/build-docs.cmake")
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/build-docs.cmake")
 
 if (WIN32)
     if (DEFINED ENV{LOCALAPPDATA} AND NOT "$ENV{LOCALAPPDATA}" STREQUAL "")
@@ -119,7 +119,7 @@ if(WITH_TESTS)
   # Enable ctest for auto tests.
   enable_testing()
 
-  add_subdirectory(tests)
+  add_subdirectory(src/tests)
 endif()
 
 add_qtc_plugin(qcai2
@@ -135,67 +135,68 @@ add_qtc_plugin(qcai2
     QtCreator::ExtensionSystem
     QtCreator::Utils
   SOURCES
-    qcai2constants.h
-    qcai2tr.h
-    resources/aiagentplugin.qrc
-    src/AiAgentPlugin.h
-    src/AiAgentPlugin.cpp
-    src/AgentController.h
-    src/AgentController.cpp
-    src/AgentDockWidget.h
-    src/AgentDockWidget.cpp
-    src/context/EditorContext.h
-    src/context/EditorContext.cpp
-    src/tools/ITool.h
-    src/tools/ToolRegistry.h
-    src/tools/ToolRegistry.cpp
-    src/tools/FileTools.h
-    src/tools/FileTools.cpp
-    src/tools/SearchTools.h
-    src/tools/SearchTools.cpp
-    src/tools/BuildTools.h
-    src/tools/BuildTools.cpp
-    src/tools/GitTools.h
-    src/tools/GitTools.cpp
-    src/tools/IdeTools.h
-    src/tools/IdeTools.cpp
-    src/providers/IAIProvider.h
-    src/providers/OpenAICompatibleProvider.h
-    src/providers/OpenAICompatibleProvider.cpp
-    src/providers/LocalHttpProvider.h
-    src/providers/LocalHttpProvider.cpp
-    src/providers/OllamaProvider.h
-    src/providers/OllamaProvider.cpp
-    src/providers/CopilotProvider.h
-    src/providers/CopilotProvider.cpp
-    src/models/AgentMessages.h
-    src/models/AgentMessages.cpp
-    src/models/ToolCall.h
-    src/models/ToolCall.cpp
-    src/safety/SafetyPolicy.h
-    src/safety/SafetyPolicy.cpp
-    src/util/Json.h
-    src/util/Json.cpp
-    src/util/ProcessRunner.h
-    src/util/ProcessRunner.cpp
-    src/util/Diff.h
-    src/util/Diff.cpp
-    src/util/Logger.h
-    src/util/Logger.cpp
-    src/util/CrashHandler.h
-    src/util/CrashHandler.cpp
-    src/settings/Settings.h
-    src/settings/Settings.cpp
-    src/settings/SettingsPage.h
-    src/settings/SettingsPage.cpp
-    src/completion/AiCompletionProvider.h
-    src/completion/AiCompletionProvider.cpp
-    src/completion/AiCompletionProcessor.h
-    src/completion/AiCompletionProcessor.cpp
-    src/completion/GhostTextManager.h
-    src/completion/GhostTextManager.cpp
-    src/diff/InlineDiffManager.h
-    src/diff/InlineDiffManager.cpp
+    qcai2.json.in
+    src/qcai2constants.h
+    src/qcai2tr.h
+    src/resources/aiagentplugin.qrc
+    src/src/AiAgentPlugin.h
+    src/src/AiAgentPlugin.cpp
+    src/src/AgentController.h
+    src/src/AgentController.cpp
+    src/src/AgentDockWidget.h
+    src/src/AgentDockWidget.cpp
+    src/src/context/EditorContext.h
+    src/src/context/EditorContext.cpp
+    src/src/tools/ITool.h
+    src/src/tools/ToolRegistry.h
+    src/src/tools/ToolRegistry.cpp
+    src/src/tools/FileTools.h
+    src/src/tools/FileTools.cpp
+    src/src/tools/SearchTools.h
+    src/src/tools/SearchTools.cpp
+    src/src/tools/BuildTools.h
+    src/src/tools/BuildTools.cpp
+    src/src/tools/GitTools.h
+    src/src/tools/GitTools.cpp
+    src/src/tools/IdeTools.h
+    src/src/tools/IdeTools.cpp
+    src/src/providers/IAIProvider.h
+    src/src/providers/OpenAICompatibleProvider.h
+    src/src/providers/OpenAICompatibleProvider.cpp
+    src/src/providers/LocalHttpProvider.h
+    src/src/providers/LocalHttpProvider.cpp
+    src/src/providers/OllamaProvider.h
+    src/src/providers/OllamaProvider.cpp
+    src/src/providers/CopilotProvider.h
+    src/src/providers/CopilotProvider.cpp
+    src/src/models/AgentMessages.h
+    src/src/models/AgentMessages.cpp
+    src/src/models/ToolCall.h
+    src/src/models/ToolCall.cpp
+    src/src/safety/SafetyPolicy.h
+    src/src/safety/SafetyPolicy.cpp
+    src/src/util/Json.h
+    src/src/util/Json.cpp
+    src/src/util/ProcessRunner.h
+    src/src/util/ProcessRunner.cpp
+    src/src/util/Diff.h
+    src/src/util/Diff.cpp
+    src/src/util/Logger.h
+    src/src/util/Logger.cpp
+    src/src/util/CrashHandler.h
+    src/src/util/CrashHandler.cpp
+    src/src/settings/Settings.h
+    src/src/settings/Settings.cpp
+    src/src/settings/SettingsPage.h
+    src/src/settings/SettingsPage.cpp
+    src/src/completion/AiCompletionProvider.h
+    src/src/completion/AiCompletionProvider.cpp
+    src/src/completion/AiCompletionProcessor.h
+    src/src/completion/AiCompletionProcessor.cpp
+    src/src/completion/GhostTextManager.h
+    src/src/completion/GhostTextManager.cpp
+    src/src/diff/InlineDiffManager.h
+    src/src/diff/InlineDiffManager.cpp
 )
 
 qcai2_enable_linker_map(qcai2)
@@ -205,23 +206,23 @@ set(QCAI2_SIDECAR_INSTALL_DIR "${QCAI2_PLUGIN_INSTALL_DIR}/qcai2/sidecar")
 
 # Sidecar path for development builds
 target_compile_definitions(qcai2 PRIVATE
-    QCAI2_SIDECAR_PATH="${CMAKE_CURRENT_SOURCE_DIR}/sidecar/copilot-sidecar.js"
+    QCAI2_SIDECAR_PATH="${CMAKE_CURRENT_SOURCE_DIR}/src/sidecar/copilot-sidecar.js"
     QCAI2_QTCREATOR_IDE_VERSION="${IDE_VERSION}"
     QCAI2_INSTALLED_SIDECAR_RELATIVE_PATH="qcai2/sidecar/copilot-sidecar.js"
 )
 
 # Install sidecar files alongside the plugin
 install(FILES
-    sidecar/copilot-sidecar.js
-    sidecar/package.json
-    sidecar/package-lock.json
+    src/sidecar/copilot-sidecar.js
+    src/sidecar/package.json
+    src/sidecar/package-lock.json
     DESTINATION ${QCAI2_SIDECAR_INSTALL_DIR}
 )
 
 set(QCAI2_INSTALL_SIDECAR_DEPS_SCRIPT
     "${CMAKE_CURRENT_BINARY_DIR}/cmake/install-sidecar-deps.cmake")
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/install-sidecar-deps.cmake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/install-sidecar-deps.cmake"
     "${QCAI2_INSTALL_SIDECAR_DEPS_SCRIPT}"
     @ONLY
 )
@@ -251,7 +252,7 @@ find_package(Doxygen QUIET)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 find_program(QCAI2_SPHINX_EXECUTABLE NAMES sphinx-build)
 
-set(QCAI2_DOCS_TEMPLATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs")
+set(QCAI2_DOCS_TEMPLATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/docs")
 set(QCAI2_DOCS_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
 set(QCAI2_DOCS_SPHINX_SOURCE_DIR "${QCAI2_DOCS_BUILD_DIR}/sphinx")
 set(QCAI2_DOCS_SPHINX_HTML_DIR "${QCAI2_DOCS_BUILD_DIR}/html")
@@ -261,9 +262,9 @@ set(QCAI2_DOCS_DOXYGEN_XML_DIR "${QCAI2_DOCS_DOXYGEN_OUTPUT_DIR}/xml")
 file(MAKE_DIRECTORY "${QCAI2_DOCS_SPHINX_SOURCE_DIR}")
 
 set(QCAI2_DOXYGEN_INPUT_PATHS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qcai2constants.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qcai2tr.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/qcai2constants.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/qcai2tr.h"
 )
 set(QCAI2_DOXYGEN_INPUTS "")
 foreach(qcai2_doxygen_input IN LISTS QCAI2_DOXYGEN_INPUT_PATHS)
@@ -329,31 +330,28 @@ if (QtCreatorExecutable)
   set_target_properties(RunQtCreator PROPERTIES FOLDER "qtc_runnable")
 endif()
 
-
 set(SRC_IDE
     .clang-format
     .github/workflows/README.md
     .github/workflows/build_cmake.yml
-    ai-prompt.txt
-    ai-todo-errors.txt
-    ai-context.md
+    ai/ai-context.md
     CMakeLists.txt
     LICENSE
     README.md
     .gitignore
-    cmake_install.cmake
-    format-changed-files.cmake
-    build-docs.cmake
-    docs/Doxyfile.in
-    docs/conf.py.in
-    docs/index.rst
-    docs/overview.rst
-    install-sidecar-deps.cmake
+    cmake/cmake_install.cmake
+    cmake/format-changed-files.cmake
+    cmake/build-docs.cmake
+    src/docs/Doxyfile.in
+    src/docs/conf.py.in
+    src/docs/index.rst
+    src/docs/overview.rst
+    cmake/install-sidecar-deps.cmake
     qcai2.json.in
-    qcai2_uk_UA.ts
-    sidecar/copilot-sidecar.js
-    sidecar/package.json
-    tests/CMakeLists.txt
+    src/qcai2_uk_UA.ts
+    src/sidecar/copilot-sidecar.js
+    src/sidecar/package.json
+    src/tests/CMakeLists.txt
 )
 
 add_custom_target(target_for_ide SOURCES ${SRC_IDE})

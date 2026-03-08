@@ -18,61 +18,75 @@
 .
 ├── CMakeLists.txt
 ├── README.md
-├── ai-context.md
-├── docs/
-│   ├── Doxyfile.in
-│   ├── conf.py.in
-│   ├── index.rst
-│   └── overview.rst
-├── sidecar/
-│   ├── copilot-sidecar.js
-│   └── package.json
+├── ai/
+│   └── ai-context.md
+├── cmake/
+│   ├── build-docs.cmake
+│   ├── cmake_install.cmake
+│   ├── format-changed-files.cmake
+│   └── install-sidecar-deps.cmake
 ├── src/
-│   ├── AiAgentPlugin.h/.cpp
-│   ├── AgentController.h/.cpp
-│   ├── AgentDockWidget.h/.cpp
-│   ├── completion/
-│   │   ├── AiCompletionProvider.h/.cpp
-│   │   ├── AiCompletionProcessor.h/.cpp
-│   │   ├── CompletionTrigger.h/.cpp      # present in tree, not built
-│   │   ├── GhostTextManager.h/.cpp
-│   │   └── GhostTextOverlay.h/.cpp       # present in tree, not built
-│   ├── context/
-│   │   └── EditorContext.h/.cpp
-│   ├── diff/
-│   │   └── InlineDiffManager.h/.cpp
-│   ├── models/
-│   │   ├── AgentMessages.h/.cpp
-│   │   └── ToolCall.h/.cpp
-│   ├── providers/
-│   │   ├── IAIProvider.h
-│   │   ├── OpenAICompatibleProvider.h/.cpp
-│   │   ├── CopilotProvider.h/.cpp
-│   │   ├── LocalHttpProvider.h/.cpp
-│   │   └── OllamaProvider.h/.cpp
-│   ├── safety/
-│   │   └── SafetyPolicy.h/.cpp
-│   ├── settings/
-│   │   ├── Settings.h/.cpp
-│   │   └── SettingsPage.h/.cpp
-│   ├── tools/
-│   │   ├── BuildTools.h/.cpp
-│   │   ├── FileTools.h/.cpp
-│   │   ├── GitTools.h/.cpp
-│   │   ├── IdeTools.h/.cpp
-│   │   ├── ITool.h
-│   │   ├── SearchTools.h/.cpp
-│   │   └── ToolRegistry.h/.cpp
-│   └── util/
-│       ├── CrashHandler.h/.cpp
-│       ├── Diff.h/.cpp
-│       ├── Json.h/.cpp
-│       ├── Logger.h/.cpp
-│       └── ProcessRunner.h/.cpp
-└── tests/
-    ├── CMakeLists.txt
-    ├── tst_json.cpp
-    └── tst_toolcall.cpp
+│   ├── docs/
+│   │   ├── Doxyfile.in
+│   │   ├── conf.py.in
+│   │   ├── index.rst
+│   │   └── overview.rst
+│   ├── qcai2.json.in
+│   ├── qcai2constants.h
+│   ├── qcai2tr.h
+│   ├── resources/
+│   │   ├── ai-agent-icon.svg
+│   │   └── aiagentplugin.qrc
+│   ├── sidecar/
+│   │   ├── copilot-sidecar.js
+│   │   ├── package-lock.json
+│   │   └── package.json
+│   ├── src/
+│   │   ├── AiAgentPlugin.h/.cpp
+│   │   ├── AgentController.h/.cpp
+│   │   ├── AgentDockWidget.h/.cpp
+│   │   ├── completion/
+│   │   │   ├── AiCompletionProvider.h/.cpp
+│   │   │   ├── AiCompletionProcessor.h/.cpp
+│   │   │   ├── CompletionTrigger.h/.cpp      # present in tree, not built
+│   │   │   ├── GhostTextManager.h/.cpp
+│   │   │   └── GhostTextOverlay.h/.cpp       # present in tree, not built
+│   │   ├── context/
+│   │   │   └── EditorContext.h/.cpp
+│   │   ├── diff/
+│   │   │   └── InlineDiffManager.h/.cpp
+│   │   ├── models/
+│   │   │   ├── AgentMessages.h/.cpp
+│   │   │   └── ToolCall.h/.cpp
+│   │   ├── providers/
+│   │   │   ├── IAIProvider.h
+│   │   │   ├── OpenAICompatibleProvider.h/.cpp
+│   │   │   ├── CopilotProvider.h/.cpp
+│   │   │   ├── LocalHttpProvider.h/.cpp
+│   │   │   └── OllamaProvider.h/.cpp
+│   │   ├── safety/
+│   │   │   └── SafetyPolicy.h/.cpp
+│   │   ├── settings/
+│   │   │   ├── Settings.h/.cpp
+│   │   │   └── SettingsPage.h/.cpp
+│   │   ├── tools/
+│   │   │   ├── BuildTools.h/.cpp
+│   │   │   ├── FileTools.h/.cpp
+│   │   │   ├── GitTools.h/.cpp
+│   │   │   ├── IdeTools.h/.cpp
+│   │   │   ├── ITool.h
+│   │   │   ├── SearchTools.h/.cpp
+│   │   │   └── ToolRegistry.h/.cpp
+│   │   └── util/
+│   │       ├── CrashHandler.h/.cpp
+│   │       ├── Diff.h/.cpp
+│   │       ├── Json.h/.cpp
+│   │       ├── Logger.h/.cpp
+│   │       └── ProcessRunner.h/.cpp
+│   └── tests/
+│       ├── CMakeLists.txt
+│       ├── tst_json.cpp
+│       └── tst_toolcall.cpp
 ```
 
 ## Building
@@ -125,7 +139,7 @@ cmake --build build --target format-changed-files
 cmake --build build --target doc
 ```
 
-The `doc` target runs Doxygen plus Sphinx and writes HTML output under `build/docs/html/`. It expects `doxygen`, `sphinx-build`, Python 3, and the Python packages required by `docs/conf.py.in` (`breathe` and `exhale`).
+The `doc` target runs Doxygen plus Sphinx and writes HTML output under `build/docs/html/`. It expects `doxygen`, `sphinx-build`, Python 3, and the Python packages required by `src/docs/conf.py.in` (`breathe` and `exhale`).
 
 ### Run Qt Creator with the built plugin
 
@@ -139,7 +153,7 @@ cmake --build build --target RunQtCreator
 cmake --install build
 ```
 
-The install step copies the plugin plus the `sidecar/` files and then runs:
+The install step copies the plugin plus the `src/sidecar/` files and then runs:
 
 ```bash
 npm install --no-audit --no-fund
@@ -218,7 +232,7 @@ Open **Tools → Options → AI Agent** in Qt Creator.
 
 ## GitHub Copilot sidecar
 
-The Copilot integration lives in `sidecar/copilot-sidecar.js` and communicates with the plugin over JSON Lines on stdin/stdout.
+The Copilot integration lives in `src/sidecar/copilot-sidecar.js` and communicates with the plugin over JSON Lines on stdin/stdout.
 
 - Methods currently handled by the sidecar: `start`, `complete`, `list_models`, `cancel`, `stop`
 - The sidecar uses `@github/copilot-sdk`

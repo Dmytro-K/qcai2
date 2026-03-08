@@ -6,7 +6,7 @@ add_executable(tst_qcai2_json
 qcai2_enable_linker_map(tst_qcai2_json)
 
 target_include_directories(tst_qcai2_json PRIVATE
-    "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/src"
 )
 target_link_libraries(tst_qcai2_json PRIVATE
     Qt::Core
@@ -22,7 +22,7 @@ add_executable(tst_qcai2_toolcall
 qcai2_enable_linker_map(tst_qcai2_toolcall)
 
 target_include_directories(tst_qcai2_toolcall PRIVATE
-    "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/src"
 )
 target_link_libraries(tst_qcai2_toolcall PRIVATE
     Qt::Core

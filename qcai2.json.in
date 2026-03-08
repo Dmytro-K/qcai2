@@ -8,7 +8,7 @@
     "Copyright" : "(C) Dmytro Kosmii",
     "License" : "BSD-2",
     "Description" : "AI Agent plugin for Qt Creator: autonomous coding agent with tool-calling, multi-provider LLM support, and safety-first design",
-    "Url" : "https://www.dmytrokosmii.com",
+    "Url" : "https://www.example.com",
     "DocumentationUrl" : "",
     ${IDE_PLUGIN_DEPENDENCIES}
 }

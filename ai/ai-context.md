@@ -31,56 +31,68 @@
 qcai2/
 ├── CMakeLists.txt
 ├── README.md
-├── ai-context.md
-├── docs/
-├── sidecar/
-│   ├── copilot-sidecar.js
-│   └── package.json
+├── ai/
+│   └── ai-context.md
+├── cmake/
+│   ├── build-docs.cmake
+│   ├── cmake_install.cmake
+│   ├── format-changed-files.cmake
+│   └── install-sidecar-deps.cmake
 ├── src/
-│   ├── AiAgentPlugin.h/.cpp
-│   ├── AgentController.h/.cpp
-│   ├── AgentDockWidget.h/.cpp
-│   ├── completion/
-│   │   ├── AiCompletionProvider.h/.cpp
-│   │   ├── AiCompletionProcessor.h/.cpp
-│   │   ├── CompletionTrigger.h/.cpp     — є в дереві, але не входить у CMake target
-│   │   ├── GhostTextManager.h/.cpp
-│   │   └── GhostTextOverlay.h/.cpp      — є в дереві, але не входить у CMake target
-│   ├── context/
-│   │   └── EditorContext.h/.cpp
-│   ├── diff/
-│   │   └── InlineDiffManager.h/.cpp
-│   ├── models/
-│   │   ├── AgentMessages.h/.cpp
-│   │   └── ToolCall.h/.cpp
-│   ├── providers/
-│   │   ├── IAIProvider.h
-│   │   ├── OpenAICompatibleProvider.h/.cpp
-│   │   ├── CopilotProvider.h/.cpp
-│   │   ├── LocalHttpProvider.h/.cpp
-│   │   └── OllamaProvider.h/.cpp
-│   ├── safety/
-│   │   └── SafetyPolicy.h/.cpp
-│   ├── settings/
-│   │   ├── Settings.h/.cpp
-│   │   └── SettingsPage.h/.cpp
-│   ├── tools/
-│   │   ├── BuildTools.h/.cpp
-│   │   ├── FileTools.h/.cpp
-│   │   ├── GitTools.h/.cpp
-│   │   ├── IdeTools.h/.cpp
-│   │   ├── ITool.h
-│   │   ├── SearchTools.h/.cpp
-│   │   └── ToolRegistry.h/.cpp
-│   └── util/
-│       ├── CrashHandler.h/.cpp
-│       ├── Diff.h/.cpp
-│       ├── Json.h/.cpp
-│       ├── Logger.h/.cpp
-│       └── ProcessRunner.h/.cpp
-└── tests/
-    ├── tst_json.cpp
-    └── tst_toolcall.cpp
+│   ├── docs/
+│   ├── qcai2.json.in
+│   ├── qcai2constants.h
+│   ├── qcai2tr.h
+│   ├── resources/
+│   ├── sidecar/
+│   │   ├── copilot-sidecar.js
+│   │   ├── package-lock.json
+│   │   └── package.json
+│   ├── src/
+│   │   ├── AiAgentPlugin.h/.cpp
+│   │   ├── AgentController.h/.cpp
+│   │   ├── AgentDockWidget.h/.cpp
+│   │   ├── completion/
+│   │   │   ├── AiCompletionProvider.h/.cpp
+│   │   │   ├── AiCompletionProcessor.h/.cpp
+│   │   │   ├── CompletionTrigger.h/.cpp     — є в дереві, але не входить у CMake target
+│   │   │   ├── GhostTextManager.h/.cpp
+│   │   │   └── GhostTextOverlay.h/.cpp      — є в дереві, але не входить у CMake target
+│   │   ├── context/
+│   │   │   └── EditorContext.h/.cpp
+│   │   ├── diff/
+│   │   │   └── InlineDiffManager.h/.cpp
+│   │   ├── models/
+│   │   │   ├── AgentMessages.h/.cpp
+│   │   │   └── ToolCall.h/.cpp
+│   │   ├── providers/
+│   │   │   ├── IAIProvider.h
+│   │   │   ├── OpenAICompatibleProvider.h/.cpp
+│   │   │   ├── CopilotProvider.h/.cpp
+│   │   │   ├── LocalHttpProvider.h/.cpp
+│   │   │   └── OllamaProvider.h/.cpp
+│   │   ├── safety/
+│   │   │   └── SafetyPolicy.h/.cpp
+│   │   ├── settings/
+│   │   │   ├── Settings.h/.cpp
+│   │   │   └── SettingsPage.h/.cpp
+│   │   ├── tools/
+│   │   │   ├── BuildTools.h/.cpp
+│   │   │   ├── FileTools.h/.cpp
+│   │   │   ├── GitTools.h/.cpp
+│   │   │   ├── IdeTools.h/.cpp
+│   │   │   ├── ITool.h
+│   │   │   ├── SearchTools.h/.cpp
+│   │   │   └── ToolRegistry.h/.cpp
+│   │   └── util/
+│   │       ├── CrashHandler.h/.cpp
+│   │       ├── Diff.h/.cpp
+│   │       ├── Json.h/.cpp
+│   │       ├── Logger.h/.cpp
+│   │       └── ProcessRunner.h/.cpp
+│   └── tests/
+│       ├── tst_json.cpp
+│       └── tst_toolcall.cpp
 ```
 
 ---
@@ -139,7 +151,7 @@ qcai2/
 
 ## GitHub Copilot sidecar
 
-`sidecar/copilot-sidecar.js` — окремий Node.js процес.
+`src/sidecar/copilot-sidecar.js` — окремий Node.js процес.
 
 **Протокол:** JSON Lines через stdin/stdout.
 
