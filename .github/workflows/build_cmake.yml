@@ -10,6 +10,9 @@ env:
   CMAKE_VERSION: "3.29.6"
   NINJA_VERSION: "1.12.1"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: ${{ matrix.config.name }}
