@@ -1,31 +1,31 @@
 # qcai2 — AI Agent Plugin for Qt Creator
 
-## Контекст для продовження розробки
+## Context for continuing development
 
-Цей файл має відображати поточний стан репозиторію, а не локальне середовище якоїсь однієї машини.
+This file should reflect the current state of the repository, not the local environment of any single machine.
 
 ---
 
-## Огляд
+## Overview
 
-**qcai2** — плагін для Qt Creator на Qt 6 / C++23 з автономним агентським циклом:
+**qcai2** is a plugin for Qt Creator built with Qt 6 / C++23 and an autonomous agent loop:
 
 `plan → act (tools) → observe → verify → iterate`
 
-Поточні можливості:
+Current capabilities:
 
-- багатопровайдерний LLM-шар: `openai`, `copilot`, `local`, `ollama`;
-- tool-calling для файлів, пошуку, збірки, тестів, git і IDE-навігації;
-- dock widget із табами Plan / Actions Log / Diff Preview / Approvals / Debug Log;
-- AI completion через `CompletionAssistProvider`;
-- ghost text через `GhostTextManager` і Qt Creator `TextSuggestion`;
-- inline diff markers через `InlineDiffManager`;
-- dry-run за замовчуванням, approval workflow, sandboxed paths;
-- debug logging і crash handler.
+- multi-provider LLM layer: `openai`, `copilot`, `local`, `ollama`;
+- tool-calling for files, search, builds, tests, git, and IDE navigation;
+- dock widget with Plan / Actions Log / Diff Preview / Approvals / Debug Log tabs;
+- AI completion via `CompletionAssistProvider`;
+- ghost text via `GhostTextManager` and Qt Creator `TextSuggestion`;
+- inline diff markers via `InlineDiffManager`;
+- dry-run by default, approval workflow, sandboxed paths;
+- debug logging and crash handler.
 
 ---
 
-## Актуальна структура проєкту
+## Current project structure
 
 ```text
 qcai2/
@@ -55,9 +55,9 @@ qcai2/
 │   │   ├── completion/
 │   │   │   ├── AiCompletionProvider.h/.cpp
 │   │   │   ├── AiCompletionProcessor.h/.cpp
-│   │   │   ├── CompletionTrigger.h/.cpp     — є в дереві, але не входить у CMake target
+│   │   │   ├── CompletionTrigger.h/.cpp     — present in the tree, but not included in the CMake target
 │   │   │   ├── GhostTextManager.h/.cpp
-│   │   │   └── GhostTextOverlay.h/.cpp      — є в дереві, але не входить у CMake target
+│   │   │   └── GhostTextOverlay.h/.cpp      — present in the tree, but not included in the CMake target
 │   │   ├── context/
 │   │   │   └── EditorContext.h/.cpp
 │   │   ├── diff/
@@ -97,16 +97,16 @@ qcai2/
 
 ---
 
-## Провайдери
+## Providers
 
-| ID | Клас | Нотатка |
+| ID | Class | Note |
 |---|---|---|
-| `openai` | `OpenAICompatibleProvider` | базовий OpenAI-compatible HTTP транспорт |
-| `copilot` | `CopilotProvider` | через Node.js sidecar і `@github/copilot-sdk` |
-| `local` | `LocalHttpProvider` | локальний/кастомний HTTP endpoint |
-| `ollama` | `OllamaProvider` | локальний Ollama server |
+| `openai` | `OpenAICompatibleProvider` | base OpenAI-compatible HTTP transport |
+| `copilot` | `CopilotProvider` | via the Node.js sidecar and `@github/copilot-sdk` |
+| `local` | `LocalHttpProvider` | local/custom HTTP endpoint |
+| `ollama` | `OllamaProvider` | local Ollama server |
 
-Поточні дефолти з `Settings`:
+Current defaults from `Settings`:
 
 - `provider = openai`
 - `modelName = gpt-5.2`
@@ -123,7 +123,7 @@ qcai2/
 
 ## Tool registry
 
-Зараз у `AiAgentPlugin::registerTools()` реєструються:
+Currently, `AiAgentPlugin::registerTools()` registers:
 
 - `read_file`
 - `apply_patch`
@@ -135,7 +135,7 @@ qcai2/
 - `git_diff`
 - `open_file_at_location`
 
-`SafetyPolicy` автоматично allowlist-ить команди:
+`SafetyPolicy` automatically allowlists these commands:
 
 - `cmake`
 - `ninja`
@@ -145,21 +145,21 @@ qcai2/
 - `git`
 - `patch`
 
-`apply_patch` завжди вимагає approval.
+`apply_patch` always requires approval.
 
 ---
 
 ## GitHub Copilot sidecar
 
-`src/sidecar/copilot-sidecar.js` — окремий Node.js процес.
+`src/sidecar/copilot-sidecar.js` is a separate Node.js process.
 
-**Протокол:** JSON Lines через stdin/stdout.
+**Protocol:** JSON Lines over stdin/stdout.
 
 ```json
 {"id":1,"method":"complete","params":{...}}
 ```
 
-Поточні методи:
+Current methods:
 
 - `start`
 - `complete`
@@ -167,14 +167,14 @@ qcai2/
 - `cancel`
 - `stop`
 
-Поточна поведінка:
+Current behavior:
 
-- sidecar стартує `CopilotClient` lazy-on-demand;
-- список моделей запитується окремо через `list_models`;
-- кожен completion створює окрему Copilot session;
-- активні запити відстежуються через `activeRequests`;
-- `cancel` може скасувати один конкретний запит або всі активні;
-- у разі проблем користувачу підказується перевстановити sidecar через `cmake --install` або `npm install` в директорії sidecar і пройти `copilot /login`.
+- the sidecar starts `CopilotClient` lazily, on demand;
+- the model list is requested separately via `list_models`;
+- each completion creates a separate Copilot session;
+- active requests are tracked through `activeRequests`;
+- `cancel` can cancel one specific request or all active ones;
+- if something goes wrong, the user is advised to reinstall the sidecar via `cmake --install` or `npm install` in the sidecar directory and complete `copilot /login`.
 
 ---
 
@@ -182,52 +182,52 @@ qcai2/
 
 ### Completion assist
 
-Поточний шлях:
+Current path:
 
 ```text
 keypress -> isActivationCharSequence() -> createProcessor()
          -> AiCompletionProcessor::perform() -> async provider call
 ```
 
-Ключові факти:
+Key facts:
 
-- тригерні символи: `.`, `>`, `:`, `(`, newline;
-- додатковий автотригер на слові, коли довжина ідентифікатора дорівнює `completionMinChars`;
-- дефолт: `completionMinChars = 3`, `completionDelayMs = 500`;
-- `completionModel` може бути порожнім — тоді використовується модель агента.
+- trigger characters: `.`, `>`, `:`, `(`, newline;
+- an additional auto-trigger on a word when the identifier length equals `completionMinChars`;
+- defaults: `completionMinChars = 3`, `completionDelayMs = 500`;
+- `completionModel` may be empty — then the agent model is used.
 
 ### Ghost text
 
 `GhostTextManager`:
 
-- слідкує за змінами документа;
-- дебаунсить запити;
-- бере контекст навколо курсора;
-- вставляє suggestion через `TextEditor::TextSuggestion` і `insertSuggestion()`.
+- watches document changes;
+- debounces requests;
+- takes context around the cursor;
+- inserts the suggestion via `TextEditor::TextSuggestion` and `insertSuggestion()`.
 
-Тобто в актуальній версії ghost text базується на нативному suggestion API Qt Creator, а не на кастомному overlay.
+So, in the current version, ghost text is based on Qt Creator's native suggestion API rather than a custom overlay.
 
 ---
 
 ## UI — Dock Widget
 
-Поточна структура `AgentDockWidget`:
+Current `AgentDockWidget` structure:
 
-- верхня панель: статус + кнопки New Chat / Apply Patch / Revert Patch / Copy Plan;
-- таби: **Plan**, **Actions Log**, **Diff Preview**, **Approvals**, **Debug Log**;
-- нижній ряд: goal editor, editable model combo, thinking combo, Run / Stop, Dry-run;
-- diff preview має список файлів, per-line approval та інтеграцію з `InlineDiffManager`.
+- top bar: status + New Chat / Apply Patch / Revert Patch / Copy Plan buttons;
+- tabs: **Plan**, **Actions Log**, **Diff Preview**, **Approvals**, **Debug Log**;
+- bottom row: goal editor, editable model combo, thinking combo, Run / Stop, Dry-run;
+- diff preview includes a file list, per-line approval, and integration with `InlineDiffManager`.
 
-Для `Ctrl+C` / `Ctrl+A` використовуються `QShortcut` з `Qt::WidgetShortcut` прямо на текстових віджетах, бо Qt Creator глобально перехоплює частину стандартних shortcut-ів.
+For `Ctrl+C` / `Ctrl+A`, `QShortcut` with `Qt::WidgetShortcut` is used directly on text widgets because Qt Creator globally intercepts some standard shortcuts.
 
 ---
 
 ## Settings
 
-У `SettingsPage` є три таби:
+`SettingsPage` has three tabs:
 
 1. **Providers**
-   - активний провайдер;
+   - active provider;
    - OpenAI-compatible URL / API key / model / thinking / temperature / max tokens;
    - Copilot model / Node path / sidecar path;
    - Local HTTP base URL / endpoint / simple mode / headers;
@@ -250,9 +250,9 @@ keypress -> isActivationCharSequence() -> createProcessor()
 
 ---
 
-## Збірка, тести, інсталяція
+## Build, tests, installation
 
-Актуальні команди з кореня репозиторію:
+Current commands from the repository root:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DWITH_TESTS=ON -DCMAKE_PREFIX_PATH="<qt>;<qtcreator>"
@@ -260,34 +260,34 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-Поточні unit tests:
+Current unit tests:
 
 - `qcai2_json`
 - `qcai2_toolcall`
 
-Інсталяція:
+Installation:
 
 ```bash
 cmake --install build
 ```
 
-Під час install CMake також копіює sidecar-файли й запускає `npm install --no-audit --no-fund` у встановленій sidecar-директорії.
+During install, CMake also copies the sidecar files and runs `npm install --no-audit --no-fund` in the installed sidecar directory.
 
 ---
 
 ## GitHub Actions
 
-Поточний workflow `.github/workflows/build_cmake.yml`:
+Current workflow `.github/workflows/build_cmake.yml`:
 
-- запускається на `push` і `pull_request`;
-- будує Windows x64 / Windows arm64 / Linux x64 / Linux arm64 / macOS;
-- конфігурує CMake з `-DWITH_TESTS=ON`;
-- запускає build + tests;
-- пакує артефакт через `cmake --install`;
-- на тегах `v*` публікує GitHub Release з zip-артефактами.
+- runs on `push` and `pull_request`;
+- builds Windows x64 / Windows arm64 / Linux x64 / Linux arm64 / macOS;
+- configures CMake with `-DWITH_TESTS=ON`;
+- runs build + tests;
+- packages the artifact via `cmake --install`;
+- on `v*` tags, publishes a GitHub Release with zip artifacts.
 
 ---
 
-## Мова спілкування
+## Communication language
 
-Спілкуватися **українською**.
+Communicate **in Ukrainian**.
