@@ -211,16 +211,16 @@ public:
 
         // Safety
         m_maxIterSpin = new QSpinBox;
-        m_maxIterSpin->setRange(1, 50);
+        m_maxIterSpin->setRange(1, 100);
         m_maxIterSpin->setValue(s.maxIterations);
         m_maxToolsSpin = new QSpinBox;
-        m_maxToolsSpin->setRange(1, 100);
+        m_maxToolsSpin->setRange(1, 1000);
         m_maxToolsSpin->setValue(s.maxToolCalls);
         m_maxDiffSpin = new QSpinBox;
-        m_maxDiffSpin->setRange(10, 5000);
+        m_maxDiffSpin->setRange(10, 100000);
         m_maxDiffSpin->setValue(s.maxDiffLines);
         m_maxFilesSpin = new QSpinBox;
-        m_maxFilesSpin->setRange(1, 100);
+        m_maxFilesSpin->setRange(1, 1000);
         m_maxFilesSpin->setValue(s.maxChangedFiles);
 
         m_dryRunCheck = new QCheckBox(Tr::tr("Dry-run mode by default"));
