@@ -343,6 +343,7 @@ set(SRC_IDE
     CMakeLists.txt
     LICENSE
     README.md
+    CHANGELOG.md
     .gitignore
     cmake/cmake_install.cmake
     cmake/format-changed-files.cmake
