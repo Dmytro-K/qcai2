@@ -35,7 +35,6 @@ qcai2/
 │   └── ai-context.md
 ├── cmake/
 │   ├── build-docs.cmake
-│   ├── cmake_install.cmake
 │   ├── format-changed-files.cmake
 │   └── install-sidecar-deps.cmake
 ├── src/

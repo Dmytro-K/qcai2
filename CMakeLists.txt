@@ -345,7 +345,6 @@ set(SRC_IDE
     README.md
     CHANGELOG.md
     .gitignore
-    cmake/cmake_install.cmake
     cmake/format-changed-files.cmake
     cmake/build-docs.cmake
     src/docs/Doxyfile.in
