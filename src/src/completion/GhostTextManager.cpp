@@ -46,8 +46,12 @@ void GhostTextManager::attachToEditor(TextEditor::TextEditorWidget *editor)
     m_lastEditPositions.insert(editor, editor->textCursor().position());
 
     connect(editor->document(), &QTextDocument::contentsChange, this,
-            [this, editor](int, int charsRemoved, int charsAdded) {
+            [this, editor](int position, int charsRemoved, int charsAdded) {
                 if (charsRemoved == 0 && charsAdded == 0)
+                    return;
+                // Only trigger when the cursor is right after the edit (user is typing/pasting).
+                // Background reformatting fires at a different position, so this filters it out.
+                if (editor->textCursor().position() != position + charsAdded)
                     return;
                 onContentsChanged(editor);
             });
