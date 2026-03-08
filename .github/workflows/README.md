@@ -1,41 +1,58 @@
 # GitHub Actions & Workflows
 
-The `build_cmake.yml` in this directory adds a [GitHub action][1] and workflow that builds
-your plugin anytime you push commits to GitHub on Windows, Linux and macOS.
+`build_cmake.yml` is the repository's current CI workflow for building, testing, installing, and packaging the plugin.
 
-The build artifacts can be downloaded from GitHub and be installed into an existing Qt Creator
-installation.
+## When it runs
 
-When you push a tag, the workflow also creates a new release on GitHub.
+- On every `push`
+- On every `pull_request`
+- On version tags that match `v*`, which also trigger the release job
 
-## Keeping it up to date
+## Current build matrix
 
-Near the top of the file you find a section starting with `env:`.
+The workflow builds these artifacts:
 
-The value for `QT_VERSION` specifies the Qt version to use for building the plugin.
+- Windows x64
+- Windows arm64
+- Linux x64
+- Linux arm64
+- macOS universal package
 
-The value for `QT_CREATOR_VERSION` specifies the Qt Creator version to use for building the plugin.
+The versions are pinned in the workflow `env:` block:
 
-The value for `QT_CREATOR_SNAPSHOT` can either be `NO` or `latest` or the build ID of a specific
-snapshot build for the Qt Creator version that you specified.
+- `QT_VERSION: 6.10.2`
+- `QT_CREATOR_VERSION: 18.0.2`
+- `CMAKE_VERSION: 3.29.6`
+- `NINJA_VERSION: 1.12.1`
+- Node.js 22 for the Copilot sidecar packaging/install flow
 
-You need to keep these values updated for different versions of your plugin, and take care
-that the Qt version and Qt Creator version you specify are compatible.
+## What the workflow does
 
-## What it does
+For each matrix entry, the build job currently:
 
-The build job consists of several steps:
+1. Checks out the repository
+2. Installs CMake and Ninja with `lukka/get-cmake`
+3. Installs extra Linux system libraries when needed
+4. Installs Qt with `jurplel/install-qt-action@v4`
+5. Downloads the Qt Creator development package with `qt-creator/install-dev-package@v2.1`
+6. Sets up Node.js
+7. Configures CMake with `-DWITH_TESTS=ON`
+8. Builds the plugin with `cmake --build build --parallel`
+9. Runs tests with `ctest --test-dir build --output-on-failure`
+10. Installs into a temporary package root with `cmake --install`
+11. Zips the installed payload and uploads it as a GitHub Actions artifact
 
-* Install required packages on the build host
-* Download, unpack and install the binary for the Qt version
-* Download and unpack the binary for the Qt Creator version
-* Build the plugin and upload the plugin libraries to GitHub
-* If a tag is pushed, create a release on GitHub for the tag, including zipped plugin libraries
-  for download
+## Release behavior
 
-## Limitations
+When the ref is a tag like `v1.2.3`, the `release` job:
 
-If your plugin requires additional resources besides the plugin library, you need to adapt the
-script accordingly.
+- downloads all uploaded artifacts,
+- flattens them into a `release/` directory,
+- creates a GitHub release with `softprops/action-gh-release@v2`,
+- attaches the zip files for all supported platforms.
 
-[1]: https://help.github.com/en/actions/automating-your-workflow-with-github-actions/about-github-actions
+## Notes for maintenance
+
+- Linux Qt installs currently include the `icu` archive because the workflow needs those runtime pieces for Qt tools.
+- Packaging is based on `cmake --install`, so sidecar files and any install-time scripts are included automatically.
+- If the plugin gains new runtime files, ensure they are installed by CMake; the workflow packages whatever `cmake --install` produces.
