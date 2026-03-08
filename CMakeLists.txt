@@ -250,11 +250,13 @@ add_custom_target(format-changed-files
 find_package(Doxygen QUIET)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 find_program(QCAI2_SPHINX_EXECUTABLE NAMES sphinx-build)
+find_program(QCAI2_LATEXMK_EXECUTABLE NAMES latexmk)
 
 set(QCAI2_DOCS_TEMPLATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/docs")
 set(QCAI2_DOCS_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
 set(QCAI2_DOCS_SPHINX_SOURCE_DIR "${QCAI2_DOCS_BUILD_DIR}/sphinx")
 set(QCAI2_DOCS_SPHINX_HTML_DIR "${QCAI2_DOCS_BUILD_DIR}/html")
+set(QCAI2_DOCS_SPHINX_LATEX_DIR "${QCAI2_DOCS_BUILD_DIR}/latex")
 set(QCAI2_DOCS_DOXYGEN_OUTPUT_DIR "${QCAI2_DOCS_BUILD_DIR}/doxygen")
 set(QCAI2_DOCS_DOXYGEN_XML_DIR "${QCAI2_DOCS_DOXYGEN_OUTPUT_DIR}/xml")
 
@@ -304,11 +306,15 @@ add_custom_target(doc
         -DPYTHON_EXECUTABLE=${Python3_EXECUTABLE}
         -DDOXYFILE_PATH=${QCAI2_DOCS_BUILD_DIR}/Doxyfile
         -DSPHINX_SOURCE_DIR=${QCAI2_DOCS_SPHINX_SOURCE_DIR}
-        -DSPHINX_OUTPUT_DIR=${QCAI2_DOCS_SPHINX_HTML_DIR}
+        -DSPHINX_HTML_DIR=${QCAI2_DOCS_SPHINX_HTML_DIR}
+        -DSPHINX_LATEX_DIR=${QCAI2_DOCS_SPHINX_LATEX_DIR}
+        -DLATEXMK_EXECUTABLE=${QCAI2_LATEXMK_EXECUTABLE}
+        -DDOCS_LATEX_FILE=qcai2.tex
+        -DDOCS_PDF_FILE=qcai2.pdf
         -P "${QCAI2_BUILD_DOCS_SCRIPT}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     USES_TERMINAL
-    COMMENT "Generating documentation with Doxygen, Sphinx, Breathe, and Exhale"
+    COMMENT "Generating HTML and PDF documentation with Doxygen and Sphinx"
 )
 
 # Enable the Run button in Qt Creator

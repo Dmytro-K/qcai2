@@ -10,6 +10,11 @@ exclude_patterns = ["_build"]
 primary_domain = "cpp"
 highlight_language = "cpp"
 html_theme = "classic"
+root_doc = "index"
+
+latex_documents = [
+    (root_doc, "qcai2.tex", "qcai2 documentation", author, "manual"),
+]
 
 breathe_projects = {
     "qcai2": "@QCAI2_DOCS_DOXYGEN_XML_DIR_PY@",

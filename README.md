@@ -73,7 +73,7 @@ cmake --build build --target format-changed-files
 cmake --build build --target doc
 ```
 
-The `doc` target runs Doxygen plus Sphinx and writes HTML output under `build/docs/html/`. It expects `doxygen`, `sphinx-build`, Python 3, and the Python packages required by the documentation source directory (`breathe` and `exhale`).
+The `doc` target runs Doxygen plus Sphinx and writes HTML output under `build/docs/html/` plus a PDF manual at `build/docs/latex/qcai2.pdf`. It expects `doxygen`, `sphinx-build`, `latexmk`, Python 3, and the Python packages required by the documentation source directory (`breathe` and `exhale`), along with a working PDF LaTeX toolchain.
 
 ### Run Qt Creator with the built plugin
 
