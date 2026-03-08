@@ -215,7 +215,6 @@ target_compile_definitions(qcai2 PRIVATE
 install(FILES
     src/sidecar/copilot-sidecar.js
     src/sidecar/package.json
-    src/sidecar/package-lock.json
     DESTINATION ${QCAI2_SIDECAR_INSTALL_DIR}
 )
 
