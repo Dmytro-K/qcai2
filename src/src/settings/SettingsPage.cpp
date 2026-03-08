@@ -464,10 +464,10 @@ private:
 SettingsPage::SettingsPage()
 {
     setId("qcai2.Settings");
-    setDisplayName(Tr::tr("AI Agent"));
+    setDisplayName(Tr::tr("Qcai2"));
     setCategory("qcai2");
     IOptionsPage::registerCategory(
-        "qcai2", Tr::tr("AI Agent"),
+        "qcai2", Tr::tr("Qcai2"),
         Utils::FilePath::fromString(QStringLiteral(":/qcai2/ai-agent-icon.svg")));
 
     setWidgetCreator([]() -> QWidget * { return new SettingsWidget; });

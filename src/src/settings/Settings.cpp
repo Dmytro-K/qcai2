@@ -161,6 +161,7 @@ void ModelCatalog::setCopilotModels(const QStringList &models)
 QStringList ModelCatalog::defaultCopilotModels()
 {
     return {
+        QStringLiteral("gpt-5.4"),           QStringLiteral("gpt-5.4"),
         QStringLiteral("gpt-5.3-codex"),     QStringLiteral("gpt-5.2-codex"),
         QStringLiteral("gpt-5.2"),           QStringLiteral("gpt-5.1-codex-max"),
         QStringLiteral("gpt-5.1-codex"),     QStringLiteral("gpt-5.1-codex-mini"),
