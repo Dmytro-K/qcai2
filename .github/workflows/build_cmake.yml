@@ -22,46 +22,51 @@ jobs:
     strategy:
       matrix:
         config:
-        - {
-            name: "Windows Latest MSVC", artifact: "Windows-x64",
-            os: windows-latest,
-            platform: windows_x64,
-            cc: "cl", cxx: "cl", msvc_arch: "x64",
-            qt_host: "windows", qt_arch: "win64_msvc2022_64",
-            qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
-          }
-        - {
-            name: "Windows Latest MSVC Arm64", artifact: "Windows-arm64",
-            os: windows-11-arm,
-            platform: windows_arm64,
-            cc: "cl", cxx: "cl", msvc_arch: "arm64",
-            qt_host: "windows_arm64", qt_arch: "win64_msvc2022_arm64",
-            qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
-          }
-        - {
-            name: "Ubuntu Latest GCC", artifact: "Linux-x64",
-            os: ubuntu-latest,
-            platform: linux_x64,
-            cc: "gcc", cxx: "g++",
-            qt_host: "linux", qt_arch: "linux_gcc_64",
-            qt_archives: "qtbase qtdeclarative qt5compat qtshadertools icu"
-          }
-        - {
-            name: "Ubuntu Latest GCC Arm64", artifact: "Linux-arm64",
-            os: ubuntu-24.04-arm,
-            platform: linux_arm64,
-            cc: "gcc", cxx: "g++",
-            qt_host: "linux_arm64", qt_arch: "linux_gcc_arm64",
-            qt_archives: "qtbase qtdeclarative qt5compat qtshadertools icu"
-          }
-        - {
-            name: "macOS Latest Clang", artifact: "macOS-universal",
-            os: macos-latest,
-            platform: mac_x64,
-            cc: "clang", cxx: "clang++",
-            qt_host: "mac", qt_arch: "clang_64",
-            qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
-          }
+         - {
+             name: "Windows Latest MSVC", artifact: "Windows-x64",
+             os: windows-latest,
+             platform: windows_x64,
+             archive_ext: zip,
+             cc: "cl", cxx: "cl", msvc_arch: "x64",
+             qt_host: "windows", qt_arch: "win64_msvc2022_64",
+             qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
+           }
+         - {
+             name: "Windows Latest MSVC Arm64", artifact: "Windows-arm64",
+             os: windows-11-arm,
+             platform: windows_arm64,
+             archive_ext: zip,
+             cc: "cl", cxx: "cl", msvc_arch: "arm64",
+             qt_host: "windows_arm64", qt_arch: "win64_msvc2022_arm64",
+             qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
+           }
+         - {
+             name: "Ubuntu Latest GCC", artifact: "Linux-x64",
+             os: ubuntu-latest,
+             platform: linux_x64,
+             archive_ext: tar.xz,
+             cc: "gcc", cxx: "g++",
+             qt_host: "linux", qt_arch: "linux_gcc_64",
+             qt_archives: "qtbase qtdeclarative qt5compat qtshadertools icu"
+           }
+         - {
+             name: "Ubuntu Latest GCC Arm64", artifact: "Linux-arm64",
+             os: ubuntu-24.04-arm,
+             platform: linux_arm64,
+             archive_ext: tar.xz,
+             cc: "gcc", cxx: "g++",
+             qt_host: "linux_arm64", qt_arch: "linux_gcc_arm64",
+             qt_archives: "qtbase qtdeclarative qt5compat qtshadertools icu"
+           }
+         - {
+             name: "macOS Latest Clang", artifact: "macOS-universal",
+             os: macos-latest,
+             platform: mac_x64,
+             archive_ext: zip,
+             cc: "clang", cxx: "clang++",
+             qt_host: "mac", qt_arch: "clang_64",
+             qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
+           }
 
     steps:
     - uses: actions/checkout@v4
@@ -195,17 +200,21 @@ jobs:
         ctest --test-dir build --output-on-failure
 
         package_root="$PWD/package-root"
-        archive_name="${PLUGIN_NAME}-${QT_CREATOR_VERSION}-${{ matrix.config.artifact }}.zip"
+        archive_name="${PLUGIN_NAME}-${QT_CREATOR_VERSION}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}"
 
         rm -rf "$package_root"
         cmake --install build --prefix "$package_root"
-        cmake -E tar cf "$archive_name" --format=zip package-root
+        if [ "${{ matrix.config.archive_ext }}" = "tar.xz" ]; then
+          tar -C "$PWD" -cf - package-root | xz -9 -T0 > "$archive_name"
+        else
+          cmake -E tar cf "$archive_name" --format=zip package-root
+        fi
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        path: ./${{ env.PLUGIN_NAME }}-${{ env.QT_CREATOR_VERSION }}-${{ matrix.config.artifact }}.zip
-        name: ${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-${{ matrix.config.artifact }}.zip
+        path: ./${{ env.PLUGIN_NAME }}-${{ env.QT_CREATOR_VERSION }}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}
+        name: ${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}
 
 
   release:
@@ -232,8 +241,8 @@ jobs:
       with:
         tag_name: v${{ needs.build.outputs.tag }}
         files: |
-          release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Linux-arm64.zip
-          release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Linux-x64.zip
+          release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Linux-arm64.tar.xz
+          release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Linux-x64.tar.xz
           release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-macOS-universal.zip
           release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Windows-arm64.zip
           release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Windows-x64.zip
