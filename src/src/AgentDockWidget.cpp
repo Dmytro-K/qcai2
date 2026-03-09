@@ -102,6 +102,40 @@ void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
     combo->setCurrentText(selected);
 }
 
+QString wrapMarkdownPayloadBlocks(const QString &markdown)
+{
+    auto applyPattern = [](const QString &text, const QRegularExpression &pattern) {
+        QString rewritten;
+        qsizetype cursor = 0;
+        QRegularExpressionMatchIterator it = pattern.globalMatch(text);
+        while (it.hasNext())
+        {
+            const QRegularExpressionMatch match = it.next();
+            rewritten += text.mid(cursor, match.capturedStart() - cursor);
+            rewritten += match.captured(1);
+            rewritten += QStringLiteral("\n\n~~~~text\n");
+            rewritten += match.captured(2);
+            if (!match.captured(2).endsWith(QLatin1Char('\n')))
+                rewritten += QLatin1Char('\n');
+            rewritten += QStringLiteral("~~~~");
+            rewritten += match.captured(3);
+            cursor = match.capturedEnd();
+        }
+        rewritten += text.mid(cursor);
+        return rewritten;
+    };
+
+    QString rewritten = markdown;
+    static const QRegularExpression toolReturnedRe(
+        QStringLiteral(R"((Tool '[^']+' returned:)\n([\s\S]*?)(\n\nContinue with the next step\.))"));
+    static const QRegularExpression approvedResultRe(
+        QStringLiteral(R"((Approved and executed '[^']+'. Result:)\n([\s\S]*?)(\n\nContinue\.))"));
+
+    rewritten = applyPattern(rewritten, toolReturnedRe);
+    rewritten = applyPattern(rewritten, approvedResultRe);
+    return rewritten;
+}
+
 class DiffHighlighter final : public QSyntaxHighlighter
 {
 public:
@@ -622,6 +656,18 @@ void AgentDockWidget::restoreChat()
     s.endGroup();
 }
 
+QString AgentDockWidget::currentLogMarkdown() const
+{
+    QString text = m_logMarkdown;
+    if (!m_streamingMarkdown.isEmpty())
+    {
+        if (!text.isEmpty())
+            text += QStringLiteral("\n\n");
+        text += m_streamingMarkdown;
+    }
+    return text;
+}
+
 void AgentDockWidget::setupUi()
 {
     auto *mainLayout = new QVBoxLayout(this);
@@ -658,6 +704,7 @@ void AgentDockWidget::setupUi()
 
         m_goalEdit->clear();
         m_logView->clear();
+        m_rawMarkdownView->clear();
         m_logMarkdown.clear();
         m_streamingMarkdown.clear();
         m_planList->clear();
@@ -696,6 +743,12 @@ void AgentDockWidget::setupUi()
     m_logView->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     m_logView->setStyleSheet(QStringLiteral("QTextEdit { padding: 8px; }"));
     m_tabs->addTab(m_logView, tr("Actions Log"));
+
+    m_rawMarkdownView = new QPlainTextEdit;
+    m_rawMarkdownView->setReadOnly(true);
+    m_rawMarkdownView->setFont(QFont(QStringLiteral("monospace"), 9));
+    m_rawMarkdownView->setLineWrapMode(QPlainTextEdit::NoWrap);
+    m_tabs->addTab(m_rawMarkdownView, tr("Raw Markdown"));
 
     m_diffView = new DiffPreviewEdit;
     m_diffView->setReadOnly(true);
@@ -754,6 +807,7 @@ void AgentDockWidget::setupUi()
 
     };
     addCopyShortcutRich(m_logView);
+    addCopyShortcut(m_rawMarkdownView);
     addCopyShortcut(m_diffView);
     addCopyShortcut(m_debugLogView);
 
@@ -985,15 +1039,11 @@ void AgentDockWidget::onLogMessage(const QString &msg)
 
 void AgentDockWidget::renderLog()
 {
-    QString text = m_logMarkdown;
-    if (!m_streamingMarkdown.isEmpty())
-    {
-        if (!text.isEmpty())
-            text += QStringLiteral("\n\n");
-        text += m_streamingMarkdown;
-    }
+    const QString text = currentLogMarkdown();
+    const QString renderedText = wrapMarkdownPayloadBlocks(text);
 
-    m_logView->setPlainText(text);
+    m_logView->setMarkdown(renderedText);
+    m_rawMarkdownView->setPlainText(text);
 
     // Defer scroll to allow document layout to complete
     QTimer::singleShot(0, m_logView, [this]() {
@@ -1001,6 +1051,12 @@ void AgentDockWidget::renderLog()
         cursor.movePosition(QTextCursor::End);
         m_logView->setTextCursor(cursor);
         m_logView->ensureCursorVisible();
+    });
+    QTimer::singleShot(0, m_rawMarkdownView, [this]() {
+        QTextCursor cursor = m_rawMarkdownView->textCursor();
+        cursor.movePosition(QTextCursor::End);
+        m_rawMarkdownView->setTextCursor(cursor);
+        m_rawMarkdownView->ensureCursorVisible();
     });
 }
 

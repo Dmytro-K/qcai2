@@ -129,6 +129,11 @@ private:
     void renderLog();
 
     /**
+     * Returns the combined committed and streaming markdown for the Actions Log.
+     */
+    QString currentLogMarkdown() const;
+
+    /**
      * Saves the current goal, logs, plan, and diff preview to settings.
      */
     void saveChat();
@@ -154,6 +159,7 @@ private:
     QTabWidget *m_tabs;
     QListWidget *m_planList;
     QTextEdit *m_logView;
+    QPlainTextEdit *m_rawMarkdownView;
     QPlainTextEdit *m_diffView;
     QListWidget *m_diffFileList;
     QListWidget *m_approvalList;

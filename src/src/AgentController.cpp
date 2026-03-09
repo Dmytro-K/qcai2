@@ -418,7 +418,7 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
     ++m_toolCallCount;
     const bool suppressReadFileLog = (name == QStringLiteral("read_file"));
     if (!suppressReadFileLog)
-        emit logMessage(QStringLiteral("🔧 Executing tool: %1").arg(name));
+        emit logMessage(formatToolExecutionLog(name, args));
     QCAI_DEBUG(
         "Agent",
         QStringLiteral("Tool call #%1: %2, args: %3")
@@ -436,7 +436,7 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
 
     QString result = tool->execute(args, workDir);
     if (!suppressReadFileLog)
-        emit logMessage(QStringLiteral("   Result: %1").arg(result.left(300)));
+        emit logMessage(formatToolResultLog(result));
     QCAI_DEBUG("Agent",
                QStringLiteral("Tool '%1' result length: %2").arg(name).arg(result.length()));
 
