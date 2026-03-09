@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.3] - 2026-03-09
+
+### Added
+
+- Added a `Raw Markdown` dock tab that shows the unrendered Actions Log markdown for debugging.
+
+### Changed
+
+- Rendered the `Actions Log` as markdown and reformatted tool-call entries so arguments and results are easier to read.
+- Wrapped raw tool payloads such as `read_file` results in fenced code blocks before rendering, so C++ and other source snippets are displayed correctly.
+- Split agent controls into separate `Reasoning` and `Thinking` settings in both the settings page and the dock widget panel.
+
 ## [0.0.2] - 2026-03-08
 
 ### Added
