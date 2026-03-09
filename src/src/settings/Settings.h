@@ -24,6 +24,9 @@ struct Settings
     /** Default model used for agent requests. */
     QString modelName = QStringLiteral("gpt-5.2");
 
+    /** Provider reasoning effort: off, low, medium, or high. */
+    QString reasoningEffort = QStringLiteral("medium");
+
     /** Provider thinking level: off, low, medium, or high. */
     QString thinkingLevel = QStringLiteral("medium");
 

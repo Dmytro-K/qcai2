@@ -144,6 +144,7 @@ private:
     /** Input controls shown beside the goal editor. */
     QTextEdit *m_goalEdit;
     QComboBox *m_modelCombo;
+    QComboBox *m_reasoningCombo;
     QComboBox *m_thinkingCombo;
     QPushButton *m_runBtn;
     QPushButton *m_stopBtn;

@@ -64,6 +64,20 @@ QStringList openAiAgentModels()
     };
 }
 
+void populateEffortCombo(QComboBox *combo)
+{
+    combo->addItem(QObject::tr("Off"), QStringLiteral("off"));
+    combo->addItem(QObject::tr("Low"), QStringLiteral("low"));
+    combo->addItem(QObject::tr("Medium"), QStringLiteral("medium"));
+    combo->addItem(QObject::tr("High"), QStringLiteral("high"));
+}
+
+void selectEffortValue(QComboBox *combo, const QString &value, int fallbackIndex)
+{
+    const int index = combo->findData(value);
+    combo->setCurrentIndex(index >= 0 ? index : fallbackIndex);
+}
+
 void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
                              const QString &selectedText)
 {
@@ -775,13 +789,13 @@ void AgentDockWidget::setupUi()
                 repopulateEditableCombo(m_modelCombo, models, m_modelCombo->currentText());
             });
 
+    m_reasoningCombo = new QComboBox;
+    populateEffortCombo(m_reasoningCombo);
+    selectEffortValue(m_reasoningCombo, settings().reasoningEffort, 2);
+
     m_thinkingCombo = new QComboBox;
-    m_thinkingCombo->addItem(tr("Off"), QStringLiteral("off"));
-    m_thinkingCombo->addItem(tr("Low"), QStringLiteral("low"));
-    m_thinkingCombo->addItem(tr("Medium"), QStringLiteral("medium"));
-    m_thinkingCombo->addItem(tr("High"), QStringLiteral("high"));
-    const int thinkingIdx = m_thinkingCombo->findData(settings().thinkingLevel);
-    m_thinkingCombo->setCurrentIndex(thinkingIdx >= 0 ? thinkingIdx : 2);
+    populateEffortCombo(m_thinkingCombo);
+    selectEffortValue(m_thinkingCombo, settings().thinkingLevel, 2);
 
     m_runBtn = new QPushButton(tr("▶ Run"));
     m_runBtn->setToolTip(tr("Run agent (Enter)"));
@@ -794,7 +808,7 @@ void AgentDockWidget::setupUi()
     connect(m_runBtn, &QPushButton::clicked, this, &AgentDockWidget::onRunClicked);
     connect(m_stopBtn, &QPushButton::clicked, this, &AgentDockWidget::onStopClicked);
 
-    // Persist model/thinking selection immediately on change
+    // Persist model/reasoning/thinking selection immediately on change
     connect(m_modelCombo, &QComboBox::currentTextChanged, this, [](const QString &text) {
         auto &cfg = settings();
         const QString model = text.trimmed();
@@ -804,6 +818,11 @@ void AgentDockWidget::setupUi()
             cfg.save();
         }
     });
+    connect(m_reasoningCombo, &QComboBox::currentIndexChanged, this, [this](int /*index*/) {
+        auto &cfg = settings();
+        cfg.reasoningEffort = m_reasoningCombo->currentData().toString();
+        cfg.save();
+    });
     connect(m_thinkingCombo, &QComboBox::currentIndexChanged, this, [this](int /*index*/) {
         auto &cfg = settings();
         cfg.thinkingLevel = m_thinkingCombo->currentData().toString();
@@ -812,6 +831,8 @@ void AgentDockWidget::setupUi()
 
     btnColumn->addWidget(new QLabel(tr("Model")));
     btnColumn->addWidget(m_modelCombo);
+    btnColumn->addWidget(new QLabel(tr("Reasoning")));
+    btnColumn->addWidget(m_reasoningCombo);
     btnColumn->addWidget(new QLabel(tr("Thinking")));
     btnColumn->addWidget(m_thinkingCombo);
     btnColumn->addWidget(m_runBtn);
@@ -844,6 +865,7 @@ void AgentDockWidget::onRunClicked()
     const QString selectedModel = m_modelCombo->currentText().trimmed();
     if (!selectedModel.isEmpty())
         cfg.modelName = selectedModel;
+    cfg.reasoningEffort = m_reasoningCombo->currentData().toString();
     cfg.thinkingLevel = m_thinkingCombo->currentData().toString();
     cfg.save();
     m_goalEdit->clear();

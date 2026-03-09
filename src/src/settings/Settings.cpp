@@ -48,6 +48,7 @@ void Settings::load()
     apiKey = s.value("apiKey", apiKey).toString();
     modelName = s.value("modelName", modelName).toString();
     thinkingLevel = s.value("thinkingLevel", thinkingLevel).toString();
+    reasoningEffort = s.value("reasoningEffort", thinkingLevel).toString();
     temperature = s.value("temperature", temperature).toDouble();
     maxTokens = s.value("maxTokens", maxTokens).toInt();
 
@@ -96,6 +97,7 @@ void Settings::save() const
     s.setValue("baseUrl", baseUrl);
     s.setValue("apiKey", apiKey);
     s.setValue("modelName", modelName);
+    s.setValue("reasoningEffort", reasoningEffort);
     s.setValue("thinkingLevel", thinkingLevel);
     s.setValue("temperature", temperature);
     s.setValue("maxTokens", maxTokens);

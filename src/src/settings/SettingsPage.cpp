@@ -54,6 +54,20 @@ void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
     combo->setCurrentText(selected);
 }
 
+void populateEffortCombo(QComboBox *combo)
+{
+    combo->addItem(Tr::tr("Off"), QStringLiteral("off"));
+    combo->addItem(Tr::tr("Low"), QStringLiteral("low"));
+    combo->addItem(Tr::tr("Medium"), QStringLiteral("medium"));
+    combo->addItem(Tr::tr("High"), QStringLiteral("high"));
+}
+
+void selectEffortValue(QComboBox *combo, const QString &value, int fallbackIndex)
+{
+    const int index = combo->findData(value);
+    combo->setCurrentIndex(index >= 0 ? index : fallbackIndex);
+}
+
 }  // namespace
 
 class SettingsWidget : public Core::IOptionsPageWidget
@@ -148,13 +162,13 @@ public:
         });
         m_modelCombo->setCurrentText(s.modelName);
 
+        m_reasoningCombo = new QComboBox;
+        populateEffortCombo(m_reasoningCombo);
+        selectEffortValue(m_reasoningCombo, s.reasoningEffort, 2);
+
         m_thinkingCombo = new QComboBox;
-        m_thinkingCombo->addItem(Tr::tr("Off"), QStringLiteral("off"));
-        m_thinkingCombo->addItem(Tr::tr("Low"), QStringLiteral("low"));
-        m_thinkingCombo->addItem(Tr::tr("Medium"), QStringLiteral("medium"));
-        m_thinkingCombo->addItem(Tr::tr("High"), QStringLiteral("high"));
-        const int thinkingIdx = m_thinkingCombo->findData(s.thinkingLevel);
-        m_thinkingCombo->setCurrentIndex(thinkingIdx >= 0 ? thinkingIdx : 2);
+        populateEffortCombo(m_thinkingCombo);
+        selectEffortValue(m_thinkingCombo, s.thinkingLevel, 2);
 
         m_tempSpin = new QDoubleSpinBox;
         m_tempSpin->setRange(0.0, 2.0);
@@ -270,24 +284,12 @@ public:
             Tr::tr("Leave empty to use the same model as the agent"));
 
         m_completionThinkingCombo = new QComboBox;
-        m_completionThinkingCombo->addItem(Tr::tr("Off"), QStringLiteral("off"));
-        m_completionThinkingCombo->addItem(Tr::tr("Low"), QStringLiteral("low"));
-        m_completionThinkingCombo->addItem(Tr::tr("Medium"), QStringLiteral("medium"));
-        m_completionThinkingCombo->addItem(Tr::tr("High"), QStringLiteral("high"));
-        {
-            const int ti = m_completionThinkingCombo->findData(s.completionThinkingLevel);
-            m_completionThinkingCombo->setCurrentIndex(ti >= 0 ? ti : 0);
-        }
+        populateEffortCombo(m_completionThinkingCombo);
+        selectEffortValue(m_completionThinkingCombo, s.completionThinkingLevel, 0);
 
         m_completionReasoningCombo = new QComboBox;
-        m_completionReasoningCombo->addItem(Tr::tr("Off"), QStringLiteral("off"));
-        m_completionReasoningCombo->addItem(Tr::tr("Low"), QStringLiteral("low"));
-        m_completionReasoningCombo->addItem(Tr::tr("Medium"), QStringLiteral("medium"));
-        m_completionReasoningCombo->addItem(Tr::tr("High"), QStringLiteral("high"));
-        {
-            const int ri = m_completionReasoningCombo->findData(s.completionReasoningEffort);
-            m_completionReasoningCombo->setCurrentIndex(ri >= 0 ? ri : 0);
-        }
+        populateEffortCombo(m_completionReasoningCombo);
+        selectEffortValue(m_completionReasoningCombo, s.completionReasoningEffort, 0);
 
         m_debugLoggingCheck = new QCheckBox(Tr::tr("Enable debug logging (Debug Log tab)"));
         m_debugLoggingCheck->setChecked(s.debugLogging);
@@ -316,6 +318,7 @@ public:
         addRow(oal, Tr::tr("Base URL:"), m_baseUrlCombo);
         addRow(oal, Tr::tr("API Key:"), m_apiKeyEdit);
         addRow(oal, Tr::tr("Model:"), m_modelCombo);
+        addRow(oal, Tr::tr("Reasoning effort:"), m_reasoningCombo);
         addRow(oal, Tr::tr("Thinking:"), m_thinkingCombo);
         addRow(oal, Tr::tr("Temperature:"), m_tempSpin);
         addRow(oal, Tr::tr("Max Tokens:"), m_maxTokensSpin);
@@ -396,6 +399,7 @@ public:
         s.baseUrl = m_baseUrlCombo->currentText();
         s.apiKey = m_apiKeyEdit->text();
         s.modelName = m_modelCombo->currentText();
+        s.reasoningEffort = m_reasoningCombo->currentData().toString();
         s.thinkingLevel = m_thinkingCombo->currentData().toString();
         s.temperature = m_tempSpin->value();
         s.maxTokens = m_maxTokensSpin->value();
@@ -439,6 +443,7 @@ private:
     QComboBox *m_baseUrlCombo;
     QLineEdit *m_apiKeyEdit;
     QComboBox *m_modelCombo;
+    QComboBox *m_reasoningCombo;
     QComboBox *m_thinkingCombo;
     QDoubleSpinBox *m_tempSpin;
     QSpinBox *m_maxTokensSpin;

@@ -14,6 +14,51 @@
 namespace qcai2
 {
 
+namespace
+{
+
+QString asIndentedCodeBlock(const QString &text)
+{
+    const QString normalized = text.isEmpty() ? QStringLiteral("(empty)") : text;
+    QStringList lines = normalized.split(QLatin1Char('\n'));
+    for (QString &line : lines)
+        line.prepend(QStringLiteral("    "));
+    return lines.join(QLatin1Char('\n'));
+}
+
+QString formatToolArgs(const QJsonObject &args)
+{
+    return QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)).trimmed();
+}
+
+QString formatToolExecutionLog(const QString &name, const QJsonObject &args)
+{
+    return QStringLiteral("🔧 **Tool:** `%1`\n\n**Arguments**\n\n%2")
+        .arg(name, asIndentedCodeBlock(formatToolArgs(args)));
+}
+
+QString formatToolResultLog(const QString &result)
+{
+    static constexpr int kMaxLoggedResultLength = 500;
+
+    QString preview = result;
+    if (preview.size() > kMaxLoggedResultLength)
+    {
+        preview = preview.left(kMaxLoggedResultLength).trimmed();
+        preview += QStringLiteral("\n... [truncated, %1 chars total]").arg(result.size());
+    }
+
+    return QStringLiteral("✅ **Result**\n\n%1").arg(asIndentedCodeBlock(preview.trimmed()));
+}
+
+bool isEnabledEffort(const QString &level)
+{
+    return level == QStringLiteral("low") || level == QStringLiteral("medium") ||
+           level == QStringLiteral("high");
+}
+
+}  // namespace
+
 AgentController::AgentController(QObject *parent) : QObject(parent)
 {
 }
@@ -146,17 +191,17 @@ void AgentController::start(const QString &goal, bool dryRun)
 
     QCAI_INFO("Agent",
               QStringLiteral(
-                  "Starting agent — provider: %1, model: %2, thinking: %3, dryRun: %4, goal: %5")
-                  .arg(m_provider->id(), s.modelName, s.thinkingLevel,
+                  "Starting agent — provider: %1, model: %2, reasoning: %3, thinking: %4, "
+                  "dryRun: %5, goal: %6")
+                  .arg(m_provider->id(), s.modelName, s.reasoningEffort, s.thinkingLevel,
                        dryRun ? QStringLiteral("yes") : QStringLiteral("no"), goal.left(100)));
 
     // System prompt
     m_messages.append({QStringLiteral("system"), buildSystemPrompt()});
 
-    if (s.thinkingLevel == QStringLiteral("low") || s.thinkingLevel == QStringLiteral("medium") ||
-        s.thinkingLevel == QStringLiteral("high"))
+    if (isEnabledEffort(s.thinkingLevel))
         m_messages.append({QStringLiteral("system"),
-                           QStringLiteral("Use %1 thinking/reasoning effort for this task.")
+                           QStringLiteral("Use %1 thinking depth for this task.")
                                .arg(s.thinkingLevel)});
 
     // User goal
@@ -203,15 +248,17 @@ void AgentController::runNextIteration()
     const auto &s = settings();
     QCAI_DEBUG("Agent",
                QStringLiteral(
-                   "Iteration %1: sending %2 messages to %3 (model: %4, thinking: %5, temp: %6)")
-                   .arg(m_iteration)
-                   .arg(m_messages.size())
-                   .arg(m_provider->id(), s.modelName)
-                   .arg(s.thinkingLevel)
-                   .arg(s.temperature));
+                   "Iteration %1: sending %2 messages to %3 (model: %4, reasoning: %5, "
+                   "thinking: %6, temp: %7)")
+                    .arg(m_iteration)
+                    .arg(m_messages.size())
+                    .arg(m_provider->id(), s.modelName)
+                    .arg(s.reasoningEffort)
+                    .arg(s.thinkingLevel)
+                    .arg(s.temperature));
 
     m_provider->complete(
-        m_messages, s.modelName, s.temperature, s.maxTokens, s.thinkingLevel,
+        m_messages, s.modelName, s.temperature, s.maxTokens, s.reasoningEffort,
         [this](const QString &response, const QString &error) {
             QTimer::singleShot(0, this,
                                [this, response, error]() { handleResponse(response, error); });
