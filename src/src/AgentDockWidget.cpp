@@ -1412,7 +1412,7 @@ void AgentDockWidget::onDiffAvailable(const QString &diff)
             m_inlineDiffManager->showDiff(diff, workDir);
     }
 
-    m_diffFileList->setVisible(!m_diffFileList->count() == 0);
+    m_diffFileList->setVisible(m_diffFileList->count() != 0);
 }
 
 void AgentDockWidget::onApprovalRequested(int id, const QString &action, const QString &reason,

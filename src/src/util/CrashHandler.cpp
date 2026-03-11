@@ -74,15 +74,14 @@ static void writeCrashFile(int sig, void **frames, int frameCount)
 
     snprintf(path, sizeof(path), "%s/.local/share/qcai2/crash.log", home);
 
-    FILE *f = fopen(path, "a");
-    if (!f)
-        f = stderr;
+    FILE *logFile = fopen(path, "a");
+    FILE *f = logFile ? logFile : stderr;
 
     fprintf(f, "\n=== QCAI2 CRASH === Signal: %s (%d) ===\n", signalName(sig), sig);
 
 #ifdef Q_OS_UNIX
     // backtrace_symbols_fd is async-signal-safe
-    if (f != stderr)
+    if (logFile)
     {
         // Write symbols to file
         char **symbols = backtrace_symbols(frames, frameCount);
@@ -99,10 +98,10 @@ static void writeCrashFile(int sig, void **frames, int frameCount)
     fprintf(stderr, "Crash log written to: %s\n", path);
 #endif
 
-    if (f != stderr)
+    if (logFile)
     {
-        fprintf(f, "=== END CRASH ===\n");
-        fclose(f);
+        fprintf(logFile, "=== END CRASH ===\n");
+        fclose(logFile);
     }
 }
 

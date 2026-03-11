@@ -1,12 +1,14 @@
 # Changelog
 
-## [0.0.4] - 2026-03-11
+## [0.0.4] - 2026-03-12
 
 ### Added
 
 - Added per-project agent context selection with a project picker that lists currently open Qt Creator projects.
 - Added `Ask` and `Agent` run modes in the dock widget.
 - Added a version-and-build-aware migration system for global settings and poject-local state.
+- Added direct agent access to Qt Creator `Compile Output` and `Application Output` through new `show_compile_output` and `show_application_output` tools.=
+- Added repository-level static analysis configuration via `.clang-tidy` and `cmake/clang-static-analyzer-args.cmake`.
 
 ### Changed
 

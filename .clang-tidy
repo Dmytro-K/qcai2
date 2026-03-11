@@ -1,0 +1,36 @@
+---
+# Keep clang-tidy checks explicit here so they can be tuned without editing CMake.
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  modernize-use-emplace,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-loop-convert,
+  readability-avoid-const-params-in-decls,
+  readability-const-return-type,
+  readability-container-data-pointer,
+  readability-delete-null-pointer,
+  readability-else-after-return,
+  readability-implicit-bool-conversion,
+  readability-misleading-indentation,
+  readability-redundant-control-flow,
+  readability-redundant-member-init,
+  readability-simplify-boolean-expr,
+  readability-static-definition-in-anonymous-namespace,
+  readability-uniqueptr-delete-release,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape,
+  -bugprone-narrowing-conversions,
+  -modernize-loop-convert,
+  -performance-avoid-endl,
+  -portability-avoid-pragma-once,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-naming,
+  -readability-magic-numbers
+WarningsAsErrors: ''
+HeaderFilterRegex: '(^|.*/)(src|tests)/'
+FormatStyle: none

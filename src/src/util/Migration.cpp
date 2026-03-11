@@ -216,9 +216,10 @@ bool createTarXzArchive(const QString &archivePath, const QList<ArchiveEntryData
         ok = checkArchiveResult(archiveHandle, archive_write_header(archiveHandle, entry), error);
         if (ok && !entryData.data.isEmpty())
         {
-            const la_ssize_t written = archive_write_data(archiveHandle, entryData.data.constData(),
-                                                          entryData.data.size());
-            if (written < 0 || written != entryData.data.size())
+            const size_t dataSize = static_cast<size_t>(entryData.data.size());
+            const la_ssize_t written =
+                archive_write_data(archiveHandle, entryData.data.constData(), dataSize);
+            if (written < 0 || static_cast<size_t>(written) != dataSize)
             {
                 if (error)
                 {

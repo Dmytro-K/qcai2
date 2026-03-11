@@ -50,6 +50,7 @@ endif()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -104,6 +105,8 @@ function(qcai2_enable_linker_map target)
 endfunction()
 
 set(QCAI2_EXTERNAL_LIST_SEPARATOR "|")
+set(QCAI2_SCRIPT_LIST_SEPARATOR "__QCAI2_LIST_SEPARATOR__")
+set(QCAI2_SCRIPT_VALUE_SEPARATOR "__QCAI2_VALUE_SEPARATOR__")
 
 function(qcai2_append_defined_cmake_arg out_var cmake_var cmake_type)
     set(qcai2_args "${${out_var}}")
@@ -183,6 +186,73 @@ function(qcai2_collect_external_generator_args out_var)
     endforeach()
 
     set(${out_var} "${qcai2_generator_args}" PARENT_SCOPE)
+endfunction()
+
+function(qcai2_collect_clang_analyzer_cmake_args out_var)
+    set(qcai2_cmake_args
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON"
+    )
+
+    if(DEFINED WITH_TESTS AND NOT "${WITH_TESTS}" STREQUAL "")
+        list(APPEND qcai2_cmake_args "-DWITH_TESTS:BOOL=${WITH_TESTS}")
+    endif()
+
+    foreach(qcai2_var IN ITEMS
+            CMAKE_BUILD_TYPE
+            CMAKE_PREFIX_PATH
+            CMAKE_FIND_ROOT_PATH
+            CMAKE_SYSTEM_NAME
+            CMAKE_SYSTEM_VERSION
+            CMAKE_SYSTEM_PROCESSOR
+            CMAKE_OSX_ARCHITECTURES
+            CMAKE_OSX_DEPLOYMENT_TARGET
+            CMAKE_OSX_SYSROOT
+            CMAKE_APPLE_SILICON_PROCESSOR
+            CMAKE_MSVC_RUNTIME_LIBRARY
+            VCPKG_TARGET_TRIPLET
+            VCPKG_HOST_TRIPLET)
+        if(DEFINED ${qcai2_var} AND NOT "${${qcai2_var}}" STREQUAL "")
+            string(REPLACE ";" "${QCAI2_SCRIPT_VALUE_SEPARATOR}" qcai2_var_value "${${qcai2_var}}")
+            list(APPEND qcai2_cmake_args "-D${qcai2_var}:STRING=${qcai2_var_value}")
+        endif()
+    endforeach()
+
+    foreach(qcai2_var IN ITEMS
+            QtCreator_DIR
+            Qt6_DIR
+            CMAKE_TOOLCHAIN_FILE
+            CMAKE_SYSROOT)
+        if(DEFINED ${qcai2_var} AND NOT "${${qcai2_var}}" STREQUAL "")
+            string(REPLACE ";" "${QCAI2_SCRIPT_VALUE_SEPARATOR}" qcai2_var_value "${${qcai2_var}}")
+            list(APPEND qcai2_cmake_args "-D${qcai2_var}:PATH=${qcai2_var_value}")
+        endif()
+    endforeach()
+
+    set(${out_var} "${qcai2_cmake_args}" PARENT_SCOPE)
+endfunction()
+
+function(qcai2_collect_target_cpp_sources out_var target)
+    get_target_property(qcai2_target_sources ${target} SOURCES)
+    get_target_property(qcai2_target_source_dir ${target} SOURCE_DIR)
+    set(qcai2_cpp_sources)
+
+    foreach(qcai2_source IN LISTS qcai2_target_sources)
+        if(qcai2_source MATCHES "^\\$<")
+            continue()
+        endif()
+
+        if(IS_ABSOLUTE "${qcai2_source}")
+            set(qcai2_source_path "${qcai2_source}")
+        else()
+            set(qcai2_source_path "${qcai2_target_source_dir}/${qcai2_source}")
+        endif()
+
+        if(qcai2_source_path MATCHES "\\.(c|cc|cpp|cxx|mm|m)$")
+            list(APPEND qcai2_cpp_sources "${qcai2_source_path}")
+        endif()
+    endforeach()
+
+    set(${out_var} "${qcai2_cpp_sources}" PARENT_SCOPE)
 endfunction()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
@@ -430,6 +500,10 @@ install(SCRIPT "${QCAI2_INSTALL_SIDECAR_DEPS_SCRIPT}")
 
 find_program(QCAI2_CLANG_FORMAT_EXECUTABLE NAMES clang-format clang-format-18 clang-format-17)
 find_program(QCAI2_GIT_EXECUTABLE NAMES git)
+find_program(QCAI2_RUN_CLANG_TIDY_EXECUTABLE NAMES run-clang-tidy run-clang-tidy-18 run-clang-tidy-17)
+find_program(QCAI2_CLANG_TIDY_EXECUTABLE NAMES clang-tidy clang-tidy-18 clang-tidy-17)
+find_program(QCAI2_SCAN_BUILD_EXECUTABLE NAMES scan-build scan-build-18 scan-build-17)
+find_program(QCAI2_CLANG_EXECUTABLE NAMES clang clang-18 clang-17)
 
 file(RELATIVE_PATH QCAI2_BINARY_DIR_RELATIVE
     "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}")
@@ -518,6 +592,83 @@ add_custom_target(doc
     COMMENT "Generating HTML and PDF documentation with Doxygen and Sphinx"
 )
 
+set(QCAI2_CLANG_TIDY_SCRIPT
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run-clang-tidy.cmake")
+set(QCAI2_CLANG_STATIC_ANALYZER_SCRIPT
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run-clang-static-analyzer.cmake")
+set(QCAI2_CLANG_STATIC_ANALYZER_ARGS_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/clang-static-analyzer-args.cmake")
+
+if(NOT EXISTS "${QCAI2_CLANG_STATIC_ANALYZER_ARGS_FILE}")
+    message(FATAL_ERROR
+        "Missing clang static analyzer args file: ${QCAI2_CLANG_STATIC_ANALYZER_ARGS_FILE}")
+endif()
+include("${QCAI2_CLANG_STATIC_ANALYZER_ARGS_FILE}")
+
+if(NOT DEFINED QCAI2_CLANG_STATIC_ANALYZER_SCAN_BUILD_ARGS)
+    set(QCAI2_CLANG_STATIC_ANALYZER_SCAN_BUILD_ARGS)
+endif()
+
+qcai2_collect_target_cpp_sources(QCAI2_CLANG_TIDY_SOURCES qcai2)
+set(QCAI2_CLANG_ANALYZER_BUILD_TARGETS qcai2)
+foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_migration)
+    if(TARGET ${qcai2_test_target})
+        qcai2_collect_target_cpp_sources(qcai2_test_sources ${qcai2_test_target})
+        list(APPEND QCAI2_CLANG_TIDY_SOURCES ${qcai2_test_sources})
+        list(APPEND QCAI2_CLANG_ANALYZER_BUILD_TARGETS ${qcai2_test_target})
+    endif()
+endforeach()
+list(REMOVE_DUPLICATES QCAI2_CLANG_TIDY_SOURCES)
+list(REMOVE_DUPLICATES QCAI2_CLANG_ANALYZER_BUILD_TARGETS)
+qcai2_collect_clang_analyzer_cmake_args(QCAI2_CLANG_ANALYZER_CMAKE_ARGS)
+string(REPLACE ";" "${QCAI2_SCRIPT_LIST_SEPARATOR}"
+    QCAI2_CLANG_TIDY_SOURCES_ARG "${QCAI2_CLANG_TIDY_SOURCES}")
+string(REPLACE ";" "${QCAI2_SCRIPT_LIST_SEPARATOR}"
+    QCAI2_CLANG_ANALYZER_BUILD_TARGETS_ARG "${QCAI2_CLANG_ANALYZER_BUILD_TARGETS}")
+string(REPLACE ";" "${QCAI2_SCRIPT_LIST_SEPARATOR}"
+    QCAI2_CLANG_ANALYZER_CMAKE_ARGS_ARG "${QCAI2_CLANG_ANALYZER_CMAKE_ARGS}")
+string(REPLACE ";" "${QCAI2_SCRIPT_LIST_SEPARATOR}"
+    QCAI2_CLANG_STATIC_ANALYZER_SCAN_BUILD_ARGS_ARG
+    "${QCAI2_CLANG_STATIC_ANALYZER_SCAN_BUILD_ARGS}")
+
+add_custom_target(clang-tidy
+    DEPENDS ${QCAI2_CLANG_ANALYZER_BUILD_TARGETS}
+    COMMAND ${CMAKE_COMMAND}
+        "-DRUN_CLANG_TIDY_EXECUTABLE=${QCAI2_RUN_CLANG_TIDY_EXECUTABLE}"
+        "-DCLANG_TIDY_EXECUTABLE=${QCAI2_CLANG_TIDY_EXECUTABLE}"
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DBUILD_DIR=${CMAKE_BINARY_DIR}"
+        "-DHEADER_FILTER=^${CMAKE_CURRENT_SOURCE_DIR}/src/"
+        "-DSOURCE_FILES=${QCAI2_CLANG_TIDY_SOURCES_ARG}"
+        -P "${QCAI2_CLANG_TIDY_SCRIPT}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    COMMENT "Running clang-tidy for qcai2 sources"
+)
+
+add_custom_target(clang-static-analyzer
+    COMMAND ${CMAKE_COMMAND}
+        "-DSCAN_BUILD_EXECUTABLE=${QCAI2_SCAN_BUILD_EXECUTABLE}"
+        "-DCLANG_EXECUTABLE=${QCAI2_CLANG_EXECUTABLE}"
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DANALYZER_BUILD_DIR=${CMAKE_BINARY_DIR}/clang-static-analyzer-build"
+        "-DANALYZER_REPORT_DIR=${CMAKE_BINARY_DIR}/clang-static-analyzer-report"
+        "-DANALYZER_GENERATOR=${CMAKE_GENERATOR}"
+        "-DANALYZER_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
+        "-DANALYZER_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+        "-DANALYZER_BUILD_TARGETS=${QCAI2_CLANG_ANALYZER_BUILD_TARGETS_ARG}"
+        "-DANALYZER_CMAKE_ARGS=${QCAI2_CLANG_ANALYZER_CMAKE_ARGS_ARG}"
+        "-DANALYZER_SCAN_BUILD_ARGS=${QCAI2_CLANG_STATIC_ANALYZER_SCAN_BUILD_ARGS_ARG}"
+        -P "${QCAI2_CLANG_STATIC_ANALYZER_SCRIPT}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    COMMENT "Running Clang Static Analyzer for qcai2"
+)
+
+add_custom_target(clang-analyze
+    DEPENDS clang-tidy clang-static-analyzer
+)
+
 # Enable the Run button in Qt Creator
 get_target_property(QtCreatorCorePath QtCreator::Core LOCATION)
 find_program(QtCreatorExecutable
@@ -547,8 +698,11 @@ set(SRC_IDE
     CHANGELOG.md
     VERSION.txt
     .gitignore
+    .clang-tidy
     cmake/format-changed-files.cmake
     cmake/build-docs.cmake
+    cmake/run-clang-tidy.cmake
+    cmake/run-clang-static-analyzer.cmake
     src/docs/Doxyfile.in
     src/docs/conf.py.in
     src/docs/index.rst
@@ -559,6 +713,7 @@ set(SRC_IDE
     src/sidecar/copilot-sidecar.js
     src/sidecar/package.json
     src/tests/CMakeLists.txt
+    cmake/clang-static-analyzer-args.cmake
 )
 
 add_custom_target(target_for_ide SOURCES ${SRC_IDE})
