@@ -22,6 +22,15 @@ class AgentController : public QObject
     Q_OBJECT
 public:
     /**
+     * High-level run mode selected in the dock widget.
+     */
+    enum class RunMode
+    {
+        Ask,
+        Agent
+    };
+
+    /**
      * Creates a controller with no configured provider or tools.
      * @param parent Parent QObject that owns this instance.
      */
@@ -61,8 +70,13 @@ public:
      * Starts a new run for the requested goal.
      * @param goal User task description.
      * @param dryRun True to forbid live patch application.
+     * @param runMode Ask for direct answers or Agent for autonomous tool use.
+     * @param modelName Model selected in the dock widget.
+     * @param reasoningEffort Reasoning effort selected in the dock widget.
+     * @param thinkingLevel Thinking depth selected in the dock widget.
      */
-    void start(const QString &goal, bool dryRun);
+    void start(const QString &goal, bool dryRun, RunMode runMode, const QString &modelName,
+               const QString &reasoningEffort, const QString &thinkingLevel);
 
     /**
      * Stops the active run and cancels any in-flight provider request.
@@ -239,6 +253,21 @@ private:
 
     /** User goal for the current run. */
     QString m_goal;
+
+    /** Selected interaction mode for the current run. */
+    RunMode m_runMode = RunMode::Agent;
+
+    /** Selected model for the current run. */
+    QString m_modelName;
+
+    /** Selected reasoning effort for the current run. */
+    QString m_reasoningEffort;
+
+    /** Selected thinking depth for the current run. */
+    QString m_thinkingLevel;
+
+    /** Ask-mode retries after the model returns an autonomous response. */
+    int m_modeRetries = 0;
 
     /** Conversation history replayed to the provider every iteration. */
     QList<ChatMessage> m_messages;

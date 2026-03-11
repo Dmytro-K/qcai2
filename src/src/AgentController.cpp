@@ -57,6 +57,12 @@ bool isEnabledEffort(const QString &level)
            level == QStringLiteral("high");
 }
 
+QString runModeLabel(AgentController::RunMode runMode)
+{
+    return runMode == AgentController::RunMode::Ask ? QStringLiteral("ask")
+                                                    : QStringLiteral("agent");
+}
+
 }  // namespace
 
 AgentController::AgentController(QObject *parent) : QObject(parent)
@@ -87,18 +93,31 @@ void AgentController::setSafetyPolicy(SafetyPolicy *policy)
 QString AgentController::buildSystemPrompt() const
 {
     QString sys;
-    sys += QStringLiteral(
-        "You are an AI coding agent inside Qt Creator. You help the user accomplish coding tasks "
-        "by using available tools. You MUST respond in JSON with one of these types:\n"
-        "1) {\"type\":\"plan\", \"steps\":[\"step description\", ...]}\n"
-        "2) {\"type\":\"tool_call\", \"name\":\"tool_name\", \"args\":{...}}\n"
-        "3) {\"type\":\"final\", \"summary\":\"what was done\", \"diff\":\"optional unified "
-        "diff\"}\n"
-        "4) {\"type\":\"need_approval\", \"action\":\"what\", \"reason\":\"why\", "
-        "\"preview\":\"details\"}\n\n");
+    if (m_runMode == RunMode::Ask)
+    {
+        sys += QStringLiteral(
+            "You are an AI assistant inside Qt Creator. Answer the user's request directly using "
+            "the current project/editor context. You MUST respond in JSON with exactly this "
+            "shape:\n"
+            "{\"type\":\"final\",\"summary\":\"direct answer for the user\",\"diff\":\"\"}\n\n"
+            "Do NOT return plan, tool_call, or need_approval. Do NOT use tools. Do NOT include a "
+            "diff unless the user explicitly asked for code changes.\n\n");
+    }
+    else
+    {
+        sys += QStringLiteral(
+            "You are an AI coding agent inside Qt Creator. You help the user accomplish coding "
+            "tasks by using available tools. You MUST respond in JSON with one of these types:\n"
+            "1) {\"type\":\"plan\", \"steps\":[\"step description\", ...]}\n"
+            "2) {\"type\":\"tool_call\", \"name\":\"tool_name\", \"args\":{...}}\n"
+            "3) {\"type\":\"final\", \"summary\":\"what was done\", \"diff\":\"optional unified "
+            "diff\"}\n"
+            "4) {\"type\":\"need_approval\", \"action\":\"what\", \"reason\":\"why\", "
+            "\"preview\":\"details\"}\n\n");
+    }
 
     // Available tools
-    if (m_toolRegistry)
+    if (m_runMode == RunMode::Agent && m_toolRegistry)
     {
         QJsonDocument toolsDoc(m_toolRegistry->toolDescriptionsJson());
         sys += QStringLiteral("Available tools:\n%1\n\n")
@@ -124,14 +143,23 @@ QString AgentController::buildSystemPrompt() const
             "MODE: DRY-RUN. Do NOT apply patches; only produce diffs for preview.\n");
     }
 
-    sys += QStringLiteral(
-        "\nFor simple/single-step tasks, skip planning and use tool_call or final directly. "
-        "Only produce a plan for multi-step tasks.\n");
+    if (m_runMode == RunMode::Agent)
+    {
+        sys += QStringLiteral(
+            "\nFor simple/single-step tasks, skip planning and use tool_call or final directly. "
+            "Only produce a plan for multi-step tasks.\n");
+    }
+    else
+    {
+        sys += QStringLiteral("\nMODE: ASK. Provide a concise direct answer in final.summary.\n");
+    }
 
     return sys;
 }
 
-void AgentController::start(const QString &goal, bool dryRun)
+void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
+                            const QString &modelName, const QString &reasoningEffort,
+                            const QString &thinkingLevel)
 {
     if (m_running)
         return;
@@ -183,7 +211,14 @@ void AgentController::start(const QString &goal, bool dryRun)
     m_iteration = 0;
     m_toolCallCount = 0;
     m_textRetries = 0;
+    m_modeRetries = 0;
     m_goal = goal;
+    m_runMode = runMode;
+    m_modelName = modelName.trimmed().isEmpty() ? s.modelName : modelName.trimmed();
+    m_reasoningEffort = reasoningEffort.trimmed().isEmpty() ? s.reasoningEffort
+                                                            : reasoningEffort.trimmed();
+    m_thinkingLevel = thinkingLevel.trimmed().isEmpty() ? s.thinkingLevel
+                                                        : thinkingLevel.trimmed();
     m_plan.clear();
     m_accumulatedDiff.clear();
     m_pendingApprovals.clear();
@@ -191,23 +226,29 @@ void AgentController::start(const QString &goal, bool dryRun)
 
     QCAI_INFO("Agent",
               QStringLiteral(
-                  "Starting agent — provider: %1, model: %2, reasoning: %3, thinking: %4, "
-                  "dryRun: %5, goal: %6")
-                  .arg(m_provider->id(), s.modelName, s.reasoningEffort, s.thinkingLevel,
-                       dryRun ? QStringLiteral("yes") : QStringLiteral("no"), goal.left(100)));
+                  "Starting run — mode: %1, provider: %2, model: %3, reasoning: %4, "
+                  "thinking: %5, dryRun: %6, goal: %7")
+                  .arg(runModeLabel(m_runMode), m_provider->id(), m_modelName, m_reasoningEffort,
+                       m_thinkingLevel, dryRun ? QStringLiteral("yes") : QStringLiteral("no"),
+                       goal.left(100)));
 
     // System prompt
     m_messages.append({QStringLiteral("system"), buildSystemPrompt()});
 
-    if (isEnabledEffort(s.thinkingLevel))
+    if (isEnabledEffort(m_thinkingLevel))
         m_messages.append({QStringLiteral("system"),
                            QStringLiteral("Use %1 thinking depth for this task.")
-                               .arg(s.thinkingLevel)});
+                               .arg(m_thinkingLevel)});
 
     // User goal
     m_messages.append({QStringLiteral("user"), goal});
 
-    emit logMessage(QStringLiteral("▶ Agent started. Goal: %1").arg(goal));
+    emit logMessage(QStringLiteral("%1 %2 started. Goal: %3")
+                        .arg(m_runMode == RunMode::Ask ? QStringLiteral("💬")
+                                                       : QStringLiteral("▶"))
+                        .arg(m_runMode == RunMode::Ask ? QStringLiteral("Ask mode")
+                                                       : QStringLiteral("Agent"))
+                        .arg(goal));
     runNextIteration();
 }
 
@@ -248,17 +289,17 @@ void AgentController::runNextIteration()
     const auto &s = settings();
     QCAI_DEBUG("Agent",
                QStringLiteral(
-                   "Iteration %1: sending %2 messages to %3 (model: %4, reasoning: %5, "
-                   "thinking: %6, temp: %7)")
+                    "Iteration %1: sending %2 messages to %3 (model: %4, reasoning: %5, "
+                    "thinking: %6, temp: %7)")
                     .arg(m_iteration)
                     .arg(m_messages.size())
-                    .arg(m_provider->id(), s.modelName)
-                    .arg(s.reasoningEffort)
-                    .arg(s.thinkingLevel)
+                    .arg(m_provider->id(), m_modelName)
+                    .arg(m_reasoningEffort)
+                    .arg(m_thinkingLevel)
                     .arg(s.temperature));
 
     m_provider->complete(
-        m_messages, s.modelName, s.temperature, s.maxTokens, s.reasoningEffort,
+        m_messages, m_modelName, s.temperature, s.maxTokens, m_reasoningEffort,
         [this](const QString &response, const QString &error) {
             QTimer::singleShot(0, this,
                                [this, response, error]() { handleResponse(response, error); });
@@ -296,6 +337,27 @@ void AgentController::handleResponse(const QString &response, const QString &err
     // Reset text retry counter on valid JSON
     if (parsed.type != ResponseType::Text && parsed.type != ResponseType::Error)
         m_textRetries = 0;
+
+    if (m_runMode == RunMode::Ask && parsed.type != ResponseType::Final &&
+        parsed.type != ResponseType::Text && parsed.type != ResponseType::Error)
+    {
+        if (m_modeRetries >= 1)
+        {
+            emit logMessage(QStringLiteral("⚠ Ask mode received a non-final response twice."));
+            m_running = false;
+            emit stopped(QStringLiteral("Ask mode received an unsupported response."));
+            return;
+        }
+
+        ++m_modeRetries;
+        emit logMessage(QStringLiteral("ℹ Ask mode requested a direct final response."));
+        m_messages.append({QStringLiteral("user"),
+                           QStringLiteral("Ask mode is enabled. Reply with one JSON object of "
+                                          "type \"final\" only. Do not plan, call tools, or ask "
+                                          "for approval.")});
+        runNextIteration();
+        return;
+    }
 
     switch (parsed.type)
     {

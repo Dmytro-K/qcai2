@@ -83,6 +83,12 @@ void selectEffortValue(QComboBox *combo, const QString &value, int fallbackIndex
     combo->setCurrentIndex(index >= 0 ? index : fallbackIndex);
 }
 
+void populateModeCombo(QComboBox *combo)
+{
+    combo->addItem(QObject::tr("Ask"), QStringLiteral("ask"));
+    combo->addItem(QObject::tr("Agent"), QStringLiteral("agent"));
+}
+
 void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
                              const QString &selectedText)
 {
@@ -606,10 +612,16 @@ void AgentDockWidget::saveChat()
     QStringList planItems;
     for (int i = 0; i < m_planList->count(); ++i)
         planItems.append(m_planList->item(i)->text());
+    const auto &cfg = settings();
+    const bool uiStateDiffers = m_modeCombo->currentData().toString() != QStringLiteral("agent") ||
+                                m_modelCombo->currentText().trimmed() != cfg.modelName ||
+                                m_reasoningCombo->currentData().toString() != cfg.reasoningEffort ||
+                                m_thinkingCombo->currentData().toString() != cfg.thinkingLevel ||
+                                m_dryRunCheck->isChecked() != cfg.dryRunDefault;
 
     const bool hasContent = !m_goalEdit->toPlainText().trimmed().isEmpty() ||
                             !persistedMarkdown.trimmed().isEmpty() || !m_currentDiff.isEmpty() ||
-                            !planItems.isEmpty();
+                            !planItems.isEmpty() || uiStateDiffers;
 
     if (!hasContent)
     {
@@ -631,6 +643,11 @@ void AgentDockWidget::saveChat()
     root[QStringLiteral("diff")] = m_currentDiff;
     root[QStringLiteral("status")] = m_statusLabel->text();
     root[QStringLiteral("activeTab")] = m_tabs->currentIndex();
+    root[QStringLiteral("mode")] = m_modeCombo->currentData().toString();
+    root[QStringLiteral("model")] = m_modelCombo->currentText().trimmed();
+    root[QStringLiteral("reasoningEffort")] = m_reasoningCombo->currentData().toString();
+    root[QStringLiteral("thinkingLevel")] = m_thinkingCombo->currentData().toString();
+    root[QStringLiteral("dryRun")] = m_dryRunCheck->isChecked();
 
     QJsonArray planJson;
     for (const QString &item : planItems)
@@ -678,6 +695,35 @@ void AgentDockWidget::restoreChat()
     }
 
     const QJsonObject root = doc.object();
+
+    {
+        const QSignalBlocker modeBlocker(m_modeCombo);
+        const QSignalBlocker modelBlocker(m_modelCombo);
+        const QSignalBlocker reasoningBlocker(m_reasoningCombo);
+        const QSignalBlocker thinkingBlocker(m_thinkingCombo);
+        const QSignalBlocker dryRunBlocker(m_dryRunCheck);
+
+        selectEffortValue(m_reasoningCombo,
+                          root.value(QStringLiteral("reasoningEffort"))
+                              .toString(m_reasoningCombo->currentData().toString()),
+                          m_reasoningCombo->currentIndex());
+        selectEffortValue(m_thinkingCombo,
+                          root.value(QStringLiteral("thinkingLevel"))
+                              .toString(m_thinkingCombo->currentData().toString()),
+                          m_thinkingCombo->currentIndex());
+
+        const QString savedMode = root.value(QStringLiteral("mode")).toString();
+        const int modeIndex = m_modeCombo->findData(savedMode);
+        if (modeIndex >= 0)
+            m_modeCombo->setCurrentIndex(modeIndex);
+
+        const QString savedModel = root.value(QStringLiteral("model")).toString().trimmed();
+        if (!savedModel.isEmpty())
+            m_modelCombo->setCurrentText(savedModel);
+
+        if (root.contains(QStringLiteral("dryRun")))
+            m_dryRunCheck->setChecked(root.value(QStringLiteral("dryRun")).toBool());
+    }
 
     const QString goal = root.value(QStringLiteral("goal")).toString();
     if (!goal.isEmpty())
@@ -845,6 +891,7 @@ void AgentDockWidget::switchProjectContext(const QString &projectFilePath)
         saveChat();
 
     clearChatState();
+    applyProjectUiDefaults();
     m_activeProjectFilePath = projectFilePath;
 
     if (auto *ctx = m_controller->editorContext())
@@ -884,6 +931,23 @@ QString AgentDockWidget::currentProjectStorageFilePath() const
 
     return QDir(projectDir)
         .filePath(QStringLiteral(".qcai2/%1").arg(sanitizedSessionFileName(m_activeProjectFilePath)));
+}
+
+void AgentDockWidget::applyProjectUiDefaults()
+{
+    const auto &cfg = settings();
+    const QSignalBlocker modeBlocker(m_modeCombo);
+    const QSignalBlocker modelBlocker(m_modelCombo);
+    const QSignalBlocker reasoningBlocker(m_reasoningCombo);
+    const QSignalBlocker thinkingBlocker(m_thinkingCombo);
+    const QSignalBlocker dryRunBlocker(m_dryRunCheck);
+
+    const int modeIndex = m_modeCombo->findData(QStringLiteral("agent"));
+    m_modeCombo->setCurrentIndex(modeIndex >= 0 ? modeIndex : 0);
+    m_modelCombo->setCurrentText(cfg.modelName);
+    selectEffortValue(m_reasoningCombo, cfg.reasoningEffort, 2);
+    selectEffortValue(m_thinkingCombo, cfg.thinkingLevel, 2);
+    m_dryRunCheck->setChecked(cfg.dryRunDefault);
 }
 
 void AgentDockWidget::setupUi()
@@ -1036,6 +1100,9 @@ void AgentDockWidget::setupUi()
     auto *btnColumn = new QVBoxLayout;
     btnColumn->setSpacing(2);
 
+    m_modeCombo = new QComboBox;
+    populateModeCombo(m_modeCombo);
+
     m_modelCombo = new QComboBox;
     m_modelCombo->setEditable(true);
     const bool useCopilotModels = settings().provider == QStringLiteral("copilot");
@@ -1072,28 +1139,23 @@ void AgentDockWidget::setupUi()
             return;
         switchProjectContext(m_projectCombo->itemData(index).toString());
     });
+    const auto persistProjectUiState = [this]() {
+        if (!m_activeProjectFilePath.isEmpty())
+            saveChat();
+    };
+    connect(m_modeCombo, &QComboBox::currentIndexChanged, this,
+            [persistProjectUiState](int) { persistProjectUiState(); });
+    connect(m_modelCombo, &QComboBox::currentTextChanged, this,
+            [persistProjectUiState](const QString &) { persistProjectUiState(); });
+    connect(m_reasoningCombo, &QComboBox::currentIndexChanged, this,
+            [persistProjectUiState](int) { persistProjectUiState(); });
+    connect(m_thinkingCombo, &QComboBox::currentIndexChanged, this,
+            [persistProjectUiState](int) { persistProjectUiState(); });
+    connect(m_dryRunCheck, &QCheckBox::checkStateChanged, this,
+            [persistProjectUiState](Qt::CheckState) { persistProjectUiState(); });
 
-    // Persist model/reasoning/thinking selection immediately on change
-    connect(m_modelCombo, &QComboBox::currentTextChanged, this, [](const QString &text) {
-        auto &cfg = settings();
-        const QString model = text.trimmed();
-        if (!model.isEmpty())
-        {
-            cfg.modelName = model;
-            cfg.save();
-        }
-    });
-    connect(m_reasoningCombo, &QComboBox::currentIndexChanged, this, [this](int /*index*/) {
-        auto &cfg = settings();
-        cfg.reasoningEffort = m_reasoningCombo->currentData().toString();
-        cfg.save();
-    });
-    connect(m_thinkingCombo, &QComboBox::currentIndexChanged, this, [this](int /*index*/) {
-        auto &cfg = settings();
-        cfg.thinkingLevel = m_thinkingCombo->currentData().toString();
-        cfg.save();
-    });
-
+    btnColumn->addWidget(new QLabel(tr("Mode")));
+    btnColumn->addWidget(m_modeCombo);
     btnColumn->addWidget(new QLabel(tr("Model")));
     btnColumn->addWidget(m_modelCombo);
     btnColumn->addWidget(new QLabel(tr("Reasoning")));
@@ -1107,6 +1169,8 @@ void AgentDockWidget::setupUi()
     inputRow->addWidget(m_goalEdit, 1);
     inputRow->addLayout(btnColumn);
 
+    applyProjectUiDefaults();
+
     // Assemble: top bar → tabs → input row
     mainLayout->addLayout(topBar);
     mainLayout->addWidget(m_tabs, 1);
@@ -1118,6 +1182,11 @@ void AgentDockWidget::updateRunState(bool running)
     m_runBtn->setEnabled(!running);
     m_stopBtn->setEnabled(running);
     m_goalEdit->setReadOnly(running);
+    m_modeCombo->setEnabled(!running);
+    m_modelCombo->setEnabled(!running);
+    m_reasoningCombo->setEnabled(!running);
+    m_thinkingCombo->setEnabled(!running);
+    m_dryRunCheck->setEnabled(!running);
     m_projectCombo->setEnabled(!running && m_projectCombo->count() > 0 &&
                                !m_projectCombo->itemData(0).toString().isEmpty());
 }
@@ -1128,18 +1197,18 @@ void AgentDockWidget::onRunClicked()
     if (goal.isEmpty())
         return;
 
-    auto &cfg = settings();
     const QString selectedModel = m_modelCombo->currentText().trimmed();
-    if (!selectedModel.isEmpty())
-        cfg.modelName = selectedModel;
-    cfg.reasoningEffort = m_reasoningCombo->currentData().toString();
-    cfg.thinkingLevel = m_thinkingCombo->currentData().toString();
-    cfg.save();
+    const QString selectedMode = m_modeCombo->currentData().toString();
     m_goalEdit->clear();
 
     updateRunState(true);
     m_tabs->setCurrentWidget(m_logView);
-    m_controller->start(goal, m_dryRunCheck->isChecked());
+    m_controller->start(
+        goal, m_dryRunCheck->isChecked(),
+        selectedMode == QStringLiteral("ask") ? AgentController::RunMode::Ask
+                                              : AgentController::RunMode::Agent,
+        selectedModel, m_reasoningCombo->currentData().toString(),
+        m_thinkingCombo->currentData().toString());
 }
 
 void AgentDockWidget::onStopClicked()

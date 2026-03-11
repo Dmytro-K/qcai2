@@ -169,12 +169,18 @@ private:
      */
     QString currentProjectStorageFilePath() const;
 
+    /**
+     * Applies global default UI values before loading project-specific overrides.
+     */
+    void applyProjectUiDefaults();
+
     /** Controller that owns the active agent run. */
     AgentController *m_controller;
 
     /** Input controls shown beside the goal editor. */
     QComboBox *m_projectCombo;
     QTextEdit *m_goalEdit;
+    QComboBox *m_modeCombo;
     QComboBox *m_modelCombo;
     QComboBox *m_reasoningCombo;
     QComboBox *m_thinkingCombo;

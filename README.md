@@ -7,7 +7,7 @@
 - **Autonomous agent loop** — `AgentController` runs a structured plan → act → observe → verify loop and expects JSON responses (`plan`, `tool_call`, `final`, `need_approval`).
 - **Built-in tools** — `read_file`, `apply_patch`, `search_repo`, `run_build`, `run_tests`, `show_diagnostics`, `git_status`, `git_diff`, and `open_file_at_location`.
 - **Multiple providers** — OpenAI-compatible HTTP APIs, GitHub Copilot through a Node.js sidecar, custom local HTTP endpoints, and Ollama.
-- **Dock widget workflow** — Plan, Actions Log, Raw Markdown, Diff Preview, Approvals, and Debug Log tabs, plus an open-project selector, goal input, model/reasoning/thinking selectors, run/stop, and dry-run controls.
+- **Dock widget workflow** — Plan, Actions Log, Raw Markdown, Diff Preview, Approvals, and Debug Log tabs, plus an open-project selector, goal input, Ask/Agent mode, model/reasoning/thinking selectors, run/stop, and dry-run controls.
 - **Editor assistance** — classic completion assist plus inline ghost-text suggestions via Qt Creator's `TextSuggestion` API.
 - **Diff review** — unified diff preview, per-line approval in the preview gutter, file navigation, and inline diff markers in editors.
 - **Safety gates** — dry-run by default, approval-required patch application, sandboxed file paths, and configurable limits for iterations, tool calls, diff size, and changed files.
