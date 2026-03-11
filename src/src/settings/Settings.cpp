@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "../util/Migration.h"
 #include "../util/Logger.h"
 
 #include <QSettings>
@@ -41,6 +42,10 @@ void Settings::load()
 {
     QSettings s;
     s.beginGroup(kGroup);
+    QString migrationError;
+    const bool migrationOk = Migration::migrateGlobalSettings(s, &migrationError);
+    if ((!migrationOk || !migrationError.isEmpty()) && !migrationError.isEmpty())
+        QCAI_WARN("Settings", migrationError);
 
     provider = s.value("provider", provider).toString();
     baseUrl = s.value("baseUrl", baseUrl).toString();
@@ -129,6 +134,7 @@ void Settings::save() const
     s.setValue("completionModel", completionModel);
     s.setValue("completionThinkingLevel", completionThinkingLevel);
     s.setValue("completionReasoningEffort", completionReasoningEffort);
+    Migration::stampGlobalSettings(s);
 
     s.endGroup();
     QCAI_DEBUG("Settings", QStringLiteral("Settings saved"));

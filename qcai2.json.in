@@ -1,8 +1,8 @@
 {
     "Id" : "qcai2",
     "Name" : "qcai2",
-    "Version" : "0.0.1",
-    "CompatVersion" : "0.0.1",
+    "Version" : "${QCAI2_VERSION_COMPAT}",
+    "CompatVersion" : "${QCAI2_VERSION_COMPAT}",
     "Vendor" : "Dmytro Kosmii",
     "VendorId" : "dmytrokosmii",
     "Copyright" : "(C) Dmytro Kosmii",

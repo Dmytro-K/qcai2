@@ -6,32 +6,46 @@ list(APPEND CMAKE_PREFIX_PATH "/usr")
 project(qcai2)
 
 include(GNUInstallDirs)
+include(ExternalProject)
+
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION.txt" QCAI2_VERSION_FILE_LINES
+    REGEX "^[ \t]*[^# \t].*$")
+list(GET QCAI2_VERSION_FILE_LINES 0 QCAI2_VERSION_FULL_RAW)
+string(STRIP "${QCAI2_VERSION_FULL_RAW}" QCAI2_VERSION_FULL)
+
+if(NOT QCAI2_VERSION_FULL MATCHES "^([0-9]+\\.[0-9]+\\.[0-9]+)(-[0-9]+)$")
+    message(FATAL_ERROR
+        "VERSION.txt must contain a revision like 0.0.4-002, got: ${QCAI2_VERSION_FULL}")
+endif()
+
+set(QCAI2_VERSION_COMPAT "${CMAKE_MATCH_1}")
+set(QCAI2_BUILD_SUFFIX "${CMAKE_MATCH_2}")
 
 set(QCAI2_FORMAT_CHANGED_SCRIPT
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/format-changed-files.cmake")
 set(QCAI2_BUILD_DOCS_SCRIPT
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/build-docs.cmake")
 
-if (WIN32)
-    if (DEFINED ENV{LOCALAPPDATA} AND NOT "$ENV{LOCALAPPDATA}" STREQUAL "")
+if(WIN32)
+    if(DEFINED ENV{LOCALAPPDATA} AND NOT "$ENV{LOCALAPPDATA}" STREQUAL "")
         set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{LOCALAPPDATA}/QtProject/qtcreator")
-    else ()
+    else()
         set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{HOME}/AppData/Local/QtProject/qtcreator")
-    endif ()
-elseif (APPLE)
+    endif()
+elseif(APPLE)
     set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{HOME}/Library/Application Support/QtProject/Qt Creator")
-else ()
-    if (DEFINED ENV{XDG_DATA_HOME} AND NOT "$ENV{XDG_DATA_HOME}" STREQUAL "")
+else()
+    if(DEFINED ENV{XDG_DATA_HOME} AND NOT "$ENV{XDG_DATA_HOME}" STREQUAL "")
         set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{XDG_DATA_HOME}/data/QtProject/qtcreator")
-    else ()
+    else()
         set(QCAI2_DEFAULT_INSTALL_PREFIX "$ENV{HOME}/.local/share/data/QtProject/qtcreator")
-    endif ()
-endif ()
+    endif()
+endif()
 
-if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "${QCAI2_DEFAULT_INSTALL_PREFIX}" CACHE PATH
         "Install path prefix, prepended onto install directories." FORCE)
-endif ()
+endif()
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -40,15 +54,15 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if (WIN32)
+if(WIN32)
     set(ENV{HOME} "$ENV{USERPROFILE}")
-endif (WIN32)
+endif(WIN32)
 
-if (WIN32)
+if(WIN32)
     set(ADDITIONAL_FLAGS WIN32)
-else (WIN32)
+else(WIN32)
     set(ADDITIONAL_FLAGS)
-endif (WIN32)
+endif(WIN32)
 
 set(COMPILER_LIST ${CMAKE_C_COMPILER_ID} ${CMAKE_CXX_COMPILER_ID})
 list(GET COMPILER_LIST 0 COMPILER_ID)
@@ -80,13 +94,95 @@ elseif("${COMPILER_ID}" STREQUAL "MSVC")
 endif("${COMPILER_ID}" STREQUAL "Clang")
 
 function(qcai2_enable_linker_map target)
-    if (MSVC)
+    if(MSVC)
         target_link_options(${target} PRIVATE
             "/MAP:${CMAKE_CURRENT_BINARY_DIR}/${target}.map")
-    elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         target_link_options(${target} PRIVATE
             "LINKER:-Map,${CMAKE_CURRENT_BINARY_DIR}/${target}.map")
-    endif ()
+    endif()
+endfunction()
+
+set(QCAI2_EXTERNAL_LIST_SEPARATOR "|")
+
+function(qcai2_append_defined_cmake_arg out_var cmake_var cmake_type)
+    set(qcai2_args "${${out_var}}")
+    if(DEFINED ${cmake_var} AND NOT "${${cmake_var}}" STREQUAL "")
+        string(REPLACE ";" "${QCAI2_EXTERNAL_LIST_SEPARATOR}" qcai2_var_value "${${cmake_var}}")
+        list(APPEND qcai2_args "-D${cmake_var}:${cmake_type}=${qcai2_var_value}")
+    endif()
+    set(${out_var} "${qcai2_args}" PARENT_SCOPE)
+endfunction()
+
+function(qcai2_collect_external_cmake_args out_var)
+    get_cmake_property(qcai2_all_vars VARIABLES)
+    set(qcai2_cmake_args)
+
+    foreach(qcai2_var IN LISTS qcai2_all_vars)
+        if(qcai2_var MATCHES "^CMAKE_[A-Z0-9_]*FLAGS($|_.*)")
+            qcai2_append_defined_cmake_arg(qcai2_cmake_args "${qcai2_var}" STRING)
+        endif()
+    endforeach()
+
+    foreach(qcai2_var IN ITEMS
+            CMAKE_BUILD_TYPE
+            CMAKE_MAKE_PROGRAM
+            CMAKE_TOOLCHAIN_FILE
+            VCPKG_TARGET_TRIPLET
+            VCPKG_HOST_TRIPLET
+            CMAKE_SYSROOT
+            CMAKE_FIND_ROOT_PATH
+            CMAKE_SYSTEM_NAME
+            CMAKE_SYSTEM_VERSION
+            CMAKE_SYSTEM_PROCESSOR
+            CMAKE_C_COMPILER
+            CMAKE_CXX_COMPILER
+            CMAKE_C_COMPILER_TARGET
+            CMAKE_CXX_COMPILER_TARGET
+            CMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN
+            CMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN
+            CMAKE_AR
+            CMAKE_RANLIB
+            CMAKE_LINKER
+            CMAKE_NM
+            CMAKE_OBJDUMP
+            CMAKE_OBJCOPY
+            CMAKE_STRIP
+            CMAKE_MT
+            CMAKE_RC_COMPILER
+            CMAKE_OSX_ARCHITECTURES
+            CMAKE_OSX_DEPLOYMENT_TARGET
+            CMAKE_OSX_SYSROOT
+            CMAKE_APPLE_SILICON_PROCESSOR
+            CMAKE_MSVC_RUNTIME_LIBRARY)
+        if(qcai2_var STREQUAL "CMAKE_MAKE_PROGRAM" OR qcai2_var STREQUAL "CMAKE_TOOLCHAIN_FILE" OR
+            qcai2_var STREQUAL "CMAKE_C_COMPILER" OR qcai2_var STREQUAL "CMAKE_CXX_COMPILER" OR
+            qcai2_var STREQUAL "CMAKE_AR" OR qcai2_var STREQUAL "CMAKE_RANLIB" OR
+            qcai2_var STREQUAL "CMAKE_LINKER" OR qcai2_var STREQUAL "CMAKE_NM" OR
+            qcai2_var STREQUAL "CMAKE_OBJDUMP" OR qcai2_var STREQUAL "CMAKE_OBJCOPY" OR
+            qcai2_var STREQUAL "CMAKE_STRIP" OR qcai2_var STREQUAL "CMAKE_MT" OR
+            qcai2_var STREQUAL "CMAKE_RC_COMPILER")
+            qcai2_append_defined_cmake_arg(qcai2_cmake_args "${qcai2_var}" FILEPATH)
+        else()
+            qcai2_append_defined_cmake_arg(qcai2_cmake_args "${qcai2_var}" STRING)
+        endif()
+    endforeach()
+
+    list(REMOVE_DUPLICATES qcai2_cmake_args)
+    list(SORT qcai2_cmake_args)
+    set(${out_var} "${qcai2_cmake_args}" PARENT_SCOPE)
+endfunction()
+
+function(qcai2_collect_external_generator_args out_var)
+    set(qcai2_generator_args)
+
+    foreach(qcai2_var IN ITEMS CMAKE_GENERATOR CMAKE_GENERATOR_PLATFORM CMAKE_GENERATOR_TOOLSET CMAKE_GENERATOR_INSTANCE)
+        if(DEFINED ${qcai2_var} AND NOT "${${qcai2_var}}" STREQUAL "")
+            list(APPEND qcai2_generator_args ${qcai2_var} "${${qcai2_var}}")
+        endif()
+    endforeach()
+
+    set(${out_var} "${qcai2_generator_args}" PARENT_SCOPE)
 endfunction()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
@@ -102,6 +198,105 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "${CMAKE_C_FLAGS_RELWITHDEBINFO_INIT}")
 
 find_package(QtCreator REQUIRED COMPONENTS Core TextEditor ProjectExplorer)
 find_package(Qt6 COMPONENTS Widgets Network REQUIRED)
+
+add_subdirectory(src/src/util/migrations)
+
+option(QCAI2_USE_SYSTEM_LIBARCHIVE "Prefer system libarchive when available" ON)
+set(QCAI2_LIBARCHIVE_VERSION "3.8.6")
+find_package(LibArchive QUIET)
+find_package(LibLZMA QUIET)
+
+add_library(qcai2_libarchive INTERFACE)
+add_library(qcai2_version_info INTERFACE)
+
+target_compile_definitions(qcai2_version_info INTERFACE
+    QCAI2_CURRENT_VERSION="${QCAI2_VERSION_COMPAT}"
+    QCAI2_CURRENT_BUILD_SUFFIX="${QCAI2_BUILD_SUFFIX}"
+)
+
+qcai2_collect_migration_files(QCAI2_MIGRATION_FILES)
+qcai2_collect_external_cmake_args(QCAI2_EXTERNAL_CMAKE_ARGS)
+qcai2_collect_external_generator_args(QCAI2_EXTERNAL_GENERATOR_ARGS)
+
+set(QCAI2_LIBARCHIVE_C_WARNING_FLAGS "")
+set(QCAI2_LIBARCHIVE_CXX_WARNING_FLAGS "")
+set(QCAI2_LIBARCHIVE_WARNING_CMAKE_ARGS "")
+
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    set(QCAI2_LIBARCHIVE_C_WARNING_FLAGS "${CMAKE_C_FLAGS} -Wno-error")
+    list(APPEND QCAI2_LIBARCHIVE_WARNING_CMAKE_ARGS
+        "-DCMAKE_C_FLAGS:STRING=${QCAI2_LIBARCHIVE_C_WARNING_FLAGS}")
+    set(QCAI2_LIBARCHIVE_CXX_WARNING_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
+    list(APPEND QCAI2_LIBARCHIVE_WARNING_CMAKE_ARGS
+        "-DCMAKE_CXX_FLAGS:STRING=${QCAI2_LIBARCHIVE_CXX_WARNING_FLAGS}")
+endif()
+
+if(QCAI2_USE_SYSTEM_LIBARCHIVE AND LibArchive_FOUND)
+    target_link_libraries(qcai2_libarchive INTERFACE LibArchive::LibArchive)
+else()
+    if(NOT LibLZMA_FOUND)
+        message(FATAL_ERROR "External libarchive build requires LibLZMA for .tar.xz migration backups.")
+    endif()
+
+    set(QCAI2_LIBARCHIVE_INSTALL_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive")
+    set(QCAI2_LIBARCHIVE_PREFIX_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-prefix")
+    set(QCAI2_LIBARCHIVE_STATIC_LIB
+        "${QCAI2_LIBARCHIVE_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}archive${CMAKE_STATIC_LIBRARY_SUFFIX}")
+
+    ExternalProject_Add(qcai2_libarchive_ep
+        PREFIX "${QCAI2_LIBARCHIVE_PREFIX_DIR}"
+        INSTALL_DIR "${QCAI2_LIBARCHIVE_INSTALL_DIR}"
+        GIT_REPOSITORY https://github.com/libarchive/libarchive.git
+        GIT_TAG "v${QCAI2_LIBARCHIVE_VERSION}"
+        GIT_SHALLOW TRUE
+        UPDATE_DISCONNECTED TRUE
+        BUILD_BYPRODUCTS "${QCAI2_LIBARCHIVE_STATIC_LIB}"
+        LIST_SEPARATOR "${QCAI2_EXTERNAL_LIST_SEPARATOR}"
+        ${QCAI2_EXTERNAL_GENERATOR_ARGS}
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+            -DBUILD_SHARED_LIBS=OFF
+            -DBUILD_TESTING=OFF
+            -DENABLE_TEST=OFF
+            -DENABLE_OPENSSL=OFF
+            -DENABLE_LIBXML2=OFF
+            -DENABLE_EXPAT=OFF
+            -DENABLE_MBEDTLS=OFF
+            -DENABLE_NETTLE=OFF
+            -DENABLE_CNG=OFF
+            -DENABLE_WIN32_XMLLITE=OFF
+            -DENABLE_ZLIB=OFF
+            -DENABLE_BZip2=OFF
+            -DENABLE_ZSTD=OFF
+            -DENABLE_LZ4=OFF
+            -DENABLE_LZO=OFF
+            -DENABLE_LIBB2=OFF
+            -DENABLE_ICONV=OFF
+            -DENABLE_ACL=OFF
+            -DENABLE_XATTR=OFF
+            -DENABLE_LZMA=ON
+            -DENABLE_CPIO=OFF
+            -DENABLE_CAT=OFF
+            -DENABLE_TAR=OFF
+            -DENABLE_UNZIP=OFF
+            -DENABLE_INSTALL=ON
+            -DENABLE_WERROR=OFF
+            ${QCAI2_EXTERNAL_CMAKE_ARGS}
+            ${QCAI2_LIBARCHIVE_WARNING_CMAKE_ARGS}
+    )
+
+    add_library(qcai2_libarchive_imported STATIC IMPORTED GLOBAL)
+    set_target_properties(qcai2_libarchive_imported PROPERTIES
+        IMPORTED_LOCATION "${QCAI2_LIBARCHIVE_STATIC_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${QCAI2_LIBARCHIVE_INSTALL_DIR}/include"
+    )
+    add_dependencies(qcai2_libarchive_imported qcai2_libarchive_ep)
+    if(WIN32)
+        target_compile_definitions(qcai2_libarchive_imported INTERFACE LIBARCHIVE_STATIC)
+    endif()
+    target_link_libraries(qcai2_libarchive INTERFACE qcai2_libarchive_imported LibLZMA::LibLZMA)
+endif()
 
 # Add a CMake option that enables building your plugin with tests.
 # You don't want your released plugin binaries to contain tests,
@@ -178,6 +373,9 @@ add_qtc_plugin(qcai2
     src/src/safety/SafetyPolicy.cpp
     src/src/util/Json.h
     src/src/util/Json.cpp
+    src/src/util/Migration.h
+    src/src/util/Migration.cpp
+    ${QCAI2_MIGRATION_FILES}
     src/src/util/ProcessRunner.h
     src/src/util/ProcessRunner.cpp
     src/src/util/Diff.h
@@ -202,6 +400,7 @@ add_qtc_plugin(qcai2
 )
 
 qcai2_enable_linker_map(qcai2)
+target_link_libraries(qcai2 PRIVATE qcai2_libarchive qcai2_version_info)
 
 set(QCAI2_PLUGIN_INSTALL_DIR "plugins/${IDE_VERSION}")
 set(QCAI2_SIDECAR_INSTALL_DIR "${QCAI2_PLUGIN_INSTALL_DIR}/qcai2/sidecar")
@@ -329,7 +528,7 @@ find_program(QtCreatorExecutable
     "${QtCreatorCorePath}/../../../MacOS"
   NO_DEFAULT_PATH
 )
-if (QtCreatorExecutable)
+if(QtCreatorExecutable)
   add_custom_target(RunQtCreator
     COMMAND ${QtCreatorExecutable} -pluginpath $<TARGET_FILE_DIR:qcai2>
     DEPENDS qcai2
@@ -346,6 +545,7 @@ set(SRC_IDE
     LICENSE
     README.md
     CHANGELOG.md
+    VERSION.txt
     .gitignore
     cmake/format-changed-files.cmake
     cmake/build-docs.cmake
@@ -362,3 +562,11 @@ set(SRC_IDE
 )
 
 add_custom_target(target_for_ide SOURCES ${SRC_IDE})
+
+set(SRC_TESTS
+    src/tests/tst_json.cpp
+    src/tests/tst_toolcall.cpp
+    src/tests/tst_migration.cpp
+)
+
+add_custom_target(tests SOURCES ${SRC_TESTS})

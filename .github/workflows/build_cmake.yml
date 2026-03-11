@@ -22,46 +22,48 @@ jobs:
     strategy:
       matrix:
         config:
-         - {
-             name: "Windows Latest MSVC", artifact: "Windows-x64",
-             os: windows-latest,
-             platform: windows_x64,
-             archive_ext: zip,
-             cc: "cl", cxx: "cl", msvc_arch: "x64",
-             qt_host: "windows", qt_arch: "win64_msvc2022_64",
-             qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
-           }
-         - {
-             name: "Windows Latest MSVC Arm64", artifact: "Windows-arm64",
-             os: windows-11-arm,
-             platform: windows_arm64,
-             archive_ext: zip,
-             cc: "cl", cxx: "cl", msvc_arch: "arm64",
-             qt_host: "windows_arm64", qt_arch: "win64_msvc2022_arm64",
-             qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
-           }
-         - {
-             name: "Ubuntu Latest GCC", artifact: "Linux-x64",
-             os: ubuntu-latest,
-             platform: linux_x64,
+          - {
+              name: "Windows Latest MSVC", artifact: "Windows-x64",
+              os: windows-latest,
+              platform: windows_x64,
+              archive_ext: zip,
+              cc: "cl", cxx: "cl", msvc_arch: "x64",
+              vcpkg_triplet: "x64-windows-static-md",
+              qt_host: "windows", qt_arch: "win64_msvc2022_64",
+              qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
+            }
+          - {
+               name: "Windows Latest MSVC Arm64", artifact: "Windows-arm64",
+               os: windows-11-arm,
+               platform: windows_arm64,
+              archive_ext: zip,
+              cc: "cl", cxx: "cl", msvc_arch: "arm64",
+              vcpkg_triplet: "arm64-windows-static-md",
+              qt_host: "windows_arm64", qt_arch: "win64_msvc2022_arm64",
+              qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
+            }
+          - {
+              name: "Ubuntu Latest GCC", artifact: "Linux-x64",
+              os: ubuntu-latest,
+              platform: linux_x64,
              archive_ext: tar.xz,
              cc: "gcc", cxx: "g++",
              qt_host: "linux", qt_arch: "linux_gcc_64",
              qt_archives: "qtbase qtdeclarative qt5compat qtshadertools icu"
            }
-         - {
-             name: "Ubuntu Latest GCC Arm64", artifact: "Linux-arm64",
-             os: ubuntu-24.04-arm,
-             platform: linux_arm64,
+          - {
+              name: "Ubuntu Latest GCC Arm64", artifact: "Linux-arm64",
+              os: ubuntu-24.04-arm,
+              platform: linux_arm64,
              archive_ext: tar.xz,
              cc: "gcc", cxx: "g++",
              qt_host: "linux_arm64", qt_arch: "linux_gcc_arm64",
              qt_archives: "qtbase qtdeclarative qt5compat qtshadertools icu"
            }
-         - {
-             name: "macOS Latest Clang", artifact: "macOS-universal",
-             os: macos-latest,
-             platform: mac_x64,
+          - {
+              name: "macOS Latest Clang", artifact: "macOS-universal",
+              os: macos-latest,
+              platform: mac_x64,
              archive_ext: zip,
              cc: "clang", cxx: "clang++",
              qt_host: "mac", qt_arch: "clang_64",
@@ -94,13 +96,17 @@ jobs:
             COMMAND sudo apt-get update
           )
           execute_process(
-            COMMAND sudo apt-get install -y libgl1-mesa-dev
+            COMMAND sudo apt-get install -y libgl1-mesa-dev liblzma-dev
             RESULT_VARIABLE result
           )
           if (NOT result EQUAL 0)
             message(FATAL_ERROR "Failed to install dependencies")
           endif()
         endif()
+
+    - name: Install macOS libs
+      if: runner.os == 'macOS'
+      run: brew install xz
 
     - name: Install Qt
       id: qt
@@ -132,6 +138,17 @@ jobs:
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: ${{ matrix.config.msvc_arch }}
+
+    - name: Install Windows libs
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $vcpkgRoot = Join-Path $env:RUNNER_TEMP 'vcpkg'
+        git clone --depth 1 https://github.com/microsoft/vcpkg.git $vcpkgRoot
+        & (Join-Path $vcpkgRoot 'bootstrap-vcpkg.bat') -disableMetrics
+        & (Join-Path $vcpkgRoot 'vcpkg.exe') install "liblzma:${{ matrix.config.vcpkg_triplet }}"
+        "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        "VCPKG_TARGET_TRIPLET=${{ matrix.config.vcpkg_triplet }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
     - name: Build, test, and package
       shell: bash
@@ -193,6 +210,11 @@ jobs:
 
         if [ "${RUNNER_OS}" = "macOS" ]; then
           cmake_args+=("-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64")
+        fi
+
+        if [ "${RUNNER_OS}" = "Windows" ]; then
+          cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+          cmake_args+=("-DVCPKG_TARGET_TRIPLET=${VCPKG_TARGET_TRIPLET}")
         fi
 
         cmake "${cmake_args[@]}"

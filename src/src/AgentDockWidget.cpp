@@ -7,6 +7,7 @@
 #include "ui_AgentDockWidget.h"
 #include "util/Diff.h"
 #include "util/Logger.h"
+#include "util/Migration.h"
 
 #include <coreplugin/editormanager/editormanager.h>
 #include <projectexplorer/projectmanager.h>
@@ -158,6 +159,56 @@ QString sanitizedSessionFileName(const QString &projectFilePath)
     baseName.replace(QRegularExpression(QStringLiteral(R"([^A-Za-z0-9._-])")),
                      QStringLiteral("_"));
     return QStringLiteral("%1.json").arg(baseName);
+}
+
+bool writeContextTextFile(const QString &path, const QString &content, const QString &description)
+{
+    if (content.isEmpty())
+    {
+        QFile::remove(path);
+        return true;
+    }
+
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly))
+    {
+        QCAI_WARN("Dock", QStringLiteral("Failed to open %1 for writing: %2")
+                              .arg(description, path));
+        return false;
+    }
+
+    file.write(content.toUtf8());
+    if (!file.commit())
+    {
+        QCAI_WARN("Dock", QStringLiteral("Failed to commit %1: %2").arg(description, path));
+        return false;
+    }
+
+    return true;
+}
+
+QString readContextTextFile(const QString &path, const QString &description, bool *ok = nullptr)
+{
+    QFile file(path);
+    if (!file.exists())
+    {
+        if (ok)
+            *ok = false;
+        return {};
+    }
+
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        QCAI_WARN("Dock", QStringLiteral("Failed to open %1 for reading: %2")
+                              .arg(description, path));
+        if (ok)
+            *ok = false;
+        return {};
+    }
+
+    if (ok)
+        *ok = true;
+    return QString::fromUtf8(file.readAll());
 }
 
 class DiffHighlighter final : public QSyntaxHighlighter
@@ -609,8 +660,11 @@ void AgentDockWidget::saveChat()
     const QString storagePath = currentProjectStorageFilePath();
     if (storagePath.isEmpty())
         return;
+    const QString goalPath = Migration::projectGoalFilePath(storagePath);
+    const QString logPath = Migration::projectActionsLogFilePath(storagePath);
 
     const QString persistedMarkdown = currentLogMarkdown();
+    const QString goalText = m_goalEdit->toPlainText();
     QStringList planItems;
     for (int i = 0; i < m_planList->count(); ++i)
         planItems.append(m_planList->item(i)->text());
@@ -621,13 +675,14 @@ void AgentDockWidget::saveChat()
                                 m_thinkingCombo->currentData().toString() != cfg.thinkingLevel ||
                                 m_dryRunCheck->isChecked() != cfg.dryRunDefault;
 
-    const bool hasContent = !m_goalEdit->toPlainText().trimmed().isEmpty() ||
-                            !persistedMarkdown.trimmed().isEmpty() || !m_currentDiff.isEmpty() ||
-                            !planItems.isEmpty() || uiStateDiffers;
+    const bool hasContent = !goalText.trimmed().isEmpty() || !persistedMarkdown.trimmed().isEmpty() ||
+                            !m_currentDiff.isEmpty() || !planItems.isEmpty() || uiStateDiffers;
 
     if (!hasContent)
     {
         QFile::remove(storagePath);
+        QFile::remove(goalPath);
+        QFile::remove(logPath);
         return;
     }
 
@@ -639,9 +694,14 @@ void AgentDockWidget::saveChat()
         return;
     }
 
+    if (!writeContextTextFile(goalPath, goalText, QStringLiteral("project goal file")) ||
+        !writeContextTextFile(logPath, persistedMarkdown,
+                              QStringLiteral("project Actions Log markdown file")))
+    {
+        return;
+    }
+
     QJsonObject root;
-    root[QStringLiteral("goal")] = m_goalEdit->toPlainText();
-    root[QStringLiteral("logMarkdown")] = persistedMarkdown;
     root[QStringLiteral("diff")] = m_currentDiff;
     root[QStringLiteral("status")] = m_statusLabel->text();
     root[QStringLiteral("activeTab")] = m_tabs->currentIndex();
@@ -650,6 +710,7 @@ void AgentDockWidget::saveChat()
     root[QStringLiteral("reasoningEffort")] = m_reasoningCombo->currentData().toString();
     root[QStringLiteral("thinkingLevel")] = m_thinkingCombo->currentData().toString();
     root[QStringLiteral("dryRun")] = m_dryRunCheck->isChecked();
+    Migration::stampProjectState(root);
 
     QJsonArray planJson;
     for (const QString &item : planItems)
@@ -677,6 +738,16 @@ void AgentDockWidget::restoreChat()
     const QString storagePath = currentProjectStorageFilePath();
     if (storagePath.isEmpty())
         return;
+    QString migrationError;
+    if (!Migration::migrateProjectState(storagePath, &migrationError))
+    {
+        if (!migrationError.isEmpty())
+            QCAI_WARN("Dock", migrationError);
+        return;
+    }
+
+    const QString goalPath = Migration::projectGoalFilePath(storagePath);
+    const QString logPath = Migration::projectActionsLogFilePath(storagePath);
 
     QFile file(storagePath);
     if (!file.exists())
@@ -727,15 +798,23 @@ void AgentDockWidget::restoreChat()
             m_dryRunCheck->setChecked(root.value(QStringLiteral("dryRun")).toBool());
     }
 
-    const QString goal = root.value(QStringLiteral("goal")).toString();
-    if (!goal.isEmpty())
-        m_goalEdit->setPlainText(goal);
+    bool goalLoadedFromFile = false;
+    const QString goal =
+        readContextTextFile(goalPath, QStringLiteral("project goal file"), &goalLoadedFromFile);
+    const QString legacyGoal = root.value(QStringLiteral("goal")).toString();
+    const QString restoredGoal = goalLoadedFromFile ? goal : legacyGoal;
+    if (!restoredGoal.isEmpty())
+        m_goalEdit->setPlainText(restoredGoal);
 
-    const QString logMarkdown = root.value(QStringLiteral("logMarkdown")).toString();
-    if (!logMarkdown.isEmpty())
+    bool logLoadedFromFile = false;
+    const QString logMarkdown = readContextTextFile(
+        logPath, QStringLiteral("project Actions Log markdown file"), &logLoadedFromFile);
+    const QString legacyLogMarkdown = root.value(QStringLiteral("logMarkdown")).toString();
+    const QString restoredLogMarkdown = logLoadedFromFile ? logMarkdown : legacyLogMarkdown;
+    if (!restoredLogMarkdown.isEmpty())
     {
         // Close any unclosed code fences from interrupted streaming
-        m_logMarkdown = logMarkdown;
+        m_logMarkdown = restoredLogMarkdown;
         int fenceCount = 0;
         const auto lines = m_logMarkdown.split('\n');
         for (const auto &line : lines)

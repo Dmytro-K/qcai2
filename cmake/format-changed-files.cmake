@@ -1,20 +1,20 @@
-if (NOT DEFINED QCAI2_FORMAT_WORKTREE_DIR OR QCAI2_FORMAT_WORKTREE_DIR STREQUAL "")
+if(NOT DEFINED QCAI2_FORMAT_WORKTREE_DIR OR QCAI2_FORMAT_WORKTREE_DIR STREQUAL "")
     set(QCAI2_FORMAT_WORKTREE_DIR "${CMAKE_CURRENT_LIST_DIR}")
-endif ()
+endif()
 
-if (NOT DEFINED CLANG_FORMAT_EXECUTABLE OR CLANG_FORMAT_EXECUTABLE STREQUAL "")
+if(NOT DEFINED CLANG_FORMAT_EXECUTABLE OR CLANG_FORMAT_EXECUTABLE STREQUAL "")
     find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format clang-format-18 clang-format-17)
-endif ()
-if (NOT CLANG_FORMAT_EXECUTABLE)
+endif()
+if(NOT CLANG_FORMAT_EXECUTABLE)
     message(FATAL_ERROR "clang-format executable not found")
-endif ()
+endif()
 
-if (NOT DEFINED GIT_EXECUTABLE OR GIT_EXECUTABLE STREQUAL "")
+if(NOT DEFINED GIT_EXECUTABLE OR GIT_EXECUTABLE STREQUAL "")
     find_program(GIT_EXECUTABLE NAMES git)
-endif ()
-if (NOT GIT_EXECUTABLE)
+endif()
+if(NOT GIT_EXECUTABLE)
     message(FATAL_ERROR "git executable not found")
-endif ()
+endif()
 
 set(QCAI2_FORMAT_SUPPORTED_EXTENSIONS
     .c
@@ -31,7 +31,7 @@ set(QCAI2_FORMAT_SUPPORTED_EXTENSIONS
     .mm
 )
 
-if (NOT DEFINED QCAI2_FORMAT_EXCLUDED_PREFIXES)
+if(NOT DEFINED QCAI2_FORMAT_EXCLUDED_PREFIXES)
     set(QCAI2_FORMAT_EXCLUDED_PREFIXES
         build/
         cmake-build-debug/
@@ -39,7 +39,7 @@ if (NOT DEFINED QCAI2_FORMAT_EXCLUDED_PREFIXES)
         cmake-build-relwithdebinfo/
         cmake-build-minsizerel/
     )
-endif ()
+endif()
 
 function(qcai2_collect_changed_files out_var)
     set(all_paths "")
@@ -54,63 +54,63 @@ function(qcai2_collect_changed_files out_var)
             RESULT_VARIABLE git_result
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
-        if (NOT git_result EQUAL 0)
+        if(NOT git_result EQUAL 0)
             message(FATAL_ERROR
                 "Failed to query changed files with git (${command_args}): ${git_error}")
-        endif ()
-        if (NOT git_output STREQUAL "")
+        endif()
+        if(NOT git_output STREQUAL "")
             string(REPLACE "\n" ";" output_list "${git_output}")
             list(APPEND all_paths ${output_list})
-        endif ()
-    endforeach ()
+        endif()
+    endforeach()
 
     list(REMOVE_DUPLICATES all_paths)
     set(filtered_paths "")
     foreach(relative_path IN LISTS all_paths)
-        if (relative_path STREQUAL "")
+        if(relative_path STREQUAL "")
             continue()
-        endif ()
+        endif()
 
         set(skip_path FALSE)
         foreach(prefix IN LISTS QCAI2_FORMAT_EXCLUDED_PREFIXES)
-            if (prefix STREQUAL "")
+            if(prefix STREQUAL "")
                 continue()
-            endif ()
+            endif()
             string(REGEX REPLACE "/+$" "" normalized_prefix "${prefix}")
-            if (normalized_prefix STREQUAL "")
+            if(normalized_prefix STREQUAL "")
                 continue()
-            endif ()
+            endif()
             string(FIND "${relative_path}" "${normalized_prefix}/" prefix_match)
-            if (relative_path STREQUAL normalized_prefix OR prefix_match EQUAL 0)
+            if(relative_path STREQUAL normalized_prefix OR prefix_match EQUAL 0)
                 set(skip_path TRUE)
                 break()
-            endif ()
-        endforeach ()
-        if (skip_path)
+            endif()
+        endforeach()
+        if(skip_path)
             continue()
-        endif ()
+        endif()
 
         get_filename_component(extension "${relative_path}" LAST_EXT)
         string(TOLOWER "${extension}" extension)
-        if (NOT extension IN_LIST QCAI2_FORMAT_SUPPORTED_EXTENSIONS)
+        if(NOT extension IN_LIST QCAI2_FORMAT_SUPPORTED_EXTENSIONS)
             continue()
-        endif ()
+        endif()
 
         set(absolute_path "${QCAI2_FORMAT_WORKTREE_DIR}/${relative_path}")
-        if (EXISTS "${absolute_path}")
+        if(EXISTS "${absolute_path}")
             list(APPEND filtered_paths "${absolute_path}")
-        endif ()
-    endforeach ()
+        endif()
+    endforeach()
 
     set(${out_var} "${filtered_paths}" PARENT_SCOPE)
 endfunction()
 
 qcai2_collect_changed_files(files_to_format)
 
-if (NOT files_to_format)
+if(NOT files_to_format)
     message(STATUS "No changed files eligible for clang-format in ${QCAI2_FORMAT_WORKTREE_DIR}")
     return()
-endif ()
+endif()
 
 list(JOIN files_to_format "\n  " formatted_file_list)
 message(STATUS "Formatting changed files:\n  ${formatted_file_list}")
@@ -121,6 +121,6 @@ execute_process(
     COMMAND_ECHO STDOUT
 )
 
-if (NOT clang_format_result EQUAL 0)
+if(NOT clang_format_result EQUAL 0)
     message(FATAL_ERROR "clang-format failed with exit code ${clang_format_result}")
-endif ()
+endif()

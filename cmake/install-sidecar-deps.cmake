@@ -1,16 +1,16 @@
 set(sidecar_dir "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/plugins/18.0.2/qcai2/sidecar")
 
-if (NOT EXISTS "${sidecar_dir}/package.json")
+if(NOT EXISTS "${sidecar_dir}/package.json")
     message(FATAL_ERROR "qcai2 sidecar package.json not found in ${sidecar_dir}")
 endif()
 
-if (WIN32)
+if(WIN32)
     find_program(NPM_EXECUTABLE NAMES npm.cmd npm)
 else()
     find_program(NPM_EXECUTABLE NAMES npm)
 endif()
 
-if (NOT NPM_EXECUTABLE)
+if(NOT NPM_EXECUTABLE)
     message(FATAL_ERROR "npm executable not found; required to install qcai2 sidecar dependencies in ${sidecar_dir}")
 endif()
 
@@ -24,7 +24,7 @@ execute_process(
     ERROR_VARIABLE npm_stderr
 )
 
-if (NOT npm_result EQUAL 0)
+if(NOT npm_result EQUAL 0)
     message(FATAL_ERROR
         "npm install failed in ${sidecar_dir} with exit code ${npm_result}\n"
         "stdout:\n${npm_stdout}\n"
