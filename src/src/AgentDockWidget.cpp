@@ -28,6 +28,7 @@
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
+#include <QSizePolicy>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
@@ -960,7 +961,11 @@ void AgentDockWidget::setupUi()
     auto *topBar = new QHBoxLayout;
     m_statusLabel = new QLabel(tr("Ready"));
     m_statusLabel->setStyleSheet(QStringLiteral("font-weight: bold; color: #888;"));
+    m_statusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_statusLabel->setMinimumWidth(0);
     m_projectCombo = new QComboBox;
+    m_projectCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
+    m_projectCombo->setMinimumWidth(0);
     m_projectCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_projectCombo->setMinimumContentsLength(18);
     m_applyPatchBtn = new QPushButton(tr("Apply Patch"));
@@ -991,7 +996,7 @@ void AgentDockWidget::setupUi()
         saveChat();
     });
     connect(m_copyPlanBtn, &QPushButton::clicked, this, &AgentDockWidget::onCopyPlanClicked);
-    topBar->addWidget(m_statusLabel);
+    topBar->addWidget(m_statusLabel, 0);
     topBar->addSpacing(8);
     topBar->addWidget(new QLabel(tr("Project")));
     topBar->addWidget(m_projectCombo, 1);
@@ -1084,8 +1089,9 @@ void AgentDockWidget::setupUi()
     // Goal input at the bottom (chat-like)
     m_goalEdit = new QTextEdit;
     m_goalEdit->setPlaceholderText(tr("Describe your goal…"));
-    m_goalEdit->setMaximumHeight(72);
+    m_goalEdit->setMinimumHeight(72);
     m_goalEdit->setAcceptRichText(false);
+    m_goalEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     auto *goalCopyShortcut = new QShortcut(QKeySequence::Copy, m_goalEdit);
     goalCopyShortcut->setContext(Qt::WidgetShortcut);
     QObject::connect(goalCopyShortcut, &QShortcut::activated, m_goalEdit, &QTextEdit::copy);
@@ -1094,17 +1100,28 @@ void AgentDockWidget::setupUi()
     QObject::connect(goalSelectAllShortcut, &QShortcut::activated, m_goalEdit,
                      &QTextEdit::selectAll);
 
-    auto *inputRow = new QHBoxLayout;
+    auto *inputPanel = new QWidget;
+    inputPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    auto *inputRow = new QHBoxLayout(inputPanel);
+    inputRow->setContentsMargins(0, 0, 0, 0);
     inputRow->setSpacing(4);
+
+    auto *goalColumn = new QVBoxLayout;
+    goalColumn->setSpacing(4);
 
     auto *btnColumn = new QVBoxLayout;
     btnColumn->setSpacing(2);
+    btnColumn->setSizeConstraint(QLayout::SetMinimumSize);
 
     m_modeCombo = new QComboBox;
     populateModeCombo(m_modeCombo);
+    m_modeCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
+    m_modeCombo->setMinimumWidth(0);
 
     m_modelCombo = new QComboBox;
     m_modelCombo->setEditable(true);
+    m_modelCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
+    m_modelCombo->setMinimumWidth(0);
     const bool useCopilotModels = settings().provider == QStringLiteral("copilot");
     repopulateEditableCombo(
         m_modelCombo, useCopilotModels ? modelCatalog().copilotModels() : openAiAgentModels(),
@@ -1119,18 +1136,25 @@ void AgentDockWidget::setupUi()
     m_reasoningCombo = new QComboBox;
     populateEffortCombo(m_reasoningCombo);
     selectEffortValue(m_reasoningCombo, settings().reasoningEffort, 2);
+    m_reasoningCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
+    m_reasoningCombo->setMinimumWidth(0);
 
     m_thinkingCombo = new QComboBox;
     populateEffortCombo(m_thinkingCombo);
     selectEffortValue(m_thinkingCombo, settings().thinkingLevel, 2);
+    m_thinkingCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
+    m_thinkingCombo->setMinimumWidth(0);
 
     m_runBtn = new QPushButton(tr("▶ Run"));
     m_runBtn->setToolTip(tr("Run agent (Enter)"));
+    m_runBtn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
     m_stopBtn = new QPushButton(tr("⏹ Stop"));
     m_stopBtn->setToolTip(tr("Stop agent (Escape)"));
     m_stopBtn->setEnabled(false);
+    m_stopBtn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
     m_dryRunCheck = new QCheckBox(tr("Dry-run"));
     m_dryRunCheck->setChecked(settings().dryRunDefault);
+    m_dryRunCheck->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
 
     connect(m_runBtn, &QPushButton::clicked, this, &AgentDockWidget::onRunClicked);
     connect(m_stopBtn, &QPushButton::clicked, this, &AgentDockWidget::onStopClicked);
@@ -1154,27 +1178,54 @@ void AgentDockWidget::setupUi()
     connect(m_dryRunCheck, &QCheckBox::checkStateChanged, this,
             [persistProjectUiState](Qt::CheckState) { persistProjectUiState(); });
 
-    btnColumn->addWidget(new QLabel(tr("Mode")));
-    btnColumn->addWidget(m_modeCombo);
-    btnColumn->addWidget(new QLabel(tr("Model")));
-    btnColumn->addWidget(m_modelCombo);
-    btnColumn->addWidget(new QLabel(tr("Reasoning")));
+    auto *modeModelRow = new QHBoxLayout;
+    modeModelRow->setSpacing(4);
+
+    auto *modeColumn = new QVBoxLayout;
+    modeColumn->setSpacing(2);
+    modeColumn->addWidget(new QLabel(tr("Mode")));
+    modeColumn->addWidget(m_modeCombo);
+
+    auto *modelColumn = new QVBoxLayout;
+    modelColumn->setSpacing(2);
+    modelColumn->addWidget(new QLabel(tr("Model")));
+    modelColumn->addWidget(m_modelCombo);
+
+    modeModelRow->addLayout(modeColumn);
+    modeModelRow->addLayout(modelColumn, 1);
+
+    goalColumn->addWidget(m_goalEdit, 1);
+    goalColumn->addLayout(modeModelRow);
+
+    btnColumn->addStretch();
+
+    auto *reasoningLabel = new QLabel(tr("Reasoning"));
+    reasoningLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    btnColumn->addWidget(reasoningLabel);
     btnColumn->addWidget(m_reasoningCombo);
-    btnColumn->addWidget(new QLabel(tr("Thinking")));
+    auto *thinkingLabel = new QLabel(tr("Thinking"));
+    thinkingLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    btnColumn->addWidget(thinkingLabel);
     btnColumn->addWidget(m_thinkingCombo);
     btnColumn->addWidget(m_runBtn);
     btnColumn->addWidget(m_stopBtn);
     btnColumn->addWidget(m_dryRunCheck);
 
-    inputRow->addWidget(m_goalEdit, 1);
+    inputRow->addLayout(goalColumn, 1);
     inputRow->addLayout(btnColumn);
 
     applyProjectUiDefaults();
 
+    auto *contentSplitter = new QSplitter(Qt::Vertical);
+    contentSplitter->setChildrenCollapsible(false);
+    contentSplitter->addWidget(m_tabs);
+    contentSplitter->addWidget(inputPanel);
+    contentSplitter->setStretchFactor(0, 3);
+    contentSplitter->setStretchFactor(1, 1);
+
     // Assemble: top bar → tabs → input row
     mainLayout->addLayout(topBar);
-    mainLayout->addWidget(m_tabs, 1);
-    mainLayout->addLayout(inputRow);
+    mainLayout->addWidget(contentSplitter, 1);
 }
 
 void AgentDockWidget::updateRunState(bool running)
