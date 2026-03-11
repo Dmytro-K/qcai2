@@ -8,6 +8,7 @@
 #include "util/Logger.h"
 
 #include <coreplugin/editormanager/editormanager.h>
+#include <projectexplorer/projectmanager.h>
 #include <utils/filepath.h>
 #include <utils/link.h>
 
@@ -16,16 +17,20 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QHBoxLayout>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QSet>
-#include <QSettings>
 #include <QShortcut>
 #include <QSignalBlocker>
 #include <QSplitter>
@@ -134,6 +139,17 @@ QString wrapMarkdownPayloadBlocks(const QString &markdown)
     rewritten = applyPattern(rewritten, toolReturnedRe);
     rewritten = applyPattern(rewritten, approvedResultRe);
     return rewritten;
+}
+
+QString sanitizedSessionFileName(const QString &projectFilePath)
+{
+    QString baseName = QFileInfo(projectFilePath).completeBaseName();
+    if (baseName.isEmpty())
+        baseName = QStringLiteral("session");
+
+    baseName.replace(QRegularExpression(QStringLiteral(R"([^A-Za-z0-9._-])")),
+                     QStringLiteral("_"));
+    return QStringLiteral("%1.json").arg(baseName);
 }
 
 class DiffHighlighter final : public QSyntaxHighlighter
@@ -560,8 +576,19 @@ AgentDockWidget::AgentDockWidget(AgentController *controller, QWidget *parent)
     for (const auto &e : existingEntries)
         m_debugLogView->appendPlainText(e);
 
-    // Restore previous chat session
-    restoreChat();
+    if (auto *projectManager = ProjectExplorer::ProjectManager::instance())
+    {
+        connect(projectManager, &ProjectExplorer::ProjectManager::projectAdded, this,
+                [this](ProjectExplorer::Project *) { refreshProjectSelector(); });
+        connect(projectManager, &ProjectExplorer::ProjectManager::projectRemoved, this,
+                [this](ProjectExplorer::Project *) { refreshProjectSelector(); });
+        connect(projectManager, &ProjectExplorer::ProjectManager::projectDisplayNameChanged, this,
+                [this](ProjectExplorer::Project *) { refreshProjectSelector(); });
+        connect(projectManager, &ProjectExplorer::ProjectManager::startupProjectChanged, this,
+                [this](ProjectExplorer::Project *) { refreshProjectSelector(); });
+    }
+
+    refreshProjectSelector();
 }
 
 AgentDockWidget::~AgentDockWidget()
@@ -571,40 +598,92 @@ AgentDockWidget::~AgentDockWidget()
 
 void AgentDockWidget::saveChat()
 {
-    QSettings s;
-    s.beginGroup(QStringLiteral("Qcai2Chat"));
-    s.setValue(QStringLiteral("goal"), m_goalEdit->toPlainText());
-    s.setValue(QStringLiteral("log"), m_logView->toPlainText());
-    QString persistedMarkdown = m_logMarkdown;
-    if (!m_streamingMarkdown.isEmpty())
-    {
-        if (!persistedMarkdown.isEmpty())
-            persistedMarkdown += QStringLiteral("\n\n");
-        persistedMarkdown += m_streamingMarkdown;
-    }
-    s.setValue(QStringLiteral("logMarkdown"), persistedMarkdown);
-    s.setValue(QStringLiteral("diff"), m_currentDiff);
-    s.setValue(QStringLiteral("status"), m_statusLabel->text());
+    const QString storagePath = currentProjectStorageFilePath();
+    if (storagePath.isEmpty())
+        return;
 
+    const QString persistedMarkdown = currentLogMarkdown();
     QStringList planItems;
     for (int i = 0; i < m_planList->count(); ++i)
         planItems.append(m_planList->item(i)->text());
-    s.setValue(QStringLiteral("plan"), planItems);
 
-    s.setValue(QStringLiteral("activeTab"), m_tabs->currentIndex());
-    s.endGroup();
+    const bool hasContent = !m_goalEdit->toPlainText().trimmed().isEmpty() ||
+                            !persistedMarkdown.trimmed().isEmpty() || !m_currentDiff.isEmpty() ||
+                            !planItems.isEmpty();
+
+    if (!hasContent)
+    {
+        QFile::remove(storagePath);
+        return;
+    }
+
+    const QFileInfo storageInfo(storagePath);
+    if (!QDir().mkpath(storageInfo.absolutePath()))
+    {
+        QCAI_WARN("Dock", QStringLiteral("Failed to create project context dir: %1")
+                              .arg(storageInfo.absolutePath()));
+        return;
+    }
+
+    QJsonObject root;
+    root[QStringLiteral("goal")] = m_goalEdit->toPlainText();
+    root[QStringLiteral("logMarkdown")] = persistedMarkdown;
+    root[QStringLiteral("diff")] = m_currentDiff;
+    root[QStringLiteral("status")] = m_statusLabel->text();
+    root[QStringLiteral("activeTab")] = m_tabs->currentIndex();
+
+    QJsonArray planJson;
+    for (const QString &item : planItems)
+        planJson.append(item);
+    root[QStringLiteral("plan")] = planJson;
+
+    QSaveFile file(storagePath);
+    if (!file.open(QIODevice::WriteOnly))
+    {
+        QCAI_WARN("Dock", QStringLiteral("Failed to open project context file for writing: %1")
+                              .arg(storagePath));
+        return;
+    }
+
+    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    if (!file.commit())
+    {
+        QCAI_WARN("Dock", QStringLiteral("Failed to commit project context file: %1")
+                              .arg(storagePath));
+    }
 }
 
 void AgentDockWidget::restoreChat()
 {
-    QSettings s;
-    s.beginGroup(QStringLiteral("Qcai2Chat"));
+    const QString storagePath = currentProjectStorageFilePath();
+    if (storagePath.isEmpty())
+        return;
 
-    const QString goal = s.value(QStringLiteral("goal")).toString();
+    QFile file(storagePath);
+    if (!file.exists())
+        return;
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        QCAI_WARN("Dock",
+                  QStringLiteral("Failed to open project context file for reading: %1")
+                      .arg(storagePath));
+        return;
+    }
+
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject())
+    {
+        QCAI_WARN("Dock", QStringLiteral("Invalid project context JSON: %1").arg(storagePath));
+        return;
+    }
+
+    const QJsonObject root = doc.object();
+
+    const QString goal = root.value(QStringLiteral("goal")).toString();
     if (!goal.isEmpty())
         m_goalEdit->setPlainText(goal);
 
-    const QString logMarkdown = s.value(QStringLiteral("logMarkdown")).toString();
+    const QString logMarkdown = root.value(QStringLiteral("logMarkdown")).toString();
     if (!logMarkdown.isEmpty())
     {
         // Close any unclosed code fences from interrupted streaming
@@ -623,7 +702,7 @@ void AgentDockWidget::restoreChat()
     }
     else
     {
-        const QString log = s.value(QStringLiteral("log")).toString();
+        const QString log = root.value(QStringLiteral("log")).toString();
         if (!log.isEmpty())
         {
             m_logMarkdown = log;
@@ -631,7 +710,7 @@ void AgentDockWidget::restoreChat()
         }
     }
 
-    m_currentDiff = s.value(QStringLiteral("diff")).toString();
+    m_currentDiff = root.value(QStringLiteral("diff")).toString();
     m_appliedDiff.clear();
     if (!m_currentDiff.isEmpty())
     {
@@ -641,19 +720,20 @@ void AgentDockWidget::restoreChat()
         m_revertPatchBtn->setEnabled(false);
     }
 
-    const QString status = s.value(QStringLiteral("status")).toString();
+    const QString status = root.value(QStringLiteral("status")).toString();
     if (!status.isEmpty())
         m_statusLabel->setText(status);
 
-    const QStringList planItems = s.value(QStringLiteral("plan")).toStringList();
+    const QJsonArray planItems = root.value(QStringLiteral("plan")).toArray();
     for (const auto &item : planItems)
-        m_planList->addItem(item);
+    {
+        if (item.isString())
+            m_planList->addItem(item.toString());
+    }
 
-    const int tab = s.value(QStringLiteral("activeTab"), 0).toInt();
+    const int tab = root.value(QStringLiteral("activeTab")).toInt(0);
     if (tab >= 0 && tab < m_tabs->count())
         m_tabs->setCurrentIndex(tab);
-
-    s.endGroup();
 }
 
 QString AgentDockWidget::currentLogMarkdown() const
@@ -668,6 +748,144 @@ QString AgentDockWidget::currentLogMarkdown() const
     return text;
 }
 
+void AgentDockWidget::clearChatState()
+{
+    m_goalEdit->clear();
+    m_logView->clear();
+    m_rawMarkdownView->clear();
+    m_logMarkdown.clear();
+    m_streamingMarkdown.clear();
+    m_planList->clear();
+    static_cast<DiffPreviewEdit *>(m_diffView)->setDiffText(QString());
+    m_diffFileList->clear();
+    m_approvalList->clear();
+    m_approvalItems.clear();
+    m_appliedDiff.clear();
+    m_currentDiff.clear();
+    m_statusLabel->setText(tr("Ready"));
+    m_applyPatchBtn->setEnabled(false);
+    m_revertPatchBtn->setEnabled(false);
+    m_tabs->setCurrentWidget(m_planList);
+}
+
+void AgentDockWidget::refreshProjectSelector()
+{
+    if (!m_projectCombo)
+        return;
+
+    const QString previousProject = m_activeProjectFilePath;
+    QString desiredProject = previousProject;
+    if (desiredProject.isEmpty())
+    {
+        if (auto *ctx = m_controller->editorContext())
+        {
+            desiredProject = ctx->selectedProjectFilePath();
+            if (desiredProject.isEmpty())
+                desiredProject = ctx->capture().projectFilePath;
+        }
+    }
+
+    const QList<EditorContext::ProjectInfo> projects =
+        m_controller->editorContext() ? m_controller->editorContext()->openProjects()
+                                      : QList<EditorContext::ProjectInfo>{};
+
+    const QSignalBlocker blocker(m_projectCombo);
+    m_projectCombo->clear();
+
+    if (projects.isEmpty())
+    {
+        m_projectCombo->addItem(tr("No open projects"), QString());
+        m_projectCombo->setEnabled(false);
+        switchProjectContext(QString());
+        updateRunState(m_stopBtn->isEnabled());
+        return;
+    }
+
+    QSet<QString> duplicateNames;
+    QSet<QString> seenNames;
+    for (const auto &project : projects)
+    {
+        if (seenNames.contains(project.projectName))
+            duplicateNames.insert(project.projectName);
+        seenNames.insert(project.projectName);
+    }
+
+    int selectedIndex = -1;
+    for (int i = 0; i < projects.size(); ++i)
+    {
+        const auto &project = projects.at(i);
+        QString label = project.projectName;
+        if (duplicateNames.contains(project.projectName))
+            label = QStringLiteral("%1 — %2")
+                        .arg(project.projectName, QFileInfo(project.projectDir).fileName());
+        m_projectCombo->addItem(label, project.projectFilePath);
+        m_projectCombo->setItemData(i, project.projectDir, Qt::ToolTipRole);
+        if (project.projectFilePath == desiredProject)
+            selectedIndex = i;
+    }
+
+    if (selectedIndex < 0)
+        selectedIndex = 0;
+
+    m_projectCombo->setEnabled(true);
+    m_projectCombo->setCurrentIndex(selectedIndex);
+
+    const QString selectedProject = m_projectCombo->currentData().toString();
+    if (selectedProject != m_activeProjectFilePath)
+        switchProjectContext(selectedProject);
+    updateRunState(m_stopBtn->isEnabled());
+}
+
+void AgentDockWidget::switchProjectContext(const QString &projectFilePath)
+{
+    if (projectFilePath == m_activeProjectFilePath)
+        return;
+
+    if (!m_activeProjectFilePath.isEmpty())
+        saveChat();
+
+    clearChatState();
+    m_activeProjectFilePath = projectFilePath;
+
+    if (auto *ctx = m_controller->editorContext())
+        ctx->setSelectedProjectFilePath(projectFilePath);
+
+    restoreChat();
+}
+
+QString AgentDockWidget::currentProjectFilePath() const
+{
+    return m_activeProjectFilePath;
+}
+
+QString AgentDockWidget::currentProjectStorageFilePath() const
+{
+    if (m_activeProjectFilePath.isEmpty())
+        return {};
+
+    QString projectDir;
+    if (auto *ctx = m_controller->editorContext())
+    {
+        const auto projects = ctx->openProjects();
+        for (const auto &project : projects)
+        {
+            if (project.projectFilePath == m_activeProjectFilePath)
+            {
+                projectDir = project.projectDir;
+                break;
+            }
+        }
+    }
+
+    if (projectDir.isEmpty())
+        projectDir = QFileInfo(m_activeProjectFilePath).absolutePath();
+    if (projectDir.isEmpty())
+        return {};
+
+    return QDir(projectDir)
+        .filePath(QStringLiteral(".qcai2/%1").arg(sanitizedSessionFileName(m_activeProjectFilePath)));
+}
+
 void AgentDockWidget::setupUi()
 {
     auto *mainLayout = new QVBoxLayout(this);
@@ -678,6 +896,9 @@ void AgentDockWidget::setupUi()
     auto *topBar = new QHBoxLayout;
     m_statusLabel = new QLabel(tr("Ready"));
     m_statusLabel->setStyleSheet(QStringLiteral("font-weight: bold; color: #888;"));
+    m_projectCombo = new QComboBox;
+    m_projectCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_projectCombo->setMinimumContentsLength(18);
     m_applyPatchBtn = new QPushButton(tr("Apply Patch"));
     m_revertPatchBtn = new QPushButton(tr("Revert Patch"));
     auto *newChatBtn = new QPushButton(tr("New Chat"));
@@ -702,29 +923,14 @@ void AgentDockWidget::setupUi()
         if (m_stopBtn->isEnabled())
             onStopClicked();
 
-        m_goalEdit->clear();
-        m_logView->clear();
-        m_rawMarkdownView->clear();
-        m_logMarkdown.clear();
-        m_streamingMarkdown.clear();
-        m_planList->clear();
-        static_cast<DiffPreviewEdit *>(m_diffView)->setDiffText(QString());
-        m_approvalList->clear();
-        m_approvalItems.clear();
-        m_appliedDiff.clear();
-        m_currentDiff.clear();
-        m_statusLabel->setText(tr("Ready"));
-        m_applyPatchBtn->setEnabled(false);
-        m_revertPatchBtn->setEnabled(false);
-        m_tabs->setCurrentWidget(m_planList);
-
-        QSettings s;
-        s.beginGroup(QStringLiteral("Qcai2Chat"));
-        s.remove(QStringLiteral(""));
-        s.endGroup();
+        clearChatState();
+        saveChat();
     });
     connect(m_copyPlanBtn, &QPushButton::clicked, this, &AgentDockWidget::onCopyPlanClicked);
     topBar->addWidget(m_statusLabel);
+    topBar->addSpacing(8);
+    topBar->addWidget(new QLabel(tr("Project")));
+    topBar->addWidget(m_projectCombo, 1);
     topBar->addStretch();
     topBar->addWidget(newChatBtn);
     topBar->addWidget(m_applyPatchBtn);
@@ -861,6 +1067,11 @@ void AgentDockWidget::setupUi()
 
     connect(m_runBtn, &QPushButton::clicked, this, &AgentDockWidget::onRunClicked);
     connect(m_stopBtn, &QPushButton::clicked, this, &AgentDockWidget::onStopClicked);
+    connect(m_projectCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
+        if (index < 0)
+            return;
+        switchProjectContext(m_projectCombo->itemData(index).toString());
+    });
 
     // Persist model/reasoning/thinking selection immediately on change
     connect(m_modelCombo, &QComboBox::currentTextChanged, this, [](const QString &text) {
@@ -907,6 +1118,8 @@ void AgentDockWidget::updateRunState(bool running)
     m_runBtn->setEnabled(!running);
     m_stopBtn->setEnabled(running);
     m_goalEdit->setReadOnly(running);
+    m_projectCombo->setEnabled(!running && m_projectCombo->count() > 0 &&
+                               !m_projectCombo->itemData(0).toString().isEmpty());
 }
 
 void AgentDockWidget::onRunClicked()
@@ -1197,8 +1410,10 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
         if (ke->key() == Qt::Key_L && (ke->modifiers() & Qt::ControlModifier))
         {
             m_logView->clear();
+            m_rawMarkdownView->clear();
             m_logMarkdown.clear();
             m_streamingMarkdown.clear();
+            saveChat();
             return true;
         }
     }

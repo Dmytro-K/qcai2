@@ -1,6 +1,7 @@
 /*! Declares helpers that capture active editor and project state for prompts. */
 #pragma once
 
+#include <QList>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -52,12 +53,12 @@ public:
         QStringList openFiles;
 
         /**
-         * Startup project display name.
+         * Selected or startup project display name.
          */
         QString projectName;
 
         /**
-         * Startup project directory.
+         * Selected or startup project directory.
          */
         QString projectDir;
 
@@ -99,9 +100,41 @@ public:
     };
 
     /**
+     * Lightweight description of one open Qt Creator project.
+     */
+    struct ProjectInfo
+    {
+        /** User-visible project name. */
+        QString projectName;
+
+        /** Absolute project root directory. */
+        QString projectDir;
+
+        /** Absolute project file path reported by Qt Creator. */
+        QString projectFilePath;
+
+    };
+
+    /**
      * Returns a fresh snapshot of the current editor state.
      */
     Snapshot capture() const;
+
+    /**
+     * Lists the projects currently open in Qt Creator.
+     */
+    QList<ProjectInfo> openProjects() const;
+
+    /**
+     * Overrides the project used for prompt and tool context.
+     * @param projectFilePath Absolute project file path for the selected project.
+     */
+    void setSelectedProjectFilePath(const QString &projectFilePath);
+
+    /**
+     * Returns the currently selected project file path override.
+     */
+    QString selectedProjectFilePath() const;
 
     /**
      * Returns a compact text fragment suitable for the system prompt.
@@ -113,6 +146,10 @@ public:
      * @param maxChars Maximum number of characters to include.
      */
     QString fileContentsFragment(int maxChars = 60000) const;
+
+private:
+    /** Project file path chosen in the dock widget, or empty to follow startupProject(). */
+    QString m_selectedProjectFilePath;
 
 };
 

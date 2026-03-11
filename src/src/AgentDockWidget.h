@@ -134,19 +134,46 @@ private:
     QString currentLogMarkdown() const;
 
     /**
-     * Saves the current goal, logs, plan, and diff preview to settings.
+     * Saves the current goal, logs, plan, and diff preview for the selected project.
      */
     void saveChat();
 
     /**
-     * Restores the last saved goal, logs, plan, and diff preview.
+     * Restores the last saved goal, logs, plan, and diff preview for the selected project.
      */
     void restoreChat();
+
+    /**
+     * Clears the current in-memory chat, plan, diff, and approval state.
+     */
+    void clearChatState();
+
+    /**
+     * Rebuilds the project combobox from the projects open in Qt Creator.
+     */
+    void refreshProjectSelector();
+
+    /**
+     * Switches the active chat/context storage to the selected project.
+     * @param projectFilePath Absolute project file path to activate.
+     */
+    void switchProjectContext(const QString &projectFilePath);
+
+    /**
+     * Returns the active project file path selected in the dock widget.
+     */
+    QString currentProjectFilePath() const;
+
+    /**
+     * Returns the on-disk context file for the active project.
+     */
+    QString currentProjectStorageFilePath() const;
 
     /** Controller that owns the active agent run. */
     AgentController *m_controller;
 
     /** Input controls shown beside the goal editor. */
+    QComboBox *m_projectCombo;
     QTextEdit *m_goalEdit;
     QComboBox *m_modelCombo;
     QComboBox *m_reasoningCombo;
@@ -182,6 +209,9 @@ private:
 
     /** Streaming log text buffered until the throttle timer fires. */
     QString m_streamingMarkdown;
+
+    /** Project file path whose context is currently loaded into the dock. */
+    QString m_activeProjectFilePath;
 
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> m_approvalItems;

@@ -1,4 +1,4 @@
-/*! Implements prompt context capture from the active editor and startup project. */
+/*! Implements prompt context capture from the active editor and selected project. */
 #include "EditorContext.h"
 #include "../util/Logger.h"
 
@@ -15,11 +15,39 @@
 #include <projectexplorer/toolchain.h>
 #include <projectexplorer/toolchainkitaspect.h>
 #include <texteditor/texteditor.h>
+#include <utils/filepath.h>
 
 #include <QTextCursor>
 
 namespace qcai2
 {
+
+namespace
+{
+
+ProjectExplorer::Project *resolveProject(const QString &selectedProjectFilePath)
+{
+    if (!selectedProjectFilePath.isEmpty())
+    {
+        if (auto *project = ProjectExplorer::ProjectManager::projectWithProjectFilePath(
+                Utils::FilePath::fromString(selectedProjectFilePath)))
+        {
+            return project;
+        }
+    }
+
+    return ProjectExplorer::ProjectManager::startupProject();
+}
+
+bool belongsToProject(const Utils::FilePath &filePath, ProjectExplorer::Project *project)
+{
+    if (!project || filePath.isEmpty())
+        return project == nullptr;
+
+    return ProjectExplorer::ProjectManager::projectsForFile(filePath).contains(project);
+}
+
+}  // namespace
 
 EditorContext::EditorContext(QObject *parent) : QObject(parent)
 {
@@ -28,29 +56,39 @@ EditorContext::EditorContext(QObject *parent) : QObject(parent)
 EditorContext::Snapshot EditorContext::capture() const
 {
     Snapshot s;
+    ProjectExplorer::Project *project = resolveProject(m_selectedProjectFilePath);
 
     // Current editor file & selection
     if (Core::IEditor *editor = Core::EditorManager::currentEditor())
     {
         if (Core::IDocument *doc = editor->document())
-            s.filePath = doc->filePath().toUrlishString();
-
-        if (auto *textEditor = qobject_cast<TextEditor::BaseTextEditor *>(editor))
         {
-            QTextCursor tc = textEditor->textCursor();
-            s.cursorLine = tc.blockNumber() + 1;
-            s.cursorColumn = tc.columnNumber() + 1;
-            s.selectedText = tc.selectedText();
+            if (belongsToProject(doc->filePath(), project))
+                s.filePath = doc->filePath().toUrlishString();
+        }
+
+        if (!s.filePath.isEmpty())
+        {
+            if (auto *textEditor = qobject_cast<TextEditor::BaseTextEditor *>(editor))
+            {
+                QTextCursor tc = textEditor->textCursor();
+                s.cursorLine = tc.blockNumber() + 1;
+                s.cursorColumn = tc.columnNumber() + 1;
+                s.selectedText = tc.selectedText();
+            }
         }
     }
 
     // Open documents
     const auto docs = Core::DocumentModel::openedDocuments();
     for (Core::IDocument *doc : docs)
-        s.openFiles.append(doc->filePath().toUrlishString());
+    {
+        if (belongsToProject(doc->filePath(), project))
+            s.openFiles.append(doc->filePath().toUrlishString());
+    }
 
     // Project & build directories
-    if (auto *project = ProjectExplorer::ProjectManager::startupProject())
+    if (project)
     {
         s.projectName = project->displayName();
         s.projectDir = project->projectDirectory().toUrlishString();
@@ -88,6 +126,37 @@ EditorContext::Snapshot EditorContext::capture() const
     return s;
 }
 
+QList<EditorContext::ProjectInfo> EditorContext::openProjects() const
+{
+    QList<ProjectInfo> projects;
+    const auto openProjects = ProjectExplorer::ProjectManager::projects();
+    projects.reserve(openProjects.size());
+
+    for (auto *project : openProjects)
+    {
+        if (!project)
+            continue;
+
+        ProjectInfo info;
+        info.projectName = project->displayName();
+        info.projectDir = project->projectDirectory().toUrlishString();
+        info.projectFilePath = project->projectFilePath().toUrlishString();
+        projects.append(info);
+    }
+
+    return projects;
+}
+
+void EditorContext::setSelectedProjectFilePath(const QString &projectFilePath)
+{
+    m_selectedProjectFilePath = projectFilePath;
+}
+
+QString EditorContext::selectedProjectFilePath() const
+{
+    return m_selectedProjectFilePath;
+}
+
 QString EditorContext::toPromptFragment() const
 {
     Snapshot s = capture();
@@ -121,12 +190,17 @@ QString EditorContext::fileContentsFragment(int maxChars) const
 {
     QString result;
     int remaining = maxChars;
+    ProjectExplorer::Project *project = resolveProject(m_selectedProjectFilePath);
 
     // Collect documents: active file first, then other open tabs
     QList<Core::IDocument *> ordered;
     Core::IDocument *activeDoc = nullptr;
     if (Core::IEditor *editor = Core::EditorManager::currentEditor())
-        activeDoc = editor->document();
+    {
+        Core::IDocument *candidate = editor->document();
+        if (candidate && belongsToProject(candidate->filePath(), project))
+            activeDoc = candidate;
+    }
 
     if (activeDoc)
         ordered.append(activeDoc);
@@ -134,7 +208,7 @@ QString EditorContext::fileContentsFragment(int maxChars) const
     const auto docs = Core::DocumentModel::openedDocuments();
     for (Core::IDocument *doc : docs)
     {
-        if (doc != activeDoc)
+        if (doc != activeDoc && belongsToProject(doc->filePath(), project))
             ordered.append(doc);
     }
 
