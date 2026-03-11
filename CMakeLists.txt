@@ -145,6 +145,7 @@ add_qtc_plugin(qcai2
     src/src/AgentController.cpp
     src/src/AgentDockWidget.h
     src/src/AgentDockWidget.cpp
+    src/src/AgentDockWidget.ui
     src/src/context/EditorContext.h
     src/src/context/EditorContext.cpp
     src/src/tools/ITool.h
@@ -189,6 +190,7 @@ add_qtc_plugin(qcai2
     src/src/settings/Settings.cpp
     src/src/settings/SettingsPage.h
     src/src/settings/SettingsPage.cpp
+    src/src/settings/SettingsWidget.ui
     src/src/completion/AiCompletionProvider.h
     src/src/completion/AiCompletionProvider.cpp
     src/src/completion/AiCompletionProcessor.h

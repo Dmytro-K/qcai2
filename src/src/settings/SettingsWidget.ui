@@ -1,0 +1,596 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SettingsWidget</class>
+ <widget class="QWidget" name="SettingsWidget">
+  <property name="windowTitle">
+   <string>Settings</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QTabWidget" name="settingsTabs">
+     <widget class="QWidget" name="providersTab">
+      <attribute name="title">
+       <string>Providers</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="providersTabLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QScrollArea" name="providersScroll">
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <widget class="QWidget" name="providersContent">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>0</y>
+            <width>584</width>
+            <height>817</height>
+           </rect>
+          </property>
+          <layout class="QVBoxLayout" name="providersContentLayout">
+           <item>
+            <layout class="QFormLayout" name="providerSelectionLayout">
+             <item row="0" column="0">
+              <widget class="QLabel" name="providerLabel">
+               <property name="text">
+                <string>Active provider:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QComboBox" name="providerCombo"/>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="openaiGroup">
+             <property name="title">
+              <string>OpenAI-Compatible</string>
+             </property>
+             <layout class="QFormLayout" name="openaiLayout">
+              <item row="0" column="0">
+               <widget class="QLabel" name="baseUrlLabel">
+                <property name="text">
+                 <string>Base URL:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QComboBox" name="baseUrlCombo">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="apiKeyLabel">
+                <property name="text">
+                 <string>API Key:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QLineEdit" name="apiKeyEdit">
+                <property name="echoMode">
+                 <enum>QLineEdit::Password</enum>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="modelLabel">
+                <property name="text">
+                 <string>Model:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QComboBox" name="modelCombo">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="reasoningLabel">
+                <property name="text">
+                 <string>Reasoning effort:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QComboBox" name="reasoningCombo"/>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="thinkingLabel">
+                <property name="text">
+                 <string>Thinking:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QComboBox" name="thinkingCombo"/>
+              </item>
+              <item row="5" column="0">
+               <widget class="QLabel" name="temperatureLabel">
+                <property name="text">
+                 <string>Temperature:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <widget class="QDoubleSpinBox" name="tempSpin">
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="minimum">
+                 <double>0.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>2.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="0">
+               <widget class="QLabel" name="maxTokensLabel">
+                <property name="text">
+                 <string>Max Tokens:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="1">
+               <widget class="QSpinBox" name="maxTokensSpin">
+                <property name="minimum">
+                 <number>256</number>
+                </property>
+                <property name="maximum">
+                 <number>128000</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="copilotGroup">
+             <property name="title">
+              <string>GitHub Copilot (via copilot-sdk sidecar)</string>
+             </property>
+             <layout class="QFormLayout" name="copilotLayout">
+              <item row="0" column="0">
+               <widget class="QLabel" name="copilotModelLabel">
+                <property name="text">
+                 <string>Model:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QComboBox" name="copilotModelCombo">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="copilotNodeLabel">
+                <property name="text">
+                 <string>Node path:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QLineEdit" name="copilotNodeEdit">
+                <property name="placeholderText">
+                 <string>node (from PATH)</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="copilotSidecarLabel">
+                <property name="text">
+                 <string>Sidecar path:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QLineEdit" name="copilotSidecarEdit">
+                <property name="placeholderText">
+                 <string>Auto-detect</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="localGroup">
+             <property name="title">
+              <string>Local HTTP</string>
+             </property>
+             <layout class="QVBoxLayout" name="localOuterLayout">
+              <item>
+               <layout class="QFormLayout" name="localLayout">
+                <item row="0" column="0">
+                 <widget class="QLabel" name="localUrlLabel">
+                  <property name="text">
+                   <string>Base URL:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QLineEdit" name="localUrlEdit"/>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="localEndpointLabel">
+                  <property name="text">
+                   <string>Endpoint:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QLineEdit" name="localEndpointEdit"/>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QLabel" name="localHeadersLabel">
+                  <property name="text">
+                   <string>Headers:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <widget class="QLineEdit" name="localHeadersEdit">
+                  <property name="placeholderText">
+                   <string>Header: Value, Header2: Value2</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QCheckBox" name="localSimpleCheck">
+                <property name="text">
+                 <string>Simple {prompt} mode</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="ollamaGroup">
+             <property name="title">
+              <string>Ollama</string>
+             </property>
+             <layout class="QFormLayout" name="ollamaLayout">
+              <item row="0" column="0">
+               <widget class="QLabel" name="ollamaUrlLabel">
+                <property name="text">
+                 <string>Base URL:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QLineEdit" name="ollamaUrlEdit"/>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="ollamaModelLabel">
+                <property name="text">
+                 <string>Model:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="ollamaModelCombo">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <spacer name="providersBottomSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Expanding</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="completionTab">
+      <attribute name="title">
+       <string>Code Completion</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="completionLayout">
+       <item>
+        <widget class="QCheckBox" name="aiCompletionCheck">
+         <property name="text">
+          <string>Enable AI code completion in editor</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QFormLayout" name="completionFormLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="completionModelLabel">
+           <property name="text">
+            <string>Completion model:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="completionModelCombo">
+           <property name="editable">
+            <bool>true</bool>
+           </property>
+           <property name="toolTip">
+            <string>Leave empty to use the same model as the agent</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="completionThinkingLabel">
+           <property name="text">
+            <string>Thinking:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QComboBox" name="completionThinkingCombo"/>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="completionReasoningLabel">
+           <property name="text">
+            <string>Reasoning effort:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QComboBox" name="completionReasoningCombo"/>
+         </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="completionMinCharsLabel">
+           <property name="text">
+            <string>Min characters to trigger:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QSpinBox" name="completionMinCharsSpin">
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>20</number>
+           </property>
+           <property name="toolTip">
+            <string>Trigger AI completion after typing this many characters</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QLabel" name="completionDelayLabel">
+           <property name="text">
+            <string>Trigger delay:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QSpinBox" name="completionDelayMsSpin">
+           <property name="minimum">
+            <number>100</number>
+           </property>
+           <property name="maximum">
+            <number>5000</number>
+           </property>
+           <property name="singleStep">
+            <number>100</number>
+           </property>
+           <property name="suffix">
+            <string> ms</string>
+           </property>
+           <property name="toolTip">
+            <string>Delay before sending completion request</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="completionBottomSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="safetyTab">
+      <attribute name="title">
+       <string>Safety &amp; Behavior</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="safetyLayout">
+       <item>
+        <widget class="QGroupBox" name="limitsGroup">
+         <property name="title">
+          <string>Agent Limits</string>
+         </property>
+         <layout class="QFormLayout" name="limitsLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="maxIterationsLabel">
+            <property name="text">
+             <string>Max iterations:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="maxIterSpin">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>100</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="maxToolsLabel">
+            <property name="text">
+             <string>Max tool calls:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="maxToolsSpin">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1000</number>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="maxDiffLabel">
+            <property name="text">
+             <string>Max diff lines:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="maxDiffSpin">
+            <property name="minimum">
+             <number>10</number>
+            </property>
+            <property name="maximum">
+             <number>100000</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="maxFilesLabel">
+            <property name="text">
+             <string>Max changed files:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QSpinBox" name="maxFilesSpin">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1000</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="behaviorGroup">
+         <property name="title">
+          <string>Behavior</string>
+         </property>
+         <layout class="QVBoxLayout" name="behaviorLayout">
+          <item>
+           <widget class="QCheckBox" name="dryRunCheck">
+            <property name="text">
+             <string>Dry-run mode by default</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="debugLoggingCheck">
+            <property name="text">
+             <string>Enable debug logging (Debug Log tab)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="agentDebugCheck">
+            <property name="text">
+             <string>Agent Debug (show raw JSON in chat)</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="safetyBottomSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

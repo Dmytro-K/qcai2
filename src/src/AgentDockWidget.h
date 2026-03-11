@@ -16,6 +16,15 @@
 #include <QTimer>
 #include <QWidget>
 
+#include <memory>
+
+QT_BEGIN_NAMESPACE
+namespace Ui
+{
+class AgentDockWidget;
+}
+QT_END_NAMESPACE
+
 namespace qcai2
 {
 
@@ -173,6 +182,9 @@ private:
      * Applies global default UI values before loading project-specific overrides.
      */
     void applyProjectUiDefaults();
+
+    /** Designer-generated UI wrapper. */
+    std::unique_ptr<Ui::AgentDockWidget> m_ui;
 
     /** Controller that owns the active agent run. */
     AgentController *m_controller;

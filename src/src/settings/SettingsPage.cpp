@@ -6,6 +6,7 @@
 #include "../../qcai2tr.h"
 #include "../util/Logger.h"
 #include "Settings.h"
+#include "ui_SettingsWidget.h"
 
 #include <coreplugin/dialogs/ioptionspage.h>
 #include <coreplugin/icore.h>
@@ -23,6 +24,8 @@
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QVBoxLayout>
+
+#include <memory>
 
 namespace qcai2
 {
@@ -75,10 +78,43 @@ class SettingsWidget : public Core::IOptionsPageWidget
 public:
     SettingsWidget()
     {
+        m_ui = std::make_unique<Ui::SettingsWidget>();
+        m_ui->setupUi(this);
+
         auto &s = settings();
 
+        m_providerCombo = m_ui->providerCombo;
+        m_baseUrlCombo = m_ui->baseUrlCombo;
+        m_apiKeyEdit = m_ui->apiKeyEdit;
+        m_modelCombo = m_ui->modelCombo;
+        m_reasoningCombo = m_ui->reasoningCombo;
+        m_thinkingCombo = m_ui->thinkingCombo;
+        m_tempSpin = m_ui->tempSpin;
+        m_maxTokensSpin = m_ui->maxTokensSpin;
+        m_copilotModelCombo = m_ui->copilotModelCombo;
+        m_copilotNodeEdit = m_ui->copilotNodeEdit;
+        m_copilotSidecarEdit = m_ui->copilotSidecarEdit;
+        m_localUrlEdit = m_ui->localUrlEdit;
+        m_localEndpointEdit = m_ui->localEndpointEdit;
+        m_localSimpleCheck = m_ui->localSimpleCheck;
+        m_localHeadersEdit = m_ui->localHeadersEdit;
+        m_ollamaUrlEdit = m_ui->ollamaUrlEdit;
+        m_ollamaModelCombo = m_ui->ollamaModelCombo;
+        m_maxIterSpin = m_ui->maxIterSpin;
+        m_maxToolsSpin = m_ui->maxToolsSpin;
+        m_maxDiffSpin = m_ui->maxDiffSpin;
+        m_maxFilesSpin = m_ui->maxFilesSpin;
+        m_dryRunCheck = m_ui->dryRunCheck;
+        m_aiCompletionCheck = m_ui->aiCompletionCheck;
+        m_completionMinCharsSpin = m_ui->completionMinCharsSpin;
+        m_completionDelayMsSpin = m_ui->completionDelayMsSpin;
+        m_completionModelCombo = m_ui->completionModelCombo;
+        m_completionThinkingCombo = m_ui->completionThinkingCombo;
+        m_completionReasoningCombo = m_ui->completionReasoningCombo;
+        m_debugLoggingCheck = m_ui->debugLoggingCheck;
+        m_agentDebugCheck = m_ui->agentDebugCheck;
+
         // Provider selection
-        m_providerCombo = new QComboBox;
         m_providerCombo->addItem(Tr::tr("OpenAI-Compatible"), QStringLiteral("openai"));
         m_providerCombo->addItem(Tr::tr("GitHub Copilot"), QStringLiteral("copilot"));
         m_providerCombo->addItem(Tr::tr("Local HTTP"), QStringLiteral("local"));
@@ -89,8 +125,6 @@ public:
 
         // OpenAI settings
         // Base URL combo: editable, with popular providers
-        m_baseUrlCombo = new QComboBox;
-        m_baseUrlCombo->setEditable(true);
         m_baseUrlCombo->addItems({
             QStringLiteral("https://api.openai.com"),
             QStringLiteral("https://api.anthropic.com"),
@@ -106,12 +140,9 @@ public:
             QStringLiteral("http://localhost:8080"),
         });
         m_baseUrlCombo->setCurrentText(s.baseUrl);
-        m_apiKeyEdit = new QLineEdit(s.apiKey);
-        m_apiKeyEdit->setEchoMode(QLineEdit::Password);
+        m_apiKeyEdit->setText(s.apiKey);
 
         // Model combo: editable, with presets
-        m_modelCombo = new QComboBox;
-        m_modelCombo->setEditable(true);
         m_modelCombo->addItems({
             // OpenAI — GPT-5 family
             QStringLiteral("gpt-5.2"),
@@ -162,26 +193,17 @@ public:
         });
         m_modelCombo->setCurrentText(s.modelName);
 
-        m_reasoningCombo = new QComboBox;
         populateEffortCombo(m_reasoningCombo);
         selectEffortValue(m_reasoningCombo, s.reasoningEffort, 2);
 
-        m_thinkingCombo = new QComboBox;
         populateEffortCombo(m_thinkingCombo);
         selectEffortValue(m_thinkingCombo, s.thinkingLevel, 2);
 
-        m_tempSpin = new QDoubleSpinBox;
-        m_tempSpin->setRange(0.0, 2.0);
-        m_tempSpin->setSingleStep(0.1);
         m_tempSpin->setValue(s.temperature);
 
-        m_maxTokensSpin = new QSpinBox;
-        m_maxTokensSpin->setRange(256, 128000);
         m_maxTokensSpin->setValue(s.maxTokens);
 
         // GitHub Copilot (sidecar)
-        m_copilotModelCombo = new QComboBox;
-        m_copilotModelCombo->setEditable(true);
         repopulateEditableCombo(m_copilotModelCombo, modelCatalog().copilotModels(),
                                 s.copilotModel);
         connect(&modelCatalog(), &ModelCatalog::copilotModelsChanged, this,
@@ -190,24 +212,17 @@ public:
                                             m_copilotModelCombo->currentText());
                 });
 
-        m_copilotNodeEdit = new QLineEdit(s.copilotNodePath);
-        m_copilotNodeEdit->setPlaceholderText(Tr::tr("node (from PATH)"));
-
-        m_copilotSidecarEdit = new QLineEdit(s.copilotSidecarPath);
-        m_copilotSidecarEdit->setPlaceholderText(Tr::tr("Auto-detect"));
+        m_copilotNodeEdit->setText(s.copilotNodePath);
+        m_copilotSidecarEdit->setText(s.copilotSidecarPath);
 
         // Local provider settings
-        m_localUrlEdit = new QLineEdit(s.localBaseUrl);
-        m_localEndpointEdit = new QLineEdit(s.localEndpointPath);
-        m_localSimpleCheck = new QCheckBox(Tr::tr("Simple {prompt} mode"));
+        m_localUrlEdit->setText(s.localBaseUrl);
+        m_localEndpointEdit->setText(s.localEndpointPath);
         m_localSimpleCheck->setChecked(s.localSimpleMode);
-        m_localHeadersEdit = new QLineEdit(s.localCustomHeaders);
-        m_localHeadersEdit->setPlaceholderText(Tr::tr("Header: Value, Header2: Value2"));
+        m_localHeadersEdit->setText(s.localCustomHeaders);
 
         // Ollama
-        m_ollamaUrlEdit = new QLineEdit(s.ollamaBaseUrl);
-        m_ollamaModelCombo = new QComboBox;
-        m_ollamaModelCombo->setEditable(true);
+        m_ollamaUrlEdit->setText(s.ollamaBaseUrl);
         m_ollamaModelCombo->addItems({
             QStringLiteral("llama4"),
             QStringLiteral("llama3.3"),
@@ -224,40 +239,19 @@ public:
         m_ollamaModelCombo->setCurrentText(s.ollamaModel);
 
         // Safety
-        m_maxIterSpin = new QSpinBox;
-        m_maxIterSpin->setRange(1, 100);
         m_maxIterSpin->setValue(s.maxIterations);
-        m_maxToolsSpin = new QSpinBox;
-        m_maxToolsSpin->setRange(1, 1000);
         m_maxToolsSpin->setValue(s.maxToolCalls);
-        m_maxDiffSpin = new QSpinBox;
-        m_maxDiffSpin->setRange(10, 100000);
         m_maxDiffSpin->setValue(s.maxDiffLines);
-        m_maxFilesSpin = new QSpinBox;
-        m_maxFilesSpin->setRange(1, 1000);
         m_maxFilesSpin->setValue(s.maxChangedFiles);
 
-        m_dryRunCheck = new QCheckBox(Tr::tr("Dry-run mode by default"));
         m_dryRunCheck->setChecked(s.dryRunDefault);
 
-        m_aiCompletionCheck = new QCheckBox(Tr::tr("Enable AI code completion in editor"));
         m_aiCompletionCheck->setChecked(s.aiCompletionEnabled);
 
-        m_completionMinCharsSpin = new QSpinBox;
-        m_completionMinCharsSpin->setRange(1, 20);
         m_completionMinCharsSpin->setValue(s.completionMinChars);
-        m_completionMinCharsSpin->setToolTip(
-            Tr::tr("Trigger AI completion after typing this many characters"));
 
-        m_completionDelayMsSpin = new QSpinBox;
-        m_completionDelayMsSpin->setRange(100, 5000);
-        m_completionDelayMsSpin->setSingleStep(100);
-        m_completionDelayMsSpin->setSuffix(QStringLiteral(" ms"));
         m_completionDelayMsSpin->setValue(s.completionDelayMs);
-        m_completionDelayMsSpin->setToolTip(Tr::tr("Delay before sending completion request"));
 
-        m_completionModelCombo = new QComboBox;
-        m_completionModelCombo->setEditable(true);
         m_completionModelCombo->addItem(Tr::tr("(Same as agent model)"), QStringLiteral(""));
         m_completionModelCombo->addItems({
             // Fast/small models suitable for completion
@@ -280,116 +274,16 @@ public:
             m_completionModelCombo->setCurrentIndex(0);
         else
             m_completionModelCombo->setCurrentText(s.completionModel);
-        m_completionModelCombo->setToolTip(
-            Tr::tr("Leave empty to use the same model as the agent"));
 
-        m_completionThinkingCombo = new QComboBox;
         populateEffortCombo(m_completionThinkingCombo);
         selectEffortValue(m_completionThinkingCombo, s.completionThinkingLevel, 0);
 
-        m_completionReasoningCombo = new QComboBox;
         populateEffortCombo(m_completionReasoningCombo);
         selectEffortValue(m_completionReasoningCombo, s.completionReasoningEffort, 0);
 
-        m_debugLoggingCheck = new QCheckBox(Tr::tr("Enable debug logging (Debug Log tab)"));
         m_debugLoggingCheck->setChecked(s.debugLogging);
 
-        m_agentDebugCheck = new QCheckBox(Tr::tr("Agent Debug (show raw JSON in chat)"));
         m_agentDebugCheck->setChecked(s.agentDebug);
-
-        // Layout helper
-        auto addRow = [](QVBoxLayout *l, const QString &label, QWidget *w) {
-            auto *row = new QHBoxLayout;
-            row->addWidget(new QLabel(label), 0);
-            row->addWidget(w, 1);
-            l->addLayout(row);
-
-        };
-
-        auto *tabs = new QTabWidget;
-
-        // ── Tab 1: Providers ──
-        auto *providersPage = new QWidget;
-        auto *pl = new QVBoxLayout(providersPage);
-        addRow(pl, Tr::tr("Active provider:"), m_providerCombo);
-
-        auto *openaiGroup = new QGroupBox(Tr::tr("OpenAI-Compatible"));
-        auto *oal = new QVBoxLayout(openaiGroup);
-        addRow(oal, Tr::tr("Base URL:"), m_baseUrlCombo);
-        addRow(oal, Tr::tr("API Key:"), m_apiKeyEdit);
-        addRow(oal, Tr::tr("Model:"), m_modelCombo);
-        addRow(oal, Tr::tr("Reasoning effort:"), m_reasoningCombo);
-        addRow(oal, Tr::tr("Thinking:"), m_thinkingCombo);
-        addRow(oal, Tr::tr("Temperature:"), m_tempSpin);
-        addRow(oal, Tr::tr("Max Tokens:"), m_maxTokensSpin);
-        pl->addWidget(openaiGroup);
-
-        auto *copilotGroup = new QGroupBox(Tr::tr("GitHub Copilot (via copilot-sdk sidecar)"));
-        auto *cl = new QVBoxLayout(copilotGroup);
-        addRow(cl, Tr::tr("Model:"), m_copilotModelCombo);
-        addRow(cl, Tr::tr("Node path:"), m_copilotNodeEdit);
-        addRow(cl, Tr::tr("Sidecar path:"), m_copilotSidecarEdit);
-        pl->addWidget(copilotGroup);
-
-        auto *localGroup = new QGroupBox(Tr::tr("Local HTTP"));
-        auto *ll = new QVBoxLayout(localGroup);
-        addRow(ll, Tr::tr("Base URL:"), m_localUrlEdit);
-        addRow(ll, Tr::tr("Endpoint:"), m_localEndpointEdit);
-        ll->addWidget(m_localSimpleCheck);
-        addRow(ll, Tr::tr("Headers:"), m_localHeadersEdit);
-        pl->addWidget(localGroup);
-
-        auto *ollamaGroup = new QGroupBox(Tr::tr("Ollama"));
-        auto *ol = new QVBoxLayout(ollamaGroup);
-        addRow(ol, Tr::tr("Base URL:"), m_ollamaUrlEdit);
-        addRow(ol, Tr::tr("Model:"), m_ollamaModelCombo);
-        pl->addWidget(ollamaGroup);
-
-        pl->addStretch();
-
-        auto *providersScroll = new QScrollArea;
-        providersScroll->setWidget(providersPage);
-        providersScroll->setWidgetResizable(true);
-        providersScroll->setFrameShape(QFrame::NoFrame);
-        tabs->addTab(providersScroll, Tr::tr("Providers"));
-
-        // ── Tab 2: Code Completion ──
-        auto *completionPage = new QWidget;
-        auto *cml = new QVBoxLayout(completionPage);
-        cml->addWidget(m_aiCompletionCheck);
-        addRow(cml, Tr::tr("Completion model:"), m_completionModelCombo);
-        addRow(cml, Tr::tr("Thinking:"), m_completionThinkingCombo);
-        addRow(cml, Tr::tr("Reasoning effort:"), m_completionReasoningCombo);
-        addRow(cml, Tr::tr("Min characters to trigger:"), m_completionMinCharsSpin);
-        addRow(cml, Tr::tr("Trigger delay:"), m_completionDelayMsSpin);
-        cml->addStretch();
-        tabs->addTab(completionPage, Tr::tr("Code Completion"));
-
-        // ── Tab 3: Safety & Behavior ──
-        auto *safetyPage = new QWidget;
-        auto *sl = new QVBoxLayout(safetyPage);
-
-        auto *limitsGroup = new QGroupBox(Tr::tr("Agent Limits"));
-        auto *liml = new QVBoxLayout(limitsGroup);
-        addRow(liml, Tr::tr("Max iterations:"), m_maxIterSpin);
-        addRow(liml, Tr::tr("Max tool calls:"), m_maxToolsSpin);
-        addRow(liml, Tr::tr("Max diff lines:"), m_maxDiffSpin);
-        addRow(liml, Tr::tr("Max changed files:"), m_maxFilesSpin);
-        sl->addWidget(limitsGroup);
-
-        auto *behaviorGroup = new QGroupBox(Tr::tr("Behavior"));
-        auto *bl = new QVBoxLayout(behaviorGroup);
-        bl->addWidget(m_dryRunCheck);
-        bl->addWidget(m_debugLoggingCheck);
-        bl->addWidget(m_agentDebugCheck);
-        sl->addWidget(behaviorGroup);
-
-        sl->addStretch();
-        tabs->addTab(safetyPage, Tr::tr("Safety & Behavior"));
-
-        auto *mainLayout = new QVBoxLayout(this);
-        mainLayout->setContentsMargins(0, 0, 0, 0);
-        mainLayout->addWidget(tabs);
     }
 
     void apply() override
@@ -439,6 +333,7 @@ public:
     }
 
 private:
+    std::unique_ptr<Ui::SettingsWidget> m_ui;
     QComboBox *m_providerCombo;
     QComboBox *m_baseUrlCombo;
     QLineEdit *m_apiKeyEdit;

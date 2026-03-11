@@ -4,6 +4,7 @@
 
 #include "AgentDockWidget.h"
 #include "settings/Settings.h"
+#include "ui_AgentDockWidget.h"
 #include "util/Diff.h"
 #include "util/Logger.h"
 
@@ -953,27 +954,70 @@ void AgentDockWidget::applyProjectUiDefaults()
 
 void AgentDockWidget::setupUi()
 {
-    auto *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(4, 4, 4, 4);
-    mainLayout->setSpacing(4);
+    m_ui = std::make_unique<Ui::AgentDockWidget>();
+    m_ui->setupUi(this);
 
-    // Status bar at top
-    auto *topBar = new QHBoxLayout;
-    m_statusLabel = new QLabel(tr("Ready"));
-    m_statusLabel->setStyleSheet(QStringLiteral("font-weight: bold; color: #888;"));
-    m_statusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    m_statusLabel->setMinimumWidth(0);
-    m_projectCombo = new QComboBox;
-    m_projectCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
-    m_projectCombo->setMinimumWidth(0);
-    m_projectCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    m_projectCombo->setMinimumContentsLength(18);
-    m_applyPatchBtn = new QPushButton(tr("Apply Patch"));
-    m_revertPatchBtn = new QPushButton(tr("Revert Patch"));
-    auto *newChatBtn = new QPushButton(tr("New Chat"));
-    m_copyPlanBtn = new QPushButton(tr("Copy Plan"));
-    m_applyPatchBtn->setEnabled(false);
-    m_revertPatchBtn->setEnabled(false);
+    m_statusLabel = m_ui->statusLabel;
+    m_projectCombo = m_ui->projectCombo;
+    m_goalEdit = m_ui->goalEdit;
+    m_modeCombo = m_ui->modeCombo;
+    m_modelCombo = m_ui->modelCombo;
+    m_reasoningCombo = m_ui->reasoningCombo;
+    m_thinkingCombo = m_ui->thinkingCombo;
+    m_runBtn = m_ui->runBtn;
+    m_stopBtn = m_ui->stopBtn;
+    m_dryRunCheck = m_ui->dryRunCheck;
+    m_tabs = m_ui->tabs;
+    m_planList = m_ui->planList;
+    m_logView = m_ui->logView;
+    m_rawMarkdownView = m_ui->rawMarkdownView;
+    m_diffFileList = m_ui->diffFileList;
+    m_approvalList = m_ui->approvalList;
+    m_debugLogView = m_ui->debugLogView;
+    m_applyPatchBtn = m_ui->applyPatchBtn;
+    m_revertPatchBtn = m_ui->revertPatchBtn;
+    m_copyPlanBtn = m_ui->copyPlanBtn;
+    auto *newChatBtn = m_ui->newChatButton;
+
+    m_ui->contentSplitter->setStretchFactor(0, 3);
+    m_ui->contentSplitter->setStretchFactor(1, 1);
+    m_ui->inputRow->setStretch(0, 1);
+    m_ui->modeModelRow->setStretch(2, 1);
+
+    auto *diffPreview = new DiffPreviewEdit(m_ui->diffViewPlaceholder->parentWidget());
+    diffPreview->setObjectName(QStringLiteral("diffView"));
+    diffPreview->setReadOnly(true);
+    diffPreview->setLineWrapMode(QPlainTextEdit::NoWrap);
+    diffPreview->setFont(QFont(QStringLiteral("monospace")));
+    if (auto *layout = m_ui->diffViewPlaceholder->parentWidget()->layout())
+        layout->replaceWidget(m_ui->diffViewPlaceholder, diffPreview);
+    m_ui->diffViewPlaceholder->deleteLater();
+    m_diffView = diffPreview;
+
+    m_logView->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    m_rawMarkdownView->setFont(QFont(QStringLiteral("monospace"), 9));
+    m_debugLogView->setFont(QFont(QStringLiteral("monospace"), 9));
+
+    populateModeCombo(m_modeCombo);
+
+    m_modelCombo->setEditable(true);
+    const bool useCopilotModels = settings().provider == QStringLiteral("copilot");
+    repopulateEditableCombo(
+        m_modelCombo, useCopilotModels ? modelCatalog().copilotModels() : openAiAgentModels(),
+        settings().modelName);
+    connect(&modelCatalog(), &ModelCatalog::copilotModelsChanged, this,
+            [this](const QStringList &models) {
+                if (settings().provider != QStringLiteral("copilot"))
+                    return;
+                repopulateEditableCombo(m_modelCombo, models, m_modelCombo->currentText());
+            });
+
+    populateEffortCombo(m_reasoningCombo);
+    selectEffortValue(m_reasoningCombo, settings().reasoningEffort, 2);
+    populateEffortCombo(m_thinkingCombo);
+    selectEffortValue(m_thinkingCombo, settings().thinkingLevel, 2);
+    m_dryRunCheck->setChecked(settings().dryRunDefault);
+
     connect(m_applyPatchBtn, &QPushButton::clicked, this, &AgentDockWidget::onApplyPatchClicked);
     connect(m_revertPatchBtn, &QPushButton::clicked, this, &AgentDockWidget::onRevertPatchClicked);
     connect(newChatBtn, &QPushButton::clicked, this, [this]() {
@@ -996,54 +1040,6 @@ void AgentDockWidget::setupUi()
         saveChat();
     });
     connect(m_copyPlanBtn, &QPushButton::clicked, this, &AgentDockWidget::onCopyPlanClicked);
-    topBar->addWidget(m_statusLabel, 0);
-    topBar->addSpacing(8);
-    topBar->addWidget(new QLabel(tr("Project")));
-    topBar->addWidget(m_projectCombo, 1);
-    topBar->addStretch();
-    topBar->addWidget(newChatBtn);
-    topBar->addWidget(m_applyPatchBtn);
-    topBar->addWidget(m_revertPatchBtn);
-    topBar->addWidget(m_copyPlanBtn);
-
-    // Tabs (main content area, takes all available space)
-    m_tabs = new QTabWidget;
-
-    m_planList = new QListWidget;
-    m_tabs->addTab(m_planList, tr("Plan"));
-
-    m_logView = new QTextEdit;
-    m_logView->setReadOnly(true);
-    m_logView->setLineWrapMode(QTextEdit::WidgetWidth);
-    m_logView->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-    m_logView->setStyleSheet(QStringLiteral("QTextEdit { padding: 8px; }"));
-    m_tabs->addTab(m_logView, tr("Actions Log"));
-
-    m_rawMarkdownView = new QPlainTextEdit;
-    m_rawMarkdownView->setReadOnly(true);
-    m_rawMarkdownView->setFont(QFont(QStringLiteral("monospace"), 9));
-    m_rawMarkdownView->setLineWrapMode(QPlainTextEdit::NoWrap);
-    m_tabs->addTab(m_rawMarkdownView, tr("Raw Markdown"));
-
-    m_diffView = new DiffPreviewEdit;
-    m_diffView->setReadOnly(true);
-    m_diffView->setLineWrapMode(QPlainTextEdit::NoWrap);
-    m_diffView->setFont(QFont(QStringLiteral("monospace")));
-
-    m_diffFileList = new QListWidget;
-    m_diffFileList->setMaximumHeight(100);
-    m_diffFileList->setStyleSheet(QStringLiteral(
-        "QListWidget::item { padding: 2px 6px; color: #4078c0; }"
-        "QListWidget::item:hover { text-decoration: underline; background: #e8f0fe; }"));
-    m_diffFileList->setCursor(Qt::PointingHandCursor);
-
-    auto *diffPage = new QWidget;
-    auto *diffLayout = new QVBoxLayout(diffPage);
-    diffLayout->setContentsMargins(0, 0, 0, 0);
-    diffLayout->setSpacing(0);
-    diffLayout->addWidget(m_diffFileList);
-    diffLayout->addWidget(m_diffView, 1);
-    m_tabs->addTab(diffPage, tr("Diff Preview"));
 
     static_cast<DiffPreviewEdit *>(m_diffView)
         ->setApprovalChangedCallback([this](qsizetype approved, qsizetype total) {
@@ -1051,14 +1047,29 @@ void AgentDockWidget::setupUi()
             m_applyPatchBtn->setEnabled(!m_currentDiff.isEmpty() && approved > 0);
         });
 
-    m_approvalList = new QListWidget;
-    m_tabs->addTab(m_approvalList, tr("Approvals"));
+    connect(m_runBtn, &QPushButton::clicked, this, &AgentDockWidget::onRunClicked);
+    connect(m_stopBtn, &QPushButton::clicked, this, &AgentDockWidget::onStopClicked);
+    connect(m_projectCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
+        if (index < 0)
+            return;
+        switchProjectContext(m_projectCombo->itemData(index).toString());
+    });
+    const auto persistProjectUiState = [this]() {
+        if (!m_activeProjectFilePath.isEmpty())
+            saveChat();
+    };
+    connect(m_modeCombo, &QComboBox::currentIndexChanged, this,
+            [persistProjectUiState](int) { persistProjectUiState(); });
+    connect(m_modelCombo, &QComboBox::currentTextChanged, this,
+            [persistProjectUiState](const QString &) { persistProjectUiState(); });
+    connect(m_reasoningCombo, &QComboBox::currentIndexChanged, this,
+            [persistProjectUiState](int) { persistProjectUiState(); });
+    connect(m_thinkingCombo, &QComboBox::currentIndexChanged, this,
+            [persistProjectUiState](int) { persistProjectUiState(); });
+    connect(m_dryRunCheck, &QCheckBox::checkStateChanged, this,
+            [persistProjectUiState](Qt::CheckState) { persistProjectUiState(); });
 
-    m_debugLogView = new QPlainTextEdit;
-    m_debugLogView->setReadOnly(true);
-    m_debugLogView->setFont(QFont(QStringLiteral("monospace"), 9));
-    m_debugLogView->setMaximumBlockCount(5000);
-    m_tabs->addTab(m_debugLogView, tr("Debug Log"));
+    applyProjectUiDefaults();
 
     // Add Ctrl+C/A shortcuts directly on text views (event filter not enough — Qt Creator
     // intercepts)
@@ -1085,13 +1096,6 @@ void AgentDockWidget::setupUi()
     addCopyShortcut(m_rawMarkdownView);
     addCopyShortcut(m_diffView);
     addCopyShortcut(m_debugLogView);
-
-    // Goal input at the bottom (chat-like)
-    m_goalEdit = new QTextEdit;
-    m_goalEdit->setPlaceholderText(tr("Describe your goal…"));
-    m_goalEdit->setMinimumHeight(72);
-    m_goalEdit->setAcceptRichText(false);
-    m_goalEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     auto *goalCopyShortcut = new QShortcut(QKeySequence::Copy, m_goalEdit);
     goalCopyShortcut->setContext(Qt::WidgetShortcut);
     QObject::connect(goalCopyShortcut, &QShortcut::activated, m_goalEdit, &QTextEdit::copy);
@@ -1099,133 +1103,6 @@ void AgentDockWidget::setupUi()
     goalSelectAllShortcut->setContext(Qt::WidgetShortcut);
     QObject::connect(goalSelectAllShortcut, &QShortcut::activated, m_goalEdit,
                      &QTextEdit::selectAll);
-
-    auto *inputPanel = new QWidget;
-    inputPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    auto *inputRow = new QHBoxLayout(inputPanel);
-    inputRow->setContentsMargins(0, 0, 0, 0);
-    inputRow->setSpacing(4);
-
-    auto *goalColumn = new QVBoxLayout;
-    goalColumn->setSpacing(4);
-
-    auto *btnColumn = new QVBoxLayout;
-    btnColumn->setSpacing(2);
-    btnColumn->setSizeConstraint(QLayout::SetMinimumSize);
-
-    m_modeCombo = new QComboBox;
-    populateModeCombo(m_modeCombo);
-    m_modeCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
-    m_modeCombo->setMinimumWidth(0);
-
-    m_modelCombo = new QComboBox;
-    m_modelCombo->setEditable(true);
-    m_modelCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
-    m_modelCombo->setMinimumWidth(0);
-    const bool useCopilotModels = settings().provider == QStringLiteral("copilot");
-    repopulateEditableCombo(
-        m_modelCombo, useCopilotModels ? modelCatalog().copilotModels() : openAiAgentModels(),
-        settings().modelName);
-    connect(&modelCatalog(), &ModelCatalog::copilotModelsChanged, this,
-            [this](const QStringList &models) {
-                if (settings().provider != QStringLiteral("copilot"))
-                    return;
-                repopulateEditableCombo(m_modelCombo, models, m_modelCombo->currentText());
-            });
-
-    m_reasoningCombo = new QComboBox;
-    populateEffortCombo(m_reasoningCombo);
-    selectEffortValue(m_reasoningCombo, settings().reasoningEffort, 2);
-    m_reasoningCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
-    m_reasoningCombo->setMinimumWidth(0);
-
-    m_thinkingCombo = new QComboBox;
-    populateEffortCombo(m_thinkingCombo);
-    selectEffortValue(m_thinkingCombo, settings().thinkingLevel, 2);
-    m_thinkingCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
-    m_thinkingCombo->setMinimumWidth(0);
-
-    m_runBtn = new QPushButton(tr("▶ Run"));
-    m_runBtn->setToolTip(tr("Run agent (Enter)"));
-    m_runBtn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-    m_stopBtn = new QPushButton(tr("⏹ Stop"));
-    m_stopBtn->setToolTip(tr("Stop agent (Escape)"));
-    m_stopBtn->setEnabled(false);
-    m_stopBtn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-    m_dryRunCheck = new QCheckBox(tr("Dry-run"));
-    m_dryRunCheck->setChecked(settings().dryRunDefault);
-    m_dryRunCheck->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
-
-    connect(m_runBtn, &QPushButton::clicked, this, &AgentDockWidget::onRunClicked);
-    connect(m_stopBtn, &QPushButton::clicked, this, &AgentDockWidget::onStopClicked);
-    connect(m_projectCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
-        if (index < 0)
-            return;
-        switchProjectContext(m_projectCombo->itemData(index).toString());
-    });
-    const auto persistProjectUiState = [this]() {
-        if (!m_activeProjectFilePath.isEmpty())
-            saveChat();
-    };
-    connect(m_modeCombo, &QComboBox::currentIndexChanged, this,
-            [persistProjectUiState](int) { persistProjectUiState(); });
-    connect(m_modelCombo, &QComboBox::currentTextChanged, this,
-            [persistProjectUiState](const QString &) { persistProjectUiState(); });
-    connect(m_reasoningCombo, &QComboBox::currentIndexChanged, this,
-            [persistProjectUiState](int) { persistProjectUiState(); });
-    connect(m_thinkingCombo, &QComboBox::currentIndexChanged, this,
-            [persistProjectUiState](int) { persistProjectUiState(); });
-    connect(m_dryRunCheck, &QCheckBox::checkStateChanged, this,
-            [persistProjectUiState](Qt::CheckState) { persistProjectUiState(); });
-
-    auto *modeModelRow = new QHBoxLayout;
-    modeModelRow->setSpacing(4);
-
-    auto *modeColumn = new QVBoxLayout;
-    modeColumn->setSpacing(2);
-    modeColumn->addWidget(new QLabel(tr("Mode")));
-    modeColumn->addWidget(m_modeCombo);
-
-    auto *modelColumn = new QVBoxLayout;
-    modelColumn->setSpacing(2);
-    modelColumn->addWidget(new QLabel(tr("Model")));
-    modelColumn->addWidget(m_modelCombo);
-
-    modeModelRow->addLayout(modeColumn);
-    modeModelRow->addLayout(modelColumn, 1);
-
-    goalColumn->addWidget(m_goalEdit, 1);
-    goalColumn->addLayout(modeModelRow);
-
-    btnColumn->addStretch();
-
-    auto *reasoningLabel = new QLabel(tr("Reasoning"));
-    reasoningLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-    btnColumn->addWidget(reasoningLabel);
-    btnColumn->addWidget(m_reasoningCombo);
-    auto *thinkingLabel = new QLabel(tr("Thinking"));
-    thinkingLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-    btnColumn->addWidget(thinkingLabel);
-    btnColumn->addWidget(m_thinkingCombo);
-    btnColumn->addWidget(m_runBtn);
-    btnColumn->addWidget(m_stopBtn);
-    btnColumn->addWidget(m_dryRunCheck);
-
-    inputRow->addLayout(goalColumn, 1);
-    inputRow->addLayout(btnColumn);
-
-    applyProjectUiDefaults();
-
-    auto *contentSplitter = new QSplitter(Qt::Vertical);
-    contentSplitter->setChildrenCollapsible(false);
-    contentSplitter->addWidget(m_tabs);
-    contentSplitter->addWidget(inputPanel);
-    contentSplitter->setStretchFactor(0, 3);
-    contentSplitter->setStretchFactor(1, 1);
-
-    // Assemble: top bar → tabs → input row
-    mainLayout->addLayout(topBar);
-    mainLayout->addWidget(contentSplitter, 1);
 }
 
 void AgentDockWidget::updateRunState(bool running)

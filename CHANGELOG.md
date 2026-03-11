@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.4] - 2026-03-11
+
+### Added
+
+- Added per-project agent context selection with a project picker that lists currently open Qt Creator projects.
+- Added project-local context storage under each project's `.qcai2/` directory for chat state and dock UI state.
+- Added `Ask` and `Agent` run modes in the dock widget.
+- Added mouse-resizable vertical splitting between the tabs area and the input panel.
+
+### Changed
+
+- Persisted the last selected `Mode`, `Model`, `Reasoning`, `Thinking`, and `Dry-run` state per project instead of sharing one global dock state.
+- Reworked the dock layout so the goal editor grows to fill the available height, `Mode` and `Model` sit under the goal editor, and the execution controls stay compact and bottom-aligned.
+- Migrated `AgentDockWidget` layout definition from hand-built C++ layout code to a Qt Designer `.ui` file while keeping the custom diff preview widget wired in from C++.
+- Migrated `SettingsPage` layout definition from hand-built C++ layout code to a Qt Designer `.ui` file.
+
 ## [0.0.3] - 2026-03-09
 
 ### Added
