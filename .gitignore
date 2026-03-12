@@ -72,3 +72,5 @@ package-lock.json
 /.qcai2/
 
 build
+.cache/
+tmp.tmp
