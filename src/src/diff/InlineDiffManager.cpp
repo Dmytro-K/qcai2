@@ -9,8 +9,19 @@
 #include <texteditor/textmark.h>
 
 #include <QAction>
+#include <QApplication>
 #include <QDir>
+#include <QFontDatabase>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
 #include <QRegularExpression>
+#include <QStyle>
+#include <QTextBlock>
+#include <QVBoxLayout>
+
+#include <functional>
 
 namespace qcai2
 {
@@ -18,6 +29,204 @@ namespace qcai2
 /** Text mark category used for AI-generated diff hunks. */
 static const TextEditor::TextMarkCategory kDiffCategory{QStringLiteral("AI Diff"),
                                                         Utils::Id("qcai2.DiffHunk")};
+
+namespace
+{
+
+QIcon standardIcon(QStyle::StandardPixmap icon)
+{
+    return qApp ? qApp->style()->standardIcon(icon) : QIcon();
+}
+
+QStringList previewLinesForHunk(const QString &hunkBody)
+{
+    constexpr int kMaxPreviewLines = 12;
+
+    QStringList lines;
+    int changedLineCount = 0;
+    const QStringList bodyLines = hunkBody.split(QLatin1Char('\n'));
+    for (const QString &line : bodyLines)
+    {
+        if ((!line.startsWith(QLatin1Char('+')) || line.startsWith(QStringLiteral("+++ "))) &&
+            (!line.startsWith(QLatin1Char('-')) || line.startsWith(QStringLiteral("--- "))))
+        {
+            continue;
+        }
+
+        ++changedLineCount;
+        lines.append(line);
+        if (lines.size() >= kMaxPreviewLines)
+            break;
+    }
+
+    if (changedLineCount > kMaxPreviewLines)
+        lines.append(QStringLiteral("…"));
+
+    return lines;
+}
+
+class DiffPreviewWidget final : public QFrame
+{
+public:
+    DiffPreviewWidget(const QStringList &previewLines, std::function<void()> accept,
+                      std::function<void()> reject,
+                      QWidget *parent = nullptr)
+        : QFrame(parent)
+    {
+        setObjectName(QStringLiteral("qcai2DiffPreviewWidget"));
+        setFrameStyle(QFrame::NoFrame);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+        auto *root = new QVBoxLayout(this);
+        root->setContentsMargins(2, 2, 2, 2);
+        root->setSpacing(2);
+
+        const QFont codeFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+        for (const QString &line : previewLines)
+        {
+            auto *row = new QLabel(line.toHtmlEscaped(), this);
+            row->setFont(codeFont);
+            row->setTextInteractionFlags(Qt::TextSelectableByMouse);
+            row->setWordWrap(false);
+            row->setMargin(0);
+
+            QString style =
+                QStringLiteral("QLabel { border-radius: 3px; padding: 1px 5px; "
+                               "background: palette(alternate-base); color: palette(text); }");
+            if (line.startsWith(QLatin1Char('+')) &&
+                !line.startsWith(QStringLiteral("+++")))
+            {
+                style = QStringLiteral("QLabel { border-radius: 3px; padding: 1px 5px; "
+                                       "background: rgba(70, 160, 95, 44); color: palette(text); "
+                                       "border-left: 3px solid #4aa36a; }");
+            }
+            else if (line.startsWith(QLatin1Char('-')) &&
+                     !line.startsWith(QStringLiteral("---")))
+            {
+                style = QStringLiteral("QLabel { border-radius: 3px; padding: 1px 5px; "
+                                       "background: rgba(190, 80, 80, 44); color: palette(text); "
+                                       "border-left: 3px solid #c06161; }");
+            }
+
+            row->setStyleSheet(style);
+            root->addWidget(row);
+        }
+
+        auto *buttonsRow = new QHBoxLayout;
+        buttonsRow->setContentsMargins(0, 0, 0, 0);
+        buttonsRow->setSpacing(4);
+        buttonsRow->addStretch(1);
+        auto addCompactButton = [this, buttonsRow](const QString &text, const QString &style,
+                                                   std::function<void()> callback) {
+            auto *button = new QPushButton(text, this);
+            button->setCursor(Qt::PointingHandCursor);
+            button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+            button->setStyleSheet(style);
+            QObject::connect(button, &QPushButton::clicked, this, [callback]() {
+                if (callback)
+                    callback();
+            });
+            buttonsRow->addWidget(button);
+        };
+        addCompactButton(QStringLiteral("Accept"),
+                         QStringLiteral("QPushButton { background: rgba(70, 160, 95, 56); "
+                                        "color: palette(text); border: 1px solid #4aa36a; "
+                                        "border-radius: 3px; padding: 0px 6px; min-height: 18px; }"),
+                         std::move(accept));
+        addCompactButton(QStringLiteral("Reject"),
+                         QStringLiteral("QPushButton { background: rgba(190, 80, 80, 56); "
+                                        "color: palette(text); border: 1px solid #c06161; "
+                                        "border-radius: 3px; padding: 0px 6px; min-height: 18px; }"),
+                         std::move(reject));
+        root->addLayout(buttonsRow);
+
+        setStyleSheet(QStringLiteral(
+            "#qcai2DiffPreviewWidget { background: transparent; border: 1px solid palette(mid); "
+            "border-radius: 4px; }"));
+    }
+};
+
+class DiffTextMark final : public TextEditor::TextMark
+{
+public:
+    DiffTextMark(const Utils::FilePath &filePath, int lineNumber, const QString &toolTip,
+                 std::function<void()> accept,
+                 std::function<void()> reject, std::function<void()> acceptAll,
+                 std::function<void()> rejectAll)
+        : TextEditor::TextMark(filePath, lineNumber, kDiffCategory), m_accept(std::move(accept)),
+          m_reject(std::move(reject)), m_acceptAll(std::move(acceptAll)),
+          m_rejectAll(std::move(rejectAll))
+    {
+        setPriority(TextEditor::TextMark::HighPriority);
+        setColor(Utils::Theme::IconsInfoColor);
+        setVisible(true);
+        setIcon(standardIcon(QStyle::SP_DialogApplyButton));
+        setToolTip(toolTip);
+        setActionsProvider([accept = m_accept, reject = m_reject, acceptAll = m_acceptAll,
+                            rejectAll = m_rejectAll] {
+            QList<QAction *> actions;
+
+            auto *acceptAction = new QAction(standardIcon(QStyle::SP_DialogApplyButton),
+                                             QStringLiteral("Accept Hunk"));
+            acceptAction->setToolTip(QStringLiteral("Accept this hunk"));
+            QObject::connect(acceptAction, &QAction::triggered, acceptAction, [accept]() {
+                if (accept)
+                    accept();
+            });
+            actions.append(acceptAction);
+
+            auto *rejectAction = new QAction(standardIcon(QStyle::SP_DialogCancelButton),
+                                             QStringLiteral("Reject Hunk"));
+            rejectAction->setToolTip(QStringLiteral("Reject this hunk"));
+            QObject::connect(rejectAction, &QAction::triggered, rejectAction, [reject]() {
+                if (reject)
+                    reject();
+            });
+            actions.append(rejectAction);
+
+            auto *acceptAllAction = new QAction(standardIcon(QStyle::SP_DialogYesButton),
+                                                QStringLiteral("Accept All Hunks"));
+            acceptAllAction->setToolTip(QStringLiteral("Accept all remaining hunks"));
+            QObject::connect(acceptAllAction, &QAction::triggered, acceptAllAction,
+                             [acceptAll]() {
+                                 if (acceptAll)
+                                     acceptAll();
+                             });
+            actions.append(acceptAllAction);
+
+            auto *rejectAllAction = new QAction(standardIcon(QStyle::SP_DialogNoButton),
+                                                QStringLiteral("Reject All Hunks"));
+            rejectAllAction->setToolTip(QStringLiteral("Reject all remaining hunks"));
+            QObject::connect(rejectAllAction, &QAction::triggered, rejectAllAction,
+                             [rejectAll]() {
+                                 if (rejectAll)
+                                     rejectAll();
+                             });
+            actions.append(rejectAllAction);
+
+            return actions;
+        });
+    }
+
+    bool isClickable() const override
+    {
+        return true;
+    }
+
+    void clicked() override
+    {
+        if (m_accept)
+            m_accept();
+    }
+
+private:
+    std::function<void()> m_accept;
+    std::function<void()> m_reject;
+    std::function<void()> m_acceptAll;
+    std::function<void()> m_rejectAll;
+};
+
+}  // namespace
 
 InlineDiffManager::InlineDiffManager(QObject *parent) : QObject(parent)
 {
@@ -101,18 +310,17 @@ void InlineDiffManager::showDiff(const QString &unifiedDiff, const QString &proj
 {
     clearAll();
     m_projectDir = projectDir;
+    TextEditor::TextDocument::showMarksAnnotation(kDiffCategory.id);
 
     auto parsed = parseDiff(unifiedDiff);
     QCAI_INFO("InlineDiff", QStringLiteral("Parsed %1 hunks from diff").arg(parsed.size()));
 
     for (auto &h : parsed)
-    {
-        m_hunks.append({std::move(h), nullptr});
-    }
+        m_hunks.push_back({std::move(h), nullptr, {}});
 
     // Create markers and open files
     QSet<QString> openedFiles;
-    for (int i = 0; i < m_hunks.size(); ++i)
+    for (int i = 0; i < int(m_hunks.size()); ++i)
     {
         const QString absPath = QDir(m_projectDir).absoluteFilePath(m_hunks[i].hunk.filePath);
 
@@ -129,7 +337,7 @@ void InlineDiffManager::showDiff(const QString &unifiedDiff, const QString &proj
     }
 
     // Navigate to first hunk
-    if (!m_hunks.isEmpty())
+    if (!m_hunks.empty())
     {
         const auto &first = m_hunks[0].hunk;
         const QString absPath = QDir(m_projectDir).absoluteFilePath(first.filePath);
@@ -145,53 +353,54 @@ void InlineDiffManager::createMarker(int index)
     const auto &h = m_hunks[index].hunk;
     const QString absPath = QDir(m_projectDir).absoluteFilePath(h.filePath);
 
-    auto mark = new TextEditor::TextMark(Utils::FilePath::fromString(absPath), h.startLineNew,
-                                         kDiffCategory);
+    const QString tooltip = QStringLiteral(
+                                "<b>AI diff hunk</b><br/>Use the inline widget or gutter actions."
+                                "<br/>Use the action buttons to reject or bulk-resolve."
+                                "<pre>%1</pre>")
+                                .arg(h.hunkHeader + QStringLiteral("\n") + h.hunkBody);
+    const QStringList previewLines = previewLinesForHunk(h.hunkBody);
 
-    mark->setPriority(TextEditor::TextMark::HighPriority);
-    mark->setColor(Utils::Theme::IconsInfoColor);
-    mark->setVisible(true);
-
-    // Summary annotation in the editor gutter
-    int addedLines = 0, removedLines = 0;
-    for (const auto &line : h.hunkBody.split(QLatin1Char('\n')))
-    {
-        if (line.startsWith(QLatin1Char('+')))
-            ++addedLines;
-        else if (line.startsWith(QLatin1Char('-')))
-            ++removedLines;
-    }
-    mark->setLineAnnotation(QStringLiteral("AI: +%1/-%2").arg(addedLines).arg(removedLines));
-
-    // Tooltip shows the full hunk diff
-    mark->setToolTip(
-        QStringLiteral("<pre>%1</pre>").arg(h.hunkHeader + QStringLiteral("\n") + h.hunkBody));
-
-    // Accept/Reject actions in the gutter context menu
-    mark->setActionsProvider([this, index]() -> QList<QAction *> {
-        auto *acceptAction = new QAction(QStringLiteral("✅ Accept Hunk"));
-        connect(acceptAction, &QAction::triggered, this, [this, index]() { acceptHunk(index); });
-
-        auto *rejectAction = new QAction(QStringLiteral("❌ Reject Hunk"));
-        connect(rejectAction, &QAction::triggered, this, [this, index]() { rejectHunk(index); });
-
-        auto *acceptAllAction = new QAction(QStringLiteral("✅ Accept All"));
-        connect(acceptAllAction, &QAction::triggered, this, [this]() { acceptAll(); });
-
-        auto *rejectAllAction = new QAction(QStringLiteral("❌ Reject All"));
-        connect(rejectAllAction, &QAction::triggered, this, [this]() { rejectAll(); });
-
-        return {acceptAction, rejectAction, acceptAllAction, rejectAllAction};
-    });
+    auto *mark = new DiffTextMark(Utils::FilePath::fromString(absPath), h.startLineNew, tooltip,
+                                  [this, index]() { acceptHunk(index); },
+                                  [this, index]() { rejectHunk(index); },
+                                  [this]() { acceptAll(); }, [this]() { rejectAll(); });
 
     m_hunks[index].mark = mark;
+
+    const Utils::FilePath filePath = Utils::FilePath::fromString(absPath);
+    const QList<TextEditor::BaseTextEditor *> editors =
+        TextEditor::BaseTextEditor::textEditorsForFilePath(filePath);
+    for (TextEditor::BaseTextEditor *editor : editors)
+    {
+        if (!editor || !editor->editorWidget() || !editor->textDocument() ||
+            !editor->textDocument()->document())
+        {
+            continue;
+        }
+
+        QTextBlock block = editor->textDocument()->document()->findBlockByNumber(h.startLineNew - 1);
+        if (!block.isValid())
+            block = editor->textDocument()->document()->lastBlock();
+        if (!block.isValid())
+            continue;
+
+        auto *widget = new DiffPreviewWidget(previewLines, [this, index]() { acceptHunk(index); },
+                                             [this, index]() { rejectHunk(index); },
+                                             editor->editorWidget());
+        std::unique_ptr<TextEditor::EmbeddedWidgetInterface> handle =
+            editor->editorWidget()->insertWidget(widget, block.position());
+        if (handle)
+            m_hunks[index].widgetHandles.push_back(std::move(handle));
+        else
+            delete widget;
+    }
 }
 
 // ── Accept / Reject ────────────────────────────────────────────
 
 void InlineDiffManager::acceptHunk(int hunkIndex)
 {
-    if (hunkIndex < 0 || hunkIndex >= m_hunks.size() || m_resolved.contains(hunkIndex))
+    if (hunkIndex < 0 || hunkIndex >= int(m_hunks.size()) || m_resolved.contains(hunkIndex))
         return;
 
     const auto &h = m_hunks[hunkIndex].hunk;
@@ -209,17 +418,19 @@ void InlineDiffManager::acceptHunk(int hunkIndex)
               QStringLiteral("Accepted hunk %1 in %2").arg(hunkIndex).arg(h.filePath));
 
     m_resolved.insert(hunkIndex);
+    m_hunks[hunkIndex].widgetHandles.clear();
     delete m_hunks[hunkIndex].mark;
     m_hunks[hunkIndex].mark = nullptr;
+    emit diffChanged(remainingDiff());
     emit hunkAccepted(hunkIndex, h.filePath);
 
-    if (m_resolved.size() == m_hunks.size())
+    if (m_resolved.size() == qsizetype(m_hunks.size()))
         emit allResolved();
 }
 
 void InlineDiffManager::rejectHunk(int hunkIndex)
 {
-    if (hunkIndex < 0 || hunkIndex >= m_hunks.size() || m_resolved.contains(hunkIndex))
+    if (hunkIndex < 0 || hunkIndex >= int(m_hunks.size()) || m_resolved.contains(hunkIndex))
         return;
 
     const auto &h = m_hunks[hunkIndex].hunk;
@@ -227,17 +438,33 @@ void InlineDiffManager::rejectHunk(int hunkIndex)
               QStringLiteral("Rejected hunk %1 in %2").arg(hunkIndex).arg(h.filePath));
 
     m_resolved.insert(hunkIndex);
+    m_hunks[hunkIndex].widgetHandles.clear();
     delete m_hunks[hunkIndex].mark;
     m_hunks[hunkIndex].mark = nullptr;
+    emit diffChanged(remainingDiff());
     emit hunkRejected(hunkIndex, h.filePath);
 
-    if (m_resolved.size() == m_hunks.size())
+    if (m_resolved.size() == qsizetype(m_hunks.size()))
         emit allResolved();
+}
+
+QString InlineDiffManager::remainingDiff() const
+{
+    QStringList patches;
+    patches.reserve(qsizetype(m_hunks.size()));
+    for (int i = 0; i < int(m_hunks.size()); ++i)
+    {
+        if (m_resolved.contains(i))
+            continue;
+        patches.append(Diff::normalize(m_hunks[i].hunk.fullPatch).trimmed());
+    }
+
+    return patches.join(QStringLiteral("\n"));
 }
 
 void InlineDiffManager::acceptAll()
 {
-    for (int i = 0; i < m_hunks.size(); ++i)
+    for (int i = 0; i < int(m_hunks.size()); ++i)
     {
         if (!m_resolved.contains(i))
             acceptHunk(i);
@@ -246,7 +473,7 @@ void InlineDiffManager::acceptAll()
 
 void InlineDiffManager::rejectAll()
 {
-    for (int i = 0; i < m_hunks.size(); ++i)
+    for (int i = 0; i < int(m_hunks.size()); ++i)
     {
         if (!m_resolved.contains(i))
             rejectHunk(i);
@@ -256,7 +483,10 @@ void InlineDiffManager::rejectAll()
 void InlineDiffManager::clearAll()
 {
     for (auto &entry : m_hunks)
+    {
+        entry.widgetHandles.clear();
         delete entry.mark;
+    }
     m_hunks.clear();
     m_resolved.clear();
 }

@@ -6,8 +6,12 @@
 #include <QSet>
 #include <QString>
 
+#include <memory>
+#include <vector>
+
 namespace TextEditor
 {
+class EmbeddedWidgetInterface;
 class TextMark;
 }
 
@@ -102,7 +106,7 @@ public:
      */
     bool hasHunks() const
     {
-        return !m_hunks.isEmpty();
+        return !m_hunks.empty();
     }
 
     /**
@@ -110,7 +114,7 @@ public:
      */
     qsizetype hunkCount() const
     {
-        return m_hunks.size();
+        return qsizetype(m_hunks.size());
     }
 
     /**
@@ -120,6 +124,11 @@ public:
     {
         return m_resolved.size();
     }
+
+    /**
+     * Returns a unified diff built from the hunks that are still unresolved.
+     */
+    QString remainingDiff() const;
 
 signals:
     /**
@@ -135,6 +144,12 @@ signals:
      * @param filePath Path of the affected file.
      */
     void hunkRejected(int index, const QString &filePath);
+
+    /**
+     * Emitted when the unresolved diff changes after accepting or rejecting hunks.
+     * @param diff Unified diff containing only unresolved hunks.
+     */
+    void diffChanged(const QString &diff);
 
     /**
      * Emitted after every hunk in the current diff is resolved.
@@ -153,6 +168,9 @@ private:
         /** Live marker shown in the editor gutter, or null when resolved. */
         TextEditor::TextMark *mark = nullptr;
 
+        /** Inline widgets inserted into open editor instances for this hunk. */
+        std::vector<std::unique_ptr<TextEditor::EmbeddedWidgetInterface>> widgetHandles;
+
     };
 
     /**
@@ -168,7 +186,7 @@ private:
     void createMarker(int index);
 
     /** Parsed hunks for the current diff preview. */
-    QList<HunkEntry> m_hunks;
+    std::vector<HunkEntry> m_hunks;
 
     /** Hunk indexes that were already accepted or rejected. */
     QSet<int> m_resolved;

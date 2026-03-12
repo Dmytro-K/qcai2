@@ -16,6 +16,8 @@
 - Fixes for Agent widget UI
 - Migrated `AgentDockWidget` and `SettingsPage` layout definition from hand-built C++ layout code to a Qt Designer `.ui`.
 - The Actions Log and `Raw Markdown` view now omit raw `read_file` file contents, preventing markdown breakage from echoed source text.
+- Inline diff review in the code editor now shows clickable AI diff annotations with visible accept/reject actions, and the dock diff preview stays synchronized as hunks are resolved inline.
+- The qcai2 project selector now follows Qt Creator's active startup project on startup and when the startup project changes.
 
 ## [0.0.3] - 2026-03-09
 

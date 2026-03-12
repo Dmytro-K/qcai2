@@ -183,6 +183,16 @@ private:
      */
     void applyProjectUiDefaults();
 
+    /**
+     * Returns the active project directory used for diff operations.
+     */
+    QString currentProjectDir() const;
+
+    /**
+     * Refreshes the diff tab state and optionally re-renders inline editor markers.
+     */
+    void syncDiffUi(const QString &diff, bool focusDiffTab, bool refreshInlineMarkers);
+
     /** Designer-generated UI wrapper. */
     std::unique_ptr<Ui::AgentDockWidget> m_ui;
 

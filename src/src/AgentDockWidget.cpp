@@ -10,6 +10,7 @@
 #include "util/Migration.h"
 
 #include <coreplugin/editormanager/editormanager.h>
+#include <projectexplorer/project.h>
 #include <projectexplorer/projectmanager.h>
 #include <utils/filepath.h>
 #include <utils/link.h>
@@ -70,6 +71,13 @@ QStringList openAiAgentModels()
         QStringLiteral("claude-sonnet-4.6"),
         QStringLiteral("gemini-3-flash"),
     };
+}
+
+QString startupProjectFilePath()
+{
+    if (auto *project = ProjectExplorer::ProjectManager::startupProject())
+        return project->projectFilePath().toUrlishString();
+    return {};
 }
 
 void populateEffortCombo(QComboBox *combo)
@@ -641,6 +649,21 @@ AgentDockWidget::AgentDockWidget(AgentController *controller, QWidget *parent)
     connect(m_controller, &AgentController::iterationChanged, this,
             &AgentDockWidget::onIterationChanged);
     connect(m_controller, &AgentController::stopped, this, &AgentDockWidget::onStopped);
+    connect(m_inlineDiffManager, &InlineDiffManager::diffChanged, this,
+            [this](const QString &diff) {
+                syncDiffUi(diff, false, false);
+                saveChat();
+            });
+    connect(m_inlineDiffManager, &InlineDiffManager::hunkAccepted, this,
+            [this](int, const QString &filePath) {
+                onLogMessage(QStringLiteral("✅ Inline diff accepted: %1").arg(filePath));
+            });
+    connect(m_inlineDiffManager, &InlineDiffManager::hunkRejected, this,
+            [this](int, const QString &filePath) {
+                onLogMessage(QStringLiteral("❌ Inline diff rejected: %1").arg(filePath));
+            });
+    connect(m_inlineDiffManager, &InlineDiffManager::allResolved, this,
+            [this]() { onLogMessage(QStringLiteral("✅ All inline diff hunks resolved.")); });
     connect(m_controller, &AgentController::errorOccurred, this, [this](const QString &err) {
         onLogMessage(QStringLiteral("❌ Error: %1").arg(err));
         updateRunState(false);
@@ -860,14 +883,8 @@ void AgentDockWidget::restoreChat()
     }
 
     m_currentDiff = root.value(QStringLiteral("diff")).toString();
-    m_appliedDiff.clear();
     if (!m_currentDiff.isEmpty())
-    {
-        auto *diffPreview = static_cast<DiffPreviewEdit *>(m_diffView);
-        diffPreview->setDiffText(m_currentDiff);
-        m_applyPatchBtn->setEnabled(diffPreview->hasApprovedChanges());
-        m_revertPatchBtn->setEnabled(false);
-    }
+        syncDiffUi(m_currentDiff, false, true);
 
     const QString status = root.value(QStringLiteral("status")).toString();
     if (!status.isEmpty())
@@ -897,6 +914,71 @@ QString AgentDockWidget::currentLogMarkdown() const
     return redactReadFilePayloads(text);
 }
 
+QString AgentDockWidget::currentProjectDir() const
+{
+    if (auto *ctx = m_controller->editorContext())
+        return ctx->capture().projectDir;
+    return {};
+}
+
+void AgentDockWidget::syncDiffUi(const QString &diff, bool focusDiffTab, bool refreshInlineMarkers)
+{
+    m_currentDiff = diff;
+    m_appliedDiff.clear();
+    m_revertPatchBtn->setEnabled(false);
+
+    auto *diffPreview = static_cast<DiffPreviewEdit *>(m_diffView);
+    diffPreview->setDiffText(diff);
+    m_applyPatchBtn->setEnabled(!diff.isEmpty() && diffPreview->hasApprovedChanges());
+
+    if (focusDiffTab)
+    {
+        if (auto *page = m_diffView->parentWidget())
+            m_tabs->setCurrentWidget(page);
+    }
+
+    m_diffFileList->clear();
+    const QString workDir = currentProjectDir();
+
+    if (!diff.isEmpty())
+    {
+        static const QRegularExpression reFile(QStringLiteral(R"(^--- a/(.+)$)"),
+                                               QRegularExpression::MultilineOption);
+        auto it = reFile.globalMatch(diff);
+        QStringList files;
+        while (it.hasNext())
+        {
+            const QString f = it.next().captured(1);
+            if (!files.contains(f))
+                files.append(f);
+        }
+
+        for (const auto &f : files)
+        {
+            auto *item = new QListWidgetItem(f);
+            item->setData(Qt::UserRole, QDir(workDir).absoluteFilePath(f));
+            m_diffFileList->addItem(item);
+        }
+
+        disconnect(m_diffFileList, &QListWidget::itemClicked, nullptr, nullptr);
+        connect(m_diffFileList, &QListWidget::itemClicked, this, [](QListWidgetItem *item) {
+            const QString absPath = item->data(Qt::UserRole).toString();
+            Core::EditorManager::openEditorAt(
+                Utils::Link(Utils::FilePath::fromString(absPath), 0, 0));
+        });
+    }
+
+    if (refreshInlineMarkers)
+    {
+        if (!diff.isEmpty() && !workDir.isEmpty())
+            m_inlineDiffManager->showDiff(diff, workDir);
+        else
+            m_inlineDiffManager->clearAll();
+    }
+
+    m_diffFileList->setVisible(m_diffFileList->count() != 0);
+}
+
 void AgentDockWidget::clearChatState()
 {
     m_goalEdit->clear();
@@ -905,6 +987,7 @@ void AgentDockWidget::clearChatState()
     m_logMarkdown.clear();
     m_streamingMarkdown.clear();
     m_planList->clear();
+    m_inlineDiffManager->clearAll();
     static_cast<DiffPreviewEdit *>(m_diffView)->setDiffText(QString());
     m_diffFileList->clear();
     m_approvalList->clear();
@@ -922,17 +1005,14 @@ void AgentDockWidget::refreshProjectSelector()
     if (!m_projectCombo)
         return;
 
-    const QString previousProject = m_activeProjectFilePath;
-    QString desiredProject = previousProject;
+    QString desiredProject = startupProjectFilePath();
     if (desiredProject.isEmpty())
     {
         if (auto *ctx = m_controller->editorContext())
-        {
             desiredProject = ctx->selectedProjectFilePath();
-            if (desiredProject.isEmpty())
-                desiredProject = ctx->capture().projectFilePath;
-        }
     }
+    if (desiredProject.isEmpty())
+        desiredProject = m_activeProjectFilePath;
 
     const QList<EditorContext::ProjectInfo> projects =
         m_controller->editorContext() ? m_controller->editorContext()->openProjects()
@@ -1384,57 +1464,7 @@ void AgentDockWidget::onPlanUpdated(const QList<PlanStep> &steps)
 
 void AgentDockWidget::onDiffAvailable(const QString &diff)
 {
-    m_currentDiff = diff;
-    m_appliedDiff.clear();
-    auto *diffPreview = static_cast<DiffPreviewEdit *>(m_diffView);
-    diffPreview->setDiffText(diff);
-    m_applyPatchBtn->setEnabled(!diff.isEmpty() && diffPreview->hasApprovedChanges());
-
-    // Switch to Diff tab (m_diffView is inside a container page)
-    if (auto *page = m_diffView->parentWidget())
-        m_tabs->setCurrentWidget(page);
-
-    // Populate file list from diff headers
-    m_diffFileList->clear();
-    QString workDir;
-    if (auto *ctx = m_controller->editorContext())
-        workDir = ctx->capture().projectDir;
-
-    if (!diff.isEmpty())
-    {
-        // Extract file paths from "--- a/..." headers
-        static const QRegularExpression reFile(QStringLiteral(R"(^--- a/(.+)$)"),
-                                               QRegularExpression::MultilineOption);
-        auto it = reFile.globalMatch(diff);
-        QStringList files;
-        while (it.hasNext())
-        {
-            const QString f = it.next().captured(1);
-            if (!files.contains(f))
-                files.append(f);
-        }
-
-        for (const auto &f : files)
-        {
-            auto *item = new QListWidgetItem(f);
-            item->setData(Qt::UserRole, QDir(workDir).absoluteFilePath(f));
-            m_diffFileList->addItem(item);
-        }
-
-        // Click → open in editor
-        disconnect(m_diffFileList, &QListWidget::itemClicked, nullptr, nullptr);
-        connect(m_diffFileList, &QListWidget::itemClicked, this, [](QListWidgetItem *item) {
-            const QString absPath = item->data(Qt::UserRole).toString();
-            Core::EditorManager::openEditorAt(
-                Utils::Link(Utils::FilePath::fromString(absPath), 0, 0));
-        });
-
-        // Show inline diff markers in code editors
-        if (!workDir.isEmpty())
-            m_inlineDiffManager->showDiff(diff, workDir);
-    }
-
-    m_diffFileList->setVisible(m_diffFileList->count() != 0);
+    syncDiffUi(diff, true, true);
 }
 
 void AgentDockWidget::onApprovalRequested(int id, const QString &action, const QString &reason,
