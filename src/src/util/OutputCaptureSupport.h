@@ -7,7 +7,7 @@
 namespace qcai2
 {
 
-enum class DiagnosticSeverity
+enum class DiagnosticSeverity : std::uint8_t
 {
     Error,
     Warning,

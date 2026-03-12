@@ -1,4 +1,6 @@
 /*! Declares the core plan-act-observe controller that drives an agent session. */
+#include <cstdint>
+#include <cstdint>
 #pragma once
 
 #include "context/EditorContext.h"
@@ -25,7 +27,7 @@ public:
     /**
      * High-level run mode selected in the dock widget.
      */
-    enum class RunMode
+    enum class RunMode : std::uint8_t
     {
         Ask,
         Agent

@@ -6,8 +6,8 @@
 
 - Added per-project agent context selection with a project picker that lists currently open Qt Creator projects.
 - Added `Ask` and `Agent` run modes in the dock widget.
-- Added a version-and-build-aware migration system for global settings and poject-local state.
-- Added direct agent access to Qt Creator `Compile Output` and `Application Output` through new `show_compile_output` and `show_application_output` tools.=
+- Added a version-and-build-aware migration system for global settings and project-local state.
+- Added direct agent access to Qt Creator `Compile Output` and `Application Output` through new `show_compile_output` and `show_application_output` tools.
 - Added repository-level static analysis configuration via `.clang-tidy` and `cmake/clang-static-analyzer-args.cmake`.
 
 ### Changed
@@ -15,6 +15,7 @@
 - Plugin version metadata and migration revision constants are now sourced from the root `VERSION.txt` file via CMake parsing.
 - Fixes for Agent widget UI
 - Migrated `AgentDockWidget` and `SettingsPage` layout definition from hand-built C++ layout code to a Qt Designer `.ui`.
+- The Actions Log and `Raw Markdown` view now omit raw `read_file` file contents, preventing markdown breakage from echoed source text.
 
 ## [0.0.3] - 2026-03-09
 

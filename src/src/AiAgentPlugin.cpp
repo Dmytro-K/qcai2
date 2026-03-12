@@ -166,7 +166,7 @@ void AiAgentPlugin::createDockWidget()
     created = true;
 
     QMainWindow *mw = ICore::mainWindow();
-    if (!mw)
+    if (mw == nullptr)
     {
         QCAI_ERROR("Plugin",
                    QStringLiteral("Main window not available yet, deferring dock creation"));

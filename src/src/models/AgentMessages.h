@@ -56,7 +56,7 @@ struct PlanStep
 /**
  * High-level response shape parsed from model output.
  */
-enum class ResponseType
+enum class ResponseType : std::uint8_t
 {
     /** A multi-step plan response. */
     Plan,

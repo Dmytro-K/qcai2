@@ -69,5 +69,6 @@ package-lock.json
 *.orig
 *.rej
 .kateproject.build
+/.qcai2/
 
 build

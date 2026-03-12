@@ -150,6 +150,27 @@ QString wrapMarkdownPayloadBlocks(const QString &markdown)
     return rewritten;
 }
 
+QString redactReadFilePayloads(const QString &markdown)
+{
+    QString rewritten;
+    qsizetype cursor = 0;
+    static const QRegularExpression readFileReturnedRe(QStringLiteral(
+        R"(((?:Human:\s*)?Tool 'read_file' returned:)([\s\S]*?)(?=\n\nContinue with the next step\.|\n(?:Human:|Assistant:|\{"type":)|$))"));
+
+    QRegularExpressionMatchIterator it = readFileReturnedRe.globalMatch(markdown);
+    while (it.hasNext())
+    {
+        const QRegularExpressionMatch match = it.next();
+        rewritten += markdown.mid(cursor, match.capturedStart() - cursor);
+        rewritten += match.captured(1);
+        rewritten += QStringLiteral("\n\n*[read_file contents omitted from log]*");
+        cursor = match.capturedEnd();
+    }
+
+    rewritten += markdown.mid(cursor);
+    return rewritten;
+}
+
 QString sanitizedSessionFileName(const QString &projectFilePath)
 {
     QString baseName = QFileInfo(projectFilePath).completeBaseName();
@@ -608,6 +629,7 @@ AgentDockWidget::AgentDockWidget(AgentController *controller, QWidget *parent)
     connect(m_controller, &AgentController::logMessage, this, &AgentDockWidget::onLogMessage);
     connect(m_controller, &AgentController::streamingToken, this, [this](const QString &token) {
         m_streamingMarkdown += token;
+        m_streamingMarkdown = redactReadFilePayloads(m_streamingMarkdown);
         if (!m_renderThrottle->isActive())
             m_renderThrottle->start();
     });
@@ -872,7 +894,7 @@ QString AgentDockWidget::currentLogMarkdown() const
             text += QStringLiteral("\n\n");
         text += m_streamingMarkdown;
     }
-    return text;
+    return redactReadFilePayloads(text);
 }
 
 void AgentDockWidget::clearChatState()
@@ -1310,7 +1332,7 @@ void AgentDockWidget::onLogMessage(const QString &msg)
     {
         if (!m_logMarkdown.isEmpty())
             m_logMarkdown += QStringLiteral("\n\n");
-        m_logMarkdown += m_streamingMarkdown;
+        m_logMarkdown += redactReadFilePayloads(m_streamingMarkdown);
         m_streamingMarkdown.clear();
     }
 

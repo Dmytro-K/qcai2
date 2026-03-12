@@ -24,7 +24,7 @@ public:
     /**
      * @brief Severity levels supported by the logger.
      */
-    enum Level
+    enum Level : std::uint8_t
     {
         /** @brief Verbose diagnostic output. */
         Debug,
