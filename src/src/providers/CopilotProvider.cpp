@@ -89,7 +89,7 @@ QString currentPluginLibraryPath()
 #else
     Dl_info info{};
     if (dladdr(reinterpret_cast<const void *>(&currentPluginLibraryPath), &info) == 0 ||
-        !info.dli_fname)
+        (info.dli_fname == nullptr))
     {
         return {};
     }
@@ -180,7 +180,7 @@ QString CopilotProvider::findSidecarScript() const
  */
 bool CopilotProvider::ensureSidecar()
 {
-    if (m_process && m_process->state() == QProcess::Running)
+    if ((m_process != nullptr) && m_process->state() == QProcess::Running)
         return true;
 
     const QString script = findSidecarScript();
@@ -250,7 +250,7 @@ bool CopilotProvider::ensureSidecar()
  */
 void CopilotProvider::sendRequest(const QJsonObject &req)
 {
-    if (!m_process)
+    if (m_process == nullptr)
         return;
     QByteArray data = QJsonDocument(req).toJson(QJsonDocument::Compact);
     data.append('\n');
@@ -262,7 +262,7 @@ void CopilotProvider::sendRequest(const QJsonObject &req)
  */
 void CopilotProvider::handleSidecarOutput()
 {
-    if (!m_process)
+    if (m_process == nullptr)
         return;
 
     m_readBuffer.append(m_process->readAllStandardOutput());
@@ -319,7 +319,7 @@ void CopilotProvider::handleSidecarOutput()
                                                   .toArray();
                 QStringList models;
                 models.reserve(modelArray.size());
-                for (const QJsonValue &value : modelArray)
+                for (const auto &value : modelArray)
                 {
                     if (value.isString())
                         models.append(value.toString());
@@ -449,7 +449,7 @@ void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString
  * Requests the list of models exposed by the sidecar.
  * @param callback Receives available model ids or an error string.
  */
-void CopilotProvider::listModels(ModelListCallback callback)
+void CopilotProvider::listModels(const ModelListCallback& callback)
 {
     if (!ensureSidecar())
     {
@@ -477,7 +477,7 @@ void CopilotProvider::listModels(ModelListCallback callback)
     req[QStringLiteral("id")] = id;
     req[QStringLiteral("method")] = QStringLiteral("list_models");
 
-    m_modelListCallbacks.insert(id, std::move(callback));
+    m_modelListCallbacks.insert(id, callback);
     sendRequest(req);
 }
 
@@ -494,7 +494,7 @@ void CopilotProvider::cancel()
         it.value()({}, QStringLiteral("Cancelled"));
 
     // Tell sidecar to cancel too (drop queued/active requests)
-    if (m_process && m_process->state() == QProcess::Running)
+    if ((m_process != nullptr) && m_process->state() == QProcess::Running)
     {
         QJsonObject req;
         req[QStringLiteral("id")] = m_nextId++;
@@ -508,7 +508,7 @@ void CopilotProvider::cancel()
  */
 void CopilotProvider::stopSidecar()
 {
-    if (!m_process)
+    if (m_process == nullptr)
         return;
 
     // Send stop command
@@ -518,7 +518,7 @@ void CopilotProvider::stopSidecar()
     sendRequest(req);
 
     m_process->waitForFinished(3000);
-    if (m_process && m_process->state() == QProcess::Running)
+    if ((m_process != nullptr) && m_process->state() == QProcess::Running)
     {
         m_process->kill();
         m_process->waitForFinished(1000);

@@ -20,7 +20,7 @@ namespace
 
 QString displayNameForRunControl(const ProjectExplorer::RunControl *runControl)
 {
-    if (!runControl)
+    if (runControl == nullptr)
         return QStringLiteral("Application");
 
     const QString displayName = runControl->displayName().trimmed();
@@ -147,7 +147,7 @@ void IdeOutputCapture::ingestExternalBuildOutput(const QString &output)
 
 void IdeOutputCapture::attachProject(ProjectExplorer::Project *project)
 {
-    if (!project || m_projects.contains(project))
+    if ((project == nullptr) || m_projects.contains(project))
         return;
 
     trackObject(project, m_projects);
@@ -159,7 +159,7 @@ void IdeOutputCapture::attachProject(ProjectExplorer::Project *project)
 
 void IdeOutputCapture::attachTarget(ProjectExplorer::Target *target)
 {
-    if (!target || m_targets.contains(target))
+    if ((target == nullptr) || m_targets.contains(target))
         return;
 
     trackObject(target, m_targets);
@@ -173,7 +173,7 @@ void IdeOutputCapture::attachTarget(ProjectExplorer::Target *target)
 void IdeOutputCapture::attachBuildConfiguration(
     ProjectExplorer::BuildConfiguration *buildConfiguration)
 {
-    if (!buildConfiguration || m_buildConfigurations.contains(buildConfiguration))
+    if ((buildConfiguration == nullptr) || m_buildConfigurations.contains(buildConfiguration))
         return;
 
     trackObject(buildConfiguration, m_buildConfigurations);
@@ -183,7 +183,7 @@ void IdeOutputCapture::attachBuildConfiguration(
 
 void IdeOutputCapture::attachBuildStepList(ProjectExplorer::BuildStepList *stepList)
 {
-    if (!stepList || m_buildStepLists.contains(stepList))
+    if ((stepList == nullptr) || m_buildStepLists.contains(stepList))
         return;
 
     trackObject(stepList, m_buildStepLists);
@@ -196,7 +196,7 @@ void IdeOutputCapture::attachBuildStepList(ProjectExplorer::BuildStepList *stepL
 
 void IdeOutputCapture::attachBuildStep(ProjectExplorer::BuildStep *step)
 {
-    if (!step || m_buildSteps.contains(step))
+    if ((step == nullptr) || m_buildSteps.contains(step))
         return;
 
     trackObject(step, m_buildSteps);
@@ -221,7 +221,7 @@ void IdeOutputCapture::attachBuildStep(ProjectExplorer::BuildStep *step)
 
 void IdeOutputCapture::attachRunControl(ProjectExplorer::RunControl *runControl)
 {
-    if (!runControl || m_runControls.contains(runControl))
+    if ((runControl == nullptr) || m_runControls.contains(runControl))
         return;
 
     trackObject(runControl, m_runControls);

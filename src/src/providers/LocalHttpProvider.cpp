@@ -136,7 +136,7 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
 
 void LocalHttpProvider::cancel()
 {
-    if (m_currentReply)
+    if (m_currentReply != nullptr)
     {
         m_currentReply->abort();
         m_currentReply->deleteLater();

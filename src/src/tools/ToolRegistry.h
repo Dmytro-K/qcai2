@@ -27,7 +27,7 @@ public:
      * Registers or replaces a tool by its name.
      * @param tool Tool instance to register.
      */
-    void registerTool(std::shared_ptr<ITool> tool);
+    void registerTool(const std::shared_ptr<ITool>& tool);
 
     /**
      * Looks up a tool by name.

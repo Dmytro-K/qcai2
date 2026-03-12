@@ -68,8 +68,8 @@ QStringList previewLinesForHunk(const QString &hunkBody)
 class DiffPreviewWidget final : public QFrame
 {
 public:
-    DiffPreviewWidget(const QStringList &previewLines, std::function<void()> accept,
-                      std::function<void()> reject,
+    DiffPreviewWidget(const QStringList &previewLines, const std::function<void()>& accept,
+                      const std::function<void()>& reject,
                       QWidget *parent = nullptr)
         : QFrame(parent)
     {
@@ -117,7 +117,7 @@ public:
         buttonsRow->setSpacing(4);
         buttonsRow->addStretch(1);
         auto addCompactButton = [this, buttonsRow](const QString &text, const QString &style,
-                                                   std::function<void()> callback) {
+                                                   const std::function<void()> &callback) {
             auto *button = new QPushButton(text, this);
             button->setCursor(Qt::PointingHandCursor);
             button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -132,12 +132,12 @@ public:
                          QStringLiteral("QPushButton { background: rgba(70, 160, 95, 56); "
                                         "color: palette(text); border: 1px solid #4aa36a; "
                                         "border-radius: 3px; padding: 0px 6px; min-height: 18px; }"),
-                         std::move(accept));
+                         accept);
         addCompactButton(QStringLiteral("Reject"),
                          QStringLiteral("QPushButton { background: rgba(190, 80, 80, 56); "
                                         "color: palette(text); border: 1px solid #c06161; "
                                         "border-radius: 3px; padding: 0px 6px; min-height: 18px; }"),
-                         std::move(reject));
+                         reject);
         root->addLayout(buttonsRow);
 
         setStyleSheet(QStringLiteral(
@@ -320,7 +320,7 @@ void InlineDiffManager::showDiff(const QString &unifiedDiff, const QString &proj
 
     // Create markers and open files
     QSet<QString> openedFiles;
-    for (int i = 0; i < int(m_hunks.size()); ++i)
+    for (std::size_t i = 0; i < m_hunks.size(); ++i)
     {
         const QString absPath = QDir(m_projectDir).absoluteFilePath(m_hunks[i].hunk.filePath);
 
@@ -333,7 +333,7 @@ void InlineDiffManager::showDiff(const QString &unifiedDiff, const QString &proj
                 Core::EditorManager::DoNotChangeCurrentEditor);
         }
 
-        createMarker(i);
+        createMarker(int(i));
     }
 
     // Navigate to first hunk
@@ -350,7 +350,7 @@ void InlineDiffManager::showDiff(const QString &unifiedDiff, const QString &proj
 
 void InlineDiffManager::createMarker(int index)
 {
-    const auto &h = m_hunks[index].hunk;
+    const auto &h = m_hunks[std::size_t(index)].hunk;
     const QString absPath = QDir(m_projectDir).absoluteFilePath(h.filePath);
 
     const QString tooltip = QStringLiteral(
@@ -365,15 +365,15 @@ void InlineDiffManager::createMarker(int index)
                                   [this, index]() { rejectHunk(index); },
                                   [this]() { acceptAll(); }, [this]() { rejectAll(); });
 
-    m_hunks[index].mark = mark;
+    m_hunks[std::size_t(index)].mark = mark;
 
     const Utils::FilePath filePath = Utils::FilePath::fromString(absPath);
     const QList<TextEditor::BaseTextEditor *> editors =
         TextEditor::BaseTextEditor::textEditorsForFilePath(filePath);
     for (TextEditor::BaseTextEditor *editor : editors)
     {
-        if (!editor || !editor->editorWidget() || !editor->textDocument() ||
-            !editor->textDocument()->document())
+        if (editor == nullptr || editor->editorWidget() == nullptr ||
+            editor->textDocument() == nullptr || editor->textDocument()->document() == nullptr)
         {
             continue;
         }
@@ -390,7 +390,7 @@ void InlineDiffManager::createMarker(int index)
         std::unique_ptr<TextEditor::EmbeddedWidgetInterface> handle =
             editor->editorWidget()->insertWidget(widget, block.position());
         if (handle)
-            m_hunks[index].widgetHandles.push_back(std::move(handle));
+            m_hunks[std::size_t(index)].widgetHandles.push_back(std::move(handle));
         else
             delete widget;
     }
@@ -403,7 +403,7 @@ void InlineDiffManager::acceptHunk(int hunkIndex)
     if (hunkIndex < 0 || hunkIndex >= int(m_hunks.size()) || m_resolved.contains(hunkIndex))
         return;
 
-    const auto &h = m_hunks[hunkIndex].hunk;
+    const auto &h = m_hunks[std::size_t(hunkIndex)].hunk;
     const QString patchText = Diff::normalize(h.fullPatch);
 
     QString errorMsg;
@@ -418,9 +418,9 @@ void InlineDiffManager::acceptHunk(int hunkIndex)
               QStringLiteral("Accepted hunk %1 in %2").arg(hunkIndex).arg(h.filePath));
 
     m_resolved.insert(hunkIndex);
-    m_hunks[hunkIndex].widgetHandles.clear();
-    delete m_hunks[hunkIndex].mark;
-    m_hunks[hunkIndex].mark = nullptr;
+    m_hunks[std::size_t(hunkIndex)].widgetHandles.clear();
+    delete m_hunks[std::size_t(hunkIndex)].mark;
+    m_hunks[std::size_t(hunkIndex)].mark = nullptr;
     emit diffChanged(remainingDiff());
     emit hunkAccepted(hunkIndex, h.filePath);
 
@@ -433,14 +433,14 @@ void InlineDiffManager::rejectHunk(int hunkIndex)
     if (hunkIndex < 0 || hunkIndex >= int(m_hunks.size()) || m_resolved.contains(hunkIndex))
         return;
 
-    const auto &h = m_hunks[hunkIndex].hunk;
+    const auto &h = m_hunks[std::size_t(hunkIndex)].hunk;
     QCAI_INFO("InlineDiff",
               QStringLiteral("Rejected hunk %1 in %2").arg(hunkIndex).arg(h.filePath));
 
     m_resolved.insert(hunkIndex);
-    m_hunks[hunkIndex].widgetHandles.clear();
-    delete m_hunks[hunkIndex].mark;
-    m_hunks[hunkIndex].mark = nullptr;
+    m_hunks[std::size_t(hunkIndex)].widgetHandles.clear();
+    delete m_hunks[std::size_t(hunkIndex)].mark;
+    m_hunks[std::size_t(hunkIndex)].mark = nullptr;
     emit diffChanged(remainingDiff());
     emit hunkRejected(hunkIndex, h.filePath);
 
@@ -452,9 +452,9 @@ QString InlineDiffManager::remainingDiff() const
 {
     QStringList patches;
     patches.reserve(qsizetype(m_hunks.size()));
-    for (int i = 0; i < int(m_hunks.size()); ++i)
+    for (std::size_t i = 0; i < m_hunks.size(); ++i)
     {
-        if (m_resolved.contains(i))
+        if (m_resolved.contains(int(i)))
             continue;
         patches.append(Diff::normalize(m_hunks[i].hunk.fullPatch).trimmed());
     }

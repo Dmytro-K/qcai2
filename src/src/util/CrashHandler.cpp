@@ -61,7 +61,7 @@ static void writeCrashFile(int sig, void **frames, int frameCount)
     // Build path: ~/.local/share/qcai2/crash.log
     // We can't use Qt in signal handler safely, so use a fixed path
     const char *home = getenv("HOME");
-    if (!home)
+    if (home == nullptr)
         home = "/tmp";
 
     char path[512];
@@ -75,21 +75,21 @@ static void writeCrashFile(int sig, void **frames, int frameCount)
     snprintf(path, sizeof(path), "%s/.local/share/qcai2/crash.log", home);
 
     FILE *logFile = fopen(path, "a");
-    FILE *f = logFile ? logFile : stderr;
+    FILE *f = (logFile != nullptr) ? logFile : stderr;
 
     fprintf(f, "\n=== QCAI2 CRASH === Signal: %s (%d) ===\n", signalName(sig), sig);
 
 #ifdef Q_OS_UNIX
     // backtrace_symbols_fd is async-signal-safe
-    if (logFile)
+    if (logFile != nullptr)
     {
         // Write symbols to file
         char **symbols = backtrace_symbols(frames, frameCount);
-        if (symbols)
+        if (symbols != nullptr)
         {
             for (int i = 0; i < frameCount; ++i)
                 fprintf(f, "  #%d %s\n", i, symbols[i]);
-            free(symbols);
+            free(static_cast<void *>(symbols));
         }
     }
     // Also dump to stderr for console visibility
@@ -98,7 +98,7 @@ static void writeCrashFile(int sig, void **frames, int frameCount)
     fprintf(stderr, "Crash log written to: %s\n", path);
 #endif
 
-    if (logFile)
+    if (logFile != nullptr)
     {
         fprintf(logFile, "=== END CRASH ===\n");
         fclose(logFile);
@@ -127,7 +127,7 @@ static void crashSignalHandler(int sig)
         QString trace;
 #ifdef Q_OS_UNIX
         char **symbols = backtrace_symbols(frames, frameCount);
-        if (symbols)
+        if (symbols != nullptr)
         {
             for (int i = 0; i < frameCount; ++i)
             {
@@ -135,7 +135,7 @@ static void crashSignalHandler(int sig)
                     trace += QLatin1Char('\n');
                 trace += QString::fromUtf8(symbols[i]);
             }
-            free(symbols);
+            free(static_cast<void *>(symbols));
         }
 #endif
         Logger::instance().error(QStringLiteral("CRASH"),

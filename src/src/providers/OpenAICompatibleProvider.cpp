@@ -234,7 +234,7 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
  */
 void OpenAICompatibleProvider::cancel()
 {
-    if (m_currentReply)
+    if (m_currentReply != nullptr)
     {
         m_currentReply->abort();
         m_currentReply->deleteLater();

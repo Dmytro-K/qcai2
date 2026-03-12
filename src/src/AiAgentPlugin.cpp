@@ -152,7 +152,7 @@ void AiAgentPlugin::extensionsInitialized()
 
 AiAgentPlugin::ShutdownFlag AiAgentPlugin::aboutToShutdown()
 {
-    if (m_controller && m_controller->isRunning())
+    if ((m_controller != nullptr) && m_controller->isRunning())
         m_controller->stop();
     settings().save();
     return SynchronousShutdown;
@@ -227,7 +227,7 @@ void AiAgentPlugin::setupProviders()
             break;
         }
     }
-    if (!m_currentProvider && !m_providers.isEmpty())
+    if ((m_currentProvider == nullptr) && !m_providers.isEmpty())
         m_currentProvider = m_providers.first();
 
     m_controller->setProvider(m_currentProvider);
@@ -241,7 +241,7 @@ void AiAgentPlugin::setupProviders()
 
 void AiAgentPlugin::refreshCopilotModels()
 {
-    if (!m_copilotProvider)
+    if (m_copilotProvider == nullptr)
         return;
 
     m_copilotProvider->listModels([](const QStringList &models, const QString &error) {

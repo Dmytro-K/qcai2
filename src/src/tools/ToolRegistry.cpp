@@ -19,10 +19,10 @@ ToolRegistry::ToolRegistry(QObject *parent) : QObject(parent)
  * Registers or replaces a tool using its stable name as the key.
  * @param tool Tool instance to register.
  */
-void ToolRegistry::registerTool(std::shared_ptr<ITool> tool)
+void ToolRegistry::registerTool(const std::shared_ptr<ITool>& tool)
 {
     QCAI_DEBUG("Tools", QStringLiteral("Registered tool: %1").arg(tool->name()));
-    m_tools.insert(tool->name(), std::move(tool));
+    m_tools.insert(tool->name(), tool);
 }
 
 /**

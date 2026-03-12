@@ -43,7 +43,7 @@ QString ReadFileTool::execute(const QJsonObject &args, const QString &workDir)
         return QStringLiteral("Error: cannot open file: %1").arg(file.errorString());
 
     QTextStream in(&file);
-    const QString content = in.readAll();
+    QString content = in.readAll();
 
     int startLine = args.value("start_line").toInt(0);
     int endLine = args.value("end_line").toInt(0);

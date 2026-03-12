@@ -221,7 +221,7 @@ QString readContextTextFile(const QString &path, const QString &description, boo
     QFile file(path);
     if (!file.exists())
     {
-        if (ok)
+        if (ok != nullptr)
             *ok = false;
         return {};
     }
@@ -230,12 +230,12 @@ QString readContextTextFile(const QString &path, const QString &description, boo
     {
         QCAI_WARN("Dock", QStringLiteral("Failed to open %1 for reading: %2")
                               .arg(description, path));
-        if (ok)
+        if (ok != nullptr)
             *ok = false;
         return {};
     }
 
-    if (ok)
+    if (ok != nullptr)
         *ok = true;
     return QString::fromUtf8(file.readAll());
 }
@@ -550,7 +550,7 @@ private:
     }
     void updateLineNumberArea(const QRect &rect, int dy)
     {
-        if (dy)
+        if (dy != 0)
             m_lineNumberArea->scroll(0, dy);
         else
             m_lineNumberArea->update(0, rect.y(), m_lineNumberArea->width(), rect.height());
@@ -1002,7 +1002,7 @@ void AgentDockWidget::clearChatState()
 
 void AgentDockWidget::refreshProjectSelector()
 {
-    if (!m_projectCombo)
+    if (m_projectCombo == nullptr)
         return;
 
     QString desiredProject = startupProjectFilePath();
@@ -1015,7 +1015,7 @@ void AgentDockWidget::refreshProjectSelector()
         desiredProject = m_activeProjectFilePath;
 
     const QList<EditorContext::ProjectInfo> projects =
-        m_controller->editorContext() ? m_controller->editorContext()->openProjects()
+        (m_controller->editorContext() != nullptr) ? m_controller->editorContext()->openProjects()
                                       : QList<EditorContext::ProjectInfo>{};
 
     const QSignalBlocker blocker(m_projectCombo);
@@ -1521,7 +1521,7 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
         // Enter — run agent
         if (ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter)
         {
-            if (ke->modifiers() & Qt::ShiftModifier)
+            if ((ke->modifiers() & Qt::ShiftModifier) != 0u)
                 return false;  // Shift+Enter — newline
             onRunClicked();
             return true;
@@ -1535,7 +1535,7 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
         }
 
         // Ctrl+L — clear log
-        if (ke->key() == Qt::Key_L && (ke->modifiers() & Qt::ControlModifier))
+        if (ke->key() == Qt::Key_L && ((ke->modifiers() & Qt::ControlModifier) != 0u))
         {
             m_logView->clear();
             m_rawMarkdownView->clear();

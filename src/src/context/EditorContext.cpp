@@ -41,7 +41,7 @@ ProjectExplorer::Project *resolveProject(const QString &selectedProjectFilePath)
 
 bool belongsToProject(const Utils::FilePath &filePath, ProjectExplorer::Project *project)
 {
-    if (!project || filePath.isEmpty())
+    if ((project == nullptr) || filePath.isEmpty())
         return project == nullptr;
 
     return ProjectExplorer::ProjectManager::projectsForFile(filePath).contains(project);
@@ -88,7 +88,7 @@ EditorContext::Snapshot EditorContext::capture() const
     }
 
     // Project & build directories
-    if (project)
+    if (project != nullptr)
     {
         s.projectName = project->displayName();
         s.projectDir = project->projectDirectory().toUrlishString();
@@ -134,7 +134,7 @@ QList<EditorContext::ProjectInfo> EditorContext::openProjects() const
 
     for (auto *project : openProjects)
     {
-        if (!project)
+        if (project == nullptr)
             continue;
 
         ProjectInfo info;
@@ -198,11 +198,11 @@ QString EditorContext::fileContentsFragment(int maxChars) const
     if (Core::IEditor *editor = Core::EditorManager::currentEditor())
     {
         Core::IDocument *candidate = editor->document();
-        if (candidate && belongsToProject(candidate->filePath(), project))
+        if ((candidate != nullptr) && belongsToProject(candidate->filePath(), project))
             activeDoc = candidate;
     }
 
-    if (activeDoc)
+    if (activeDoc != nullptr)
         ordered.append(activeDoc);
 
     const auto docs = Core::DocumentModel::openedDocuments();

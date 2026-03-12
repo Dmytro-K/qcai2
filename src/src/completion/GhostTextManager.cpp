@@ -35,7 +35,7 @@ void GhostTextManager::setEnabled(bool enabled)
 
 void GhostTextManager::attachToEditor(TextEditor::TextEditorWidget *editor)
 {
-    if (!editor || m_debounceTimers.contains(editor))
+    if ((editor == nullptr) || m_debounceTimers.contains(editor))
         return;
 
     auto *timer = new QTimer(this);
@@ -67,7 +67,7 @@ void GhostTextManager::attachToEditor(TextEditor::TextEditorWidget *editor)
 
 void GhostTextManager::onContentsChanged(TextEditor::TextEditorWidget *editor)
 {
-    if (!m_enabled || !m_provider)
+    if (!m_enabled || (m_provider == nullptr))
         return;
 
     const auto &s = settings();
@@ -81,7 +81,7 @@ void GhostTextManager::onContentsChanged(TextEditor::TextEditorWidget *editor)
 
 void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
 {
-    if (!m_enabled || !m_provider || !editor)
+    if (!m_enabled || (m_provider == nullptr) || (editor == nullptr))
         return;
 
     const auto &s = settings();
@@ -94,14 +94,14 @@ void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
         return;
 
     const QTextDocument *doc = editor->document();
-    if (!doc)
+    if (doc == nullptr)
         return;
 
     const QString fullText = doc->toPlainText();
     const int startBefore = qMax(0, pos - kContextBefore);
     const QString prefix = fullText.mid(startBefore, pos - startBefore);
     const QString suffix = fullText.mid(pos, qMin(kContextAfter, fullText.length() - pos));
-    const QString fileName = editor->textDocument()
+    const QString fileName = (editor->textDocument() != nullptr)
                                  ? editor->textDocument()->filePath().toUrlishString()
                                  : QStringLiteral("untitled");
 

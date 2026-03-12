@@ -52,7 +52,7 @@ QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
     if (!result.stdErr.isEmpty())
         output += QStringLiteral("\nSTDERR:\n") + result.stdErr;
 
-    if (m_outputCapture)
+    if (m_outputCapture != nullptr)
         m_outputCapture->ingestExternalBuildOutput(output);
 
     return output;
@@ -118,7 +118,7 @@ QJsonObject ShowDiagnosticsTool::argsSchema() const
 QString ShowDiagnosticsTool::execute(const QJsonObject &args, const QString & /*workDir*/)
 {
     const int maxItems = qBound(1, args.value("max_items").toInt(50), 500);
-    if (m_outputCapture)
+    if (m_outputCapture != nullptr)
     {
         const QString report = m_outputCapture->diagnosticsSnapshot(maxItems);
         if (report != QStringLiteral("No diagnostics found."))
@@ -142,17 +142,17 @@ QJsonObject ShowCompileOutputTool::argsSchema() const
 
 QString ShowCompileOutputTool::execute(const QJsonObject &args, const QString & /*workDir*/)
 {
-    if (!m_outputCapture)
+    if (m_outputCapture == nullptr)
         return QStringLiteral("Compile Output integration is not available.");
 
     const int maxLines = qBound(10, args.value("max_lines").toInt(200), 2000);
     const bool diagnosticsOnly = args.value("diagnostics_only").toBool(false);
 
-    const QString diagnostics = m_outputCapture->diagnosticsSnapshot(50);
+    QString diagnostics = m_outputCapture->diagnosticsSnapshot(50);
     if (diagnosticsOnly)
         return diagnostics;
 
-    const QString output = m_outputCapture->compileOutputSnapshot(maxLines);
+    QString output = m_outputCapture->compileOutputSnapshot(maxLines);
     if (diagnostics == QStringLiteral("No diagnostics found."))
         return output;
 
@@ -168,7 +168,7 @@ QJsonObject ShowApplicationOutputTool::argsSchema() const
 
 QString ShowApplicationOutputTool::execute(const QJsonObject &args, const QString & /*workDir*/)
 {
-    if (!m_outputCapture)
+    if (m_outputCapture == nullptr)
         return QStringLiteral("Application Output integration is not available.");
 
     const int maxLines = qBound(10, args.value("max_lines").toInt(200), 2000);

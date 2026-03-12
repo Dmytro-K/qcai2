@@ -137,7 +137,7 @@ QString AgentController::buildSystemPrompt() const
     }
 
     // Available tools
-    if (m_runMode == RunMode::Agent && m_toolRegistry)
+    if (m_runMode == RunMode::Agent && (m_toolRegistry != nullptr))
     {
         QJsonDocument toolsDoc(m_toolRegistry->toolDescriptionsJson());
         sys += QStringLiteral("Available tools:\n%1\n\n")
@@ -145,7 +145,7 @@ QString AgentController::buildSystemPrompt() const
     }
 
     // Editor context
-    if (m_editorContext)
+    if (m_editorContext != nullptr)
     {
         sys += QStringLiteral("Current editor context:\n%1\n")
                    .arg(m_editorContext->toPromptFragment());
@@ -200,7 +200,7 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
                 break;
             }
         }
-        if (!m_provider)
+        if (m_provider == nullptr)
             m_provider = m_allProviders.first();
 
         // Reconfigure the selected provider
@@ -220,7 +220,7 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
         }
     }
 
-    if (!m_provider)
+    if (m_provider == nullptr)
     {
         emit errorOccurred(QStringLiteral("No AI provider configured."));
         return;
@@ -280,7 +280,7 @@ void AgentController::stop()
     QCAI_INFO("Agent", QStringLiteral("Agent stopped by user at iteration %1, tool calls: %2")
                            .arg(m_iteration)
                            .arg(m_toolCallCount));
-    if (m_provider)
+    if (m_provider != nullptr)
         m_provider->cancel();
     disarmProviderWatchdog();
     emit logMessage(QStringLiteral("⏹ Agent stopped by user."));
@@ -294,7 +294,7 @@ void AgentController::runNextIteration()
 
     // Check limits
     const int maxIter =
-        m_safetyPolicy ? m_safetyPolicy->maxIterations() : settings().maxIterations;
+        (m_safetyPolicy != nullptr) ? m_safetyPolicy->maxIterations() : settings().maxIterations;
     if (m_iteration >= maxIter)
     {
         m_running = false;
@@ -471,7 +471,7 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
     if (!m_running)
         return;
 
-    const int maxCalls = m_safetyPolicy ? m_safetyPolicy->maxToolCalls() : settings().maxToolCalls;
+    const int maxCalls = (m_safetyPolicy != nullptr) ? m_safetyPolicy->maxToolCalls() : settings().maxToolCalls;
     if (m_toolCallCount >= maxCalls)
     {
         m_running = false;
@@ -480,8 +480,8 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
         return;
     }
 
-    ITool *tool = m_toolRegistry ? m_toolRegistry->tool(name) : nullptr;
-    if (!tool)
+    ITool *tool = (m_toolRegistry != nullptr) ? m_toolRegistry->tool(name) : nullptr;
+    if (tool == nullptr)
     {
         m_messages.append(
             {QStringLiteral("user"),
@@ -494,7 +494,7 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
     // Check if approval is required
     if (tool->requiresApproval() && !m_dryRun)
     {
-        QString reason = m_safetyPolicy ? m_safetyPolicy->requiresApproval(name)
+        QString reason = (m_safetyPolicy != nullptr) ? m_safetyPolicy->requiresApproval(name)
                                         : QStringLiteral("Tool requires approval.");
 
         if (!reason.isEmpty())
@@ -526,7 +526,7 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
 
     // Get workDir from editor context
     QString workDir;
-    if (m_editorContext)
+    if (m_editorContext != nullptr)
     {
         auto snap = m_editorContext->capture();
         workDir = snap.projectDir;
@@ -571,7 +571,7 @@ void AgentController::handleProviderInactivityTimeout()
 
     QCAI_ERROR("Agent", QStringLiteral("Provider response timed out after %1 ms of inactivity")
                             .arg(kProviderInactivityTimeoutMs));
-    if (m_provider)
+    if (m_provider != nullptr)
         m_provider->cancel();
 
     emit logMessage(QStringLiteral("⌛ Provider response timed out after %1 seconds of inactivity.")
@@ -591,14 +591,14 @@ void AgentController::approveAction(int approvalId)
             auto pa = m_pendingApprovals.takeAt(i);
             emit logMessage(QStringLiteral("✅ Approved: %1").arg(pa.toolName));
 
-            if (!pa.toolName.isEmpty() && m_toolRegistry)
+            if (!pa.toolName.isEmpty() && (m_toolRegistry != nullptr))
             {
                 ITool *tool = m_toolRegistry->tool(pa.toolName);
-                if (tool)
+                if (tool != nullptr)
                 {
                     ++m_toolCallCount;
                     QString workDir;
-                    if (m_editorContext)
+                    if (m_editorContext != nullptr)
                         workDir = m_editorContext->capture().projectDir;
                     QString result = tool->execute(pa.toolArgs, workDir);
                     m_messages.append(

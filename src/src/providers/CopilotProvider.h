@@ -70,7 +70,7 @@ public:
      * Requests the available Copilot models from the sidecar.
      * @param callback Callback invoked with the final result.
      */
-    void listModels(ModelListCallback callback);
+    void listModels(const ModelListCallback& callback);
 
     /**
      * Cancels queued or active requests on both plugin and sidecar sides.

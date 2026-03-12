@@ -24,7 +24,7 @@ bool writeTextFile(const QString &path, const QString &content, QString *error)
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly))
     {
-        if (error)
+        if (error != nullptr)
             *error = QStringLiteral("Failed to open %1 for writing").arg(path);
         return false;
     }
@@ -32,7 +32,7 @@ bool writeTextFile(const QString &path, const QString &content, QString *error)
     file.write(content.toUtf8());
     if (!file.commit())
     {
-        if (error)
+        if (error != nullptr)
             *error = QStringLiteral("Failed to commit %1").arg(path);
         return false;
     }
@@ -45,21 +45,21 @@ QString readTextFile(const QString &path, bool *exists = nullptr, QString *error
     QFile file(path);
     if (!file.exists())
     {
-        if (exists)
+        if (exists != nullptr)
             *exists = false;
         return {};
     }
 
     if (!file.open(QIODevice::ReadOnly))
     {
-        if (exists)
+        if (exists != nullptr)
             *exists = true;
-        if (error)
+        if (error != nullptr)
             *error = QStringLiteral("Failed to open %1 for reading").arg(path);
         return {};
     }
 
-    if (exists)
+    if (exists != nullptr)
         *exists = true;
     return QString::fromUtf8(file.readAll());
 }
@@ -94,7 +94,7 @@ bool migrateProjectStateTo_0_0_4_001(const QString &storagePath, QJsonObject &ro
     (void)readTextFile(goalPath, &goalExists, &readError);
     if (!readError.isEmpty())
     {
-        if (error)
+        if (error != nullptr)
             *error = readError;
         return false;
     }
@@ -117,7 +117,7 @@ bool migrateProjectStateTo_0_0_4_001(const QString &storagePath, QJsonObject &ro
     (void)readTextFile(logPath, &logExists, &readError);
     if (!readError.isEmpty())
     {
-        if (error)
+        if (error != nullptr)
             *error = readError;
         return false;
     }

@@ -73,21 +73,21 @@ QString readTextFile(const QString &path, bool *exists = nullptr, QString *error
     QFile file(path);
     if (!file.exists())
     {
-        if (exists)
+        if (exists != nullptr)
             *exists = false;
         return {};
     }
 
     if (!file.open(QIODevice::ReadOnly))
     {
-        if (exists)
+        if (exists != nullptr)
             *exists = true;
-        if (error)
+        if (error != nullptr)
             *error = QStringLiteral("Failed to open %1 for reading").arg(path);
         return {};
     }
 
-    if (exists)
+    if (exists != nullptr)
         *exists = true;
     return QString::fromUtf8(file.readAll());
 }
@@ -113,7 +113,7 @@ bool checkArchiveResult(struct archive *archiveHandle, int result, QString *erro
     if (result == ARCHIVE_OK)
         return true;
 
-    if (error)
+    if (error != nullptr)
     {
         *error = QStringLiteral("libarchive error: %1")
                      .arg(QString::fromUtf8(archive_error_string(archiveHandle)));
@@ -184,9 +184,9 @@ bool createTarXzArchive(const QString &archivePath, const QList<ArchiveEntryData
                         QString *error)
 {
     struct archive *archiveHandle = archive_write_new();
-    if (!archiveHandle)
+    if (archiveHandle == nullptr)
     {
-        if (error)
+        if (error != nullptr)
             *error = QStringLiteral("Failed to allocate libarchive writer");
         return false;
     }
@@ -221,7 +221,7 @@ bool createTarXzArchive(const QString &archivePath, const QList<ArchiveEntryData
                 archive_write_data(archiveHandle, entryData.data.constData(), dataSize);
             if (written < 0 || static_cast<size_t>(written) != dataSize)
             {
-                if (error)
+                if (error != nullptr)
                 {
                     *error = QStringLiteral("Failed to write archive entry %1: %2")
                                  .arg(entryData.path,
@@ -238,7 +238,7 @@ bool createTarXzArchive(const QString &archivePath, const QList<ArchiveEntryData
         ok && checkArchiveResult(archiveHandle, archive_write_close(archiveHandle), error);
     const int freeResult = archive_write_free(archiveHandle);
     bool freeOk = freeResult == ARCHIVE_OK;
-    if (!freeOk && error)
+    if (!freeOk && (error != nullptr))
         *error = QStringLiteral("Failed to finalize archive %1").arg(archivePath);
     return ok && closeOk && freeOk;
 }
@@ -263,7 +263,7 @@ bool ensureDirExists(const QString &dirPath, QString *error)
 {
     if (QDir().mkpath(dirPath))
         return true;
-    if (error)
+    if (error != nullptr)
         *error = QStringLiteral("Failed to create backup directory %1").arg(dirPath);
     return false;
 }
@@ -319,7 +319,7 @@ bool appendFileIfExists(QList<ArchiveEntryData> &entries, const QString &archive
     const QString text = readTextFile(diskPath, &exists, &readError);
     if (!readError.isEmpty())
     {
-        if (error)
+        if (error != nullptr)
             *error = readError;
         return false;
     }
@@ -378,7 +378,7 @@ bool saveProjectRoot(const QString &storagePath, const QJsonObject &root, QStrin
     QSaveFile file(storagePath);
     if (!file.open(QIODevice::WriteOnly))
     {
-        if (error)
+        if (error != nullptr)
             *error = QStringLiteral("Failed to open %1 for writing").arg(storagePath);
         return false;
     }
@@ -386,7 +386,7 @@ bool saveProjectRoot(const QString &storagePath, const QJsonObject &root, QStrin
     file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     if (!file.commit())
     {
-        if (error)
+        if (error != nullptr)
             *error = QStringLiteral("Failed to commit %1").arg(storagePath);
         return false;
     }
@@ -538,7 +538,7 @@ bool migrateProjectState(const QString &storagePath, QString *error)
         return true;
     if (!file.open(QIODevice::ReadOnly))
     {
-        if (error)
+        if (error != nullptr)
             *error = QStringLiteral("Failed to open %1 for reading").arg(storagePath);
         return false;
     }
@@ -549,7 +549,7 @@ bool migrateProjectState(const QString &storagePath, QString *error)
     const QJsonDocument doc = QJsonDocument::fromJson(rawState);
     if (!doc.isObject())
     {
-        if (error)
+        if (error != nullptr)
             *error = QStringLiteral("Invalid project context JSON: %1").arg(storagePath);
         return false;
     }

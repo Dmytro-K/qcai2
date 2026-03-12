@@ -45,16 +45,16 @@ void AiCompletionProcessor::cancel()
 
 TextEditor::IAssistProposal *AiCompletionProcessor::perform()
 {
-    if (!m_provider || m_cancelled)
+    if ((m_provider == nullptr) || m_cancelled)
         return nullptr;
 
     const TextEditor::AssistInterface *iface = interface();
-    if (!iface)
+    if (iface == nullptr)
         return nullptr;
 
     const int pos = iface->position();
     const QTextDocument *doc = iface->textDocument();
-    if (!doc)
+    if (doc == nullptr)
         return nullptr;
 
     // Extract text before and after cursor

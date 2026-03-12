@@ -21,7 +21,7 @@ AiCompletionProvider::AiCompletionProvider(QObject *parent) : CompletionAssistPr
 TextEditor::IAssistProcessor *AiCompletionProvider::createProcessor(
     const TextEditor::AssistInterface * /*assistInterface*/) const
 {
-    if (!m_enabled || !m_provider)
+    if (!m_enabled || (m_provider == nullptr))
         return nullptr;
 
     // Use completion-specific model if set, otherwise fall back to agent model
@@ -40,7 +40,7 @@ int AiCompletionProvider::activationCharSequenceLength() const
 
 bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) const
 {
-    if (!m_enabled || !m_provider || sequence.isEmpty())
+    if (!m_enabled || (m_provider == nullptr) || sequence.isEmpty())
         return false;
 
     const QChar c = sequence.at(sequence.length() - 1);
@@ -58,7 +58,7 @@ bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) con
     if (c.isLetterOrNumber() || c == QLatin1Char('_'))
     {
         auto *editor = TextEditor::TextEditorWidget::currentTextEditorWidget();
-        if (!editor)
+        if (editor == nullptr)
             return false;
 
         QTextCursor tc = editor->textCursor();
