@@ -17,6 +17,10 @@ namespace qcai2
 namespace
 {
 
+constexpr int kDefaultPromptResultLimit = 15000;
+constexpr int kVerboseToolPromptResultLimit = 4000;
+constexpr int kProviderInactivityTimeoutMs = 75000;
+
 QString asIndentedCodeBlock(const QString &text)
 {
     const QString normalized = text.isEmpty() ? QStringLiteral("(empty)") : text;
@@ -51,6 +55,18 @@ QString formatToolResultLog(const QString &result)
     return QStringLiteral("✅ **Result**\n\n%1").arg(asIndentedCodeBlock(preview.trimmed()));
 }
 
+int promptResultLimitForTool(const QString &name)
+{
+    if (name == QStringLiteral("show_compile_output") ||
+        name == QStringLiteral("show_application_output") ||
+        name == QStringLiteral("show_diagnostics"))
+    {
+        return kVerboseToolPromptResultLimit;
+    }
+
+    return kDefaultPromptResultLimit;
+}
+
 bool isEnabledEffort(const QString &level)
 {
     return level == QStringLiteral("low") || level == QStringLiteral("medium") ||
@@ -67,6 +83,10 @@ QString runModeLabel(AgentController::RunMode runMode)
 
 AgentController::AgentController(QObject *parent) : QObject(parent)
 {
+    m_providerWatchdog.setSingleShot(true);
+    m_providerWatchdog.setInterval(kProviderInactivityTimeoutMs);
+    connect(&m_providerWatchdog, &QTimer::timeout, this,
+            &AgentController::handleProviderInactivityTimeout);
 }
 
 void AgentController::setProvider(IAIProvider *provider)
@@ -262,6 +282,7 @@ void AgentController::stop()
                            .arg(m_toolCallCount));
     if (m_provider)
         m_provider->cancel();
+    disarmProviderWatchdog();
     emit logMessage(QStringLiteral("⏹ Agent stopped by user."));
     emit stopped(QStringLiteral("Stopped by user at iteration %1.").arg(m_iteration));
 }
@@ -295,8 +316,13 @@ void AgentController::runNextIteration()
                     .arg(m_messages.size())
                     .arg(m_provider->id(), m_modelName)
                     .arg(m_reasoningEffort)
-                    .arg(m_thinkingLevel)
-                    .arg(s.temperature));
+                     .arg(m_thinkingLevel)
+                     .arg(s.temperature));
+
+    m_waitingForProvider = true;
+    m_providerActivitySeen = false;
+    emit logMessage(QStringLiteral("⏳ Waiting for model response..."));
+    armProviderWatchdog();
 
     m_provider->complete(
         m_messages, m_modelName, s.temperature, s.maxTokens, m_reasoningEffort,
@@ -306,7 +332,15 @@ void AgentController::runNextIteration()
         },
         [this](const QString &delta) {
             if (!delta.isEmpty())
+            {
+                if (!m_providerActivitySeen)
+                {
+                    m_providerActivitySeen = true;
+                    emit logMessage(QStringLiteral("✍ Model response in progress..."));
+                }
+                armProviderWatchdog();
                 emit streamingToken(delta);
+            }
         });
 }
 
@@ -314,6 +348,8 @@ void AgentController::handleResponse(const QString &response, const QString &err
 {
     if (!m_running)
         return;
+
+    disarmProviderWatchdog();
 
     if (!error.isEmpty())
     {
@@ -503,7 +539,7 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
                QStringLiteral("Tool '%1' result length: %2").arg(name).arg(result.length()));
 
     // Feed result back to LLM
-    const int maxResultLen = 15000;
+    const int maxResultLen = promptResultLimitForTool(name);
     const QString truncatedResult =
         result.length() > maxResultLen
             ? result.left(maxResultLen) +
@@ -513,6 +549,37 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
                        QStringLiteral("Tool '%1' returned:\n%2\n\nContinue with the next step.")
                            .arg(name, truncatedResult)});
     runNextIteration();
+}
+
+void AgentController::armProviderWatchdog()
+{
+    if (m_running && m_waitingForProvider)
+        m_providerWatchdog.start();
+}
+
+void AgentController::disarmProviderWatchdog()
+{
+    m_providerWatchdog.stop();
+    m_waitingForProvider = false;
+    m_providerActivitySeen = false;
+}
+
+void AgentController::handleProviderInactivityTimeout()
+{
+    if (!m_running || !m_waitingForProvider)
+        return;
+
+    QCAI_ERROR("Agent", QStringLiteral("Provider response timed out after %1 ms of inactivity")
+                            .arg(kProviderInactivityTimeoutMs));
+    if (m_provider)
+        m_provider->cancel();
+
+    emit logMessage(QStringLiteral("⌛ Provider response timed out after %1 seconds of inactivity.")
+                        .arg(kProviderInactivityTimeoutMs / 1000));
+    emit errorOccurred(QStringLiteral("Provider response timed out."));
+    m_running = false;
+    disarmProviderWatchdog();
+    emit stopped(QStringLiteral("Provider response timed out."));
 }
 
 void AgentController::approveAction(int approvalId)

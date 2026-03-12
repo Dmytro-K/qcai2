@@ -15,6 +15,7 @@ class IAIProvider;
 class AiCompletionProvider;
 class GhostTextManager;
 class CopilotProvider;
+class IdeOutputCapture;
 
 namespace Internal
 {
@@ -98,6 +99,9 @@ private:
 
     /** Ghost-text overlay manager attached to editor widgets. */
     GhostTextManager *m_ghostTextManager = nullptr;
+
+    /** Captures Qt Creator Compile Output and Application Output for agent tools. */
+    IdeOutputCapture *m_outputCapture = nullptr;
 
 };
 

@@ -5,6 +5,8 @@
 namespace qcai2
 {
 
+class IdeOutputCapture;
+
 /**
  * Tool that runs cmake --build in the configured build directory.
  */
@@ -49,11 +51,17 @@ public:
         m_buildDir = dir;
     }
 
+    void setOutputCapture(IdeOutputCapture *outputCapture)
+    {
+        m_outputCapture = outputCapture;
+    }
+
 private:
     /**
      * Build directory used for cmake and ctest commands.
      */
     QString m_buildDir;
+    IdeOutputCapture *m_outputCapture = nullptr;
 
 };
 
@@ -151,9 +159,68 @@ public:
         m_lastBuildOutput = output;
     }
 
+    void setOutputCapture(IdeOutputCapture *outputCapture)
+    {
+        m_outputCapture = outputCapture;
+    }
+
 private:
     /** Cached build output scanned by show_diagnostics. */
     QString m_lastBuildOutput;
+    IdeOutputCapture *m_outputCapture = nullptr;
+
+};
+
+class ShowCompileOutputTool : public ITool
+{
+public:
+    QString name() const override
+    {
+        return QStringLiteral("show_compile_output");
+    }
+
+    QString description() const override
+    {
+        return QStringLiteral(
+            "Show recent Qt Creator Compile Output and compile diagnostics.");
+    }
+
+    QJsonObject argsSchema() const override;
+    QString execute(const QJsonObject &args, const QString &workDir) override;
+
+    void setOutputCapture(IdeOutputCapture *outputCapture)
+    {
+        m_outputCapture = outputCapture;
+    }
+
+private:
+    IdeOutputCapture *m_outputCapture = nullptr;
+
+};
+
+class ShowApplicationOutputTool : public ITool
+{
+public:
+    QString name() const override
+    {
+        return QStringLiteral("show_application_output");
+    }
+
+    QString description() const override
+    {
+        return QStringLiteral("Show recent Qt Creator Application Output.");
+    }
+
+    QJsonObject argsSchema() const override;
+    QString execute(const QJsonObject &args, const QString &workDir) override;
+
+    void setOutputCapture(IdeOutputCapture *outputCapture)
+    {
+        m_outputCapture = outputCapture;
+    }
+
+private:
+    IdeOutputCapture *m_outputCapture = nullptr;
 
 };
 

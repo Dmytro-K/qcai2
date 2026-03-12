@@ -10,6 +10,7 @@
 #include <QList>
 #include <QObject>
 #include <QString>
+#include <QTimer>
 
 namespace qcai2
 {
@@ -221,6 +222,21 @@ private:
      */
     QString buildSystemPrompt() const;
 
+    /**
+     * Arms the inactivity watchdog for an in-flight provider request.
+     */
+    void armProviderWatchdog();
+
+    /**
+     * Stops the inactivity watchdog after a provider request completes.
+     */
+    void disarmProviderWatchdog();
+
+    /**
+     * Aborts the current run when the provider stays inactive for too long.
+     */
+    void handleProviderInactivityTimeout();
+
     /** Active provider used for the current run. */
     IAIProvider *m_provider = nullptr;
 
@@ -296,6 +312,15 @@ private:
 
     /** Next approval identifier emitted to the UI. */
     int m_nextApprovalId = 1;
+
+    /** Kills agent runs that stall waiting for a provider response. */
+    QTimer m_providerWatchdog;
+
+    /** True while a provider request is currently in flight. */
+    bool m_waitingForProvider = false;
+
+    /** Tracks whether the current request has produced any visible activity yet. */
+    bool m_providerActivitySeen = false;
 
 };
 

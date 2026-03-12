@@ -443,6 +443,10 @@ add_qtc_plugin(qcai2
     src/src/safety/SafetyPolicy.cpp
     src/src/util/Json.h
     src/src/util/Json.cpp
+    src/src/util/OutputCaptureSupport.h
+    src/src/util/OutputCaptureSupport.cpp
+    src/src/util/IdeOutputCapture.h
+    src/src/util/IdeOutputCapture.cpp
     src/src/util/Migration.h
     src/src/util/Migration.cpp
     ${QCAI2_MIGRATION_FILES}

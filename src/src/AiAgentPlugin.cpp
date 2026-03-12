@@ -22,6 +22,7 @@
 #include "tools/SearchTools.h"
 #include "tools/ToolRegistry.h"
 #include "util/CrashHandler.h"
+#include "util/IdeOutputCapture.h"
 #include "util/Logger.h"
 
 #include <coreplugin/actionmanager/actioncontainer.h>
@@ -65,6 +66,7 @@ void AiAgentPlugin::initialize()
     m_toolRegistry = new ToolRegistry(this);
     m_safetyPolicy = new SafetyPolicy(this);
     m_controller = new AgentController(this);
+    m_outputCapture = new IdeOutputCapture(this);
 
     // Configure safety from settings
     auto &s = settings();
@@ -75,6 +77,7 @@ void AiAgentPlugin::initialize()
 
     // Set up tools and providers
     registerTools();
+    m_outputCapture->initialize();
     setupProviders();
     QMetaObject::invokeMethod(this, &AiAgentPlugin::refreshCopilotModels, Qt::QueuedConnection);
     QCAI_DEBUG("Plugin", QStringLiteral("Registered %1 tools, %2 providers")
@@ -267,9 +270,17 @@ void AiAgentPlugin::registerTools()
     auto buildTool = std::make_shared<RunBuildTool>();
     auto testsTool = std::make_shared<RunTestsTool>();
     auto diagTool = std::make_shared<ShowDiagnosticsTool>();
+    auto compileOutputTool = std::make_shared<ShowCompileOutputTool>();
+    auto applicationOutputTool = std::make_shared<ShowApplicationOutputTool>();
+    buildTool->setOutputCapture(m_outputCapture);
+    diagTool->setOutputCapture(m_outputCapture);
+    compileOutputTool->setOutputCapture(m_outputCapture);
+    applicationOutputTool->setOutputCapture(m_outputCapture);
     m_toolRegistry->registerTool(buildTool);
     m_toolRegistry->registerTool(testsTool);
     m_toolRegistry->registerTool(diagTool);
+    m_toolRegistry->registerTool(compileOutputTool);
+    m_toolRegistry->registerTool(applicationOutputTool);
 
     m_toolRegistry->registerTool(std::make_shared<GitStatusTool>());
     m_toolRegistry->registerTool(std::make_shared<GitDiffTool>());
