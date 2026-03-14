@@ -414,6 +414,11 @@ add_qtc_plugin(qcai2
     src/src/commands/SlashCommandRegistry.h
     src/src/commands/SlashCommandRegistry.cpp
     src/src/commands/HelloCommand.cpp
+    src/src/goal/GoalSpecialHandler.h
+    src/src/goal/GoalTextEdit.h
+    src/src/goal/GoalTextEdit.cpp
+    src/src/goal/SlashCommandGoalHandler.h
+    src/src/goal/SlashCommandGoalHandler.cpp
     src/src/context/EditorContext.h
     src/src/context/EditorContext.cpp
     src/src/tools/ITool.h

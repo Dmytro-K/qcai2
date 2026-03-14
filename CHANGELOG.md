@@ -4,7 +4,7 @@
 
 ### Added
 
-- Added extensible slash commands with goal-editor autocomplete, `DECLARE_COMMAND(...)` auto-registration, and a sample `/hello` command.
+- Added a shared goal-editor special-token system with popup autocompletion, blue leading slash-command highlighting, `DECLARE_COMMAND(...)` auto-registration, and a sample `/hello` command.
 
 ## [0.0.4] - 2026-03-12
 

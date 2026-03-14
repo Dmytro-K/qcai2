@@ -70,6 +70,7 @@ package-lock.json
 *.rej
 .kateproject.build
 /.qcai2/
+/.qcai2_buk/
 
 build
 .cache/

@@ -2,7 +2,9 @@
 #pragma once
 
 #include <QHash>
+#include <QList>
 #include <QString>
+#include <QStringList>
 
 #include <functional>
 
@@ -84,9 +86,23 @@ class SlashCommandRegistry
 {
 public:
     /**
+     * Display metadata for one registered slash command.
+     */
+    struct CommandInfo
+    {
+        QString name;
+        QString description;
+    };
+
+    /**
      * Creates the registry from all statically declared command definitions.
      */
     SlashCommandRegistry();
+
+    /**
+     * Returns registered slash commands with names prefixed by `/`.
+     */
+    QList<CommandInfo> commands() const;
 
     /**
      * Returns registered slash command names prefixed with `/`, sorted for UI use.

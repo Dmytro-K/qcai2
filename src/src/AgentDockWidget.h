@@ -4,8 +4,8 @@
 #include "AgentController.h"
 #include "commands/SlashCommandRegistry.h"
 #include "diff/InlineDiffManager.h"
+#include "goal/GoalTextEdit.h"
 
-#include <QCompleter>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
@@ -135,17 +135,6 @@ private:
     bool tryExecuteSlashCommand(const QString &goal);
 
     /**
-     * Refreshes slash-command completion visibility based on current editor state.
-     */
-    void updateSlashCommandCompletion();
-
-    /**
-     * Replaces the typed slash token with the selected completion.
-     * @param completion Completion text chosen from the popup.
-     */
-    void applySlashCommandCompletion(const QString &completion);
-
-    /**
      * Handles keyboard shortcuts from the goal editor.
      * @param obj JSON object to convert.
      * @param event Event being filtered.
@@ -221,7 +210,7 @@ private:
 
     /** Input controls shown beside the goal editor. */
     QComboBox *m_projectCombo;
-    QTextEdit *m_goalEdit;
+    GoalTextEdit *m_goalEdit;
     QComboBox *m_modeCombo;
     QComboBox *m_modelCombo;
     QComboBox *m_reasoningCombo;
@@ -272,9 +261,6 @@ private:
 
     /** Registry of dock-local slash commands. */
     SlashCommandRegistry m_slashCommands;
-
-    /** Popup completer for slash commands in the goal editor. */
-    QCompleter *m_slashCommandCompleter = nullptr;
 
 };
 

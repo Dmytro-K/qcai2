@@ -2,6 +2,8 @@
 
 #include "SlashCommandRegistry.h"
 
+#include <algorithm>
+
 namespace qcai2
 {
 
@@ -73,15 +75,28 @@ SlashCommandRegistry::SlashCommandRegistry()
     }
 }
 
+QList<SlashCommandRegistry::CommandInfo> SlashCommandRegistry::commands() const
+{
+    QList<CommandInfo> commandInfos;
+    commandInfos.reserve(m_commands.size());
+
+    for (auto it = m_commands.cbegin(); it != m_commands.cend(); ++it)
+        commandInfos.append({QStringLiteral("/%1").arg(it->displayName), it->description});
+
+    std::sort(commandInfos.begin(), commandInfos.end(),
+              [](const CommandInfo &lhs, const CommandInfo &rhs) {
+                  return lhs.name.compare(rhs.name, Qt::CaseInsensitive) < 0;
+              });
+    return commandInfos;
+}
+
 QStringList SlashCommandRegistry::commandNames() const
 {
     QStringList names;
-    names.reserve(m_commands.size());
-
-    for (auto it = m_commands.cbegin(); it != m_commands.cend(); ++it)
-        names.append(QStringLiteral("/%1").arg(it->displayName));
-
-    names.sort(Qt::CaseInsensitive);
+    const QList<CommandInfo> commandInfos = commands();
+    names.reserve(commandInfos.size());
+    for (const CommandInfo &command : commandInfos)
+        names.append(command.name);
     return names;
 }
 

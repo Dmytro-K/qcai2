@@ -34,6 +34,7 @@ add_executable(tst_qcai2_slash_commands
     tst_slash_commands.cpp
     ../src/commands/SlashCommandRegistry.cpp
     ../src/commands/HelloCommand.cpp
+    ../src/goal/SlashCommandGoalHandler.cpp
 )
 
 qcai2_enable_linker_map(tst_qcai2_slash_commands)
@@ -43,6 +44,7 @@ target_include_directories(tst_qcai2_slash_commands PRIVATE
 )
 target_link_libraries(tst_qcai2_slash_commands PRIVATE
     Qt::Core
+    Qt::Gui
     Qt::Test
 )
 add_test(NAME qcai2_slash_commands COMMAND tst_qcai2_slash_commands)

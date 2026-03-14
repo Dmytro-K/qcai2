@@ -8,6 +8,7 @@
 #include "util/Diff.h"
 #include "util/Logger.h"
 #include "util/Migration.h"
+#include "goal/SlashCommandGoalHandler.h"
 
 #include <coreplugin/editormanager/editormanager.h>
 #include <projectexplorer/project.h>
@@ -17,7 +18,6 @@
 
 #include <QClipboard>
 #include <QColor>
-#include <QCompleter>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -35,11 +35,9 @@
 #include <QSizePolicy>
 #include <QRegularExpression>
 #include <QSaveFile>
-#include <QScrollBar>
 #include <QSet>
 #include <QShortcut>
 #include <QSignalBlocker>
-#include <QStringListModel>
 #include <QSplitter>
 #include <QSyntaxHighlighter>
 #include <QTextBlock>
@@ -191,42 +189,6 @@ QString sanitizedSessionFileName(const QString &projectFilePath)
     baseName.replace(QRegularExpression(QStringLiteral(R"([^A-Za-z0-9._-])")),
                      QStringLiteral("_"));
     return QStringLiteral("%1.json").arg(baseName);
-}
-
-struct SlashCompletionState
-{
-    bool active = false;
-    int commandStart = 0;
-    int commandEnd = 0;
-    QString prefix;
-};
-
-SlashCompletionState slashCompletionState(const QTextEdit *editor)
-{
-    const QString text = editor->toPlainText();
-    const QTextCursor cursor = editor->textCursor();
-    const int cursorPos = cursor.position();
-
-    int firstNonSpace = 0;
-    while (firstNonSpace < text.size() && text.at(firstNonSpace).isSpace())
-        ++firstNonSpace;
-
-    if (firstNonSpace >= text.size() || text.at(firstNonSpace) != QLatin1Char('/'))
-        return {};
-
-    int commandEnd = firstNonSpace + 1;
-    while (commandEnd < text.size() && !text.at(commandEnd).isSpace())
-        ++commandEnd;
-
-    if (cursorPos < firstNonSpace + 1 || cursorPos > commandEnd)
-        return {};
-
-    SlashCompletionState state;
-    state.active = true;
-    state.commandStart = firstNonSpace;
-    state.commandEnd = commandEnd;
-    state.prefix = text.mid(firstNonSpace, cursorPos - firstNonSpace);
-    return state;
 }
 
 bool writeContextTextFile(const QString &path, const QString &content, const QString &description)
@@ -1179,7 +1141,7 @@ void AgentDockWidget::setupUi()
 
     m_statusLabel = m_ui->statusLabel;
     m_projectCombo = m_ui->projectCombo;
-    m_goalEdit = m_ui->goalEdit;
+    auto *designerGoalEdit = m_ui->goalEdit;
     m_modeCombo = m_ui->modeCombo;
     m_modelCombo = m_ui->modelCombo;
     m_reasoningCombo = m_ui->reasoningCombo;
@@ -1203,6 +1165,20 @@ void AgentDockWidget::setupUi()
     m_ui->contentSplitter->setStretchFactor(1, 1);
     m_ui->inputRow->setStretch(0, 1);
     m_ui->modeModelRow->setStretch(2, 1);
+
+    auto *goalEdit = new GoalTextEdit(designerGoalEdit->parentWidget());
+    goalEdit->setObjectName(designerGoalEdit->objectName());
+    goalEdit->setSizePolicy(designerGoalEdit->sizePolicy());
+    goalEdit->setMinimumSize(designerGoalEdit->minimumSize());
+    goalEdit->setAcceptRichText(designerGoalEdit->acceptRichText());
+    goalEdit->setPlaceholderText(designerGoalEdit->placeholderText());
+    goalEdit->setFont(designerGoalEdit->font());
+    const int goalEditIndex = m_ui->goalColumn->indexOf(designerGoalEdit);
+    m_ui->goalColumn->removeWidget(designerGoalEdit);
+    m_ui->goalColumn->insertWidget(goalEditIndex, goalEdit);
+    designerGoalEdit->deleteLater();
+    m_goalEdit = goalEdit;
+    m_goalEdit->addSpecialHandler(std::make_unique<SlashCommandGoalHandler>(&m_slashCommands));
 
     auto *diffPreview = new DiffPreviewEdit(m_ui->diffViewPlaceholder->parentWidget());
     diffPreview->setObjectName(QStringLiteral("diffView"));
@@ -1323,16 +1299,6 @@ void AgentDockWidget::setupUi()
     goalSelectAllShortcut->setContext(Qt::WidgetShortcut);
     QObject::connect(goalSelectAllShortcut, &QShortcut::activated, m_goalEdit,
                      &QTextEdit::selectAll);
-
-    auto *slashCommandModel = new QStringListModel(m_slashCommands.commandNames(), this);
-    m_slashCommandCompleter = new QCompleter(slashCommandModel, this);
-    m_slashCommandCompleter->setCaseSensitivity(Qt::CaseInsensitive);
-    m_slashCommandCompleter->setCompletionMode(QCompleter::PopupCompletion);
-    m_slashCommandCompleter->setFilterMode(Qt::MatchStartsWith);
-    m_slashCommandCompleter->setWidget(m_goalEdit);
-    QObject::connect(m_slashCommandCompleter, qOverload<const QString &>(&QCompleter::activated),
-                     this, &AgentDockWidget::applySlashCommandCompletion);
-    connect(m_goalEdit, &QTextEdit::textChanged, this, &AgentDockWidget::updateSlashCommandCompletion);
 }
 
 void AgentDockWidget::updateRunState(bool running)
@@ -1370,49 +1336,6 @@ bool AgentDockWidget::tryExecuteSlashCommand(const QString &goal)
 
     saveChat();
     return true;
-}
-
-void AgentDockWidget::updateSlashCommandCompletion()
-{
-    if (m_slashCommandCompleter == nullptr)
-        return;
-
-    const SlashCompletionState state = slashCompletionState(m_goalEdit);
-    if (!state.active)
-    {
-        m_slashCommandCompleter->popup()->hide();
-        return;
-    }
-
-    m_slashCommandCompleter->setCompletionPrefix(state.prefix);
-    if (m_slashCommandCompleter->completionCount() <= 0)
-    {
-        m_slashCommandCompleter->popup()->hide();
-        return;
-    }
-
-    QRect popupRect = m_goalEdit->cursorRect();
-    popupRect.setWidth(m_slashCommandCompleter->popup()->sizeHintForColumn(0) +
-                       m_slashCommandCompleter->popup()->verticalScrollBar()->sizeHint().width());
-    m_slashCommandCompleter->complete(popupRect);
-}
-
-void AgentDockWidget::applySlashCommandCompletion(const QString &completion)
-{
-    const SlashCompletionState state = slashCompletionState(m_goalEdit);
-    if (!state.active)
-        return;
-
-    QTextCursor cursor = m_goalEdit->textCursor();
-    cursor.beginEditBlock();
-    cursor.setPosition(state.commandStart);
-    cursor.setPosition(state.commandEnd, QTextCursor::KeepAnchor);
-    cursor.insertText(completion);
-    cursor.endEditBlock();
-    m_goalEdit->setTextCursor(cursor);
-
-    if (m_slashCommandCompleter != nullptr)
-        m_slashCommandCompleter->popup()->hide();
 }
 
 void AgentDockWidget::onRunClicked()
@@ -1636,7 +1559,7 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
     {
         auto *ke = static_cast<QKeyEvent *>(event);
 
-        if (m_slashCommandCompleter != nullptr && m_slashCommandCompleter->popup()->isVisible())
+        if (m_goalEdit->hasCompletionPopup())
         {
             switch (ke->key())
             {
