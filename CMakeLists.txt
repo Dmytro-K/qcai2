@@ -408,9 +408,13 @@ add_qtc_plugin(qcai2
     src/src/AiAgentPlugin.cpp
     src/src/AgentController.h
     src/src/AgentController.cpp
-    src/src/AgentDockWidget.h
-    src/src/AgentDockWidget.cpp
-    src/src/AgentDockWidget.ui
+    src/src/ui/AgentDockWidget.h
+    src/src/ui/AgentDockWidget.cpp
+    src/src/linked_files/AgentDockLinkedFilesController.h
+    src/src/linked_files/AgentDockLinkedFilesController.cpp
+    src/src/session/AgentDockSessionController.h
+    src/src/session/AgentDockSessionController.cpp
+    src/src/ui/AgentDockWidget.ui
     src/src/commands/SlashCommandRegistry.h
     src/src/commands/SlashCommandRegistry.cpp
     src/src/commands/HelloCommand.cpp

@@ -10,6 +10,7 @@
 ### Changed
 
 - The dock now auto-reloads project session state when session files are changed externally.
+- Project session files now use stable `.qcai2/session.*` names.
 
 ## [0.0.4] - 2026-03-12
 

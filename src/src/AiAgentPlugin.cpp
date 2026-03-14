@@ -3,7 +3,7 @@
 #include "../qcai2constants.h"
 #include "../qcai2tr.h"
 #include "AgentController.h"
-#include "AgentDockWidget.h"
+#include "ui/AgentDockWidget.h"
 #include "completion/AiCompletionProvider.h"
 #include "completion/GhostTextManager.h"
 // CompletionTrigger removed — completion triggers via isActivationCharSequence instead

@@ -1,15 +1,14 @@
 /*! Declares the main dock widget that presents chat, plans, diffs, and approvals. */
 #pragma once
 
-#include "AgentController.h"
-#include "commands/SlashCommandRegistry.h"
-#include "diff/InlineDiffManager.h"
-#include "goal/LinkedFilesListWidget.h"
-#include "goal/GoalTextEdit.h"
+#include "../AgentController.h"
+#include "../commands/SlashCommandRegistry.h"
+#include "../diff/InlineDiffManager.h"
+#include "../goal/LinkedFilesListWidget.h"
+#include "../goal/GoalTextEdit.h"
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QFileSystemWatcher>
 #include <QLabel>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -30,6 +29,9 @@ QT_END_NAMESPACE
 
 namespace qcai2
 {
+
+class AgentDockLinkedFilesController;
+class AgentDockSessionController;
 
 /**
  * Main dock widget for goal entry, logs, diff review, and approval prompts.
@@ -117,6 +119,9 @@ private slots:
     void onStopped(const QString &summary);
 
 private:
+    friend class AgentDockLinkedFilesController;
+    friend class AgentDockSessionController;
+
     /**
      * Builds the dock widget layout and wires local UI actions.
      */
@@ -136,61 +141,6 @@ private:
     bool tryExecuteSlashCommand(const QString &goal);
 
     /**
-     * Returns project-relative file candidates for # file linking autocomplete.
-     */
-    QStringList linkedFileCandidates() const;
-
-    /**
-     * Returns valid linked files referenced inside the goal text via #tokens.
-     */
-    QStringList linkedFilesFromGoalText() const;
-
-    /**
-     * Returns the normalized active editor file, regardless of ignore rules.
-     */
-    QString currentEditorLinkedFile() const;
-
-    /**
-     * Returns the active editor file that should be linked by default, if any.
-     */
-    QString defaultLinkedFile() const;
-
-    /**
-     * Returns the combined manual and goal-text-linked files for the current request.
-     */
-    QStringList effectiveLinkedFiles() const;
-
-    /**
-     * Adds one or more files to the manually linked file list.
-     */
-    void addLinkedFiles(const QStringList &paths);
-
-    /**
-     * Removes selected linked files from the list and matching #tokens from the goal.
-     */
-    void removeSelectedLinkedFiles();
-
-    /**
-     * Rebuilds the linked-file list shown above the goal editor.
-     */
-    void refreshLinkedFilesUi();
-
-    /**
-     * Builds the request-specific prompt context for linked files.
-     */
-    QString linkedFilesPromptContext() const;
-
-    /**
-     * Converts a stored linked-file label into an absolute path, when possible.
-     */
-    QString linkedFileAbsolutePath(const QString &path) const;
-
-    /**
-     * Normalizes a linked-file path to a project-relative label when possible.
-     */
-    QString normalizeLinkedFilePath(const QString &path) const;
-
-    /**
      * Handles keyboard shortcuts from the goal editor.
      * @param obj JSON object to convert.
      * @param event Event being filtered.
@@ -208,70 +158,14 @@ private:
     QString currentLogMarkdown() const;
 
     /**
-     * Saves the current goal, logs, plan, and diff preview for the selected project.
-     */
-    void saveChat();
-
-    /**
-     * Restores the last saved goal, logs, plan, and diff preview for the selected project.
-     */
-    void restoreChat();
-
-    /**
      * Clears the current in-memory chat, plan, diff, and approval state.
      */
     void clearChatState();
 
     /**
-     * Rebuilds the project combobox from the projects open in Qt Creator.
-     */
-    void refreshProjectSelector();
-
-    /**
-     * Switches the active chat/context storage to the selected project.
-     * @param projectFilePath Absolute project file path to activate.
-     */
-    void switchProjectContext(const QString &projectFilePath);
-
-    /**
-     * Returns the active project file path selected in the dock widget.
-     */
-    QString currentProjectFilePath() const;
-
-    /**
-     * Returns the on-disk context file for the active project.
-     */
-    QString currentProjectStorageFilePath() const;
-
-    /**
-     * Returns the current on-disk session-related paths that should be watched.
-     */
-    QStringList currentSessionWatchPaths() const;
-
-    /**
-     * Applies global default UI values before loading project-specific overrides.
-     */
-    void applyProjectUiDefaults();
-
-    /**
-     * Returns the active project directory used for diff operations.
-     */
-    QString currentProjectDir() const;
-
-    /**
      * Refreshes the diff tab state and optionally re-renders inline editor markers.
      */
     void syncDiffUi(const QString &diff, bool focusDiffTab, bool refreshInlineMarkers);
-
-    /**
-     * Rebuilds file watcher subscriptions for the active project session files.
-     */
-    void updateSessionFileWatcher();
-
-    /**
-     * Reloads the current project session from disk after an external change.
-     */
-    void reloadSessionFromDisk();
 
     /** Designer-generated UI wrapper. */
     std::unique_ptr<Ui::AgentDockWidget> m_ui;
@@ -319,44 +213,23 @@ private:
     /** Streaming log text buffered until the throttle timer fires. */
     QString m_streamingMarkdown;
 
-    /** Project file path whose context is currently loaded into the dock. */
-    QString m_activeProjectFilePath;
-
-    /** Files linked explicitly via drag-and-drop or the linked-files list. */
-    QStringList m_manualLinkedFiles;
-
-    /** Linked-file path prefixes ignored by linked-files autocomplete/defaults. */
-    QStringList m_ignoredLinkedFiles;
-
-    /** Current-editor files hidden from linked files only for the active in-memory session. */
-    QStringList m_hiddenDefaultLinkedFiles;
-
-    /** Cached project root used to build # file completion candidates. */
-    mutable QString m_cachedLinkedFileRoot;
-
-    /** Cached project-relative file paths used by the # completion handler. */
-    mutable QStringList m_cachedLinkedFileCandidates;
-
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> m_approvalItems;
 
     /** Short timer that batches frequent log renders while streaming. */
     QTimer *m_renderThrottle;
 
-    /** Watches the active project session files for external modifications. */
-    QFileSystemWatcher *m_sessionFileWatcher = nullptr;
-
-    /** Debounces bursts of session-file change notifications. */
-    QTimer *m_sessionReloadTimer = nullptr;
-
-    /** Tracks whether session storage currently exists on disk for the active project. */
-    bool m_sessionStoragePresent = false;
-
     /** Manages inline editor markers for diff hunks. */
     InlineDiffManager *m_inlineDiffManager;
 
     /** Registry of dock-local slash commands. */
     SlashCommandRegistry m_slashCommands;
+
+    /** Non-UI linked-files behavior extracted out of the widget. */
+    std::unique_ptr<AgentDockLinkedFilesController> m_linkedFilesController;
+
+    /** Non-UI project session persistence extracted out of the widget. */
+    std::unique_ptr<AgentDockSessionController> m_sessionController;
 
 };
 

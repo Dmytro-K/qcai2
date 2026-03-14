@@ -50,7 +50,12 @@ qcai2/
 │   ├── src/
 │   │   ├── AiAgentPlugin.h/.cpp
 │   │   ├── AgentController.h/.cpp
-│   │   ├── AgentDockWidget.h/.cpp
+│   │   ├── ui/
+│   │   │   └── AgentDockWidget.h/.cpp/.ui
+│   │   ├── session/
+│   │   │   └── AgentDockSessionController.h/.cpp
+│   │   ├── linked_files/
+│   │   │   └── AgentDockLinkedFilesController.h/.cpp
 │   │   ├── completion/
 │   │   │   ├── AiCompletionProvider.h/.cpp
 │   │   │   ├── AiCompletionProcessor.h/.cpp
@@ -214,6 +219,7 @@ Current `AgentDockWidget` structure:
 - tabs: **Plan**, **Actions Log**, **Diff Preview**, **Approvals**, **Debug Log**;
 - bottom row: goal editor, editable model combo, thinking combo, Run / Stop, Dry-run;
 - diff preview includes a file list, per-line approval, and integration with `InlineDiffManager`.
+- source layout: UI facade lives in `src/src/ui/AgentDockWidget.*`, with linked-files and project-session logic split into `src/src/linked_files/` and `src/src/session/`.
 
 For `Ctrl+C` / `Ctrl+A`, `QShortcut` with `Qt::WidgetShortcut` is used directly on text widgets because Qt Creator globally intercepts some standard shortcuts.
 
