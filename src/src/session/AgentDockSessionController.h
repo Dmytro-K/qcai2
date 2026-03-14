@@ -1,6 +1,8 @@
 /*! Declares project-session persistence used by AgentDockWidget. */
 #pragma once
 
+#include <qtmcp/ServerDefinition.h>
+
 #include <QString>
 #include <QStringList>
 
@@ -30,6 +32,7 @@ public:
     QString legacyProjectStorageFilePath() const;
     QStringList currentSessionWatchPaths() const;
     QString currentProjectDir() const;
+    const qtmcp::ServerDefinitions &projectMcpServers() const;
 
     void applyProjectUiDefaults();
     void migrateLegacySessionFiles();
@@ -41,6 +44,7 @@ private:
 
     AgentDockWidget &m_dock;
     QString m_activeProjectFilePath;
+    qtmcp::ServerDefinitions m_projectMcpServers;
     std::unique_ptr<QFileSystemWatcher> m_sessionFileWatcher;
     std::unique_ptr<QTimer> m_sessionReloadTimer;
     bool m_sessionStoragePresent = false;

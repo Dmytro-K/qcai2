@@ -1,5 +1,7 @@
 #pragma once
 
+#include <qtmcp/ServerDefinition.h>
+
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -104,6 +106,9 @@ struct Settings
 
     /** Completion reasoning effort: off, low, medium, or high. */
     QString completionReasoningEffort = QStringLiteral("off");
+
+    /** Globally configured MCP servers keyed by logical server name. */
+    qtmcp::ServerDefinitions mcpServers;
 
     /**
      * Loads settings from QSettings.

@@ -387,6 +387,8 @@ if(WITH_TESTS)
   add_subdirectory(src/tests)
 endif()
 
+add_subdirectory(lib/qtmcp)
+
 add_qtc_plugin(qcai2
   PLUGIN_PATH
     plugins/${IDE_VERSION}
@@ -429,6 +431,8 @@ add_qtc_plugin(qcai2
     src/src/goal/SlashCommandGoalHandler.cpp
     src/src/context/EditorContext.h
     src/src/context/EditorContext.cpp
+    src/src/mcp/McpToolManager.h
+    src/src/mcp/McpToolManager.cpp
     src/src/tools/ITool.h
     src/src/tools/ToolRegistry.h
     src/src/tools/ToolRegistry.cpp
@@ -478,6 +482,8 @@ add_qtc_plugin(qcai2
     src/src/settings/Settings.cpp
     src/src/settings/SettingsPage.h
     src/src/settings/SettingsPage.cpp
+    src/src/settings/McpServersWidget.h
+    src/src/settings/McpServersWidget.cpp
     src/src/settings/SettingsWidget.ui
     src/src/completion/AiCompletionProvider.h
     src/src/completion/AiCompletionProvider.cpp
@@ -490,7 +496,7 @@ add_qtc_plugin(qcai2
 )
 
 qcai2_enable_linker_map(qcai2)
-target_link_libraries(qcai2 PRIVATE qcai2_libarchive qcai2_version_info)
+target_link_libraries(qcai2 PRIVATE qcai2_libarchive qcai2_version_info qtmcp::qtmcp)
 
 set(QCAI2_PLUGIN_INSTALL_DIR "plugins/${IDE_VERSION}")
 set(QCAI2_SIDECAR_INSTALL_DIR "${QCAI2_PLUGIN_INSTALL_DIR}/qcai2/sidecar")

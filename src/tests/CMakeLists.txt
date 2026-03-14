@@ -66,6 +66,23 @@ target_link_libraries(tst_qcai2_output_capture PRIVATE
 )
 add_test(NAME qcai2_output_capture COMMAND tst_qcai2_output_capture)
 
+add_executable(tst_qcai2_mcp_config
+    tst_mcp_config.cpp
+    ../../lib/qtmcp/src/ServerDefinition.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_mcp_config)
+
+target_include_directories(tst_qcai2_mcp_config PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/lib/qtmcp/include"
+)
+target_link_libraries(tst_qcai2_mcp_config PRIVATE
+    Qt::Core
+    Qt::Test
+)
+add_test(NAME qcai2_mcp_config COMMAND tst_qcai2_mcp_config)
+
 add_executable(tst_qcai2_migration
     tst_migration.cpp
     ../src/util/Migration.cpp

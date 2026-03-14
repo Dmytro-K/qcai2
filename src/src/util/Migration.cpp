@@ -3,6 +3,7 @@
 #include "Migration.h"
 #include "migrations/Migration_0_0_4_001.h"
 #include "migrations/Migration_0_0_5_002.h"
+#include "migrations/Migration_0_0_5_003.h"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -252,6 +253,14 @@ QString ensureGlobalBackupDir()
     return QDir(base).filePath(QStringLiteral("qcai2_buk"));
 }
 
+QString globalStructuredSettingsPath()
+{
+    QString base = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (base.isEmpty())
+        base = QDir::homePath();
+    return QDir(base).filePath(QStringLiteral("settings.json"));
+}
+
 QString ensureProjectBackupDir(const QString &storagePath)
 {
     QDir contextDir = QFileInfo(storagePath).dir();
@@ -282,6 +291,9 @@ QByteArray manifestJson(const QString &kind, const QString &createdAt, const Rev
     return QJsonDocument(manifest).toJson(QJsonDocument::Indented);
 }
 
+bool appendFileIfExists(QList<ArchiveEntryData> &entries, const QString &archiveName,
+                        const QString &diskPath, QString *error);
+
 QJsonObject settingsSnapshot(QSettings &settings)
 {
     QJsonObject snapshot;
@@ -306,6 +318,11 @@ bool createGlobalSettingsBackup(QSettings &settings, const Revision &fromRevisio
     QList<ArchiveEntryData> entries;
     entries.append({QStringLiteral("settings.json"),
                     QJsonDocument(settingsSnapshot(settings)).toJson(QJsonDocument::Indented)});
+    if (!appendFileIfExists(entries, QStringLiteral("structured-settings.json"),
+                            globalStructuredSettingsPath(), error))
+    {
+        return false;
+    }
     entries.append({QStringLiteral("manifest.json"),
                     manifestJson(QStringLiteral("global-settings"), timestamp, fromRevision,
                                  toRevision, QStringLiteral("QSettings/qcai2"))});
@@ -443,6 +460,11 @@ QString globalBackupDirPath()
     return ensureGlobalBackupDir();
 }
 
+QString globalStructuredSettingsFilePath()
+{
+    return globalStructuredSettingsPath();
+}
+
 QString projectBackupDirPath(const QString &storagePath)
 {
     return ensureProjectBackupDir(storagePath);
@@ -517,6 +539,10 @@ bool migrateGlobalSettings(QSettings &settings, QString *error)
     if (isOlder(stored, migration_0_0_4_001))
         changed = migrateGlobalSettingsTo_0_0_4_001(settings) || changed;
 
+    const Revision migration_0_0_5_003 = parseRevision(QStringLiteral("0.0.5"), QStringLiteral("-003"));
+    if (isOlder(stored, migration_0_0_5_003))
+        changed = migrateGlobalSettingsTo_0_0_5_003(settings) || changed;
+
     if (!stored.valid || stored.revisionString() != current.revisionString())
     {
         stampGlobalSettings(settings);
@@ -578,6 +604,12 @@ bool migrateProjectState(const QString &storagePath, QString *error)
     if (isOlder(stored, migration_0_0_5_002))
     {
         changed = migrateProjectStateTo_0_0_5_002(root) || changed;
+    }
+
+    const Revision migration_0_0_5_003 = parseRevision(QStringLiteral("0.0.5"), QStringLiteral("-003"));
+    if (isOlder(stored, migration_0_0_5_003))
+    {
+        changed = migrateProjectStateTo_0_0_5_003(root) || changed;
     }
 
     if (!stored.valid || stored.revisionString() != current.revisionString())

@@ -30,6 +30,7 @@ Revision parseRevision(const QString &version, const QString &buildSuffix = {});
 bool isOlder(const Revision &lhs, const Revision &rhs);
 
 QString globalBackupDirPath();
+QString globalStructuredSettingsFilePath();
 QString projectBackupDirPath(const QString &storagePath);
 
 void stampGlobalSettings(QSettings &settings);

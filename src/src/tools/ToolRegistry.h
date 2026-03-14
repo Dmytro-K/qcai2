@@ -36,6 +36,13 @@ public:
     ITool *tool(const QString &name) const;
 
     /**
+     * Removes a previously registered tool by name.
+     * @param name Stable tool name to remove.
+     * @return True when a tool was removed.
+     */
+    bool unregisterTool(const QString &name);
+
+    /**
      * Returns all registered tools in map order.
      */
     QList<std::shared_ptr<ITool>> allTools() const;

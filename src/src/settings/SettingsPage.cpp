@@ -3,6 +3,7 @@
 */
 
 #include "SettingsPage.h"
+#include "McpServersWidget.h"
 #include "../../qcai2tr.h"
 #include "../util/Logger.h"
 #include "Settings.h"
@@ -113,6 +114,9 @@ public:
         m_completionReasoningCombo = m_ui->completionReasoningCombo;
         m_debugLoggingCheck = m_ui->debugLoggingCheck;
         m_agentDebugCheck = m_ui->agentDebugCheck;
+        m_mcpServersWidget = new McpServersWidget(this);
+        m_mcpServersWidget->setServers(s.mcpServers);
+        m_ui->settingsTabs->insertTab(1, m_mcpServersWidget, Tr::tr("MCP Servers"));
 
         // Provider selection
         m_providerCombo->addItem(Tr::tr("OpenAI-Compatible"), QStringLiteral("openai"));
@@ -326,6 +330,7 @@ public:
         s.completionReasoningEffort = m_completionReasoningCombo->currentData().toString();
         s.debugLogging = m_debugLoggingCheck->isChecked();
         s.agentDebug = m_agentDebugCheck->isChecked();
+        s.mcpServers = m_mcpServersWidget->servers();
         s.save();
 
         // Apply debug logging immediately
@@ -358,6 +363,7 @@ private:
     QComboBox *m_completionReasoningCombo;
     QCheckBox *m_debugLoggingCheck;
     QCheckBox *m_agentDebugCheck;
+    McpServersWidget *m_mcpServersWidget = nullptr;
 
 };
 

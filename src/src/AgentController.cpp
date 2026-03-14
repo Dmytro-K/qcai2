@@ -3,6 +3,7 @@
 */
 
 #include "AgentController.h"
+#include "mcp/McpToolManager.h"
 #include "settings/Settings.h"
 #include "util/Diff.h"
 #include "util/Logger.h"
@@ -10,6 +11,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QTimer>
+
+#include <utility>
 
 namespace qcai2
 {
@@ -105,6 +108,10 @@ void AgentController::setEditorContext(EditorContext *ctx)
 {
     m_editorContext = ctx;
 }
+void AgentController::setMcpToolManager(McpToolManager *manager)
+{
+    m_mcpToolManager = manager;
+}
 void AgentController::setSafetyPolicy(SafetyPolicy *policy)
 {
     m_safetyPolicy = policy;
@@ -191,7 +198,9 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
         return;
 
     // Re-select and reconfigure provider from current settings
-    const auto &s = settings();
+    auto &s = settings();
+    s.load();
+    Logger::instance().setEnabled(s.debugLogging);
     if (!m_allProviders.isEmpty())
     {
         m_provider = nullptr;
@@ -230,6 +239,15 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
     {
         emit errorOccurred(QStringLiteral("No AI provider configured."));
         return;
+    }
+
+    QStringList mcpRefreshMessages;
+    if (runMode == RunMode::Agent && m_mcpToolManager != nullptr)
+    {
+        QString projectDir;
+        if (m_editorContext != nullptr)
+            projectDir = m_editorContext->capture().projectDir;
+        mcpRefreshMessages = m_mcpToolManager->refreshForProject(projectDir);
     }
 
     m_running = true;
@@ -280,6 +298,8 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
                         .arg(goal));
     if (!m_linkedFiles.isEmpty())
         emit logMessage(QStringLiteral("📎 Linked files: %1").arg(m_linkedFiles.join(QStringLiteral(", "))));
+    for (const QString &message : std::as_const(mcpRefreshMessages))
+        emit logMessage(message);
     runNextIteration();
 }
 

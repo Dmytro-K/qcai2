@@ -35,6 +35,14 @@ ITool *ToolRegistry::tool(const QString &name) const
     return (it != m_tools.end()) ? it->get() : nullptr;
 }
 
+bool ToolRegistry::unregisterTool(const QString &name)
+{
+    const auto removed = m_tools.remove(name);
+    if (removed > 0)
+        QCAI_DEBUG("Tools", QStringLiteral("Unregistered tool: %1").arg(name));
+    return removed > 0;
+}
+
 /**
  * Returns all registered tools.
  */

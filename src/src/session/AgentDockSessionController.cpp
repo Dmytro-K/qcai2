@@ -10,6 +10,8 @@
 #include "../util/Logger.h"
 #include "../util/Migration.h"
 
+#include <qtmcp/ServerDefinition.h>
+
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectmanager.h>
 
@@ -156,7 +158,8 @@ void AgentDockSessionController::saveChat()
         !goalText.trimmed().isEmpty() || !persistedMarkdown.trimmed().isEmpty() ||
         !m_dock.m_currentDiff.isEmpty() || !planItems.isEmpty() ||
         !m_dock.m_linkedFilesController->manualLinkedFiles().isEmpty() ||
-        !m_dock.m_linkedFilesController->ignoredLinkedFiles().isEmpty() || uiStateDiffers;
+        !m_dock.m_linkedFilesController->ignoredLinkedFiles().isEmpty() ||
+        !m_projectMcpServers.isEmpty() || uiStateDiffers;
 
     if (!hasContent)
     {
@@ -195,6 +198,8 @@ void AgentDockSessionController::saveChat()
         QJsonArray::fromStringList(m_dock.m_linkedFilesController->manualLinkedFiles());
     root[QStringLiteral("ignoredLinkedFiles")] =
         QJsonArray::fromStringList(m_dock.m_linkedFilesController->ignoredLinkedFiles());
+    if (!m_projectMcpServers.isEmpty())
+        root[QStringLiteral("mcpServers")] = qtmcp::serverDefinitionsToJson(m_projectMcpServers);
     Migration::stampProjectState(root);
 
     QJsonArray planJson;
@@ -360,6 +365,26 @@ void AgentDockSessionController::restoreChat()
     m_dock.m_linkedFilesController->invalidateCandidates();
     m_dock.m_linkedFilesController->refreshUi();
 
+    m_projectMcpServers.clear();
+    const QJsonValue mcpServersValue = root.value(QStringLiteral("mcpServers"));
+    if (!mcpServersValue.isUndefined() && !mcpServersValue.isNull())
+    {
+        if (!mcpServersValue.isObject())
+        {
+            QCAI_WARN("Dock", QStringLiteral("Project session key 'mcpServers' must be an object."));
+        }
+        else
+        {
+            QString mcpError;
+            if (!qtmcp::serverDefinitionsFromJson(mcpServersValue.toObject(), &m_projectMcpServers,
+                                                  &mcpError))
+            {
+                QCAI_WARN("Dock", QStringLiteral("Failed to parse project MCP servers: %1").arg(mcpError));
+                m_projectMcpServers.clear();
+            }
+        }
+    }
+
     const int tab = root.value(QStringLiteral("activeTab")).toInt(0);
     if (tab >= 0 && tab < m_dock.m_tabs->count())
         m_dock.m_tabs->setCurrentIndex(tab);
@@ -445,6 +470,7 @@ void AgentDockSessionController::switchProjectContext(const QString &projectFile
     applyProjectUiDefaults();
     m_dock.m_linkedFilesController->invalidateCandidates();
     m_activeProjectFilePath = projectFilePath;
+    m_projectMcpServers.clear();
 
     if (auto *ctx = m_dock.m_controller->editorContext())
         ctx->setSelectedProjectFilePath(projectFilePath);
@@ -520,6 +546,11 @@ QStringList AgentDockSessionController::currentSessionWatchPaths() const
 QString AgentDockSessionController::currentProjectDir() const
 {
     return projectDirForPath(m_activeProjectFilePath);
+}
+
+const qtmcp::ServerDefinitions &AgentDockSessionController::projectMcpServers() const
+{
+    return m_projectMcpServers;
 }
 
 void AgentDockSessionController::applyProjectUiDefaults()
@@ -635,6 +666,7 @@ void AgentDockSessionController::reloadSessionFromDisk()
     const bool wasRunning = m_dock.m_stopBtn->isEnabled();
     m_dock.clearChatState();
     applyProjectUiDefaults();
+    m_projectMcpServers.clear();
     restoreChat();
     updateSessionFileWatcher();
     m_dock.updateRunState(wasRunning);

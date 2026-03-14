@@ -1,0 +1,20 @@
+/*! Migration steps for revision 0.0.5-003. */
+
+#include "Migration_0_0_5_003.h"
+
+namespace qcai2::Migration
+{
+
+bool migrateGlobalSettingsTo_0_0_5_003(QSettings &settings)
+{
+    Q_UNUSED(settings);
+    return false;
+}
+
+bool migrateProjectStateTo_0_0_5_003(QJsonObject &root)
+{
+    Q_UNUSED(root);
+    return false;
+}
+
+}  // namespace qcai2::Migration

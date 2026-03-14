@@ -8,6 +8,7 @@
 #include "completion/GhostTextManager.h"
 // CompletionTrigger removed — completion triggers via isActivationCharSequence instead
 #include "context/EditorContext.h"
+#include "mcp/McpToolManager.h"
 #include "providers/CopilotProvider.h"
 #include "providers/LocalHttpProvider.h"
 #include "providers/OllamaProvider.h"
@@ -64,6 +65,7 @@ void AiAgentPlugin::initialize()
     // Create components
     m_editorContext = new EditorContext(this);
     m_toolRegistry = new ToolRegistry(this);
+    m_mcpToolManager = new McpToolManager(m_toolRegistry, this);
     m_safetyPolicy = new SafetyPolicy(this);
     m_controller = new AgentController(this);
     m_outputCapture = new IdeOutputCapture(this);
@@ -87,6 +89,7 @@ void AiAgentPlugin::initialize()
     // Wire controller
     m_controller->setToolRegistry(m_toolRegistry);
     m_controller->setEditorContext(m_editorContext);
+    m_controller->setMcpToolManager(m_mcpToolManager);
     m_controller->setSafetyPolicy(m_safetyPolicy);
 
     // Set up AI code completion

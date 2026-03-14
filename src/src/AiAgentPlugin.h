@@ -9,6 +9,7 @@ namespace qcai2
 class AgentController;
 class AgentDockWidget;
 class EditorContext;
+class McpToolManager;
 class ToolRegistry;
 class SafetyPolicy;
 class IAIProvider;
@@ -78,6 +79,9 @@ private:
 
     /** Captures active editor and project context for prompts. */
     EditorContext *m_editorContext = nullptr;
+
+    /** Loads configured MCP servers and exposes their tools at runtime. */
+    McpToolManager *m_mcpToolManager = nullptr;
 
     /** Registry that owns the tools available to the model. */
     ToolRegistry *m_toolRegistry = nullptr;

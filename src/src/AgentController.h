@@ -17,6 +17,8 @@
 namespace qcai2
 {
 
+class McpToolManager;
+
 /**
  * Coordinates one agent run from planning through tool execution and completion.
  */
@@ -62,6 +64,12 @@ public:
      * @param ctx Editor context used for prompt generation.
      */
     void setEditorContext(EditorContext *ctx);
+
+    /**
+     * Sets the MCP runtime bridge used to expose configured MCP tools.
+     * @param manager Runtime MCP tool manager.
+     */
+    void setMcpToolManager(McpToolManager *manager);
 
     /**
      * Sets the safety policy that caps iterations, tool calls, and approvals.
@@ -257,6 +265,9 @@ private:
 
     /** Editor and project snapshot provider. */
     EditorContext *m_editorContext = nullptr;
+
+    /** Runtime bridge that injects configured MCP tools before agent runs. */
+    McpToolManager *m_mcpToolManager = nullptr;
 
     /** Limits for iterations, tool calls, and approval handling. */
     SafetyPolicy *m_safetyPolicy = nullptr;

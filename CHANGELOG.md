@@ -6,6 +6,8 @@
 
 - Added a shared goal-editor special-token system with popup autocompletion, blue slash commands, `DECLARE_COMMAND(...)` auto-registration, and a sample `/hello` command.
 - Added file references via linked files above the goal, drag-and-drop attachments, and `#` references in the goal editor.
+- Added the standalone-friendly Qt MCP client library.
+- Added MCP client.
 
 ### Changed
 
