@@ -34,6 +34,7 @@ add_executable(tst_qcai2_slash_commands
     tst_slash_commands.cpp
     ../src/commands/SlashCommandRegistry.cpp
     ../src/commands/HelloCommand.cpp
+    ../src/goal/FileReferenceGoalHandler.cpp
     ../src/goal/SlashCommandGoalHandler.cpp
 )
 

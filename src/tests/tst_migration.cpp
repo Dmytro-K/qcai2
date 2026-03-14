@@ -34,6 +34,7 @@ private slots:
     void parseRevision_readsVersionAndBuildSuffix();
     void migrateGlobalSettings_copiesLegacyReasoningAndStampsRevision();
     void migrateProjectState_movesGoalAndLogToSiblingFiles();
+    void migrateProjectState_renamesIgnoredLinkedFilesKey();
 };
 
 void MigrationTest::parseRevision_readsVersionAndBuildSuffix()
@@ -139,6 +140,45 @@ void MigrationTest::migrateProjectState_movesGoalAndLogToSiblingFiles()
     qInfo() << "Project backup archives" << backups;
     QCOMPARE(backups.size(), 1);
     QVERIFY(backups.constFirst().contains("session__"));
+}
+
+void MigrationTest::migrateProjectState_renamesIgnoredLinkedFilesKey()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString contextDirPath = dir.filePath("project/.qcai2");
+    QVERIFY(QDir().mkpath(contextDirPath));
+    const QString storagePath = QDir(contextDirPath).filePath("session.json");
+    {
+        QSaveFile file(storagePath);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        const QJsonObject root{{"excludedDefaultLinkedFiles",
+                                QJsonArray{QStringLiteral("src/Main.cpp"),
+                                           QStringLiteral("README.md")}},
+                               {"storageRevision", "0.0.5-001"}};
+        file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+        QVERIFY(file.commit());
+    }
+
+    QString error;
+    const bool migrated = Migration::migrateProjectState(storagePath, &error);
+    QVERIFY2(migrated, qPrintable(error));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    QFile stateFile(storagePath);
+    QVERIFY2(stateFile.open(QIODevice::ReadOnly), qPrintable(stateFile.errorString()));
+    const QJsonDocument doc = QJsonDocument::fromJson(stateFile.readAll());
+    QVERIFY(doc.isObject());
+    const QJsonObject root = doc.object();
+    QVERIFY(!root.contains("excludedDefaultLinkedFiles"));
+    QVERIFY(root.contains("ignoredLinkedFiles"));
+    QCOMPARE(root.value("storageRevision").toString(), Migration::currentRevisionString());
+
+    const QJsonArray ignoredLinkedFiles = root.value("ignoredLinkedFiles").toArray();
+    QCOMPARE(ignoredLinkedFiles.size(), 2);
+    QCOMPARE(ignoredLinkedFiles.at(0).toString(), QString("src/Main.cpp"));
+    QCOMPARE(ignoredLinkedFiles.at(1).toString(), QString("README.md"));
 }
 
 QTEST_APPLESS_MAIN(MigrationTest)

@@ -70,6 +70,13 @@ public:
     void setSafetyPolicy(SafetyPolicy *policy);
 
     /**
+     * Sets extra request-specific context, such as linked files, for the next run.
+     * @param context Additional prompt context supplied alongside the goal.
+     * @param linkedFiles Display names of linked files for logging.
+     */
+    void setRequestContext(const QString &context, const QStringList &linkedFiles = {});
+
+    /**
      * Starts a new run for the requested goal.
      * @param goal User task description.
      * @param dryRun True to forbid live patch application.
@@ -271,6 +278,12 @@ private:
 
     /** User goal for the current run. */
     QString m_goal;
+
+    /** Extra request-specific prompt context prepared by the dock widget. */
+    QString m_requestContext;
+
+    /** Linked file labels associated with the pending request. */
+    QStringList m_linkedFiles;
 
     /** Selected interaction mode for the current run. */
     RunMode m_runMode = RunMode::Agent;

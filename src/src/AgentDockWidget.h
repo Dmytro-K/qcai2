@@ -4,12 +4,12 @@
 #include "AgentController.h"
 #include "commands/SlashCommandRegistry.h"
 #include "diff/InlineDiffManager.h"
+#include "goal/LinkedFilesListWidget.h"
 #include "goal/GoalTextEdit.h"
 
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
-#include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSplitter>
@@ -135,6 +135,61 @@ private:
     bool tryExecuteSlashCommand(const QString &goal);
 
     /**
+     * Returns project-relative file candidates for # file linking autocomplete.
+     */
+    QStringList linkedFileCandidates() const;
+
+    /**
+     * Returns valid linked files referenced inside the goal text via #tokens.
+     */
+    QStringList linkedFilesFromGoalText() const;
+
+    /**
+     * Returns the normalized active editor file, regardless of ignore rules.
+     */
+    QString currentEditorLinkedFile() const;
+
+    /**
+     * Returns the active editor file that should be linked by default, if any.
+     */
+    QString defaultLinkedFile() const;
+
+    /**
+     * Returns the combined manual and goal-text-linked files for the current request.
+     */
+    QStringList effectiveLinkedFiles() const;
+
+    /**
+     * Adds one or more files to the manually linked file list.
+     */
+    void addLinkedFiles(const QStringList &paths);
+
+    /**
+     * Removes selected linked files from the list and matching #tokens from the goal.
+     */
+    void removeSelectedLinkedFiles();
+
+    /**
+     * Rebuilds the linked-file list shown above the goal editor.
+     */
+    void refreshLinkedFilesUi();
+
+    /**
+     * Builds the request-specific prompt context for linked files.
+     */
+    QString linkedFilesPromptContext() const;
+
+    /**
+     * Converts a stored linked-file label into an absolute path, when possible.
+     */
+    QString linkedFileAbsolutePath(const QString &path) const;
+
+    /**
+     * Normalizes a linked-file path to a project-relative label when possible.
+     */
+    QString normalizeLinkedFilePath(const QString &path) const;
+
+    /**
      * Handles keyboard shortcuts from the goal editor.
      * @param obj JSON object to convert.
      * @param event Event being filtered.
@@ -210,6 +265,7 @@ private:
 
     /** Input controls shown beside the goal editor. */
     QComboBox *m_projectCombo;
+    LinkedFilesListWidget *m_linkedFilesView = nullptr;
     GoalTextEdit *m_goalEdit;
     QComboBox *m_modeCombo;
     QComboBox *m_modelCombo;
@@ -249,6 +305,21 @@ private:
 
     /** Project file path whose context is currently loaded into the dock. */
     QString m_activeProjectFilePath;
+
+    /** Files linked explicitly via drag-and-drop or the linked-files list. */
+    QStringList m_manualLinkedFiles;
+
+    /** Linked-file path prefixes ignored by linked-files autocomplete/defaults. */
+    QStringList m_ignoredLinkedFiles;
+
+    /** Current-editor files hidden from linked files only for the active in-memory session. */
+    QStringList m_hiddenDefaultLinkedFiles;
+
+    /** Cached project root used to build # file completion candidates. */
+    mutable QString m_cachedLinkedFileRoot;
+
+    /** Cached project-relative file paths used by the # completion handler. */
+    mutable QStringList m_cachedLinkedFileCandidates;
 
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> m_approvalItems;

@@ -3,12 +3,16 @@
 
 #include "GoalSpecialHandler.h"
 
+#include <QStringList>
 #include <QTextEdit>
 
 #include <memory>
 #include <vector>
 
 class QCompleter;
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDropEvent;
 class QModelIndex;
 class QKeyEvent;
 class QStandardItemModel;
@@ -21,6 +25,7 @@ namespace qcai2
  */
 class GoalTextEdit : public QTextEdit
 {
+    Q_OBJECT
 public:
     explicit GoalTextEdit(QWidget *parent = nullptr);
 
@@ -34,7 +39,13 @@ public:
      */
     bool hasCompletionPopup() const;
 
+signals:
+    void filesDropped(const QStringList &paths);
+
 protected:
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dragMoveEvent(QDragMoveEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
 private:

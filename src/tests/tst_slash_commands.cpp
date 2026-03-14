@@ -5,6 +5,7 @@
 #include <QtTest>
 
 #include "src/commands/SlashCommandRegistry.h"
+#include "src/goal/FileReferenceGoalHandler.h"
 #include "src/goal/SlashCommandGoalHandler.h"
 
 using namespace qcai2;
@@ -56,6 +57,21 @@ private slots:
      * @brief Colors the leading slash command token with the link color.
      */
     void highlightSpans_leadingSlashCommand_isBlue();
+
+    /**
+     * @brief Offers popup completions for # file references.
+     */
+    void fileCompletion_hashPrefix_returnsMatchingFiles();
+
+    /**
+     * @brief Orders case-sensitive # file matches before case-insensitive ones.
+     */
+    void fileCompletion_caseSensitiveMatches_areOrderedFirst();
+
+    /**
+     * @brief Highlights # file references with a dedicated color.
+     */
+    void fileHighlight_hashReference_isColored();
 };
 
 void macroTestCommand(const SlashCommandInvocation &invocation, const SlashCommandContext &context)
@@ -173,6 +189,54 @@ void SlashCommandRegistryTest::highlightSpans_leadingSlashCommand_isBlue()
     QCOMPARE(spans.first().start, 2);
     QCOMPARE(spans.first().length, 6);
     QCOMPARE(spans.first().format.foreground().color(), palette.color(QPalette::Link));
+}
+
+void SlashCommandRegistryTest::fileCompletion_hashPrefix_returnsMatchingFiles()
+{
+    FileReferenceGoalHandler handler(
+        []() { return QStringList{QStringLiteral("src/main.cpp"), QStringLiteral("README.md")}; });
+
+    const GoalCompletionSession session =
+        handler.completionSession({QStringLiteral("Check #sr now"), 9});
+
+    QVERIFY(session.active);
+    QCOMPARE(session.replaceStart, 6);
+    QCOMPARE(session.replaceEnd, 9);
+    QCOMPARE(session.prefix, QStringLiteral("#sr"));
+    QCOMPARE(session.items.size(), 1);
+    QCOMPARE(session.items.first().label, QStringLiteral("#src/main.cpp"));
+    QCOMPARE(session.items.first().insertText, QStringLiteral("#src/main.cpp"));
+}
+
+void SlashCommandRegistryTest::fileCompletion_caseSensitiveMatches_areOrderedFirst()
+{
+    FileReferenceGoalHandler handler([]() {
+        return QStringList{QStringLiteral("src/Main.cpp"), QStringLiteral("Src/main.cpp"),
+                           QStringLiteral("src/main.cpp")};
+    });
+
+    const GoalCompletionSession session =
+        handler.completionSession({QStringLiteral("Check #Ma now"), 9});
+
+    QVERIFY(session.active);
+    QCOMPARE(session.items.size(), 3);
+    QCOMPARE(session.items.at(0).label, QStringLiteral("#src/Main.cpp"));
+    QCOMPARE(session.items.at(1).label, QStringLiteral("#Src/main.cpp"));
+    QCOMPARE(session.items.at(2).label, QStringLiteral("#src/main.cpp"));
+}
+
+void SlashCommandRegistryTest::fileHighlight_hashReference_isColored()
+{
+    FileReferenceGoalHandler handler([]() { return QStringList{}; });
+    const QPalette palette;
+
+    const QList<GoalHighlightSpan> spans =
+        handler.highlightSpans(QStringLiteral("Use #src/main.cpp please"), palette);
+
+    QCOMPARE(spans.size(), 1);
+    QCOMPARE(spans.first().start, 4);
+    QCOMPARE(spans.first().length, 13);
+    QVERIFY(spans.first().format.foreground().color().isValid());
 }
 
 QTEST_APPLESS_MAIN(SlashCommandRegistryTest)

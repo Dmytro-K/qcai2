@@ -2,6 +2,7 @@
 
 #include "Migration.h"
 #include "migrations/Migration_0_0_4_001.h"
+#include "migrations/Migration_0_0_5_002.h"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -571,6 +572,12 @@ bool migrateProjectState(const QString &storagePath, QString *error)
         if (!migrateProjectStateTo_0_0_4_001(storagePath, root, error))
             return false;
         changed = true;
+    }
+
+    const Revision migration_0_0_5_002 = parseRevision(QStringLiteral("0.0.5"), QStringLiteral("-002"));
+    if (isOlder(stored, migration_0_0_5_002))
+    {
+        changed = migrateProjectStateTo_0_0_5_002(root) || changed;
     }
 
     if (!stored.valid || stored.revisionString() != current.revisionString())

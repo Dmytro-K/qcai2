@@ -417,6 +417,10 @@ add_qtc_plugin(qcai2
     src/src/goal/GoalSpecialHandler.h
     src/src/goal/GoalTextEdit.h
     src/src/goal/GoalTextEdit.cpp
+    src/src/goal/FileReferenceGoalHandler.h
+    src/src/goal/FileReferenceGoalHandler.cpp
+    src/src/goal/LinkedFilesListWidget.h
+    src/src/goal/LinkedFilesListWidget.cpp
     src/src/goal/SlashCommandGoalHandler.h
     src/src/goal/SlashCommandGoalHandler.cpp
     src/src/context/EditorContext.h

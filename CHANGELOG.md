@@ -4,7 +4,12 @@
 
 ### Added
 
-- Added a shared goal-editor special-token system with popup autocompletion, blue leading slash-command highlighting, `DECLARE_COMMAND(...)` auto-registration, and a sample `/hello` command.
+- Added a shared goal-editor special-token system with popup autocompletion, blue slash commands, `DECLARE_COMMAND(...)` auto-registration, and a sample `/hello` command.
+- Added file references via linked files above the goal, drag-and-drop attachments, and `#` references in the goal editor.
+
+### Changed
+
+- Project session state now migrates legacy ignored linked-file paths into the `ignoredLinkedFiles` array.
 
 ## [0.0.4] - 2026-03-12
 

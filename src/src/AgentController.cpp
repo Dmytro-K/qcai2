@@ -110,6 +110,12 @@ void AgentController::setSafetyPolicy(SafetyPolicy *policy)
     m_safetyPolicy = policy;
 }
 
+void AgentController::setRequestContext(const QString &context, const QStringList &linkedFiles)
+{
+    m_requestContext = context;
+    m_linkedFiles = linkedFiles;
+}
+
 QString AgentController::buildSystemPrompt() const
 {
     QString sys;
@@ -255,6 +261,9 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
     // System prompt
     m_messages.append({QStringLiteral("system"), buildSystemPrompt()});
 
+    if (!m_requestContext.trimmed().isEmpty())
+        m_messages.append({QStringLiteral("system"), m_requestContext.trimmed()});
+
     if (isEnabledEffort(m_thinkingLevel))
         m_messages.append({QStringLiteral("system"),
                            QStringLiteral("Use %1 thinking depth for this task.")
@@ -269,6 +278,8 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
                         .arg(m_runMode == RunMode::Ask ? QStringLiteral("Ask mode")
                                                        : QStringLiteral("Agent"))
                         .arg(goal));
+    if (!m_linkedFiles.isEmpty())
+        emit logMessage(QStringLiteral("📎 Linked files: %1").arg(m_linkedFiles.join(QStringLiteral(", "))));
     runNextIteration();
 }
 

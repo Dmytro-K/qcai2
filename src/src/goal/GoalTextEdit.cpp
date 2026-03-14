@@ -4,17 +4,22 @@
 
 #include <QAbstractItemView>
 #include <QCompleter>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QKeyEvent>
+#include <QMimeData>
 #include <QScrollBar>
 #include <QStandardItem>
 #include <QStandardItemModel>
 #include <QTextCursor>
+#include <QUrl>
 
 namespace qcai2
 {
 
 GoalTextEdit::GoalTextEdit(QWidget *parent) : QTextEdit(parent)
 {
+    setAcceptDrops(true);
     m_completionModel = new QStandardItemModel(this);
     m_completer = new QCompleter(m_completionModel, this);
     m_completer->setCaseSensitivity(Qt::CaseInsensitive);
@@ -41,6 +46,51 @@ bool GoalTextEdit::hasCompletionPopup() const
 {
     return m_completer != nullptr && m_completer->popup() != nullptr &&
            m_completer->popup()->isVisible();
+}
+
+void GoalTextEdit::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (event->mimeData()->hasUrls())
+    {
+        event->acceptProposedAction();
+        return;
+    }
+
+    QTextEdit::dragEnterEvent(event);
+}
+
+void GoalTextEdit::dragMoveEvent(QDragMoveEvent *event)
+{
+    if (event->mimeData()->hasUrls())
+    {
+        event->acceptProposedAction();
+        return;
+    }
+
+    QTextEdit::dragMoveEvent(event);
+}
+
+void GoalTextEdit::dropEvent(QDropEvent *event)
+{
+    if (event->mimeData()->hasUrls())
+    {
+        QStringList paths;
+        const QList<QUrl> urls = event->mimeData()->urls();
+        for (const QUrl &url : urls)
+        {
+            if (url.isLocalFile())
+                paths.append(url.toLocalFile());
+        }
+
+        if (!paths.isEmpty())
+        {
+            emit filesDropped(paths);
+            event->acceptProposedAction();
+            return;
+        }
+    }
+
+    QTextEdit::dropEvent(event);
 }
 
 void GoalTextEdit::keyPressEvent(QKeyEvent *event)
