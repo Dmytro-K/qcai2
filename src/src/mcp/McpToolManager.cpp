@@ -9,6 +9,7 @@
 #include "../util/Migration.h"
 
 #include <qtmcp/Client.h>
+#include <qtmcp/HttpTransport.h>
 #include <qtmcp/ServerDefinition.h>
 #include <qtmcp/StdioTransport.h>
 
@@ -23,8 +24,10 @@
 #include <QMap>
 #include <QPointer>
 #include <QProcessEnvironment>
+#include <QRegularExpression>
 #include <QSet>
 #include <QTimer>
+#include <QUrl>
 
 #include <memory>
 #include <utility>
@@ -35,7 +38,8 @@ namespace qcai2
 namespace
 {
 
-constexpr auto kMcpProtocolVersion = "2024-11-05";
+constexpr auto kMcpProtocolVersionStdio = "2024-11-05";
+constexpr auto kMcpProtocolVersionHttp = "2025-03-26";
 constexpr int kMaxToolsListPages = 32;
 
 QString sanitizeToolSegment(const QString &value)
@@ -214,6 +218,75 @@ qtmcp::ServerDefinitions loadProjectServerDefinitions(const QString &projectDir,
     }
 
     return definitions;
+}
+
+QString expandEnvironmentPlaceholders(const QString &value, const QString &serverName,
+                                      const QString &fieldLabel, const QProcessEnvironment &env,
+                                      QStringList *messages)
+{
+    static const QRegularExpression pattern(QStringLiteral(R"(\$\{([A-Za-z_][A-Za-z0-9_]*)\})"));
+
+    QString resolved = value;
+    QRegularExpressionMatchIterator iterator = pattern.globalMatch(value);
+    while (iterator.hasNext())
+    {
+        const QRegularExpressionMatch match = iterator.next();
+        const QString variableName = match.captured(1);
+        if (!env.contains(variableName))
+        {
+            if (messages != nullptr)
+            {
+                messages->append(QStringLiteral("⚠ MCP: server `%1` references unset environment variable `%2` in %3.")
+                                     .arg(serverName, variableName, fieldLabel));
+            }
+            continue;
+        }
+
+        resolved.replace(match.captured(0), env.value(variableName));
+    }
+
+    return resolved;
+}
+
+QString extraFieldString(const QJsonObject &extraFields, const QString &name)
+{
+    return extraFields.value(name).toString().trimmed();
+}
+
+bool extraFieldBool(const QJsonObject &extraFields, const QString &name, bool fallback)
+{
+    const QJsonValue value = extraFields.value(name);
+    if (value.isBool())
+        return value.toBool();
+    return fallback;
+}
+
+QStringList extraFieldStringList(const QJsonObject &extraFields, const QString &name)
+{
+    QStringList values;
+    const QJsonValue value = extraFields.value(name);
+    if (value.isString())
+    {
+        const QStringList parts = value.toString().split(QRegularExpression(QStringLiteral("\\s+")),
+                                                         Qt::SkipEmptyParts);
+        for (const QString &part : parts)
+            values.append(part.trimmed());
+        return values;
+    }
+
+    if (!value.isArray())
+        return values;
+
+    for (const QJsonValue &entry : value.toArray())
+    {
+        if (entry.isString())
+        {
+            const QString trimmed = entry.toString().trimmed();
+            if (!trimmed.isEmpty())
+                values.append(trimmed);
+        }
+    }
+    return values;
 }
 
 struct RpcResult
@@ -536,16 +609,24 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             continue;
         ++enabledServerCount;
 
-        if (definition.transport != QStringLiteral("stdio"))
+        if (definition.transport != QStringLiteral("stdio") &&
+            definition.transport != QStringLiteral("http"))
         {
-            messages.append(QStringLiteral("ℹ MCP: server `%1` uses unsupported runtime transport `%2`; v1 only exposes stdio servers.")
+            messages.append(QStringLiteral("ℹ MCP: server `%1` uses unsupported runtime transport `%2`; supported transports are `stdio` and `http`.")
                                 .arg(serverName, definition.transport));
             continue;
         }
 
-        if (definition.command.trimmed().isEmpty())
+        if (definition.transport == QStringLiteral("stdio") && definition.command.trimmed().isEmpty())
         {
             messages.append(QStringLiteral("⚠ MCP: server `%1` is enabled but has no command configured.")
+                                .arg(serverName));
+            continue;
+        }
+
+        if (definition.transport == QStringLiteral("http") && definition.url.trimmed().isEmpty())
+        {
+            messages.append(QStringLiteral("⚠ MCP: server `%1` is enabled but has no URL configured.")
                                 .arg(serverName));
             continue;
         }
@@ -555,25 +636,68 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
         session->definition = definition;
         session->client = std::make_unique<qtmcp::Client>();
 
-        qtmcp::StdioTransportConfig transportConfig;
-        transportConfig.program = definition.command;
-        transportConfig.arguments = definition.args;
-        transportConfig.workingDirectory = projectDir;
-        transportConfig.environment = QProcessEnvironment::systemEnvironment();
-        for (auto envIt = definition.env.begin(); envIt != definition.env.end(); ++envIt)
-            transportConfig.environment.insert(envIt.key(), envIt.value());
+        const QProcessEnvironment processEnvironment = QProcessEnvironment::systemEnvironment();
+        QString protocolVersion;
+        if (definition.transport == QStringLiteral("stdio"))
+        {
+            qtmcp::StdioTransportConfig transportConfig;
+            transportConfig.program = definition.command;
+            transportConfig.arguments = definition.args;
+            transportConfig.workingDirectory = projectDir;
+            transportConfig.environment = processEnvironment;
+            for (auto envIt = definition.env.begin(); envIt != definition.env.end(); ++envIt)
+                transportConfig.environment.insert(envIt.key(), envIt.value());
 
-        session->client->setTransport(
-            std::make_unique<qtmcp::StdioTransport>(std::move(transportConfig)));
+            session->client->setTransport(
+                std::make_unique<qtmcp::StdioTransport>(std::move(transportConfig)));
+            protocolVersion = QString::fromLatin1(kMcpProtocolVersionStdio);
+        }
+        else
+        {
+            qtmcp::HttpTransportConfig transportConfig;
+            transportConfig.endpoint = QUrl(expandEnvironmentPlaceholders(
+                definition.url, serverName, QStringLiteral("the endpoint URL"), processEnvironment,
+                &messages));
+            transportConfig.protocolVersion = QString::fromLatin1(kMcpProtocolVersionHttp);
+            transportConfig.requestTimeoutMs = definition.requestTimeoutMs;
+            transportConfig.oauthEnabled =
+                extraFieldBool(definition.extraFields, QStringLiteral("oauthEnabled"),
+                               definition.headers.isEmpty());
+            transportConfig.oauthClientId =
+                extraFieldString(definition.extraFields, QStringLiteral("oauthClientId"));
+            transportConfig.oauthClientSecret =
+                expandEnvironmentPlaceholders(
+                    extraFieldString(definition.extraFields, QStringLiteral("oauthClientSecret")),
+                    serverName, QStringLiteral("oauthClientSecret"), processEnvironment, &messages);
+            transportConfig.oauthClientName =
+                extraFieldString(definition.extraFields, QStringLiteral("oauthClientName"));
+            if (transportConfig.oauthClientName.isEmpty())
+                transportConfig.oauthClientName = QStringLiteral("qcai2");
+            transportConfig.oauthScopes =
+                extraFieldStringList(definition.extraFields, QStringLiteral("oauthScopes"));
+            for (auto headerIt = definition.headers.begin(); headerIt != definition.headers.end();
+                 ++headerIt)
+            {
+                transportConfig.headers.insert(
+                    headerIt.key(),
+                    expandEnvironmentPlaceholders(headerIt.value(), serverName,
+                                                  QStringLiteral("header `%1`").arg(headerIt.key()),
+                                                  processEnvironment, &messages));
+            }
+
+            session->client->setTransport(
+                std::make_unique<qtmcp::HttpTransport>(std::move(transportConfig)));
+            protocolVersion = QString::fromLatin1(kMcpProtocolVersionHttp);
+        }
         QObject::connect(session->client.get(), &qtmcp::Client::transportLogMessage, this,
                          [serverName, sessionPtr = session.get()](const QString &message) {
                              const QString trimmed = message.trimmed();
-                             if (!trimmed.isEmpty())
-                             {
-                                 sessionPtr->recentLogLines.append(trimmed);
-                                 while (sessionPtr->recentLogLines.size() > 10)
-                                     sessionPtr->recentLogLines.removeFirst();
-                             }
+                              if (!trimmed.isEmpty())
+                              {
+                                  sessionPtr->recentLogLines.append(trimmed);
+                                  while (sessionPtr->recentLogLines.size() > 30)
+                                      sessionPtr->recentLogLines.removeFirst();
+                              }
                              QCAI_DEBUG("MCP", QStringLiteral("[%1] %2").arg(serverName, message));
                          });
 
@@ -587,7 +711,7 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
         }
 
         const QJsonObject initializeParams{
-            {QStringLiteral("protocolVersion"), QString::fromLatin1(kMcpProtocolVersion)},
+            {QStringLiteral("protocolVersion"), protocolVersion},
             {QStringLiteral("capabilities"), QJsonObject{}},
             {QStringLiteral("clientInfo"),
              QJsonObject{{QStringLiteral("name"), QStringLiteral("qcai2")},

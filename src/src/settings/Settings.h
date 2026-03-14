@@ -122,11 +122,23 @@ struct Settings
 
 };
 
+struct McpServerConnectionState
+{
+    QString state;
+    QString message;
+};
+
+using McpServerConnectionStates = QMap<QString, McpServerConnectionState>;
+
 /**
  * Returns the process-wide settings singleton.
  * @return Shared settings instance.
  */
 Settings &settings();
+
+McpServerConnectionStates loadMcpServerConnectionStates(QString *error = nullptr);
+bool saveMcpServerConnectionStates(const McpServerConnectionStates &states,
+                                   QString *error = nullptr);
 
 /**
  * Tracks user-visible model choices for provider-specific UIs.

@@ -67,7 +67,7 @@ jobs:
              archive_ext: zip,
              cc: "clang", cxx: "clang++",
              qt_host: "mac", qt_arch: "clang_64",
-             qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
+              qt_archives: "qtbase qtdeclarative qt5compat qtshadertools",
            }
 
     steps:
@@ -117,8 +117,31 @@ jobs:
         target: desktop
         arch: ${{ matrix.config.qt_arch }}
         archives: ${{ matrix.config.qt_archives }}
+        modules: qtnetworkauth
         dir: ${{ github.workspace }}/qt
         cache: true
+
+    - name: Verify Qt NetworkAuth
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -z "${QT_ROOT_DIR:-}" ]; then
+          echo "::error::QT_ROOT_DIR is not set after install-qt-action"
+          exit 1
+        fi
+
+        networkauth_config="$(
+          find "${QT_ROOT_DIR}" \
+            \( -path '*/Qt6NetworkAuth/Qt6NetworkAuthConfig.cmake' \
+               -o -path '*/Qt5NetworkAuth/Qt5NetworkAuthConfig.cmake' \) \
+            -print -quit
+        )"
+        if [ -z "${networkauth_config}" ]; then
+          echo "::error::Qt NetworkAuth was not installed under ${QT_ROOT_DIR}"
+          exit 1
+        fi
+
+        echo "Using Qt NetworkAuth config ${networkauth_config}"
 
     - name: Download Qt Creator
       id: qt_creator

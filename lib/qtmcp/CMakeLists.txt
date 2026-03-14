@@ -9,15 +9,16 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     set(CMAKE_CXX_EXTENSIONS OFF)
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network)
-find_package(Qt6 QUIET COMPONENTS NetworkAuth)
+find_package(Qt6 REQUIRED COMPONENTS Core Network Gui NetworkAuth)
 
 add_library(qtmcp
     include/qtmcp/Client.h
+    include/qtmcp/HttpTransport.h
     include/qtmcp/ServerDefinition.h
     include/qtmcp/StdioTransport.h
     include/qtmcp/Transport.h
     src/Client.cpp
+    src/HttpTransport.cpp
     src/ServerDefinition.cpp
     src/StdioTransport.cpp
     src/Transport.cpp
@@ -38,14 +39,11 @@ target_link_libraries(qtmcp
     PUBLIC
         Qt6::Core
         Qt6::Network
+        Qt6::NetworkAuth
+    PRIVATE
+        Qt6::Gui
 )
-
-if(TARGET Qt6::NetworkAuth)
-    target_link_libraries(qtmcp PUBLIC Qt6::NetworkAuth)
-    target_compile_definitions(qtmcp PUBLIC QTMCP_HAS_NETWORKAUTH=1)
-else()
-    target_compile_definitions(qtmcp PUBLIC QTMCP_HAS_NETWORKAUTH=0)
-endif()
+target_compile_definitions(qtmcp PUBLIC QTMCP_HAS_NETWORKAUTH=1)
 
 
 set(SRC_IDE

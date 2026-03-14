@@ -2,24 +2,275 @@
 
 #include "McpServersWidget.h"
 
+#include <qtmcp/Client.h>
+#include <qtmcp/HttpTransport.h>
+
+#include "Settings.h"
+#include "../util/Migration.h"
+#include "../util/Logger.h"
+
 #include <QCheckBox>
+#include <QBrush>
+#include <QColor>
 #include <QComboBox>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QProcessEnvironment>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QTimer>
 #include <QVBoxLayout>
+
+#include <algorithm>
+#include <memory>
 
 namespace qcai2
 {
+
+namespace
+{
+
+void logMcpSettingsDebug(const QString &serverName, const QString &message)
+{
+    const QString trimmed = message.trimmed();
+    if (trimmed.isEmpty())
+        return;
+    QCAI_DEBUG("MCP",
+               QStringLiteral("[settings:%1] %2").arg(serverName, trimmed));
+}
+
+constexpr auto kMcpProtocolVersionHttp = "2025-03-26";
+constexpr int kStatusProbeTimeoutMs = 10000;
+
+QString expandEnvironmentPlaceholders(const QString &value, const QProcessEnvironment &environment)
+{
+    QString resolved = value;
+    static const QRegularExpression pattern(QStringLiteral(R"(\$\{([A-Za-z_][A-Za-z0-9_]*)\})"));
+    auto match = pattern.match(resolved);
+    while (match.hasMatch())
+    {
+        const QString variableName = match.captured(1);
+        const QString replacement = environment.value(variableName);
+        resolved.replace(match.capturedStart(0), match.capturedLength(0), replacement);
+        match = pattern.match(resolved);
+    }
+    return resolved;
+}
+
+QString extraFieldString(const QJsonObject &extraFields, const QString &name)
+{
+    return extraFields.value(name).toString().trimmed();
+}
+
+bool extraFieldBool(const QJsonObject &extraFields, const QString &name, bool fallback)
+{
+    const QJsonValue value = extraFields.value(name);
+    return value.isBool() ? value.toBool() : fallback;
+}
+
+QStringList extraFieldStringList(const QJsonObject &extraFields, const QString &name)
+{
+    QStringList values;
+    const QJsonValue value = extraFields.value(name);
+    if (value.isString())
+        return value.toString().split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+
+    if (!value.isArray())
+        return values;
+
+    for (const QJsonValue &entry : value.toArray())
+    {
+        if (!entry.isString())
+            continue;
+        const QString trimmed = entry.toString().trimmed();
+        if (!trimmed.isEmpty())
+            values.append(trimmed);
+    }
+    return values;
+}
+
+QString extractBearerToken(QMap<QString, QString> *headers)
+{
+    if (headers == nullptr)
+        return {};
+
+    const auto keys = headers->keys();
+    for (const QString &key : keys)
+    {
+        if (key.compare(QStringLiteral("Authorization"), Qt::CaseInsensitive) != 0)
+            continue;
+
+        const QString value = headers->value(key).trimmed();
+        if (!value.startsWith(QStringLiteral("Bearer "), Qt::CaseInsensitive))
+            return {};
+
+        headers->remove(key);
+        return value.mid(7).trimmed();
+    }
+
+    return {};
+}
+
+void removeAuthorizationHeaders(QMap<QString, QString> *headers)
+{
+    if (headers == nullptr)
+        return;
+
+    const auto keys = headers->keys();
+    for (const QString &key : keys)
+    {
+        if (key.compare(QStringLiteral("Authorization"), Qt::CaseInsensitive) == 0)
+            headers->remove(key);
+    }
+}
+
+QMap<QString, QString> normalizedHeadersWithToken(const QString &headersText, const QString &tokenText)
+{
+    QMap<QString, QString> headers;
+    for (const QString &line : headersText.split(QLatin1Char('\n')))
+    {
+        const QString trimmed = line.trimmed();
+        if (trimmed.isEmpty())
+            continue;
+
+        const qsizetype separatorIndex = trimmed.indexOf(QLatin1Char(':'));
+        if (separatorIndex < 0)
+        {
+            headers.insert(trimmed, QString());
+            continue;
+        }
+
+        const QString key = trimmed.left(separatorIndex).trimmed();
+        const QString value = trimmed.mid(separatorIndex + 1).trimmed();
+        if (!key.isEmpty())
+            headers.insert(key, value);
+    }
+
+    const QString token = tokenText.trimmed();
+    if (!token.isEmpty())
+    {
+        removeAuthorizationHeaders(&headers);
+        headers.insert(QStringLiteral("Authorization"), QStringLiteral("Bearer %1").arg(token));
+        return headers;
+    }
+
+    QString extractedToken = extractBearerToken(&headers);
+    if (!extractedToken.isEmpty())
+        headers.insert(QStringLiteral("Authorization"),
+                       QStringLiteral("Bearer %1").arg(extractedToken));
+    return headers;
+}
+
+QJsonObject initializeParamsObject()
+{
+    return QJsonObject{
+        {QStringLiteral("protocolVersion"), QString::fromLatin1(kMcpProtocolVersionHttp)},
+        {QStringLiteral("capabilities"), QJsonObject{}},
+        {QStringLiteral("clientInfo"),
+         QJsonObject{{QStringLiteral("name"), QStringLiteral("qcai2")},
+                     {QStringLiteral("version"), Migration::currentRevisionString()}}}
+    };
+}
+
+int probeTimeoutMs(int configuredTimeoutMs)
+{
+    if (configuredTimeoutMs <= 0)
+        return kStatusProbeTimeoutMs;
+    return std::min(configuredTimeoutMs, kStatusProbeTimeoutMs);
+}
+
+qtmcp::HttpTransportConfig buildHttpTransportConfig(const QString &serverName,
+                                                    const qtmcp::ServerDefinition &definition)
+{
+    const QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+
+    qtmcp::HttpTransportConfig config;
+    config.endpoint = QUrl(expandEnvironmentPlaceholders(definition.url, environment));
+    config.protocolVersion = QString::fromLatin1(kMcpProtocolVersionHttp);
+    config.requestTimeoutMs = definition.requestTimeoutMs;
+    config.oauthEnabled =
+        extraFieldBool(definition.extraFields, QStringLiteral("oauthEnabled"),
+                       definition.headers.isEmpty());
+    config.oauthClientId =
+        extraFieldString(definition.extraFields, QStringLiteral("oauthClientId"));
+    config.oauthClientSecret =
+        expandEnvironmentPlaceholders(
+            extraFieldString(definition.extraFields, QStringLiteral("oauthClientSecret")),
+            environment);
+    config.oauthClientName =
+        extraFieldString(definition.extraFields, QStringLiteral("oauthClientName"));
+    if (config.oauthClientName.isEmpty())
+        config.oauthClientName = QStringLiteral("qcai2");
+    config.oauthScopes =
+        extraFieldStringList(definition.extraFields, QStringLiteral("oauthScopes"));
+    for (auto it = definition.headers.begin(); it != definition.headers.end(); ++it)
+        config.headers.insert(it.key(), expandEnvironmentPlaceholders(it.value(), environment));
+
+    Q_UNUSED(serverName);
+    return config;
+}
+
+QColor statusColor(McpServersWidget::HttpStatusKind kind, const QWidget *widget)
+{
+    switch (kind)
+    {
+        case McpServersWidget::HttpStatusKind::Reachable:
+            return QColor(0, 128, 0);
+        case McpServersWidget::HttpStatusKind::AuthorizationRequired:
+        case McpServersWidget::HttpStatusKind::Error:
+            return QColor(180, 0, 0);
+        default:
+            return widget->palette().color(QPalette::Text);
+    }
+}
+
+QString notTestedText()
+{
+    return McpServersWidget::tr("Not tested");
+}
+
+QString checkingText()
+{
+    return McpServersWidget::tr("Checking...");
+}
+
+QString authorizedText()
+{
+    return McpServersWidget::tr("Authorized");
+}
+
+QString connectedText()
+{
+    return McpServersWidget::tr("Connected");
+}
+
+QString authorizationRequiredText()
+{
+    return McpServersWidget::tr("Authorization required");
+}
+
+QString authorizingText()
+{
+    return McpServersWidget::tr("Authorizing...");
+}
+
+QString errorPrefixText()
+{
+    return McpServersWidget::tr("Error");
+}
+
+}  // namespace
 
 McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
 {
@@ -78,10 +329,26 @@ McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
     auto *httpPage = new QWidget(m_transportPages);
     auto *httpLayout = new QFormLayout(httpPage);
     m_urlEdit = new QLineEdit(httpPage);
+    m_tokenEdit = new QLineEdit(httpPage);
+    m_tokenEdit->setPlaceholderText(tr("Bearer token or ${ENV_VAR}"));
     m_headersEdit = new QPlainTextEdit(httpPage);
     m_headersEdit->setPlaceholderText(tr("One Header: Value pair per line"));
+    auto *httpStatusRow = new QWidget(httpPage);
+    auto *httpStatusLayout = new QHBoxLayout(httpStatusRow);
+    httpStatusLayout->setContentsMargins(0, 0, 0, 0);
+    m_httpStatusLabel = new QLabel(notTestedText(), httpStatusRow);
+    m_httpStatusLabel->setWordWrap(true);
+    m_testConnectionButton = new QPushButton(tr("Test connection"), httpStatusRow);
+    m_authorizeButton = new QPushButton(tr("Authorize"), httpStatusRow);
+    m_testConnectionButton->setEnabled(false);
+    m_authorizeButton->setEnabled(false);
+    httpStatusLayout->addWidget(m_httpStatusLabel, 1);
+    httpStatusLayout->addWidget(m_testConnectionButton, 0);
+    httpStatusLayout->addWidget(m_authorizeButton, 0);
     httpLayout->addRow(tr("URL:"), m_urlEdit);
+    httpLayout->addRow(tr("Token:"), m_tokenEdit);
     httpLayout->addRow(tr("Headers:"), m_headersEdit);
+    httpLayout->addRow(tr("Status:"), httpStatusRow);
     m_transportPages->addWidget(httpPage);
 
     auto *unknownPage = new QWidget(m_transportPages);
@@ -106,7 +373,12 @@ McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
         const QString name = currentServerName();
         if (name.isEmpty())
             return;
+        if (m_testingConnection && m_connectionTestServerName == name)
+            cleanupConnectionTest();
         m_servers.remove(name);
+        m_httpStatuses.remove(name);
+        m_authorizedServers.remove(name);
+        persistConnectionStates();
         repopulateServerList();
     });
     connect(m_serverList, &QListWidget::currentItemChanged, this,
@@ -117,6 +389,7 @@ McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
             return;
         if (auto *server = currentServer())
             server->enabled = state == Qt::Checked;
+        invalidateCurrentServerStatus();
     });
     connect(m_transportCombo, &QComboBox::currentTextChanged, this, [this](const QString &text) {
         updateTransportPage(text);
@@ -124,56 +397,112 @@ McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
             return;
         if (auto *server = currentServer())
             server->transport = text.trimmed();
+        invalidateCurrentServerStatus();
     });
     connect(m_startupTimeoutSpin, &QSpinBox::valueChanged, this, [this](int value) {
         if (m_updating)
             return;
         if (auto *server = currentServer())
             server->startupTimeoutMs = value;
+        invalidateCurrentServerStatus();
     });
     connect(m_requestTimeoutSpin, &QSpinBox::valueChanged, this, [this](int value) {
         if (m_updating)
             return;
         if (auto *server = currentServer())
             server->requestTimeoutMs = value;
+        invalidateCurrentServerStatus();
     });
     connect(m_commandEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
         if (m_updating)
             return;
         if (auto *server = currentServer())
             server->command = text;
+        invalidateCurrentServerStatus();
     });
     connect(m_urlEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
         if (m_updating)
             return;
         if (auto *server = currentServer())
             server->url = text;
+        invalidateCurrentServerStatus();
     });
     connect(m_argsEdit, &QPlainTextEdit::textChanged, this, [this]() {
         if (m_updating)
             return;
         if (auto *server = currentServer())
             server->args = textLines(m_argsEdit->toPlainText());
+        invalidateCurrentServerStatus();
     });
     connect(m_envEdit, &QPlainTextEdit::textChanged, this, [this]() {
         if (m_updating)
             return;
         if (auto *server = currentServer())
             server->env = parseMapLines(m_envEdit->toPlainText(), QLatin1Char('='));
+        invalidateCurrentServerStatus();
     });
     connect(m_headersEdit, &QPlainTextEdit::textChanged, this, [this]() {
         if (m_updating)
             return;
         if (auto *server = currentServer())
-            server->headers = parseMapLines(m_headersEdit->toPlainText(), QLatin1Char(':'));
+        {
+            QMap<QString, QString> headers =
+                parseMapLines(m_headersEdit->toPlainText(), QLatin1Char(':'));
+            QString token = m_tokenEdit->text().trimmed();
+            if (token.isEmpty())
+            {
+                QString extractedToken = extractBearerToken(&headers);
+                if (!extractedToken.isEmpty())
+                {
+                    m_updating = true;
+                    m_tokenEdit->setText(extractedToken);
+                    m_headersEdit->setPlainText(
+                        joinMapLines(headers, QLatin1Char(':'), true).join(QLatin1Char('\n')));
+                    m_updating = false;
+                    token = extractedToken;
+                }
+            }
+            if (!token.isEmpty())
+            {
+                removeAuthorizationHeaders(&headers);
+                headers.insert(QStringLiteral("Authorization"),
+                               QStringLiteral("Bearer %1").arg(token));
+            }
+            server->headers = headers;
+        }
+        invalidateCurrentServerStatus();
     });
+    connect(m_tokenEdit, &QLineEdit::textChanged, this, [this](const QString &) {
+        if (m_updating)
+            return;
+        if (auto *server = currentServer())
+            server->headers = normalizedHeadersWithToken(m_headersEdit->toPlainText(),
+                                                         m_tokenEdit->text());
+        invalidateCurrentServerStatus();
+    });
+    connect(m_testConnectionButton, &QPushButton::clicked, this,
+            [this]() { testCurrentServerConnection(); });
+    connect(m_authorizeButton, &QPushButton::clicked, this,
+            [this]() { authorizeCurrentServer(); });
 
     setEditorsEnabled(false);
+    m_connectionTestTimer = new QTimer(this);
+    m_connectionTestTimer->setSingleShot(true);
+    connect(m_connectionTestTimer, &QTimer::timeout, this, [this]() {
+        if (!m_testingConnection || m_connectionTestServerName.isEmpty())
+            return;
+        finishConnectionTest(m_connectionTestServerName, HttpStatusKind::Error,
+                             tr("Error: connection test timed out"));
+    });
 }
 
 void McpServersWidget::setServers(const qtmcp::ServerDefinitions &servers)
 {
+    cleanupConnectionTest();
     m_servers = servers;
+    m_httpStatuses.clear();
+    m_authorizedServers.clear();
+    loadPersistedConnectionStates();
     repopulateServerList();
 }
 
@@ -213,6 +542,7 @@ void McpServersWidget::repopulateServerList(const QString &selectedServer)
         auto *item = new QListWidgetItem(it.key(), m_serverList);
         item->setData(Qt::UserRole, it.key());
         m_serverList->addItem(item);
+        updateServerListItem(it.key());
     }
 
     QListWidgetItem *selectedItem = nullptr;
@@ -259,10 +589,14 @@ void McpServersWidget::loadCurrentServer()
     m_envEdit->setPlainText(
         joinMapLines(server->env, QLatin1Char('='), false).join(QLatin1Char('\n')));
     m_urlEdit->setText(server->url);
+    QMap<QString, QString> visibleHeaders = server->headers;
+    const QString token = extractBearerToken(&visibleHeaders);
+    m_tokenEdit->setText(token);
     m_headersEdit->setPlainText(
-        joinMapLines(server->headers, QLatin1Char(':'), true).join(QLatin1Char('\n')));
+        joinMapLines(visibleHeaders, QLatin1Char(':'), true).join(QLatin1Char('\n')));
     updateTransportPage(server->transport);
     m_updating = false;
+    updateCurrentHttpStatusUi();
 }
 
 void McpServersWidget::clearEditors()
@@ -277,9 +611,11 @@ void McpServersWidget::clearEditors()
     m_argsEdit->clear();
     m_envEdit->clear();
     m_urlEdit->clear();
+    m_tokenEdit->clear();
     m_headersEdit->clear();
     updateTransportPage(QStringLiteral("stdio"));
     m_updating = false;
+    updateCurrentHttpStatusUi();
 }
 
 void McpServersWidget::setEditorsEnabled(bool enabled)
@@ -293,8 +629,16 @@ void McpServersWidget::setEditorsEnabled(bool enabled)
     m_argsEdit->setEnabled(enabled);
     m_envEdit->setEnabled(enabled);
     m_urlEdit->setEnabled(enabled);
+    m_tokenEdit->setEnabled(enabled);
     m_headersEdit->setEnabled(enabled);
     m_transportPages->setEnabled(enabled);
+    if (!enabled)
+    {
+        m_httpStatusLabel->setText(notTestedText());
+        m_httpStatusLabel->setStyleSheet(QString());
+        m_testConnectionButton->setEnabled(false);
+        m_authorizeButton->setEnabled(false);
+    }
 }
 
 void McpServersWidget::updateTransportPage(const QString &transport)
@@ -315,6 +659,418 @@ void McpServersWidget::updateTransportPage(const QString &transport)
                 .arg(normalized.isEmpty() ? tr("(empty)") : normalized));
         m_transportPages->setCurrentIndex(2);
     }
+
+    updateCurrentHttpStatusUi();
+}
+
+void McpServersWidget::updateCurrentHttpStatusUi()
+{
+    const qtmcp::ServerDefinition *server = currentServer();
+    const bool isHttpServer =
+        server != nullptr && server->transport.trimmed() == QStringLiteral("http");
+
+    if (!isHttpServer)
+    {
+        m_httpStatusLabel->setText(notTestedText());
+        m_httpStatusLabel->setStyleSheet(QString());
+        m_testConnectionButton->setEnabled(false);
+        m_authorizeButton->setEnabled(false);
+        return;
+    }
+
+    const HttpStatus status = m_httpStatuses.value(currentServerName());
+    QString text = status.message;
+    if (text.isEmpty())
+        text = notTestedText();
+
+    m_httpStatusLabel->setText(text);
+    const QColor color = statusColor(status.kind, this);
+    m_httpStatusLabel->setStyleSheet(
+        QStringLiteral("color: %1;").arg(color.name(QColor::HexRgb)));
+
+    const bool canTest = !m_authorizing && !m_testingConnection && server->enabled;
+    const bool canAuthorize =
+        status.kind == HttpStatusKind::AuthorizationRequired && !m_authorizing
+        && !m_testingConnection;
+    m_testConnectionButton->setEnabled(canTest);
+    m_authorizeButton->setEnabled(canAuthorize);
+}
+
+void McpServersWidget::updateServerListItem(const QString &serverName)
+{
+    for (int i = 0; i < m_serverList->count(); ++i)
+    {
+        QListWidgetItem *item = m_serverList->item(i);
+        if (item == nullptr || item->data(Qt::UserRole).toString() != serverName)
+            continue;
+
+        const HttpStatus status = m_httpStatuses.value(serverName);
+        QString text = serverName;
+        if (!status.message.isEmpty())
+            text += QStringLiteral(" - %1").arg(status.message);
+        item->setText(text);
+        item->setToolTip(status.message);
+        item->setForeground(QBrush(statusColor(status.kind, this)));
+        return;
+    }
+}
+
+void McpServersWidget::setHttpStatus(const QString &serverName, HttpStatusKind kind,
+                                     const QString &message)
+{
+    HttpStatus status;
+    status.kind = kind;
+    status.message = message;
+    m_httpStatuses.insert(serverName, status);
+    persistConnectionStates();
+    updateServerListItem(serverName);
+    if (serverName == currentServerName())
+        updateCurrentHttpStatusUi();
+}
+
+void McpServersWidget::clearHttpStatus(const QString &serverName)
+{
+    if (serverName.isEmpty())
+        return;
+
+    m_httpStatuses.remove(serverName);
+    m_authorizedServers.remove(serverName);
+    persistConnectionStates();
+    updateServerListItem(serverName);
+    if (serverName == currentServerName())
+        updateCurrentHttpStatusUi();
+}
+
+void McpServersWidget::loadPersistedConnectionStates()
+{
+    QString error;
+    const McpServerConnectionStates storedStates = loadMcpServerConnectionStates(&error);
+    if (!error.isEmpty())
+        QCAI_WARN("Settings", error);
+
+    for (auto it = storedStates.cbegin(); it != storedStates.cend(); ++it)
+    {
+        if (!m_servers.contains(it.key()))
+            continue;
+
+        HttpStatus status;
+        const QString state = it.value().state.trimmed();
+        if (state == QStringLiteral("authorized"))
+        {
+            status.kind = HttpStatusKind::Reachable;
+            m_authorizedServers.insert(it.key());
+            if (it.value().message.trimmed().isEmpty())
+                status.message = authorizedText();
+        }
+        else if (state == QStringLiteral("reachable"))
+            status.kind = HttpStatusKind::Reachable;
+        else if (state == QStringLiteral("authorization_required"))
+            status.kind = HttpStatusKind::AuthorizationRequired;
+        else if (state == QStringLiteral("error"))
+            status.kind = HttpStatusKind::Error;
+        else
+            continue;
+        if (status.message.isEmpty())
+            status.message = it.value().message.trimmed();
+        m_httpStatuses.insert(it.key(), status);
+        if (status.kind == HttpStatusKind::Reachable
+            && (status.message == authorizedText()
+                || status.message == QStringLiteral("Авторизовано")))
+        {
+            m_authorizedServers.insert(it.key());
+        }
+    }
+
+    persistConnectionStates();
+}
+
+void McpServersWidget::persistConnectionStates() const
+{
+    McpServerConnectionStates states;
+    for (auto it = m_httpStatuses.cbegin(); it != m_httpStatuses.cend(); ++it)
+    {
+        if (!m_servers.contains(it.key()))
+            continue;
+
+        McpServerConnectionState state;
+        switch (it.value().kind)
+        {
+            case HttpStatusKind::Checking:
+                continue;
+            case HttpStatusKind::Reachable:
+                state.state = m_authorizedServers.contains(it.key()) ? QStringLiteral("authorized")
+                                                                     : QStringLiteral("reachable");
+                break;
+            case HttpStatusKind::AuthorizationRequired:
+                state.state = QStringLiteral("authorization_required");
+                break;
+            case HttpStatusKind::Error:
+                state.state = QStringLiteral("error");
+                break;
+            case HttpStatusKind::Unknown:
+                continue;
+        }
+        state.message = it.value().message;
+        states.insert(it.key(), state);
+    }
+
+    QString error;
+    if (!saveMcpServerConnectionStates(states, &error) && !error.isEmpty())
+        QCAI_WARN("Settings", error);
+}
+
+void McpServersWidget::finishConnectionTest(const QString &serverName, HttpStatusKind kind,
+                                            const QString &message, bool authorized)
+{
+    if (authorized)
+        m_authorizedServers.insert(serverName);
+    else if (kind != HttpStatusKind::Reachable || message != authorizedText())
+        m_authorizedServers.remove(serverName);
+
+    setHttpStatus(serverName, kind, message);
+    cleanupConnectionTest();
+}
+
+void McpServersWidget::cleanupConnectionTest()
+{
+    if (m_connectionTestTimer != nullptr)
+        m_connectionTestTimer->stop();
+
+    qtmcp::Client *client = m_connectionTestClient;
+    m_connectionTestClient = nullptr;
+    m_connectionTestServerName.clear();
+    m_connectionTestRequestId = 0;
+    m_testingConnection = false;
+
+    if (client != nullptr)
+    {
+        client->disconnect(this);
+        client->stop();
+        client->deleteLater();
+    }
+
+    updateCurrentHttpStatusUi();
+}
+
+void McpServersWidget::invalidateCurrentServerStatus()
+{
+    const QString serverName = currentServerName();
+    if (serverName.isEmpty())
+        return;
+
+    if (m_testingConnection && m_connectionTestServerName == serverName)
+        cleanupConnectionTest();
+    clearHttpStatus(serverName);
+}
+
+void McpServersWidget::testCurrentServerConnection()
+{
+    if (m_testingConnection || m_authorizing)
+        return;
+
+    const QString serverName = currentServerName();
+    const qtmcp::ServerDefinition *definition = currentServer();
+    if (serverName.isEmpty() || definition == nullptr ||
+        definition->transport.trimmed() != QStringLiteral("http"))
+    {
+        return;
+    }
+
+    if (!definition->enabled)
+    {
+        setHttpStatus(serverName, HttpStatusKind::Error, tr("Error: server is disabled"));
+        return;
+    }
+
+    if (definition->url.trimmed().isEmpty())
+    {
+        setHttpStatus(serverName, HttpStatusKind::Error, tr("Error: URL is not set"));
+        return;
+    }
+
+    m_testingConnection = true;
+    m_connectionTestServerName = serverName;
+    m_connectionTestRequestId = 0;
+    setHttpStatus(serverName, HttpStatusKind::Checking, checkingText());
+    const int startupTimeoutMs = probeTimeoutMs(definition->startupTimeoutMs);
+    const int requestTimeoutMs = probeTimeoutMs(definition->requestTimeoutMs);
+
+    qtmcp::HttpTransportConfig transportConfig = buildHttpTransportConfig(serverName, *definition);
+    transportConfig.interactiveOAuthEnabled = false;
+
+    auto *client = new qtmcp::Client(this);
+    client->setTransport(std::make_unique<qtmcp::HttpTransport>(transportConfig));
+    m_connectionTestClient = client;
+
+    auto *transport = qobject_cast<qtmcp::HttpTransport *>(client->transport());
+    Q_ASSERT(transport != nullptr);
+
+    connect(client, &qtmcp::Client::transportLogMessage, this,
+            [serverName](const QString &message) { logMcpSettingsDebug(serverName, message); });
+    connect(client, &qtmcp::Client::transportErrorOccurred, this,
+            [this, client, transport, serverName](const QString &message) {
+                if (client != m_connectionTestClient)
+                    return;
+                QCAI_ERROR("MCP",
+                           QStringLiteral("[settings:%1] %2").arg(serverName, message.trimmed()));
+
+                const QString transportOAuthError = transport->lastOAuthError().trimmed();
+                if (transport->lastAuthorizationRequired()
+                    || transportOAuthError == QStringLiteral("OAuth authorization required.")
+                    || message.trimmed() == QStringLiteral("OAuth authorization required."))
+                {
+                    finishConnectionTest(serverName, HttpStatusKind::AuthorizationRequired,
+                                         authorizationRequiredText());
+                    return;
+                }
+
+                const QString details = !transportOAuthError.isEmpty()
+                    ? transportOAuthError
+                    : message.trimmed();
+                finishConnectionTest(serverName, HttpStatusKind::Error,
+                                     details.isEmpty() ? errorPrefixText()
+                                                       : tr("Error: %1").arg(details));
+            });
+
+    connect(client, &qtmcp::Client::connected, this,
+            [this, client, transport, serverName, requestTimeoutMs]() {
+        if (client != m_connectionTestClient)
+            return;
+
+        if (m_connectionTestTimer != nullptr)
+            m_connectionTestTimer->start(requestTimeoutMs);
+
+        if (transport->config().oauthEnabled && m_authorizedServers.contains(serverName)
+            && transport->hasCachedOAuthCredentials())
+        {
+            logMcpSettingsDebug(
+                serverName,
+                QStringLiteral("Skipping redundant HTTP initialize probe because this server is already authorized and cached OAuth credentials are available."));
+            finishConnectionTest(serverName, HttpStatusKind::Reachable, authorizedText(), true);
+            return;
+        }
+
+        if (transport->config().oauthEnabled && !transport->hasCachedOAuthCredentials())
+        {
+            logMcpSettingsDebug(
+                serverName,
+                QStringLiteral("Skipping HTTP initialize probe because no cached OAuth credentials are available; authorization is required first."));
+            finishConnectionTest(serverName, HttpStatusKind::AuthorizationRequired,
+                                 authorizationRequiredText());
+            return;
+        }
+
+        const qint64 requestId =
+            client->sendRequest(QStringLiteral("initialize"), initializeParamsObject());
+        if (requestId <= 0)
+        {
+            finishConnectionTest(serverName, HttpStatusKind::Error,
+                                 tr("Error: failed to send initialize request"));
+            return;
+        }
+        m_connectionTestRequestId = requestId;
+    });
+
+    connect(client, &qtmcp::Client::responseReceived, this,
+            [this, client, transport, serverName](const QJsonValue &id, const QJsonValue &) {
+                if (client != m_connectionTestClient || id.toInteger() != m_connectionTestRequestId)
+                    return;
+                finishConnectionTest(serverName, HttpStatusKind::Reachable,
+                                     transport->config().oauthEnabled ? authorizedText()
+                                                                      : connectedText(),
+                                     transport->config().oauthEnabled);
+            });
+
+    connect(client, &qtmcp::Client::errorResponseReceived, this,
+            [this, client, transport, serverName](const QJsonValue &id, int, const QString &message,
+                                                  const QJsonValue &) {
+                if (client != m_connectionTestClient || id.toInteger() != m_connectionTestRequestId)
+                    return;
+
+                const QString transportOAuthError = transport->lastOAuthError().trimmed();
+                if (transport->lastAuthorizationRequired()
+                    || transportOAuthError == QStringLiteral("OAuth authorization required."))
+                {
+                    finishConnectionTest(serverName, HttpStatusKind::AuthorizationRequired,
+                                         authorizationRequiredText());
+                    return;
+                }
+
+                const QString details = !transportOAuthError.isEmpty()
+                    ? transportOAuthError
+                    : message.trimmed();
+                finishConnectionTest(serverName, HttpStatusKind::Error,
+                                     details.isEmpty() ? errorPrefixText()
+                                                       : tr("Error: %1").arg(details));
+            });
+
+    connect(client, &qtmcp::Client::disconnected, this, [this, client, serverName]() {
+        if (client != m_connectionTestClient)
+            return;
+        finishConnectionTest(serverName, HttpStatusKind::Error,
+                             tr("Error: MCP server disconnected"));
+    });
+
+    if (m_connectionTestTimer != nullptr)
+        m_connectionTestTimer->start(startupTimeoutMs);
+    client->start();
+}
+
+void McpServersWidget::authorizeCurrentServer()
+{
+    if (m_authorizing || m_testingConnection)
+        return;
+
+    const QString serverName = currentServerName();
+    const qtmcp::ServerDefinition *definition = currentServer();
+    if (serverName.isEmpty() || definition == nullptr ||
+        definition->transport.trimmed() != QStringLiteral("http"))
+    {
+        return;
+    }
+
+    m_authorizing = true;
+    setHttpStatus(serverName, HttpStatusKind::Checking, authorizingText());
+    updateCurrentHttpStatusUi();
+
+    qtmcp::HttpTransportConfig transportConfig = buildHttpTransportConfig(serverName, *definition);
+    transportConfig.oauthEnabled = true;
+
+    qtmcp::HttpTransport transport(std::move(transportConfig));
+    connect(&transport, &qtmcp::Transport::logMessage, this,
+            [serverName](const QString &message) { logMcpSettingsDebug(serverName, message); });
+    connect(&transport, &qtmcp::Transport::errorOccurred, this,
+            [serverName](const QString &message) {
+                QCAI_ERROR("MCP",
+                           QStringLiteral("[settings:%1] %2").arg(serverName, message.trimmed()));
+            });
+    QString errorMessage;
+    logMcpSettingsDebug(serverName, QStringLiteral("Starting explicit OAuth authorization from settings UI."));
+    const bool authorized = transport.authorize(&errorMessage);
+    transport.stop();
+    logMcpSettingsDebug(
+        serverName,
+        QStringLiteral("Explicit OAuth authorization finished: success=%1 message=%2")
+            .arg(authorized ? QStringLiteral("yes") : QStringLiteral("no"),
+                 errorMessage.isEmpty() ? QStringLiteral("(none)") : errorMessage));
+
+    m_authorizing = false;
+    if (!authorized)
+    {
+        m_authorizedServers.remove(serverName);
+        setHttpStatus(serverName, HttpStatusKind::AuthorizationRequired,
+                      authorizationRequiredText());
+        if (!errorMessage.trimmed().isEmpty())
+        {
+            QMessageBox::warning(this, tr("OAuth Authorization Failed"), errorMessage.trimmed());
+        }
+        updateCurrentHttpStatusUi();
+        return;
+    }
+
+    m_authorizedServers.insert(serverName);
+    setHttpStatus(serverName, HttpStatusKind::Reachable, authorizedText());
+    updateCurrentHttpStatusUi();
 }
 
 QString McpServersWidget::makeUniqueServerName(const QString &baseName) const
@@ -334,6 +1090,9 @@ void McpServersWidget::renameCurrentServer()
     const QString oldName = currentServerName();
     if (oldName.isEmpty())
         return;
+
+    if (m_testingConnection && m_connectionTestServerName == oldName)
+        cleanupConnectionTest();
 
     const QString newName = m_nameEdit->text().trimmed();
     if (newName.isEmpty())
@@ -359,8 +1118,15 @@ void McpServersWidget::renameCurrentServer()
     if (newName == oldName)
         return;
 
+    const HttpStatus preservedStatus = m_httpStatuses.take(oldName);
+    const bool wasAuthorized = m_authorizedServers.remove(oldName);
     const qtmcp::ServerDefinition definition = m_servers.take(oldName);
     m_servers.insert(newName, definition);
+    if (preservedStatus.kind != HttpStatusKind::Unknown || !preservedStatus.message.isEmpty())
+        m_httpStatuses.insert(newName, preservedStatus);
+    if (wasAuthorized)
+        m_authorizedServers.insert(newName);
+    persistConnectionStates();
     repopulateServerList(newName);
 }
 
