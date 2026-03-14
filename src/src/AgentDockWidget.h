@@ -9,6 +9,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFileSystemWatcher>
 #include <QLabel>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -243,6 +244,11 @@ private:
     QString currentProjectStorageFilePath() const;
 
     /**
+     * Returns the current on-disk session-related paths that should be watched.
+     */
+    QStringList currentSessionWatchPaths() const;
+
+    /**
      * Applies global default UI values before loading project-specific overrides.
      */
     void applyProjectUiDefaults();
@@ -256,6 +262,16 @@ private:
      * Refreshes the diff tab state and optionally re-renders inline editor markers.
      */
     void syncDiffUi(const QString &diff, bool focusDiffTab, bool refreshInlineMarkers);
+
+    /**
+     * Rebuilds file watcher subscriptions for the active project session files.
+     */
+    void updateSessionFileWatcher();
+
+    /**
+     * Reloads the current project session from disk after an external change.
+     */
+    void reloadSessionFromDisk();
 
     /** Designer-generated UI wrapper. */
     std::unique_ptr<Ui::AgentDockWidget> m_ui;
@@ -326,6 +342,15 @@ private:
 
     /** Short timer that batches frequent log renders while streaming. */
     QTimer *m_renderThrottle;
+
+    /** Watches the active project session files for external modifications. */
+    QFileSystemWatcher *m_sessionFileWatcher = nullptr;
+
+    /** Debounces bursts of session-file change notifications. */
+    QTimer *m_sessionReloadTimer = nullptr;
+
+    /** Tracks whether session storage currently exists on disk for the active project. */
+    bool m_sessionStoragePresent = false;
 
     /** Manages inline editor markers for diff hunks. */
     InlineDiffManager *m_inlineDiffManager;

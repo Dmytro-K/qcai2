@@ -9,7 +9,7 @@
 
 ### Changed
 
-- Project session state now migrates legacy ignored linked-file paths into the `ignoredLinkedFiles` array.
+- The dock now auto-reloads project session state when session files are changed externally.
 
 ## [0.0.4] - 2026-03-12
 

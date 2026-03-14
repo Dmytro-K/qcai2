@@ -655,6 +655,21 @@ AgentDockWidget::AgentDockWidget(AgentController *controller, QWidget *parent)
     m_renderThrottle->setInterval(50);
     connect(m_renderThrottle, &QTimer::timeout, this, &AgentDockWidget::renderLog);
 
+    m_sessionFileWatcher = new QFileSystemWatcher(this);
+    m_sessionReloadTimer = new QTimer(this);
+    m_sessionReloadTimer->setSingleShot(true);
+    m_sessionReloadTimer->setInterval(150);
+    connect(m_sessionFileWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString &) {
+        updateSessionFileWatcher();
+        m_sessionReloadTimer->start();
+    });
+    connect(m_sessionFileWatcher, &QFileSystemWatcher::directoryChanged, this,
+            [this](const QString &) {
+                updateSessionFileWatcher();
+                m_sessionReloadTimer->start();
+            });
+    connect(m_sessionReloadTimer, &QTimer::timeout, this, &AgentDockWidget::reloadSessionFromDisk);
+
     // Connect controller signals
     connect(m_controller, &AgentController::logMessage, this, &AgentDockWidget::onLogMessage);
     connect(m_controller, &AgentController::streamingToken, this, [this](const QString &token) {
@@ -758,6 +773,7 @@ void AgentDockWidget::saveChat()
         QFile::remove(storagePath);
         QFile::remove(goalPath);
         QFile::remove(logPath);
+        updateSessionFileWatcher();
         return;
     }
 
@@ -808,6 +824,8 @@ void AgentDockWidget::saveChat()
         QCAI_WARN("Dock", QStringLiteral("Failed to commit project context file: %1")
                               .arg(storagePath));
     }
+
+    updateSessionFileWatcher();
 }
 
 void AgentDockWidget::restoreChat()
@@ -945,11 +963,14 @@ void AgentDockWidget::restoreChat()
         if (value.isString())
             m_ignoredLinkedFiles.append(value.toString());
     }
+    m_cachedLinkedFileCandidates.clear();
     refreshLinkedFilesUi();
 
     const int tab = root.value(QStringLiteral("activeTab")).toInt(0);
     if (tab >= 0 && tab < m_tabs->count())
         m_tabs->setCurrentIndex(tab);
+
+    updateSessionFileWatcher();
 }
 
 QString AgentDockWidget::currentLogMarkdown() const
@@ -1394,6 +1415,7 @@ void AgentDockWidget::switchProjectContext(const QString &projectFilePath)
         ctx->setSelectedProjectFilePath(projectFilePath);
 
     restoreChat();
+    updateSessionFileWatcher();
 }
 
 QString AgentDockWidget::currentProjectFilePath() const
@@ -1429,6 +1451,40 @@ QString AgentDockWidget::currentProjectStorageFilePath() const
         .filePath(QStringLiteral(".qcai2/%1").arg(sanitizedSessionFileName(m_activeProjectFilePath)));
 }
 
+QStringList AgentDockWidget::currentSessionWatchPaths() const
+{
+    const QString storagePath = currentProjectStorageFilePath();
+    if (storagePath.isEmpty())
+        return {};
+
+    QStringList paths;
+    const QString goalPath = Migration::projectGoalFilePath(storagePath);
+    const QString logPath = Migration::projectActionsLogFilePath(storagePath);
+    const QFileInfo storageInfo(storagePath);
+    const QString sessionDirPath = storageInfo.absolutePath();
+
+    const auto appendIfExists = [&paths](const QString &path) {
+        if (!path.isEmpty() && QFileInfo::exists(path) && !paths.contains(path))
+            paths.append(path);
+    };
+
+    if (QDir(sessionDirPath).exists())
+    {
+        paths.append(sessionDirPath);
+    }
+    else
+    {
+        const QString projectDir = currentProjectDir();
+        if (!projectDir.isEmpty())
+            paths.append(projectDir);
+    }
+
+    appendIfExists(storagePath);
+    appendIfExists(goalPath);
+    appendIfExists(logPath);
+    return paths;
+}
+
 void AgentDockWidget::applyProjectUiDefaults()
 {
     const auto &cfg = settings();
@@ -1444,6 +1500,56 @@ void AgentDockWidget::applyProjectUiDefaults()
     selectEffortValue(m_reasoningCombo, cfg.reasoningEffort, 2);
     selectEffortValue(m_thinkingCombo, cfg.thinkingLevel, 2);
     m_dryRunCheck->setChecked(cfg.dryRunDefault);
+}
+
+void AgentDockWidget::updateSessionFileWatcher()
+{
+    if (m_sessionFileWatcher == nullptr)
+        return;
+
+    const QString storagePath = currentProjectStorageFilePath();
+    const QString goalPath =
+        storagePath.isEmpty() ? QString() : Migration::projectGoalFilePath(storagePath);
+    const QString logPath =
+        storagePath.isEmpty() ? QString() : Migration::projectActionsLogFilePath(storagePath);
+    const QFileInfo storageInfo(storagePath);
+    m_sessionStoragePresent =
+        !storagePath.isEmpty() &&
+        (QFileInfo::exists(storagePath) || QFileInfo::exists(goalPath) || QFileInfo::exists(logPath) ||
+         QDir(storageInfo.absolutePath()).exists());
+
+    const QStringList currentPaths = m_sessionFileWatcher->files() + m_sessionFileWatcher->directories();
+    if (!currentPaths.isEmpty())
+        m_sessionFileWatcher->removePaths(currentPaths);
+
+    const QStringList watchPaths = currentSessionWatchPaths();
+    if (!watchPaths.isEmpty())
+        m_sessionFileWatcher->addPaths(watchPaths);
+}
+
+void AgentDockWidget::reloadSessionFromDisk()
+{
+    const QString storagePath = currentProjectStorageFilePath();
+    if (storagePath.isEmpty())
+        return;
+
+    const QString goalPath = Migration::projectGoalFilePath(storagePath);
+    const QString logPath = Migration::projectActionsLogFilePath(storagePath);
+    const QFileInfo storageInfo(storagePath);
+    const bool sessionExists = QFileInfo::exists(storagePath) || QFileInfo::exists(goalPath) ||
+                               QFileInfo::exists(logPath) || QDir(storageInfo.absolutePath()).exists();
+    if (!sessionExists && !m_sessionStoragePresent)
+    {
+        updateSessionFileWatcher();
+        return;
+    }
+
+    const bool wasRunning = m_stopBtn->isEnabled();
+    clearChatState();
+    applyProjectUiDefaults();
+    restoreChat();
+    updateSessionFileWatcher();
+    updateRunState(wasRunning);
 }
 
 void AgentDockWidget::setupUi()
