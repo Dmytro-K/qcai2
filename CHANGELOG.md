@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.5] - 2026-03-14
+
+### Added
+
+- Added extensible slash commands with goal-editor autocomplete, `DECLARE_COMMAND(...)` auto-registration, and a sample `/hello` command.
+
 ## [0.0.4] - 2026-03-12
 
 ### Added

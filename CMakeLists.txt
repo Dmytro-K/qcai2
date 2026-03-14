@@ -411,6 +411,9 @@ add_qtc_plugin(qcai2
     src/src/AgentDockWidget.h
     src/src/AgentDockWidget.cpp
     src/src/AgentDockWidget.ui
+    src/src/commands/SlashCommandRegistry.h
+    src/src/commands/SlashCommandRegistry.cpp
+    src/src/commands/HelloCommand.cpp
     src/src/context/EditorContext.h
     src/src/context/EditorContext.cpp
     src/src/tools/ITool.h
@@ -615,7 +618,7 @@ endif()
 
 qcai2_collect_target_cpp_sources(QCAI2_CLANG_TIDY_SOURCES qcai2)
 set(QCAI2_CLANG_ANALYZER_BUILD_TARGETS qcai2)
-foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_migration)
+foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_slash_commands tst_qcai2_migration)
     if(TARGET ${qcai2_test_target})
         qcai2_collect_target_cpp_sources(qcai2_test_sources ${qcai2_test_target})
         list(APPEND QCAI2_CLANG_TIDY_SOURCES ${qcai2_test_sources})
@@ -725,6 +728,7 @@ add_custom_target(target_for_ide SOURCES ${SRC_IDE})
 set(SRC_TESTS
     src/tests/tst_json.cpp
     src/tests/tst_toolcall.cpp
+    src/tests/tst_slash_commands.cpp
     src/tests/tst_migration.cpp
 )
 

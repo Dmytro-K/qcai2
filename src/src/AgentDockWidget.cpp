@@ -17,6 +17,7 @@
 
 #include <QClipboard>
 #include <QColor>
+#include <QCompleter>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -34,9 +35,11 @@
 #include <QSizePolicy>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QScrollBar>
 #include <QSet>
 #include <QShortcut>
 #include <QSignalBlocker>
+#include <QStringListModel>
 #include <QSplitter>
 #include <QSyntaxHighlighter>
 #include <QTextBlock>
@@ -188,6 +191,42 @@ QString sanitizedSessionFileName(const QString &projectFilePath)
     baseName.replace(QRegularExpression(QStringLiteral(R"([^A-Za-z0-9._-])")),
                      QStringLiteral("_"));
     return QStringLiteral("%1.json").arg(baseName);
+}
+
+struct SlashCompletionState
+{
+    bool active = false;
+    int commandStart = 0;
+    int commandEnd = 0;
+    QString prefix;
+};
+
+SlashCompletionState slashCompletionState(const QTextEdit *editor)
+{
+    const QString text = editor->toPlainText();
+    const QTextCursor cursor = editor->textCursor();
+    const int cursorPos = cursor.position();
+
+    int firstNonSpace = 0;
+    while (firstNonSpace < text.size() && text.at(firstNonSpace).isSpace())
+        ++firstNonSpace;
+
+    if (firstNonSpace >= text.size() || text.at(firstNonSpace) != QLatin1Char('/'))
+        return {};
+
+    int commandEnd = firstNonSpace + 1;
+    while (commandEnd < text.size() && !text.at(commandEnd).isSpace())
+        ++commandEnd;
+
+    if (cursorPos < firstNonSpace + 1 || cursorPos > commandEnd)
+        return {};
+
+    SlashCompletionState state;
+    state.active = true;
+    state.commandStart = firstNonSpace;
+    state.commandEnd = commandEnd;
+    state.prefix = text.mid(firstNonSpace, cursorPos - firstNonSpace);
+    return state;
 }
 
 bool writeContextTextFile(const QString &path, const QString &content, const QString &description)
@@ -1284,6 +1323,16 @@ void AgentDockWidget::setupUi()
     goalSelectAllShortcut->setContext(Qt::WidgetShortcut);
     QObject::connect(goalSelectAllShortcut, &QShortcut::activated, m_goalEdit,
                      &QTextEdit::selectAll);
+
+    auto *slashCommandModel = new QStringListModel(m_slashCommands.commandNames(), this);
+    m_slashCommandCompleter = new QCompleter(slashCommandModel, this);
+    m_slashCommandCompleter->setCaseSensitivity(Qt::CaseInsensitive);
+    m_slashCommandCompleter->setCompletionMode(QCompleter::PopupCompletion);
+    m_slashCommandCompleter->setFilterMode(Qt::MatchStartsWith);
+    m_slashCommandCompleter->setWidget(m_goalEdit);
+    QObject::connect(m_slashCommandCompleter, qOverload<const QString &>(&QCompleter::activated),
+                     this, &AgentDockWidget::applySlashCommandCompletion);
+    connect(m_goalEdit, &QTextEdit::textChanged, this, &AgentDockWidget::updateSlashCommandCompletion);
 }
 
 void AgentDockWidget::updateRunState(bool running)
@@ -1297,13 +1346,82 @@ void AgentDockWidget::updateRunState(bool running)
     m_thinkingCombo->setEnabled(!running);
     m_dryRunCheck->setEnabled(!running);
     m_projectCombo->setEnabled(!running && m_projectCombo->count() > 0 &&
-                               !m_projectCombo->itemData(0).toString().isEmpty());
+                                !m_projectCombo->itemData(0).toString().isEmpty());
+}
+
+bool AgentDockWidget::tryExecuteSlashCommand(const QString &goal)
+{
+    const SlashCommandDispatchResult result = m_slashCommands.dispatch(
+        goal, SlashCommandContext{[this](const QString &message) { onLogMessage(message); }});
+    if (!result.isSlashCommand)
+        return false;
+
+    m_tabs->setCurrentWidget(m_logView);
+
+    if (!result.errorMessage.isEmpty())
+        onLogMessage(result.errorMessage);
+
+    if (result.executed)
+    {
+        m_goalEdit->clear();
+        m_statusLabel->setText(QStringLiteral("Slash command executed: /%1")
+                                   .arg(result.commandName));
+    }
+
+    saveChat();
+    return true;
+}
+
+void AgentDockWidget::updateSlashCommandCompletion()
+{
+    if (m_slashCommandCompleter == nullptr)
+        return;
+
+    const SlashCompletionState state = slashCompletionState(m_goalEdit);
+    if (!state.active)
+    {
+        m_slashCommandCompleter->popup()->hide();
+        return;
+    }
+
+    m_slashCommandCompleter->setCompletionPrefix(state.prefix);
+    if (m_slashCommandCompleter->completionCount() <= 0)
+    {
+        m_slashCommandCompleter->popup()->hide();
+        return;
+    }
+
+    QRect popupRect = m_goalEdit->cursorRect();
+    popupRect.setWidth(m_slashCommandCompleter->popup()->sizeHintForColumn(0) +
+                       m_slashCommandCompleter->popup()->verticalScrollBar()->sizeHint().width());
+    m_slashCommandCompleter->complete(popupRect);
+}
+
+void AgentDockWidget::applySlashCommandCompletion(const QString &completion)
+{
+    const SlashCompletionState state = slashCompletionState(m_goalEdit);
+    if (!state.active)
+        return;
+
+    QTextCursor cursor = m_goalEdit->textCursor();
+    cursor.beginEditBlock();
+    cursor.setPosition(state.commandStart);
+    cursor.setPosition(state.commandEnd, QTextCursor::KeepAnchor);
+    cursor.insertText(completion);
+    cursor.endEditBlock();
+    m_goalEdit->setTextCursor(cursor);
+
+    if (m_slashCommandCompleter != nullptr)
+        m_slashCommandCompleter->popup()->hide();
 }
 
 void AgentDockWidget::onRunClicked()
 {
     const QString goal = m_goalEdit->toPlainText().trimmed();
     if (goal.isEmpty())
+        return;
+
+    if (tryExecuteSlashCommand(goal))
         return;
 
     const QString selectedModel = m_modelCombo->currentText().trimmed();
@@ -1517,6 +1635,21 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
     if (obj == m_goalEdit && event->type() == QEvent::KeyPress)
     {
         auto *ke = static_cast<QKeyEvent *>(event);
+
+        if (m_slashCommandCompleter != nullptr && m_slashCommandCompleter->popup()->isVisible())
+        {
+            switch (ke->key())
+            {
+                case Qt::Key_Return:
+                case Qt::Key_Enter:
+                case Qt::Key_Escape:
+                case Qt::Key_Tab:
+                case Qt::Key_Backtab:
+                    return false;
+                default:
+                    break;
+            }
+        }
 
         // Enter — run agent
         if (ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter)

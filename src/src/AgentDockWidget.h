@@ -2,8 +2,10 @@
 #pragma once
 
 #include "AgentController.h"
+#include "commands/SlashCommandRegistry.h"
 #include "diff/InlineDiffManager.h"
 
+#include <QCompleter>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
@@ -124,6 +126,24 @@ private:
      * @param running True when the UI should show a running state.
      */
     void updateRunState(bool running);
+
+    /**
+     * Executes a slash command locally when the goal starts with `/`.
+     * @param goal Trimmed goal text from the editor.
+     * @return True when the input was treated as a slash command.
+     */
+    bool tryExecuteSlashCommand(const QString &goal);
+
+    /**
+     * Refreshes slash-command completion visibility based on current editor state.
+     */
+    void updateSlashCommandCompletion();
+
+    /**
+     * Replaces the typed slash token with the selected completion.
+     * @param completion Completion text chosen from the popup.
+     */
+    void applySlashCommandCompletion(const QString &completion);
 
     /**
      * Handles keyboard shortcuts from the goal editor.
@@ -249,6 +269,12 @@ private:
 
     /** Manages inline editor markers for diff hunks. */
     InlineDiffManager *m_inlineDiffManager;
+
+    /** Registry of dock-local slash commands. */
+    SlashCommandRegistry m_slashCommands;
+
+    /** Popup completer for slash commands in the goal editor. */
+    QCompleter *m_slashCommandCompleter = nullptr;
 
 };
 
