@@ -713,6 +713,19 @@ AgentDockWidget::~AgentDockWidget()
     m_sessionController->saveChat();
 }
 
+void AgentDockWidget::focusGoalInput()
+{
+    if (m_goalEdit == nullptr)
+    {
+        return;
+    }
+
+    m_goalEdit->setFocus(Qt::ShortcutFocusReason);
+    QTextCursor cursor = m_goalEdit->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    m_goalEdit->setTextCursor(cursor);
+}
+
 QString AgentDockWidget::currentLogMarkdown() const
 {
     QString text = m_logMarkdown;

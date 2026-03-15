@@ -54,6 +54,11 @@ public:
      */
     ~AgentDockWidget() override;
 
+    /**
+     * Focuses the goal editor so the user can immediately type a new request.
+     */
+    void focusGoalInput();
+
 private slots:
     /**
      * Starts a run using the current goal, model, and dry-run settings.

@@ -7,6 +7,9 @@ namespace qcai2::Constants
 /** Action id used to register the sample menu command. */
 const char ACTION_ID[] = "qcai2.ShowAgent";
 
+/** Action id used to focus the AI Agent goal input. */
+const char FOCUS_GOAL_ACTION_ID[] = "qcai2.FocusGoalInput";
+
 /** Navigation widget id used to register the AI Agent in Qt Creator sidebars. */
 const char NAVIGATION_ID[] = "qcai2.Navigation.AiAgent";
 

@@ -184,6 +184,12 @@ void AiAgentPlugin::initialize()
         .setText(Tr::tr("Show AI Agent"))
         .setDefaultKeySequence(Tr::tr("Ctrl+Alt+Meta+A"))
         .addOnTriggered(this, &AiAgentPlugin::showNavigationWidget);
+
+    ActionBuilder(this, Constants::FOCUS_GOAL_ACTION_ID)
+        .addToContainer(Constants::MENU_ID)
+        .setText(Tr::tr("Focus AI Agent Goal"))
+        .setDefaultKeySequence(Tr::tr("Ctrl+Shift+Alt+S"))
+        .addOnTriggered(this, &AiAgentPlugin::focusGoalInput);
 }
 
 void AiAgentPlugin::extensionsInitialized()
@@ -222,6 +228,33 @@ void AiAgentPlugin::showNavigationWidget()
     }
 
     QCAI_INFO("Plugin", QStringLiteral("AI Agent navigation widget activated"));
+}
+
+void AiAgentPlugin::focusGoalInput()
+{
+    if (ICore::mainWindow() == nullptr)
+    {
+        QMetaObject::invokeMethod(this, &AiAgentPlugin::focusGoalInput, Qt::QueuedConnection);
+        return;
+    }
+
+    if (QWidget *widget =
+            NavigationWidget::activateSubWidget(Constants::NAVIGATION_ID, Side::Right))
+    {
+        if (auto *dockWidget = qobject_cast<AgentDockWidget *>(widget))
+        {
+            QMetaObject::invokeMethod(
+                dockWidget, [dockWidget]() { dockWidget->focusGoalInput(); },
+                Qt::QueuedConnection);
+        }
+        else
+        {
+            QCAI_WARN("Plugin", QStringLiteral("Activated AI Agent widget has unexpected type"));
+        }
+        return;
+    }
+
+    QCAI_ERROR("Plugin", QStringLiteral("Failed to activate AI Agent navigation widget"));
 }
 
 void AiAgentPlugin::setupProviders()
