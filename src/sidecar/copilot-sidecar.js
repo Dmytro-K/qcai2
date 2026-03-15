@@ -7,11 +7,10 @@
 // Streaming: {"id":N,"stream_delta":"text"}
 
 import { CopilotClient } from "@github/copilot-sdk";
-import { createInterface } from "node:readline";
 
 let client = null;
 
-// Active requests: id -> { cancelled: false }
+// Active requests: id -> { cancelled: false, session: null }
 const activeRequests = new Map();
 
 function send(obj) {
@@ -118,7 +117,7 @@ async function handleComplete(id, params) {
     const { messages, model, temperature, maxTokens, streaming, reasoningEffort } = params;
     const requestedModel = model || "gpt-4.1";
 
-    const state = { cancelled: false };
+    const state = { cancelled: false, session: null };
     activeRequests.set(id, state);
 
     let session = null;
@@ -133,6 +132,7 @@ async function handleComplete(id, params) {
         if (reasoningEffort)
             sessionOpts.reasoningEffort = reasoningEffort;
         session = await client.createSession(sessionOpts);
+        state.session = session;
 
         if (state.cancelled) {
             log(`Request #${id} cancelled during session creation`);
@@ -247,12 +247,21 @@ function handleCancel(id, params) {
         if (state) {
             state.cancelled = true;
             log(`Cancelled request #${targetId}`);
+            // Destroy the session to abort the pending API call
+            if (state.session) {
+                state.session.destroy().catch(() => {});
+                state.session = null;
+            }
         }
     } else {
         // Cancel all active requests
         for (const [reqId, state] of activeRequests) {
             state.cancelled = true;
             log(`Cancelled request #${reqId}`);
+            if (state.session) {
+                state.session.destroy().catch(() => {});
+                state.session = null;
+            }
         }
     }
     sendResult(id, { status: "cancelled" });
@@ -295,25 +304,77 @@ function dispatch(method, id, params) {
 }
 
 // ── Main loop ──────────────────────────────────────────────────
-const rl = createInterface({ input: process.stdin, terminal: false });
+// Use a brace-depth JSON parser instead of readline to handle payloads
+// that may contain embedded newlines (e.g. from Qt's toJson quirks).
 
-rl.on("line", (line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
+let inputBuffer = "";
 
-    let req;
-    try {
-        req = JSON.parse(trimmed);
-    } catch (e) {
-        sendError(-1, `Invalid JSON: ${e.message}`);
-        return;
+/**
+ * Scans the buffer for a complete top-level JSON object by tracking brace
+ * depth and string escaping.  Returns the index of the closing '}' or -1.
+ */
+function findJsonEnd(buf) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = 0; i < buf.length; i++) {
+        const c = buf[i];
+        if (escape) { escape = false; continue; }
+        if (inString) {
+            if (c === "\\") { escape = true; continue; }
+            if (c === '"') inString = false;
+            continue;
+        }
+        if (c === '"') { inString = true; continue; }
+        if (c === "{") depth++;
+        else if (c === "}") {
+            depth--;
+            if (depth === 0) return i;
+        }
     }
+    return -1;
+}
 
-    const { id, method, params } = req;
-    dispatch(method, id, params || {});
+function processBuffer() {
+    while (true) {
+        // Skip leading whitespace / newlines between messages
+        const startIdx = inputBuffer.search(/\S/);
+        if (startIdx < 0) { inputBuffer = ""; return; }
+        if (startIdx > 0) inputBuffer = inputBuffer.substring(startIdx);
+        if (inputBuffer[0] !== "{") {
+            // Junk before JSON — discard up to next '{'
+            const braceIdx = inputBuffer.indexOf("{");
+            if (braceIdx < 0) { inputBuffer = ""; return; }
+            inputBuffer = inputBuffer.substring(braceIdx);
+        }
+
+        const end = findJsonEnd(inputBuffer);
+        if (end < 0) return; // incomplete object, wait for more data
+
+        const jsonStr = inputBuffer.substring(0, end + 1);
+        inputBuffer = inputBuffer.substring(end + 1);
+
+        log(`Received complete JSON: ${jsonStr.length} bytes`);
+        let req;
+        try {
+            req = JSON.parse(jsonStr);
+        } catch (e) {
+            sendError(-1, `Invalid JSON: ${e.message}`);
+            continue;
+        }
+
+        const { id, method, params } = req;
+        dispatch(method, id, params || {});
+    }
+}
+
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+    inputBuffer += chunk;
+    processBuffer();
 });
 
-rl.on("close", () => {
+process.stdin.on("end", () => {
     if (client) client.stop().catch(() => {});
     process.exit(0);
 });

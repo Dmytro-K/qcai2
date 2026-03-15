@@ -33,6 +33,10 @@ struct SlashCommandContext
 {
     /** Appends a user-visible entry to the Actions Log. */
     std::function<void(const QString &)> logMessage;
+
+    /** When non-null, the handler can write a replacement goal that will be
+     *  sent to the AI agent instead of running as a simple command. */
+    QString *goalOverride = nullptr;
 };
 
 /**
@@ -51,6 +55,10 @@ struct SlashCommandDispatchResult
 
     /** User-visible error to log when dispatch failed. */
     QString errorMessage;
+
+    /** When set by the handler, the dispatcher should redirect this text
+     *  to the AI agent instead of treating the command as fully handled. */
+    QString goalOverride;
 };
 
 /**

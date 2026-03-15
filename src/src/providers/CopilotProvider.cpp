@@ -277,8 +277,26 @@ void CopilotProvider::sendRequest(const QJsonObject &req)
         return;
     }
     QByteArray data = QJsonDocument(req).toJson(QJsonDocument::Compact);
+    // Defensive: strip any raw newlines/carriage-returns from compact JSON.
+    // Qt's toJson(Compact) should escape them inside strings, but empirical
+    // evidence shows raw 0x0A can leak through, breaking the JSON-Lines framing.
+    data.replace('\n', QByteArray());
+    data.replace('\r', QByteArray());
     data.append('\n');
-    m_process->write(data);
+
+    const qint64 written = m_process->write(data);
+    if (written != data.size())
+    {
+        QCAI_ERROR("Copilot", QStringLiteral("Pipe write failed: wrote %1 of %2 bytes")
+                                  .arg(written)
+                                  .arg(data.size()));
+        return;
+    }
+    // Flush to ensure data reaches the sidecar pipe immediately
+    if (m_process->waitForBytesWritten(3000) == false)
+    {
+        QCAI_WARN("Copilot", QStringLiteral("Pipe flush timed out (%1 bytes)").arg(data.size()));
+    }
 }
 
 /**
@@ -477,15 +495,20 @@ void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString
     }
 
     int id = m_nextId++;
-    QCAI_DEBUG("Copilot", QStringLiteral("Sending request #%1: model=%2 msgs=%3 streaming=%4")
-                              .arg(id)
-                              .arg(model)
-                              .arg(messages.size())
-                              .arg(streamCallback ? QStringLiteral("yes") : QStringLiteral("no")));
     QJsonObject req;
     req[QStringLiteral("id")] = id;
     req[QStringLiteral("method")] = QStringLiteral("complete");
     req[QStringLiteral("params")] = params;
+
+    const qint64 payloadSize = QJsonDocument(req).toJson(QJsonDocument::Compact).size();
+    QCAI_DEBUG(
+        "Copilot",
+        QStringLiteral("Sending request #%1: model=%2 msgs=%3 streaming=%4 payload=%5 bytes")
+            .arg(id)
+            .arg(model)
+            .arg(messages.size())
+            .arg(streamCallback ? QStringLiteral("yes") : QStringLiteral("no"))
+            .arg(payloadSize));
 
     m_pending.insert(id, callback);
     if (streamCallback)

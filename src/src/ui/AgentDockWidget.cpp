@@ -1036,12 +1036,19 @@ void AgentDockWidget::updateRunState(bool running)
                                !m_projectCombo->itemData(0).toString().isEmpty());
 }
 
-bool AgentDockWidget::tryExecuteSlashCommand(const QString &goal)
+bool AgentDockWidget::tryExecuteSlashCommand(QString &goal)
 {
     const SlashCommandDispatchResult result = m_slashCommands.dispatch(
         goal, SlashCommandContext{[this](const QString &message) { onLogMessage(message); }});
     if (!result.isSlashCommand)
     {
+        return false;
+    }
+
+    // Redirect to AI agent when the handler produced a goalOverride.
+    if (!result.goalOverride.isEmpty())
+    {
+        goal = result.goalOverride;
         return false;
     }
 
@@ -1065,7 +1072,7 @@ bool AgentDockWidget::tryExecuteSlashCommand(const QString &goal)
 
 void AgentDockWidget::onRunClicked()
 {
-    const QString goal = m_goalEdit->toPlainText().trimmed();
+    QString goal = m_goalEdit->toPlainText().trimmed();
     if (goal.isEmpty())
     {
         return;
