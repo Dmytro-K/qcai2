@@ -731,6 +731,7 @@ set(SRC_IDE
     README.md
     CHANGELOG.md
     VERSION.txt
+    docs/CODING_STYLE.md
     .gitignore
     .clang-tidy
     cmake/format-changed-files.cmake
