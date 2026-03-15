@@ -421,6 +421,8 @@ add_qtc_plugin(qcai2
     src/src/commands/SlashCommandRegistry.cpp
     src/src/commands/HelloCommand.cpp
     src/src/commands/ExplainCommand.cpp
+    src/src/commands/RefactorCommand.cpp
+    src/src/commands/TestCommand.cpp
     src/src/goal/GoalSpecialHandler.h
     src/src/goal/GoalTextEdit.h
     src/src/goal/GoalTextEdit.cpp
