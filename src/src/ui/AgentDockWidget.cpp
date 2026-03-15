@@ -632,7 +632,11 @@ AgentDockWidget::AgentDockWidget(AgentController *controller,
             &AgentDockWidget::onProviderUsageAvailable);
     connect(m_controller, &AgentController::streamingToken, this, [this](const QString &token) {
         m_streamingMarkdown += token;
-        m_streamingMarkdown = redactReadFilePayloads(m_streamingMarkdown);
+        if (!m_isStreaming)
+        {
+            m_isStreaming = true;
+            m_streamingRenderedLen = 0;
+        }
         if (!m_renderThrottle->isActive())
         {
             m_renderThrottle->start();
@@ -797,6 +801,8 @@ void AgentDockWidget::clearChatState()
     m_rawMarkdownView->clear();
     m_logMarkdown.clear();
     m_streamingMarkdown.clear();
+    m_streamingRenderedLen = 0;
+    m_isStreaming = false;
     m_planList->clear();
     m_inlineDiffManager->clearAll();
     static_cast<DiffPreviewEdit *>(m_diffView)->setDiffText(QString());
@@ -1205,6 +1211,8 @@ void AgentDockWidget::appendStampedLogEntry(const QString &body)
         }
         m_logMarkdown += redactReadFilePayloads(m_streamingMarkdown);
         m_streamingMarkdown.clear();
+        m_streamingRenderedLen = 0;
+        m_isStreaming = false;
     }
 
     const QString stamped =
@@ -1218,10 +1226,27 @@ void AgentDockWidget::appendStampedLogEntry(const QString &body)
     m_logMarkdown += stamped;
 
     m_renderThrottle->stop();
-    renderLog();
+    renderLogFull();
 }
 
 void AgentDockWidget::renderLog()
+{
+    if (m_isStreaming)
+    {
+        // During streaming: append only new tokens (fast, no re-parse)
+        const QString newTokens = m_streamingMarkdown.mid(m_streamingRenderedLen);
+        m_streamingRenderedLen = m_streamingMarkdown.size();
+        if (!newTokens.isEmpty())
+        {
+            renderLogStreaming(newTokens);
+        }
+        return;
+    }
+
+    renderLogFull();
+}
+
+void AgentDockWidget::renderLogFull()
 {
     const QString text = currentLogMarkdown();
     const QString renderedText = wrapMarkdownPayloadBlocks(text);
@@ -1242,6 +1267,21 @@ void AgentDockWidget::renderLog()
         m_rawMarkdownView->setTextCursor(cursor);
         m_rawMarkdownView->ensureCursorVisible();
     });
+}
+
+void AgentDockWidget::renderLogStreaming(const QString &newTokens)
+{
+    // Append new tokens as plain text at the end of the log view
+    QTextCursor cursor(m_logView->document());
+    cursor.movePosition(QTextCursor::End);
+    cursor.insertText(newTokens);
+    m_logView->ensureCursorVisible();
+
+    // Also append to raw markdown view
+    QTextCursor rawCursor(m_rawMarkdownView->document());
+    rawCursor.movePosition(QTextCursor::End);
+    rawCursor.insertText(newTokens);
+    m_rawMarkdownView->ensureCursorVisible();
 }
 
 void AgentDockWidget::onPlanUpdated(const QList<PlanStep> &steps)
@@ -1351,6 +1391,8 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
             m_rawMarkdownView->clear();
             m_logMarkdown.clear();
             m_streamingMarkdown.clear();
+            m_streamingRenderedLen = 0;
+            m_isStreaming = false;
             m_sessionController->saveChat();
             return true;
         }

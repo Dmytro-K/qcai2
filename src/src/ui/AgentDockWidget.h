@@ -162,6 +162,16 @@ private:
     void renderLog();
 
     /**
+     * Performs a full markdown re-render of the Actions Log.
+     */
+    void renderLogFull();
+
+    /**
+     * Appends new streaming tokens to the log view incrementally.
+     */
+    void renderLogStreaming(const QString &newTokens);
+
+    /**
      * Appends one timestamped markdown entry to the committed log buffer.
      */
     void appendStampedLogEntry(const QString &body);
@@ -226,6 +236,12 @@ private:
 
     /** Streaming log text buffered until the throttle timer fires. */
     QString m_streamingMarkdown;
+
+    /** Length of streaming markdown already appended to the log view. */
+    qsizetype m_streamingRenderedLen = 0;
+
+    /** True while streaming tokens are being appended incrementally. */
+    bool m_isStreaming = false;
 
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> m_approvalItems;
