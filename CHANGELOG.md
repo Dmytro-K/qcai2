@@ -7,8 +7,9 @@
 - Added persistent chat history with append-only messages, rolling summaries, stable workspace memory, stored artifacts, and lightweight context restoration for agent and completion requests.
 - Added usage shown after completed model requests.
 - Added and documented a repository coding style guide, then aligned the codebase with the explicit comparison and parenthesized-condition rules.
+- Added MCP SSE transport
 
-### Fixed
+### Changed
 
 - Fixed an MCP startup freeze where runtime HTTP MCP sessions could wait for the full 10-second startup timeout after the transport had already connected, delaying the initial `initialize` request.
 
