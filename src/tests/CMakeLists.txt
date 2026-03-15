@@ -30,6 +30,22 @@ target_link_libraries(tst_qcai2_toolcall PRIVATE
 )
 add_test(NAME qcai2_toolcall COMMAND tst_qcai2_toolcall)
 
+add_executable(tst_qcai2_agent_messages
+    tst_agent_messages.cpp
+    ../src/models/AgentMessages.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_agent_messages)
+
+target_include_directories(tst_qcai2_agent_messages PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_agent_messages PRIVATE
+    Qt::Core
+    Qt::Test
+)
+add_test(NAME qcai2_agent_messages COMMAND tst_qcai2_agent_messages)
+
 add_executable(tst_qcai2_slash_commands
     tst_slash_commands.cpp
     ../src/commands/SlashCommandRegistry.cpp
@@ -66,6 +82,23 @@ target_link_libraries(tst_qcai2_output_capture PRIVATE
 )
 add_test(NAME qcai2_output_capture COMMAND tst_qcai2_output_capture)
 
+add_executable(tst_qcai2_safety_policy
+    tst_safety_policy.cpp
+    ../src/safety/SafetyPolicy.cpp
+    ../src/util/Logger.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_safety_policy)
+
+target_include_directories(tst_qcai2_safety_policy PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_safety_policy PRIVATE
+    Qt::Core
+    Qt::Test
+)
+add_test(NAME qcai2_safety_policy COMMAND tst_qcai2_safety_policy)
+
 add_executable(tst_qcai2_mcp_config
     tst_mcp_config.cpp
     ../../lib/qtmcp/src/ServerDefinition.cpp
@@ -82,6 +115,23 @@ target_link_libraries(tst_qcai2_mcp_config PRIVATE
     Qt::Test
 )
 add_test(NAME qcai2_mcp_config COMMAND tst_qcai2_mcp_config)
+
+add_executable(tst_qcai2_tool_registry
+    tst_tool_registry.cpp
+    ../src/tools/ToolRegistry.cpp
+    ../src/util/Logger.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_tool_registry)
+
+target_include_directories(tst_qcai2_tool_registry PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_tool_registry PRIVATE
+    Qt::Core
+    Qt::Test
+)
+add_test(NAME qcai2_tool_registry COMMAND tst_qcai2_tool_registry)
 
 add_executable(tst_qcai2_migration
     tst_migration.cpp

@@ -14,6 +14,9 @@ class McpConfigTest : public QObject
 
 private slots:
     void serverDefinitions_roundTripPreservesKnownAndExtraFields();
+    void serverDefinitionFromJson_keepsDefaultsWhenOptionalFieldsAreMissing();
+    void serverDefinitionFromJson_rejectsInvalidFieldTypes();
+    void serverDefinitionsFromJson_reportsServerSpecificErrors();
 };
 
 void McpConfigTest::serverDefinitions_roundTripPreservesKnownAndExtraFields()
@@ -63,6 +66,64 @@ void McpConfigTest::serverDefinitions_roundTripPreservesKnownAndExtraFields()
     QCOMPARE(parsed.value(QStringLiteral("github")).requestTimeoutMs, github.requestTimeoutMs);
     QCOMPARE(parsed.value(QStringLiteral("github")).extraFields.value(QStringLiteral("customTransportFlag")).toBool(),
              true);
+}
+
+void McpConfigTest::serverDefinitionFromJson_keepsDefaultsWhenOptionalFieldsAreMissing()
+{
+    const QJsonObject json{{QStringLiteral("command"), QStringLiteral("npx")}};
+
+    ServerDefinition definition;
+    QString error;
+    QVERIFY2(serverDefinitionFromJson(json, &definition, &error), qPrintable(error));
+
+    QVERIFY(definition.enabled);
+    QCOMPARE(definition.transport, QStringLiteral("stdio"));
+    QCOMPARE(definition.command, QStringLiteral("npx"));
+    QCOMPARE(definition.startupTimeoutMs, 10000);
+    QCOMPARE(definition.requestTimeoutMs, 30000);
+    QVERIFY(definition.args.isEmpty());
+    QVERIFY(definition.env.isEmpty());
+    QVERIFY(definition.headers.isEmpty());
+}
+
+void McpConfigTest::serverDefinitionFromJson_rejectsInvalidFieldTypes()
+{
+    ServerDefinition definition;
+    QString error;
+
+    QVERIFY(!serverDefinitionFromJson(QJsonObject{{QStringLiteral("enabled"), QStringLiteral("yes")}},
+                                      &definition, &error));
+    QCOMPARE(error, QStringLiteral("Field 'enabled' must be a boolean."));
+
+    QVERIFY(!serverDefinitionFromJson(
+        QJsonObject{{QStringLiteral("args"), QJsonArray{QStringLiteral("ok"), 3}}}, &definition,
+        &error));
+    QCOMPARE(error, QStringLiteral("Field 'args[1]' must be a string."));
+
+    QVERIFY(!serverDefinitionFromJson(
+        QJsonObject{{QStringLiteral("headers"),
+                     QJsonObject{{QStringLiteral("Authorization"), 42}}}},
+        &definition, &error));
+    QCOMPARE(error, QStringLiteral("Field 'headers.Authorization' must be a string."));
+}
+
+void McpConfigTest::serverDefinitionsFromJson_reportsServerSpecificErrors()
+{
+    ServerDefinitions definitions;
+    QString error;
+
+    QVERIFY(!serverDefinitionsFromJson(
+        QJsonObject{{QStringLiteral("broken"),
+                     QJsonObject{{QStringLiteral("headers"),
+                                  QJsonObject{{QStringLiteral("Authorization"), false}}}}}},
+        &definitions, &error));
+    QCOMPARE(error,
+             QStringLiteral("Invalid MCP server 'broken': Field 'headers.Authorization' must be a string."));
+
+    QVERIFY(!serverDefinitionsFromJson(
+        QJsonObject{{QStringLiteral("filesystem"), QStringLiteral("not-an-object")}}, &definitions,
+        &error));
+    QCOMPARE(error, QStringLiteral("MCP server 'filesystem' must be an object."));
 }
 
 QTEST_APPLESS_MAIN(McpConfigTest)

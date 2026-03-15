@@ -376,7 +376,7 @@ SettingsPage::SettingsPage()
         "qcai2", Tr::tr("Qcai2"),
         Utils::FilePath::fromString(QStringLiteral(":/qcai2/ai-agent-icon.svg")));
 
-    setWidgetCreator([]() -> QWidget * { return new SettingsWidget; });
+    setWidgetCreator([]() -> Core::IOptionsPageWidget * { return new SettingsWidget; });
 }
 
 }  // namespace qcai2
