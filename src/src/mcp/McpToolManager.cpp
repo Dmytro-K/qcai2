@@ -501,7 +501,10 @@ public:
 
         timer.start(timeoutMs);
         client->start();
-        loop.exec();
+        if ((connected == false) && failure.isEmpty() && (client->isConnected() == false))
+        {
+            loop.exec();
+        }
 
         QObject::disconnect(connectedConnection);
         QObject::disconnect(errorConnection);
