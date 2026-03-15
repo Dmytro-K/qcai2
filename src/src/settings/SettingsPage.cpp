@@ -94,6 +94,7 @@ class SettingsWidget : public Core::IOptionsPageWidget
         QString copilotModel;
         QString copilotNodePath;
         QString copilotSidecarPath;
+        int copilotCompletionTimeoutSec = 0;
         QString localBaseUrl;
         QString localEndpointPath;
         bool localSimpleMode = false;
@@ -137,6 +138,7 @@ public:
         m_copilotModelCombo = m_ui->copilotModelCombo;
         m_copilotNodeEdit = m_ui->copilotNodeEdit;
         m_copilotSidecarEdit = m_ui->copilotSidecarEdit;
+        m_copilotCompletionTimeoutSpin = m_ui->copilotCompletionTimeoutSpin;
         m_localUrlEdit = m_ui->localUrlEdit;
         m_localEndpointEdit = m_ui->localEndpointEdit;
         m_localSimpleCheck = m_ui->localSimpleCheck;
@@ -262,6 +264,7 @@ public:
 
         m_copilotNodeEdit->setText(s.copilotNodePath);
         m_copilotSidecarEdit->setText(s.copilotSidecarPath);
+        m_copilotCompletionTimeoutSpin->setValue(s.copilotCompletionTimeoutSec);
 
         // Local provider settings
         m_localUrlEdit->setText(s.localBaseUrl);
@@ -351,6 +354,7 @@ public:
         installCheckSettingsDirtyTrigger(m_copilotModelCombo);
         installCheckSettingsDirtyTrigger(m_copilotNodeEdit);
         installCheckSettingsDirtyTrigger(m_copilotSidecarEdit);
+        installCheckSettingsDirtyTrigger(m_copilotCompletionTimeoutSpin);
         installCheckSettingsDirtyTrigger(m_localUrlEdit);
         installCheckSettingsDirtyTrigger(m_localEndpointEdit);
         installCheckSettingsDirtyTrigger(m_localSimpleCheck);
@@ -395,6 +399,7 @@ public:
         s.copilotModel = m_copilotModelCombo->currentText();
         s.copilotNodePath = m_copilotNodeEdit->text();
         s.copilotSidecarPath = m_copilotSidecarEdit->text();
+        s.copilotCompletionTimeoutSec = m_copilotCompletionTimeoutSpin->value();
 
         s.localBaseUrl = m_localUrlEdit->text();
         s.localEndpointPath = m_localEndpointEdit->text();
@@ -448,6 +453,7 @@ private:
             m_copilotModelCombo->currentText(),
             m_copilotNodeEdit->text(),
             m_copilotSidecarEdit->text(),
+            m_copilotCompletionTimeoutSpin->value(),
             m_localUrlEdit->text(),
             m_localEndpointEdit->text(),
             m_localSimpleCheck->isChecked(),
@@ -488,6 +494,7 @@ private:
         m_copilotModelCombo->setCurrentText(snap.copilotModel);
         m_copilotNodeEdit->setText(snap.copilotNodePath);
         m_copilotSidecarEdit->setText(snap.copilotSidecarPath);
+        m_copilotCompletionTimeoutSpin->setValue(snap.copilotCompletionTimeoutSec);
 
         m_localUrlEdit->setText(snap.localBaseUrl);
         m_localEndpointEdit->setText(snap.localEndpointPath);
@@ -532,6 +539,7 @@ private:
     QSpinBox *m_maxTokensSpin;
     QLineEdit *m_copilotNodeEdit, *m_copilotSidecarEdit;
     QComboBox *m_copilotModelCombo;
+    QSpinBox *m_copilotCompletionTimeoutSpin;
     QLineEdit *m_localUrlEdit, *m_localEndpointEdit, *m_localHeadersEdit;
     QCheckBox *m_localSimpleCheck;
     QLineEdit *m_ollamaUrlEdit;

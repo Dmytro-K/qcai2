@@ -261,6 +261,8 @@ void Settings::load()
     copilotModel = s.value("copilotModel", copilotModel).toString();
     copilotNodePath = s.value("copilotNodePath", copilotNodePath).toString();
     copilotSidecarPath = s.value("copilotSidecarPath", copilotSidecarPath).toString();
+    copilotCompletionTimeoutSec =
+        s.value("copilotCompletionTimeoutSec", copilotCompletionTimeoutSec).toInt();
 
     maxIterations = s.value("maxIterations", maxIterations).toInt();
     maxToolCalls = s.value("maxToolCalls", maxToolCalls).toInt();
@@ -343,6 +345,7 @@ void Settings::save() const
     s.setValue("copilotModel", copilotModel);
     s.setValue("copilotNodePath", copilotNodePath);
     s.setValue("copilotSidecarPath", copilotSidecarPath);
+    s.setValue("copilotCompletionTimeoutSec", copilotCompletionTimeoutSec);
 
     s.setValue("maxIterations", maxIterations);
     s.setValue("maxToolCalls", maxToolCalls);
