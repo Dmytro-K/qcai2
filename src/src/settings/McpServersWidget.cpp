@@ -398,6 +398,7 @@ McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
         const QString name = makeUniqueServerName(QStringLiteral("server"));
         m_servers.insert(name, qtmcp::ServerDefinition{});
         repopulateServerList(name);
+        emit changed();
     });
     connect(m_removeButton, &QPushButton::clicked, this, [this]() {
         const QString name = currentServerName();
@@ -414,6 +415,7 @@ McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
         m_authorizedServers.remove(name);
         persistConnectionStates();
         repopulateServerList();
+        emit changed();
     });
     connect(m_serverList, &QListWidget::currentItemChanged, this,
             [this](QListWidgetItem *, QListWidgetItem *) { loadCurrentServer(); });
@@ -981,6 +983,7 @@ void McpServersWidget::invalidateCurrentServerStatus()
         cleanupConnectionTest();
     }
     clearHttpStatus(serverName);
+    emit changed();
 }
 
 void McpServersWidget::testCurrentServerConnection()
@@ -1285,6 +1288,7 @@ void McpServersWidget::renameCurrentServer()
     }
     persistConnectionStates();
     repopulateServerList(newName);
+    emit changed();
 }
 
 QStringList McpServersWidget::textLines(const QString &text)

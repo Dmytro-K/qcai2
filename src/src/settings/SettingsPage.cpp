@@ -12,6 +12,7 @@
 #include <coreplugin/dialogs/ioptionspage.h>
 #include <coreplugin/icore.h>
 #include <utils/filepath.h>
+#include <utils/guiutils.h>
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -80,6 +81,43 @@ void selectEffortValue(QComboBox *combo, const QString &value, int fallbackIndex
 
 class SettingsWidget : public Core::IOptionsPageWidget
 {
+    struct Snapshot
+    {
+        QString provider;
+        QString baseUrl;
+        QString apiKey;
+        QString modelName;
+        QString reasoningEffort;
+        QString thinkingLevel;
+        double temperature = 0;
+        int maxTokens = 0;
+        QString copilotModel;
+        QString copilotNodePath;
+        QString copilotSidecarPath;
+        QString localBaseUrl;
+        QString localEndpointPath;
+        bool localSimpleMode = false;
+        QString localCustomHeaders;
+        QString ollamaBaseUrl;
+        QString ollamaModel;
+        int maxIterations = 0;
+        int maxToolCalls = 0;
+        int maxDiffLines = 0;
+        int maxChangedFiles = 0;
+        bool dryRunDefault = false;
+        bool aiCompletionEnabled = false;
+        int completionMinChars = 0;
+        int completionDelayMs = 0;
+        QString completionModel;
+        QString completionThinkingLevel;
+        QString completionReasoningEffort;
+        bool debugLogging = false;
+        bool agentDebug = false;
+        qtmcp::ServerDefinitions mcpServers;
+
+        friend bool operator==(const Snapshot &, const Snapshot &) = default;
+    };
+
 public:
     SettingsWidget()
     {
@@ -298,6 +336,48 @@ public:
         m_debugLoggingCheck->setChecked(s.debugLogging);
 
         m_agentDebugCheck->setChecked(s.agentDebug);
+
+        m_snapshot = captureSnapshot();
+
+        // Notify the framework when any widget value changes so it can poll isDirty().
+        using Utils::installCheckSettingsDirtyTrigger;
+        installCheckSettingsDirtyTrigger(m_providerCombo);
+        installCheckSettingsDirtyTrigger(m_baseUrlCombo);
+        installCheckSettingsDirtyTrigger(m_apiKeyEdit);
+        installCheckSettingsDirtyTrigger(m_modelCombo);
+        installCheckSettingsDirtyTrigger(m_reasoningCombo);
+        installCheckSettingsDirtyTrigger(m_thinkingCombo);
+        installCheckSettingsDirtyTrigger(m_maxTokensSpin);
+        installCheckSettingsDirtyTrigger(m_copilotModelCombo);
+        installCheckSettingsDirtyTrigger(m_copilotNodeEdit);
+        installCheckSettingsDirtyTrigger(m_copilotSidecarEdit);
+        installCheckSettingsDirtyTrigger(m_localUrlEdit);
+        installCheckSettingsDirtyTrigger(m_localEndpointEdit);
+        installCheckSettingsDirtyTrigger(m_localSimpleCheck);
+        installCheckSettingsDirtyTrigger(m_localHeadersEdit);
+        installCheckSettingsDirtyTrigger(m_ollamaUrlEdit);
+        installCheckSettingsDirtyTrigger(m_ollamaModelCombo);
+        installCheckSettingsDirtyTrigger(m_maxIterSpin);
+        installCheckSettingsDirtyTrigger(m_maxToolsSpin);
+        installCheckSettingsDirtyTrigger(m_maxDiffSpin);
+        installCheckSettingsDirtyTrigger(m_maxFilesSpin);
+        installCheckSettingsDirtyTrigger(m_dryRunCheck);
+        installCheckSettingsDirtyTrigger(m_aiCompletionCheck);
+        installCheckSettingsDirtyTrigger(m_completionMinCharsSpin);
+        installCheckSettingsDirtyTrigger(m_completionDelayMsSpin);
+        installCheckSettingsDirtyTrigger(m_completionModelCombo);
+        installCheckSettingsDirtyTrigger(m_completionThinkingCombo);
+        installCheckSettingsDirtyTrigger(m_completionReasoningCombo);
+        installCheckSettingsDirtyTrigger(m_debugLoggingCheck);
+        installCheckSettingsDirtyTrigger(m_agentDebugCheck);
+        // QDoubleSpinBox not supported by installCheckSettingsDirtyTrigger
+        connect(m_tempSpin, &QDoubleSpinBox::valueChanged, Utils::checkSettingsDirty);
+        connect(m_mcpServersWidget, &McpServersWidget::changed, Utils::checkSettingsDirty);
+    }
+
+    bool isDirty() const override
+    {
+        return captureSnapshot() != m_snapshot;
     }
 
     void apply() override
@@ -333,7 +413,6 @@ public:
         s.aiCompletionEnabled = m_aiCompletionCheck->isChecked();
         s.completionMinChars = m_completionMinCharsSpin->value();
         s.completionDelayMs = m_completionDelayMsSpin->value();
-        // If "(Same as agent model)" is selected, store empty string
         const int cIdx = m_completionModelCombo->currentIndex();
         s.completionModel = (cIdx == 0) ? QString() : m_completionModelCombo->currentText();
         s.completionThinkingLevel = m_completionThinkingCombo->currentData().toString();
@@ -343,11 +422,105 @@ public:
         s.mcpServers = m_mcpServersWidget->servers();
         s.save();
 
-        // Apply debug logging immediately
         Logger::instance().setEnabled(s.debugLogging);
+
+        m_snapshot = captureSnapshot();
+    }
+
+    void cancel() override
+    {
+        restoreSnapshot(m_snapshot);
     }
 
 private:
+    Snapshot captureSnapshot() const
+    {
+        const int cIdx = m_completionModelCombo->currentIndex();
+        return {
+            m_providerCombo->currentData().toString(),
+            m_baseUrlCombo->currentText(),
+            m_apiKeyEdit->text(),
+            m_modelCombo->currentText(),
+            m_reasoningCombo->currentData().toString(),
+            m_thinkingCombo->currentData().toString(),
+            m_tempSpin->value(),
+            m_maxTokensSpin->value(),
+            m_copilotModelCombo->currentText(),
+            m_copilotNodeEdit->text(),
+            m_copilotSidecarEdit->text(),
+            m_localUrlEdit->text(),
+            m_localEndpointEdit->text(),
+            m_localSimpleCheck->isChecked(),
+            m_localHeadersEdit->text(),
+            m_ollamaUrlEdit->text(),
+            m_ollamaModelCombo->currentText(),
+            m_maxIterSpin->value(),
+            m_maxToolsSpin->value(),
+            m_maxDiffSpin->value(),
+            m_maxFilesSpin->value(),
+            m_dryRunCheck->isChecked(),
+            m_aiCompletionCheck->isChecked(),
+            m_completionMinCharsSpin->value(),
+            m_completionDelayMsSpin->value(),
+            (cIdx == 0) ? QString() : m_completionModelCombo->currentText(),
+            m_completionThinkingCombo->currentData().toString(),
+            m_completionReasoningCombo->currentData().toString(),
+            m_debugLoggingCheck->isChecked(),
+            m_agentDebugCheck->isChecked(),
+            m_mcpServersWidget->servers(),
+        };
+    }
+
+    void restoreSnapshot(const Snapshot &snap)
+    {
+        const int provIdx = m_providerCombo->findData(snap.provider);
+        if (provIdx >= 0)
+            m_providerCombo->setCurrentIndex(provIdx);
+
+        m_baseUrlCombo->setCurrentText(snap.baseUrl);
+        m_apiKeyEdit->setText(snap.apiKey);
+        m_modelCombo->setCurrentText(snap.modelName);
+        selectEffortValue(m_reasoningCombo, snap.reasoningEffort, 2);
+        selectEffortValue(m_thinkingCombo, snap.thinkingLevel, 2);
+        m_tempSpin->setValue(snap.temperature);
+        m_maxTokensSpin->setValue(snap.maxTokens);
+
+        m_copilotModelCombo->setCurrentText(snap.copilotModel);
+        m_copilotNodeEdit->setText(snap.copilotNodePath);
+        m_copilotSidecarEdit->setText(snap.copilotSidecarPath);
+
+        m_localUrlEdit->setText(snap.localBaseUrl);
+        m_localEndpointEdit->setText(snap.localEndpointPath);
+        m_localSimpleCheck->setChecked(snap.localSimpleMode);
+        m_localHeadersEdit->setText(snap.localCustomHeaders);
+
+        m_ollamaUrlEdit->setText(snap.ollamaBaseUrl);
+        m_ollamaModelCombo->setCurrentText(snap.ollamaModel);
+
+        m_maxIterSpin->setValue(snap.maxIterations);
+        m_maxToolsSpin->setValue(snap.maxToolCalls);
+        m_maxDiffSpin->setValue(snap.maxDiffLines);
+        m_maxFilesSpin->setValue(snap.maxChangedFiles);
+
+        m_dryRunCheck->setChecked(snap.dryRunDefault);
+        m_aiCompletionCheck->setChecked(snap.aiCompletionEnabled);
+        m_completionMinCharsSpin->setValue(snap.completionMinChars);
+        m_completionDelayMsSpin->setValue(snap.completionDelayMs);
+
+        if (snap.completionModel.isEmpty())
+            m_completionModelCombo->setCurrentIndex(0);
+        else
+            m_completionModelCombo->setCurrentText(snap.completionModel);
+
+        selectEffortValue(m_completionThinkingCombo, snap.completionThinkingLevel, 0);
+        selectEffortValue(m_completionReasoningCombo, snap.completionReasoningEffort, 0);
+
+        m_debugLoggingCheck->setChecked(snap.debugLogging);
+        m_agentDebugCheck->setChecked(snap.agentDebug);
+        m_mcpServersWidget->setServers(snap.mcpServers);
+    }
+
+    Snapshot m_snapshot;
     std::unique_ptr<Ui::SettingsWidget> m_ui;
     QComboBox *m_providerCombo;
     QComboBox *m_baseUrlCombo;
