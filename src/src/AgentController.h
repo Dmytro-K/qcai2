@@ -8,6 +8,7 @@
 #include "safety/SafetyPolicy.h"
 #include "tools/ToolRegistry.h"
 
+#include <QElapsedTimer>
 #include <QJsonObject>
 #include <QList>
 #include <QObject>
@@ -184,8 +185,9 @@ signals:
     /**
      * Publishes provider token-usage counters for one completed model request.
      * @param usage Usage counters returned by the provider.
+     * @param durationMs Wall-clock duration of the completed request in milliseconds.
      */
-    void providerUsageAvailable(const ProviderUsage &usage);
+    void providerUsageAvailable(const ProviderUsage &usage, qint64 durationMs);
 
     /**
      * Publishes the latest multi-step plan returned by the model.
@@ -353,6 +355,9 @@ private:
 
     /** Accumulated provider usage across all model requests in the current run. */
     ProviderUsage m_accumulatedUsage;
+
+    /** Measures elapsed time for the in-flight provider request. */
+    QElapsedTimer m_providerRequestTimer;
 
     /** Most recent multi-step plan returned by the model. */
     QList<PlanStep> m_plan;

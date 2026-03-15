@@ -14,6 +14,8 @@ private slots:
     void providerUsageFromResponseObject_readsOpenAiUsageShapes();
     void providerUsageFromResponseObject_readsDirectTopLevelFields();
     void formatProviderUsageSummary_omitsMissingFieldsAndDerivesTotal();
+    void formatProviderUsageSummary_appendsDuration();
+    void formatProviderUsageSummary_supportsDurationOnly();
 };
 
 void ProviderUsageTest::providerUsageFromResponseObject_readsOpenAiUsageShapes()
@@ -64,6 +66,21 @@ void ProviderUsageTest::formatProviderUsageSummary_omitsMissingFieldsAndDerivesT
 
     QCOMPARE(formatProviderUsageSummary(usage),
              QStringLiteral("input 50 | output 12 | total 62 | cached input 5"));
+}
+
+void ProviderUsageTest::formatProviderUsageSummary_appendsDuration()
+{
+    ProviderUsage usage;
+    usage.inputTokens = 50;
+    usage.outputTokens = 12;
+
+    QCOMPARE(formatProviderUsageSummary(usage, 1534),
+             QStringLiteral("input 50 | output 12 | total 62 | time 1.53 s"));
+}
+
+void ProviderUsageTest::formatProviderUsageSummary_supportsDurationOnly()
+{
+    QCOMPARE(formatProviderUsageSummary(ProviderUsage{}, 87), QStringLiteral("time 87 ms"));
 }
 
 QTEST_APPLESS_MAIN(ProviderUsageTest)

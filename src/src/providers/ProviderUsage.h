@@ -5,6 +5,8 @@
 #include <QMetaType>
 #include <QString>
 
+#include <cstdint>
+
 namespace qcai2
 {
 
@@ -24,7 +26,7 @@ struct ProviderUsage
 };
 
 ProviderUsage providerUsageFromResponseObject(const QJsonObject &responseObject);
-QString formatProviderUsageSummary(const ProviderUsage &usage);
+QString formatProviderUsageSummary(const ProviderUsage &usage, std::int64_t durationMs = -1);
 
 }  // namespace qcai2
 
