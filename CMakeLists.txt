@@ -444,6 +444,8 @@ add_qtc_plugin(qcai2
     src/src/tools/ToolRegistry.cpp
     src/src/tools/FileTools.h
     src/src/tools/FileTools.cpp
+    src/src/tools/CreateFileTool.h
+    src/src/tools/CreateFileTool.cpp
     src/src/tools/SearchTools.h
     src/src/tools/SearchTools.cpp
     src/src/tools/BuildTools.h
@@ -452,6 +454,12 @@ add_qtc_plugin(qcai2
     src/src/tools/GitTools.cpp
     src/src/tools/IdeTools.h
     src/src/tools/IdeTools.cpp
+    src/src/tools/ListDirectoryTool.h
+    src/src/tools/ListDirectoryTool.cpp
+    src/src/tools/RunCommandTool.h
+    src/src/tools/RunCommandTool.cpp
+    src/src/tools/FindSymbolTool.h
+    src/src/tools/FindSymbolTool.cpp
     src/src/providers/IAIProvider.h
     src/src/providers/ProviderUsage.h
     src/src/providers/ProviderUsage.cpp
