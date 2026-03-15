@@ -116,13 +116,16 @@ async function handleComplete(id, params) {
 
     const { messages, model, temperature, maxTokens, streaming, reasoningEffort } = params;
     const requestedModel = model || "gpt-4.1";
+    const completionTimeoutSec = Number.isFinite(params?.completionTimeoutSec)
+        ? Math.max(0, Math.trunc(params.completionTimeoutSec))
+        : 300;
 
     const state = { cancelled: false, session: null };
     activeRequests.set(id, state);
 
     let session = null;
     try {
-        log(`Request #${id}: creating session model=${requestedModel} reasoningEffort=${reasoningEffort || "default"}`);
+        log(`Request #${id}: creating session model=${requestedModel} reasoningEffort=${reasoningEffort || "default"} timeout=${completionTimeoutSec > 0 ? `${completionTimeoutSec}s` : "none"}`);
         const sessionOpts = {
             model: requestedModel,
             streaming: true,
@@ -163,7 +166,9 @@ async function handleComplete(id, params) {
             }
         });
 
-        const response = await session.sendAndWait({ prompt }, 300000);
+        const response = completionTimeoutSec > 0
+            ? await session.sendAndWait({ prompt }, completionTimeoutSec * 1000)
+            : await session.sendAndWait({ prompt });
         unsubscribe();
         unsubscribeUsage();
 

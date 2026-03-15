@@ -1,4 +1,5 @@
 #include "CopilotProvider.h"
+#include "../settings/Settings.h"
 #include "../util/Logger.h"
 
 #include <QCoreApplication>
@@ -489,6 +490,7 @@ void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString
     params[QStringLiteral("maxTokens")] = maxTokens;
     // Always use streaming mode — non-streaming sendAndWait has long delays
     params[QStringLiteral("streaming")] = true;
+    params[QStringLiteral("completionTimeoutSec")] = settings().copilotCompletionTimeoutSec;
     if (!reasoningEffort.isEmpty() && reasoningEffort != QStringLiteral("off"))
     {
         params[QStringLiteral("reasoningEffort")] = reasoningEffort;
@@ -503,12 +505,16 @@ void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString
     const qint64 payloadSize = QJsonDocument(req).toJson(QJsonDocument::Compact).size();
     QCAI_DEBUG(
         "Copilot",
-        QStringLiteral("Sending request #%1: model=%2 msgs=%3 streaming=%4 payload=%5 bytes")
+        QStringLiteral("Sending request #%1: model=%2 msgs=%3 streaming=%4 payload=%5 bytes "
+                       "timeout=%6")
             .arg(id)
             .arg(model)
             .arg(messages.size())
             .arg(streamCallback ? QStringLiteral("yes") : QStringLiteral("no"))
-            .arg(payloadSize));
+            .arg(payloadSize)
+            .arg(settings().copilotCompletionTimeoutSec > 0
+                     ? QStringLiteral("%1s").arg(settings().copilotCompletionTimeoutSec)
+                     : QStringLiteral("none")));
 
     m_pending.insert(id, callback);
     if (streamCallback)

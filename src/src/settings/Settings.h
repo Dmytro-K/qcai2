@@ -68,6 +68,9 @@ struct Settings
     /** Optional explicit path to the Copilot sidecar script. */
     QString copilotSidecarPath;
 
+    /** Maximum Copilot completion wait time in seconds; 0 disables the timeout. */
+    int copilotCompletionTimeoutSec = 300;
+
     /** Maximum agent loop iterations allowed per request. */
     int maxIterations = 8;
 
@@ -119,7 +122,6 @@ struct Settings
      * Saves settings to QSettings.
      */
     void save() const;
-
 };
 
 struct McpServerConnectionState
@@ -183,7 +185,6 @@ private:
      * Current normalized Copilot model list.
      */
     QStringList m_copilotModels;
-
 };
 
 /**
