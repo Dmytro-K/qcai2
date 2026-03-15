@@ -35,8 +35,10 @@ GoalTextEdit::GoalTextEdit(QWidget *parent) : QTextEdit(parent)
 
 void GoalTextEdit::addSpecialHandler(std::unique_ptr<GoalSpecialHandler> handler)
 {
-    if (!handler)
+    if (((!handler) == true))
+    {
         return;
+    }
 
     m_specialHandlers.push_back(std::move(handler));
     refreshSpecialState();
@@ -72,17 +74,19 @@ void GoalTextEdit::dragMoveEvent(QDragMoveEvent *event)
 
 void GoalTextEdit::dropEvent(QDropEvent *event)
 {
-    if (event->mimeData()->hasUrls())
+    if (((event->mimeData()->hasUrls()) == true))
     {
         QStringList paths;
         const QList<QUrl> urls = event->mimeData()->urls();
         for (const QUrl &url : urls)
         {
             if (url.isLocalFile())
+            {
                 paths.append(url.toLocalFile());
+            }
         }
 
-        if (!paths.isEmpty())
+        if (((!paths.isEmpty()) == true))
         {
             emit filesDropped(paths);
             event->acceptProposedAction();
@@ -95,7 +99,7 @@ void GoalTextEdit::dropEvent(QDropEvent *event)
 
 void GoalTextEdit::keyPressEvent(QKeyEvent *event)
 {
-    if (hasCompletionPopup())
+    if (hasCompletionPopup() == true)
     {
         switch (event->key())
         {
@@ -135,27 +139,32 @@ void GoalTextEdit::refreshCompletionPopup()
         }
     }
 
-    if (!m_activeCompletion.active || m_activeCompletion.items.isEmpty())
+    if (((!m_activeCompletion.active || m_activeCompletion.items.isEmpty()) == true))
     {
         m_completionModel->clear();
-        if (m_completer != nullptr && m_completer->popup() != nullptr)
+        if (((m_completer != nullptr && m_completer->popup() != nullptr) == true))
+        {
             m_completer->popup()->hide();
+        }
         return;
     }
 
     m_completionModel->clear();
     for (const GoalCompletionItem &item : m_activeCompletion.items)
     {
-        auto *modelItem =
-            new QStandardItem(item.label.isEmpty() ? item.insertText : item.label);
+        auto *modelItem = new QStandardItem(item.label.isEmpty() ? item.insertText : item.label);
         modelItem->setData(item.insertText, Qt::UserRole);
         if (!item.detail.isEmpty())
+        {
             modelItem->setToolTip(item.detail);
+        }
         m_completionModel->appendRow(modelItem);
     }
 
-    if (m_completer == nullptr || m_completer->popup() == nullptr)
+    if (((m_completer == nullptr || m_completer->popup() == nullptr) == true))
+    {
         return;
+    }
 
     m_completer->setCompletionPrefix(QString());
 
@@ -177,7 +186,9 @@ void GoalTextEdit::refreshHighlighting()
         for (const GoalHighlightSpan &span : spans)
         {
             if (span.length <= 0)
+            {
                 continue;
+            }
 
             QTextCursor cursor(document());
             cursor.setPosition(span.start);
@@ -195,12 +206,16 @@ void GoalTextEdit::refreshHighlighting()
 
 void GoalTextEdit::applyCompletionIndex(const QModelIndex &index)
 {
-    if (!m_activeCompletion.active || !index.isValid())
+    if (((!m_activeCompletion.active || !index.isValid()) == true))
+    {
         return;
+    }
 
     const QString insertText = index.data(Qt::UserRole).toString();
-    if (insertText.isEmpty())
+    if (insertText.isEmpty() == true)
+    {
         return;
+    }
 
     QTextCursor cursor = textCursor();
     cursor.beginEditBlock();
@@ -210,8 +225,10 @@ void GoalTextEdit::applyCompletionIndex(const QModelIndex &index)
     cursor.endEditBlock();
     setTextCursor(cursor);
 
-    if (m_completer != nullptr && m_completer->popup() != nullptr)
+    if (((m_completer != nullptr && m_completer->popup() != nullptr) == true))
+    {
         m_completer->popup()->hide();
+    }
 }
 
 }  // namespace qcai2

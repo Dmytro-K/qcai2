@@ -8,16 +8,20 @@ namespace qcai2
 QJsonObject ToolCall::toJson() const
 {
     QJsonObject o;
-    if (!id.isEmpty())
+    if (((!id.isEmpty()) == true))
+    {
         o["id"] = id;
+    }
     o["name"] = name;
     o["args"] = args;
-    if (executed)
+    if (executed == true)
     {
         o["result"] = result;
         o["failed"] = failed;
-        if (failed)
+        if (failed == true)
+        {
             o["error"] = errorMsg;
+        }
     }
     return o;
 }

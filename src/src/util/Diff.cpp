@@ -35,7 +35,7 @@ QString normalize(const QString &unifiedDiff)
     for (int i = 0; i < lines.size();)
     {
         const auto m = hunkHeader.match(lines[i]);
-        if (!m.hasMatch())
+        if (((!m.hasMatch()) == true))
         {
             ++i;
             continue;
@@ -44,25 +44,29 @@ QString normalize(const QString &unifiedDiff)
         int oldCount = 0;
         int newCount = 0;
         int j = i + 1;
-        for (; j < lines.size(); ++j)
+        for (; ((j < lines.size()) == true); ++j)
         {
             const QString &l = lines[j];
-            if (l.startsWith("@@ -") || l.startsWith("--- ") || l.startsWith("diff --git ") ||
-                l.startsWith("Index: "))
+            if (((l.startsWith("@@ -") || l.startsWith("--- ") || l.startsWith("diff --git ") ||
+                  l.startsWith("Index: ")) == true))
+            {
                 break;
-            if (l.startsWith("\\ No newline at end of file"))
+            }
+            if (l.startsWith("\\ No newline at end of file") == true)
+            {
                 continue;
-            if (l.startsWith('+') && !l.startsWith("+++ "))
+            }
+            if (((l.startsWith('+') && !l.startsWith("+++ ")) == true))
             {
                 ++newCount;
                 continue;
             }
-            if (l.startsWith('-') && !l.startsWith("--- "))
+            if (((l.startsWith('-') && !l.startsWith("--- ")) == true))
             {
                 ++oldCount;
                 continue;
             }
-            if (l.startsWith(' '))
+            if (l.startsWith(' ') == true)
             {
                 ++oldCount;
                 ++newCount;
@@ -88,7 +92,7 @@ ValidationResult validate(const QString &unifiedDiff, int maxLines, int maxFiles
 {
     ValidationResult r;
     const QString normalizedDiff = normalize(unifiedDiff);
-    if (normalizedDiff.trimmed().isEmpty())
+    if (((normalizedDiff.trimmed().isEmpty()) == true))
     {
         r.error = QStringLiteral("Empty diff");
         return r;
@@ -120,21 +124,23 @@ ValidationResult validate(const QString &unifiedDiff, int maxLines, int maxFiles
         {
             // Skip the +++ / --- file header lines
             if (!line.startsWith("+++") && !line.startsWith("---"))
+            {
                 ++changedLines;
+            }
         }
     }
 
     r.linesChanged = changedLines;
     r.filesChanged = static_cast<int>(files.size());
 
-    if (r.filesChanged > maxFiles)
+    if (((r.filesChanged > maxFiles) == true))
     {
         r.error = QStringLiteral("Too many files changed: %1 (max %2)")
                       .arg(r.filesChanged)
                       .arg(maxFiles);
         return r;
     }
-    if (r.linesChanged > maxLines)
+    if (((r.linesChanged > maxLines) == true))
     {
         r.error = QStringLiteral("Too many lines changed: %1 (max %2)")
                       .arg(r.linesChanged)
@@ -159,7 +165,7 @@ static bool runPatchCmd(const QString &unifiedDiff, const QString &workDir,
     args.append(extraArgs);
 
     auto result = runner.run(QStringLiteral("patch"), args, workDir, 15000, unifiedDiff);
-    if (!result.success)
+    if (((!result.success) == true))
     {
         errorMsg = result.stdErr.isEmpty() ? result.errorString : result.stdErr;
         return false;
@@ -171,8 +177,10 @@ bool applyPatch(const QString &unifiedDiff, const QString &workDir, bool dryRun,
 {
     const QString normalizedDiff = normalize(unifiedDiff);
     QStringList extra;
-    if (dryRun)
+    if (dryRun == true)
+    {
         extra << QStringLiteral("--dry-run");
+    }
     return runPatchCmd(normalizedDiff, workDir, extra, errorMsg);
 }
 
@@ -195,7 +203,7 @@ NewFileResult extractAndCreateNewFiles(const QString &patchText, const QString &
     while (i < lines.size())
     {
         const auto m = newFileHeader.match(lines[i]);
-        if (!m.hasMatch())
+        if (((!m.hasMatch()) == true))
         {
             diffLines.append(lines[i]);
             ++i;
@@ -210,37 +218,45 @@ NewFileResult extractAndCreateNewFiles(const QString &patchText, const QString &
         while (i < lines.size())
         {
             if (newFileHeader.match(lines[i]).hasMatch())
+            {
                 break;
+            }
             if (lines[i].startsWith(QStringLiteral("=== MODIFIED:")))
+            {
                 break;
+            }
             contentLines.append(lines[i]);
             ++i;
         }
 
         // Trim trailing empty lines
         while (!contentLines.isEmpty() && contentLines.last().trimmed().isEmpty())
+        {
             contentLines.removeLast();
+        }
 
         const QString content = contentLines.join('\n') + QLatin1Char('\n');
 
         // Sandbox check
         const QDir dir(workDir);
         const QString absPath = dir.absoluteFilePath(relPath);
-        if (!QFileInfo(absPath).absoluteFilePath().startsWith(dir.canonicalPath()))
+        if (((!QFileInfo(absPath).absoluteFilePath().startsWith(dir.canonicalPath())) == true))
         {
             result.error = QStringLiteral("New file path outside project: %1").arg(relPath);
             return result;
         }
 
-        if (!dryRun)
+        if (dryRun == false)
         {
             // Create parent directories
             QFileInfo fi(absPath);
-            if (!fi.dir().exists())
+            if (((!fi.dir().exists()) == true))
+            {
                 QDir().mkpath(fi.absolutePath());
+            }
 
             QFile f(absPath);
-            if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
+            if (f.open(QIODevice::WriteOnly | QIODevice::Text) == false)
             {
                 result.error =
                     QStringLiteral("Cannot create file %1: %2").arg(relPath, f.errorString());

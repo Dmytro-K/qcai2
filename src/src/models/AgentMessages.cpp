@@ -27,9 +27,9 @@ QList<QString> extractTopLevelObjects(const QString &raw)
     {
         const QChar ch = raw.at(i);
 
-        if (inString)
+        if (inString == true)
         {
-            if (escaped)
+            if (escaped == true)
             {
                 escaped = false;
             }
@@ -52,8 +52,10 @@ QList<QString> extractTopLevelObjects(const QString &raw)
 
         if (ch == QLatin1Char('{'))
         {
-            if (depth == 0)
+            if (((depth == 0) == true))
+            {
                 start = i;
+            }
             ++depth;
             continue;
         }
@@ -61,7 +63,7 @@ QList<QString> extractTopLevelObjects(const QString &raw)
         if (ch == QLatin1Char('}') && depth > 0)
         {
             --depth;
-            if (depth == 0 && start >= 0)
+            if (((depth == 0 && start >= 0) == true))
             {
                 objects.append(raw.mid(start, i - start + 1));
                 start = -1;
@@ -149,27 +151,34 @@ AgentResponse AgentResponse::parse(const QString &raw)
         QJsonParseError err;
         const QJsonDocument doc = QJsonDocument::fromJson(candidate.toUtf8(), &err);
         if (err.error != QJsonParseError::NoError || !doc.isObject())
+        {
             return false;
+        }
 
         const QJsonObject obj = doc.object();
         if (!obj.value(QStringLiteral("type")).isString())
+        {
             return false;
+        }
 
         out = parseJson(obj);
         return true;
-
     };
 
     AgentResponse parsed;
     if (tryParseTypedResponse(raw, parsed))
+    {
         return parsed;
+    }
 
     // Keep previous behavior: if the whole payload is a single JSON object,
     // return parseJson() even for unknown/unsupported type.
     QJsonParseError err;
     const QJsonDocument doc = QJsonDocument::fromJson(raw.toUtf8(), &err);
     if (err.error == QJsonParseError::NoError && doc.isObject())
+    {
         return parseJson(doc.object());
+    }
 
     static const QRegularExpression fencedJsonRe(R"(```(?:json)?\s*(\{[\s\S]*?\})\s*```)",
                                                  QRegularExpression::MultilineOption);
@@ -179,7 +188,9 @@ AgentResponse AgentResponse::parse(const QString &raw)
     {
         const QRegularExpressionMatch m = it.next();
         if (tryParseTypedResponse(m.captured(1), parsed))
+        {
             return parsed;
+        }
     }
 
     // Handle multiple JSON objects in one message, e.g.
@@ -188,7 +199,9 @@ AgentResponse AgentResponse::parse(const QString &raw)
     for (const QString &candidate : objects)
     {
         if (tryParseTypedResponse(candidate, parsed))
+        {
             return parsed;
+        }
     }
 
     // Fallback: return raw text

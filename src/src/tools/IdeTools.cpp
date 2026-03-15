@@ -29,16 +29,23 @@ QJsonObject OpenFileAtLocationTool::argsSchema() const
 QString OpenFileAtLocationTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString relPath = args.value("path").toString();
-    if (relPath.isEmpty())
+    if (relPath.isEmpty() == true)
+    {
         return QStringLiteral("Error: 'path' argument is required.");
+    }
 
     const QString absPath = QDir(workDir).absoluteFilePath(relPath);
-    if (!QFileInfo::exists(absPath))
+    if (QFileInfo::exists(absPath) == false)
+    {
         return QStringLiteral("Error: file does not exist: %1").arg(absPath);
+    }
 
     // Sandbox check
-    if (!QFileInfo(absPath).canonicalFilePath().startsWith(QDir(workDir).canonicalPath()))
+    if (((!QFileInfo(absPath).canonicalFilePath().startsWith(QDir(workDir).canonicalPath())) ==
+         true))
+    {
         return QStringLiteral("Error: path is outside the project directory.");
+    }
 
     int line = args.value("line").toInt(0);
     int column = args.value("column").toInt(0);

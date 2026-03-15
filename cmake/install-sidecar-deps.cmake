@@ -1,4 +1,4 @@
-set(sidecar_dir "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@QCAI2_SIDECAR_INSTALL_DIR@")
+set(sidecar_dir "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/plugins/19.0.0/qcai2/sidecar")
 
 if(NOT EXISTS "${sidecar_dir}/package.json")
     message(FATAL_ERROR "qcai2 sidecar package.json not found in ${sidecar_dir}")

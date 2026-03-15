@@ -62,10 +62,33 @@ With `-DWITH_TESTS=ON`, the repository currently builds two QtTest executables:
 - `qcai2_json`
 - `qcai2_toolcall`
 
-### Format changed files
+### Format files
 
 ```bash
 cmake --build build --target format-changed-files
+```
+
+By default this runs in dry-run mode: it does not modify files, prints the diffs
+required to format them, and fails if formatting changes are needed.
+
+To check all supported source files, use:
+
+```bash
+cmake --build build --target format-all-files
+```
+
+To apply formatting instead of showing diffs, use:
+
+```bash
+cmake --build build --target format-changed-files-apply
+cmake --build build --target format-all-files-apply
+```
+
+To install a `pre-commit` hook that blocks commits with misformatted staged
+files, run:
+
+```bash
+scripts/install-format-hook.sh
 ```
 
 ### Generate documentation

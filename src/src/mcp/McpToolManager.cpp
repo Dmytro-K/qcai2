@@ -49,19 +49,29 @@ QString sanitizeToolSegment(const QString &value)
 
     for (const QChar ch : value)
     {
-        if (ch.isLetterOrNumber())
+        if (ch.isLetterOrNumber() == true)
+        {
             result.append(ch.toLower());
+        }
         else
+        {
             result.append(QLatin1Char('_'));
+        }
     }
 
-    while (result.contains(QStringLiteral("__")))
+    while (((result.contains(QStringLiteral("__"))) == true))
+    {
         result.replace(QStringLiteral("__"), QStringLiteral("_"));
+    }
 
-    while (result.startsWith(QLatin1Char('_')))
+    while (((result.startsWith(QLatin1Char('_'))) == true))
+    {
         result.remove(0, 1);
-    while (result.endsWith(QLatin1Char('_')))
+    }
+    while (((result.endsWith(QLatin1Char('_'))) == true))
+    {
         result.chop(1);
+    }
 
     return result.isEmpty() ? QStringLiteral("tool") : result;
 }
@@ -76,27 +86,41 @@ QString uniqueExposedToolName(const QString &serverName, const QString &toolName
     int suffix = 2;
 
     while (usedNames.contains(candidate))
+    {
         candidate = QStringLiteral("%1_%2").arg(base).arg(suffix++);
+    }
 
     return candidate;
 }
 
 QString prettyJson(const QJsonValue &value)
 {
-    if (value.isObject())
+    if (value.isObject() == true)
+    {
         return QString::fromUtf8(QJsonDocument(value.toObject()).toJson(QJsonDocument::Indented))
             .trimmed();
-    if (value.isArray())
+    }
+    if (value.isArray() == true)
+    {
         return QString::fromUtf8(QJsonDocument(value.toArray()).toJson(QJsonDocument::Indented))
             .trimmed();
-    if (value.isString())
+    }
+    if (value.isString() == true)
+    {
         return value.toString();
-    if (value.isBool())
+    }
+    if (value.isBool() == true)
+    {
         return value.toBool() ? QStringLiteral("true") : QStringLiteral("false");
-    if (value.isDouble())
+    }
+    if (value.isDouble() == true)
+    {
         return QString::number(value.toDouble());
-    if (value.isNull())
+    }
+    if (value.isNull() == true)
+    {
         return QStringLiteral("null");
+    }
     return QString();
 }
 
@@ -106,49 +130,61 @@ QString flattenToolContent(const QJsonArray &content)
 
     for (const QJsonValue &entryValue : content)
     {
-        if (!entryValue.isObject())
+        if (entryValue.isObject() == false)
         {
             const QString raw = prettyJson(entryValue);
-            if (!raw.isEmpty())
+            if (raw.isEmpty() == false)
+            {
                 parts.append(raw);
+            }
             continue;
         }
 
         const QJsonObject entry = entryValue.toObject();
         const QString type = entry.value(QStringLiteral("type")).toString();
 
-        if (type == QStringLiteral("text"))
+        if (((type == QStringLiteral("text")) == true))
         {
             const QString text = entry.value(QStringLiteral("text")).toString().trimmed();
-            if (!text.isEmpty())
+            if (text.isEmpty() == false)
+            {
                 parts.append(text);
+            }
             continue;
         }
 
-        if (type == QStringLiteral("image"))
+        if (((type == QStringLiteral("image")) == true))
         {
             parts.append(QStringLiteral("[image content, mimeType=%1]")
                              .arg(entry.value(QStringLiteral("mimeType")).toString()));
             continue;
         }
 
-        if (type == QStringLiteral("resource"))
+        if (((type == QStringLiteral("resource")) == true))
         {
             const QJsonObject resource = entry.value(QStringLiteral("resource")).toObject();
             const QString uri = resource.value(QStringLiteral("uri")).toString();
             const QString text = resource.value(QStringLiteral("text")).toString().trimmed();
-            if (!uri.isEmpty() && !text.isEmpty())
+            if (((!uri.isEmpty() && !text.isEmpty()) == true))
+            {
                 parts.append(QStringLiteral("[resource %1]\n%2").arg(uri, text));
-            else if (!uri.isEmpty())
+            }
+            else if (uri.isEmpty() == false)
+            {
                 parts.append(QStringLiteral("[resource %1]").arg(uri));
+            }
             else
+            {
                 parts.append(prettyJson(resource));
+            }
             continue;
         }
 
         const QString raw = prettyJson(entry);
-        if (!raw.isEmpty())
+        if (raw.isEmpty() == false)
+        {
             parts.append(raw);
+        }
     }
 
     return parts.join(QStringLiteral("\n\n")).trimmed();
@@ -156,30 +192,40 @@ QString flattenToolContent(const QJsonArray &content)
 
 bool jsonRequestIdMatches(const QJsonValue &id, qint64 expectedId)
 {
-    if (id.isDouble())
+    if (id.isDouble() == true)
+    {
         return static_cast<qint64>(id.toDouble()) == expectedId;
-    if (id.isString())
+    }
+    if (id.isString() == true)
+    {
         return id.toString() == QString::number(expectedId);
+    }
     return false;
 }
 
-qtmcp::ServerDefinitions loadProjectServerDefinitions(const QString &projectDir, QStringList *messages)
+qtmcp::ServerDefinitions loadProjectServerDefinitions(const QString &projectDir,
+                                                      QStringList *messages)
 {
     qtmcp::ServerDefinitions definitions;
-    if (projectDir.trimmed().isEmpty())
+    if (((projectDir.trimmed().isEmpty()) == true))
+    {
         return definitions;
+    }
 
     const QString storagePath = QDir(projectDir).filePath(QStringLiteral(".qcai2/session.json"));
-    if (!QFileInfo::exists(storagePath))
+    if (QFileInfo::exists(storagePath) == false)
+    {
         return definitions;
+    }
 
     QFile storageFile(storagePath);
-    if (!storageFile.open(QIODevice::ReadOnly))
+    if (storageFile.open(QIODevice::ReadOnly) == false)
     {
-        if (messages != nullptr)
+        if (((messages != nullptr) == true))
         {
-            messages->append(QStringLiteral("⚠ MCP: could not read project session MCP config from `%1`: %2")
-                                 .arg(storagePath, storageFile.errorString()));
+            messages->append(
+                QStringLiteral("⚠ MCP: could not read project session MCP config from `%1`: %2")
+                    .arg(storagePath, storageFile.errorString()));
         }
         return definitions;
     }
@@ -198,11 +244,16 @@ qtmcp::ServerDefinitions loadProjectServerDefinitions(const QString &projectDir,
 
     const QJsonValue mcpServersValue = document.object().value(QStringLiteral("mcpServers"));
     if (mcpServersValue.isUndefined() || mcpServersValue.isNull())
+    {
         return definitions;
+    }
     if (!mcpServersValue.isObject())
     {
         if (messages != nullptr)
-            messages->append(QStringLiteral("⚠ MCP: project session key `mcpServers` must be an object."));
+        {
+            messages->append(
+                QStringLiteral("⚠ MCP: project session key `mcpServers` must be an object."));
+        }
         return definitions;
     }
 
@@ -211,8 +262,9 @@ qtmcp::ServerDefinitions loadProjectServerDefinitions(const QString &projectDir,
     {
         if (messages != nullptr)
         {
-            messages->append(QStringLiteral("⚠ MCP: failed to parse project MCP servers from `%1`: %2")
-                                 .arg(storagePath, error));
+            messages->append(
+                QStringLiteral("⚠ MCP: failed to parse project MCP servers from `%1`: %2")
+                    .arg(storagePath, error));
         }
         return {};
     }
@@ -236,8 +288,10 @@ QString expandEnvironmentPlaceholders(const QString &value, const QString &serve
         {
             if (messages != nullptr)
             {
-                messages->append(QStringLiteral("⚠ MCP: server `%1` references unset environment variable `%2` in %3.")
-                                     .arg(serverName, variableName, fieldLabel));
+                messages->append(
+                    QStringLiteral(
+                        "⚠ MCP: server `%1` references unset environment variable `%2` in %3.")
+                        .arg(serverName, variableName, fieldLabel));
             }
             continue;
         }
@@ -257,7 +311,9 @@ bool extraFieldBool(const QJsonObject &extraFields, const QString &name, bool fa
 {
     const QJsonValue value = extraFields.value(name);
     if (value.isBool())
+    {
         return value.toBool();
+    }
     return fallback;
 }
 
@@ -267,15 +323,19 @@ QStringList extraFieldStringList(const QJsonObject &extraFields, const QString &
     const QJsonValue value = extraFields.value(name);
     if (value.isString())
     {
-        const QStringList parts = value.toString().split(QRegularExpression(QStringLiteral("\\s+")),
-                                                         Qt::SkipEmptyParts);
+        const QStringList parts =
+            value.toString().split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
         for (const QString &part : parts)
+        {
             values.append(part.trimmed());
+        }
         return values;
     }
 
     if (!value.isArray())
+    {
         return values;
+    }
 
     for (const QJsonValue &entry : value.toArray())
     {
@@ -283,7 +343,9 @@ QStringList extraFieldStringList(const QJsonObject &extraFields, const QString &
         {
             const QString trimmed = entry.toString().trimmed();
             if (!trimmed.isEmpty())
+            {
                 values.append(trimmed);
+            }
         }
     }
     return values;
@@ -353,7 +415,9 @@ public:
     QString execute(const QJsonObject &args, const QString &) override
     {
         if (m_manager == nullptr)
+        {
             return QStringLiteral("Error: MCP runtime manager is unavailable.");
+        }
         return m_manager->executeTool(m_metadata.exposedName, args);
     }
 
@@ -376,7 +440,9 @@ public:
         if (registry != nullptr)
         {
             for (const QString &toolName : std::as_const(registeredToolNames))
+            {
                 registry->unregisterTool(toolName);
+            }
         }
 
         registeredToolNames.clear();
@@ -384,7 +450,9 @@ public:
         for (auto it = sessions.begin(); it != sessions.end(); ++it)
         {
             if (it.value()->client != nullptr)
+            {
                 it.value()->client->stop();
+            }
         }
         sessions.clear();
     }
@@ -394,11 +462,15 @@ public:
         if (client == nullptr)
         {
             if (error != nullptr)
+            {
                 *error = QStringLiteral("MCP client is null.");
+            }
             return false;
         }
         if (client->isConnected())
+        {
             return true;
+        }
 
         QEventLoop loop;
         QTimer timer;
@@ -412,16 +484,17 @@ public:
                 connected = true;
                 loop.quit();
             });
-        const auto errorConnection =
-            QObject::connect(client, &qtmcp::Client::transportErrorOccurred, &loop,
-                             [&](const QString &message) {
-                                 failure = message;
-                                 loop.quit();
-                             });
+        const auto errorConnection = QObject::connect(
+            client, &qtmcp::Client::transportErrorOccurred, &loop, [&](const QString &message) {
+                failure = message;
+                loop.quit();
+            });
         const auto disconnectedConnection =
             QObject::connect(client, &qtmcp::Client::disconnected, &loop, [&]() {
                 if (!connected)
+                {
                     failure = QStringLiteral("MCP server disconnected during startup.");
+                }
                 loop.quit();
             });
         QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
@@ -435,12 +508,18 @@ public:
         QObject::disconnect(disconnectedConnection);
 
         if (connected)
+        {
             return true;
+        }
 
         if (failure.isEmpty())
+        {
             failure = QStringLiteral("Timed out waiting for MCP server startup.");
+        }
         if (error != nullptr)
+        {
             *error = failure;
+        }
         return false;
     }
 
@@ -472,31 +551,33 @@ public:
             QObject::connect(client, &qtmcp::Client::responseReceived, &loop,
                              [&](const QJsonValue &id, const QJsonValue &result) {
                                  if (!jsonRequestIdMatches(id, requestId))
+                                 {
                                      return;
+                                 }
                                  rpcResult.finished = true;
                                  rpcResult.result = result;
                                  loop.quit();
                              });
-        const auto errorResponseConnection =
-            QObject::connect(client, &qtmcp::Client::errorResponseReceived, &loop,
-                             [&](const QJsonValue &id, int code, const QString &message,
-                                 const QJsonValue &data) {
-                                 if (!jsonRequestIdMatches(id, requestId))
-                                     return;
-                                 rpcResult.finished = true;
-                                 rpcResult.protocolError = true;
-                                 rpcResult.errorCode = code;
-                                 rpcResult.errorMessage = message;
-                                 rpcResult.errorData = data;
-                                 loop.quit();
-                             });
-        const auto transportErrorConnection =
-            QObject::connect(client, &qtmcp::Client::transportErrorOccurred, &loop,
-                             [&](const QString &message) {
-                                 rpcResult.protocolError = true;
-                                 rpcResult.errorMessage = message;
-                                 loop.quit();
-                             });
+        const auto errorResponseConnection = QObject::connect(
+            client, &qtmcp::Client::errorResponseReceived, &loop,
+            [&](const QJsonValue &id, int code, const QString &message, const QJsonValue &data) {
+                if (!jsonRequestIdMatches(id, requestId))
+                {
+                    return;
+                }
+                rpcResult.finished = true;
+                rpcResult.protocolError = true;
+                rpcResult.errorCode = code;
+                rpcResult.errorMessage = message;
+                rpcResult.errorData = data;
+                loop.quit();
+            });
+        const auto transportErrorConnection = QObject::connect(
+            client, &qtmcp::Client::transportErrorOccurred, &loop, [&](const QString &message) {
+                rpcResult.protocolError = true;
+                rpcResult.errorMessage = message;
+                loop.quit();
+            });
         const auto disconnectedConnection =
             QObject::connect(client, &qtmcp::Client::disconnected, &loop, [&]() {
                 if (!rpcResult.finished)
@@ -533,13 +614,17 @@ public:
     {
         QString message = rpcResult.errorMessage.trimmed();
         if (message.isEmpty())
+        {
             message = QStringLiteral("Unknown MCP protocol error.");
+        }
 
         if (!rpcResult.errorData.isUndefined() && !rpcResult.errorData.isNull())
         {
             const QString details = prettyJson(rpcResult.errorData);
             if (!details.isEmpty())
+            {
                 message += QStringLiteral("\n\nDetails:\n%1").arg(details);
+            }
         }
 
         return message;
@@ -556,7 +641,9 @@ public:
         if (!structuredContent.isEmpty())
         {
             if (!combined.isEmpty())
+            {
                 combined += QStringLiteral("\n\n");
+            }
             combined += structuredContent;
         }
 
@@ -566,7 +653,9 @@ public:
     static QString recentLogsSuffix(const ServerSession &session)
     {
         if (session.recentLogLines.isEmpty())
+        {
             return {};
+        }
 
         return QStringLiteral("\n\nRecent server logs:\n%1")
             .arg(session.recentLogLines.join(QLatin1Char('\n')));
@@ -594,7 +683,9 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
     const qtmcp::ServerDefinitions projectDefinitions =
         loadProjectServerDefinitions(projectDir, &messages);
     for (auto it = projectDefinitions.begin(); it != projectDefinitions.end(); ++it)
+    {
         mergedDefinitions.insert(it.key(), it.value());
+    }
 
     QSet<QString> usedExposedNames;
     int enabledServerCount = 0;
@@ -606,28 +697,34 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
         const qtmcp::ServerDefinition &definition = defIt.value();
 
         if (!definition.enabled)
+        {
             continue;
+        }
         ++enabledServerCount;
 
         if (definition.transport != QStringLiteral("stdio") &&
             definition.transport != QStringLiteral("http"))
         {
-            messages.append(QStringLiteral("ℹ MCP: server `%1` uses unsupported runtime transport `%2`; supported transports are `stdio` and `http`.")
+            messages.append(QStringLiteral("ℹ MCP: server `%1` uses unsupported runtime transport "
+                                           "`%2`; supported transports are `stdio` and `http`.")
                                 .arg(serverName, definition.transport));
             continue;
         }
 
-        if (definition.transport == QStringLiteral("stdio") && definition.command.trimmed().isEmpty())
+        if (definition.transport == QStringLiteral("stdio") &&
+            definition.command.trimmed().isEmpty())
         {
-            messages.append(QStringLiteral("⚠ MCP: server `%1` is enabled but has no command configured.")
-                                .arg(serverName));
+            messages.append(
+                QStringLiteral("⚠ MCP: server `%1` is enabled but has no command configured.")
+                    .arg(serverName));
             continue;
         }
 
         if (definition.transport == QStringLiteral("http") && definition.url.trimmed().isEmpty())
         {
-            messages.append(QStringLiteral("⚠ MCP: server `%1` is enabled but has no URL configured.")
-                                .arg(serverName));
+            messages.append(
+                QStringLiteral("⚠ MCP: server `%1` is enabled but has no URL configured.")
+                    .arg(serverName));
             continue;
         }
 
@@ -646,7 +743,9 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             transportConfig.workingDirectory = projectDir;
             transportConfig.environment = processEnvironment;
             for (auto envIt = definition.env.begin(); envIt != definition.env.end(); ++envIt)
+            {
                 transportConfig.environment.insert(envIt.key(), envIt.value());
+            }
 
             session->client->setTransport(
                 std::make_unique<qtmcp::StdioTransport>(std::move(transportConfig)));
@@ -665,24 +764,25 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
                                definition.headers.isEmpty());
             transportConfig.oauthClientId =
                 extraFieldString(definition.extraFields, QStringLiteral("oauthClientId"));
-            transportConfig.oauthClientSecret =
-                expandEnvironmentPlaceholders(
-                    extraFieldString(definition.extraFields, QStringLiteral("oauthClientSecret")),
-                    serverName, QStringLiteral("oauthClientSecret"), processEnvironment, &messages);
+            transportConfig.oauthClientSecret = expandEnvironmentPlaceholders(
+                extraFieldString(definition.extraFields, QStringLiteral("oauthClientSecret")),
+                serverName, QStringLiteral("oauthClientSecret"), processEnvironment, &messages);
             transportConfig.oauthClientName =
                 extraFieldString(definition.extraFields, QStringLiteral("oauthClientName"));
             if (transportConfig.oauthClientName.isEmpty())
+            {
                 transportConfig.oauthClientName = QStringLiteral("qcai2");
+            }
             transportConfig.oauthScopes =
                 extraFieldStringList(definition.extraFields, QStringLiteral("oauthScopes"));
             for (auto headerIt = definition.headers.begin(); headerIt != definition.headers.end();
                  ++headerIt)
             {
                 transportConfig.headers.insert(
-                    headerIt.key(),
-                    expandEnvironmentPlaceholders(headerIt.value(), serverName,
-                                                  QStringLiteral("header `%1`").arg(headerIt.key()),
-                                                  processEnvironment, &messages));
+                    headerIt.key(), expandEnvironmentPlaceholders(
+                                        headerIt.value(), serverName,
+                                        QStringLiteral("header `%1`").arg(headerIt.key()),
+                                        processEnvironment, &messages));
             }
 
             session->client->setTransport(
@@ -692,12 +792,14 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
         QObject::connect(session->client.get(), &qtmcp::Client::transportLogMessage, this,
                          [serverName, sessionPtr = session.get()](const QString &message) {
                              const QString trimmed = message.trimmed();
-                              if (!trimmed.isEmpty())
-                              {
-                                  sessionPtr->recentLogLines.append(trimmed);
-                                  while (sessionPtr->recentLogLines.size() > 30)
-                                      sessionPtr->recentLogLines.removeFirst();
-                              }
+                             if (!trimmed.isEmpty())
+                             {
+                                 sessionPtr->recentLogLines.append(trimmed);
+                                 while (sessionPtr->recentLogLines.size() > 30)
+                                 {
+                                     sessionPtr->recentLogLines.removeFirst();
+                                 }
+                             }
                              QCAI_DEBUG("MCP", QStringLiteral("[%1] %2").arg(serverName, message));
                          });
 
@@ -705,8 +807,8 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
         if (!Impl::waitForConnection(session->client.get(), definition.startupTimeoutMs,
                                      &startupError))
         {
-            messages.append(QStringLiteral("⚠ MCP: failed to start `%1`: %2")
-                                .arg(serverName, startupError));
+            messages.append(
+                QStringLiteral("⚠ MCP: failed to start `%1`: %2").arg(serverName, startupError));
             continue;
         }
 
@@ -715,24 +817,23 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             {QStringLiteral("capabilities"), QJsonObject{}},
             {QStringLiteral("clientInfo"),
              QJsonObject{{QStringLiteral("name"), QStringLiteral("qcai2")},
-                         {QStringLiteral("version"), Migration::currentRevisionString()}}}
-        };
-        const RpcResult initializeResult = Impl::sendRequestSync(
-            session->client.get(), QStringLiteral("initialize"), initializeParams,
-            definition.requestTimeoutMs);
+                         {QStringLiteral("version"), Migration::currentRevisionString()}}}};
+        const RpcResult initializeResult =
+            Impl::sendRequestSync(session->client.get(), QStringLiteral("initialize"),
+                                  initializeParams, definition.requestTimeoutMs);
         if (initializeResult.protocolError)
         {
             messages.append(QStringLiteral("⚠ MCP: initialize failed for `%1`: %2")
-                                .arg(serverName,
-                                     Impl::formatRpcError(initializeResult)
-                                         + Impl::recentLogsSuffix(*session)));
+                                .arg(serverName, Impl::formatRpcError(initializeResult) +
+                                                     Impl::recentLogsSuffix(*session)));
             session->client->stop();
             continue;
         }
         if (!initializeResult.result.isObject())
         {
-            messages.append(QStringLiteral("⚠ MCP: initialize for `%1` returned a non-object result.")
-                                .arg(serverName));
+            messages.append(
+                QStringLiteral("⚠ MCP: initialize for `%1` returned a non-object result.")
+                    .arg(serverName));
             session->client->stop();
             continue;
         }
@@ -759,25 +860,27 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             ++pageCount;
             QJsonObject listParams;
             if (!nextCursor.isEmpty())
+            {
                 listParams.insert(QStringLiteral("cursor"), nextCursor);
+            }
 
-            const RpcResult listResult = Impl::sendRequestSync(
-                session->client.get(), QStringLiteral("tools/list"),
-                listParams.isEmpty() ? QJsonValue() : QJsonValue(listParams),
-                definition.requestTimeoutMs);
+            const RpcResult listResult =
+                Impl::sendRequestSync(session->client.get(), QStringLiteral("tools/list"),
+                                      listParams.isEmpty() ? QJsonValue() : QJsonValue(listParams),
+                                      definition.requestTimeoutMs);
             if (listResult.protocolError)
             {
                 messages.append(QStringLiteral("⚠ MCP: tools/list failed for `%1`: %2")
-                                    .arg(serverName,
-                                         Impl::formatRpcError(listResult)
-                                             + Impl::recentLogsSuffix(*session)));
+                                    .arg(serverName, Impl::formatRpcError(listResult) +
+                                                         Impl::recentLogsSuffix(*session)));
                 collectedTools = {};
                 break;
             }
             if (!listResult.result.isObject())
             {
-                messages.append(QStringLiteral("⚠ MCP: tools/list for `%1` returned a non-object result.")
-                                    .arg(serverName));
+                messages.append(
+                    QStringLiteral("⚠ MCP: tools/list for `%1` returned a non-object result.")
+                        .arg(serverName));
                 collectedTools = {};
                 break;
             }
@@ -786,28 +889,34 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             const QJsonValue toolsValue = listObject.value(QStringLiteral("tools"));
             if (!toolsValue.isArray())
             {
-                messages.append(QStringLiteral("⚠ MCP: tools/list for `%1` returned no `tools` array.")
-                                    .arg(serverName));
+                messages.append(
+                    QStringLiteral("⚠ MCP: tools/list for `%1` returned no `tools` array.")
+                        .arg(serverName));
                 collectedTools = {};
                 break;
             }
 
             const QJsonArray toolsPage = toolsValue.toArray();
             for (const QJsonValue &toolValue : toolsPage)
+            {
                 collectedTools.append(toolValue);
+            }
 
             nextCursor = listObject.value(QStringLiteral("nextCursor")).toString();
             if (nextCursor.isEmpty())
+            {
                 break;
+            }
         }
 
         if (collectedTools.isEmpty())
         {
             if (pageCount >= kMaxToolsListPages && !nextCursor.isEmpty())
             {
-                messages.append(QStringLiteral("⚠ MCP: tool pagination for `%1` exceeded %2 pages.")
-                                    .arg(serverName)
-                                    .arg(kMaxToolsListPages));
+                messages.append(
+                    QStringLiteral("⚠ MCP: tool pagination for `%1` exceeded %2 pages.")
+                        .arg(serverName)
+                        .arg(kMaxToolsListPages));
             }
             session->client->stop();
             continue;
@@ -817,12 +926,16 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
         for (const QJsonValue &toolValue : collectedTools)
         {
             if (!toolValue.isObject())
+            {
                 continue;
+            }
 
             const QJsonObject toolObject = toolValue.toObject();
             const QString toolName = toolObject.value(QStringLiteral("name")).toString().trimmed();
             if (toolName.isEmpty())
+            {
                 continue;
+            }
 
             RemoteTool remoteTool;
             remoteTool.serverName = serverName;
@@ -835,8 +948,7 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             session->toolsByExposedName.insert(remoteTool.exposedName, remoteTool);
             if (m_impl->registry != nullptr)
             {
-                m_impl->registry->registerTool(
-                    std::make_shared<McpDynamicTool>(this, remoteTool));
+                m_impl->registry->registerTool(std::make_shared<McpDynamicTool>(this, remoteTool));
                 m_impl->registeredToolNames.append(remoteTool.exposedName);
             }
             ++registeredForServer;
@@ -844,8 +956,9 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
 
         if (registeredForServer == 0)
         {
-            messages.append(QStringLiteral("ℹ MCP: server `%1` started but exposed no usable tools.")
-                                .arg(serverName));
+            messages.append(
+                QStringLiteral("ℹ MCP: server `%1` started but exposed no usable tools.")
+                    .arg(serverName));
             session->client->stop();
             continue;
         }
@@ -859,7 +972,8 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
 
     if (enabledServerCount > 0 && loadedToolCount == 0)
     {
-        messages.append(QStringLiteral("⚠ MCP: %1 enabled server(s) were configured, but no MCP tools were loaded for this run.")
+        messages.append(QStringLiteral("⚠ MCP: %1 enabled server(s) were configured, but no MCP "
+                                       "tools were loaded for this run.")
                             .arg(enabledServerCount));
     }
 
@@ -868,18 +982,21 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
 
 QString McpToolManager::executeTool(const QString &exposedToolName, const QJsonObject &args) const
 {
-    for (auto sessionIt = m_impl->sessions.begin(); sessionIt != m_impl->sessions.end(); ++sessionIt)
+    for (auto sessionIt = m_impl->sessions.begin(); sessionIt != m_impl->sessions.end();
+         ++sessionIt)
     {
         const auto toolIt = sessionIt.value()->toolsByExposedName.find(exposedToolName);
         if (toolIt == sessionIt.value()->toolsByExposedName.end())
+        {
             continue;
+        }
 
         const RemoteTool &remoteTool = toolIt.value();
-        const RpcResult callResult = Impl::sendRequestSync(
-            sessionIt.value()->client.get(), QStringLiteral("tools/call"),
-            QJsonObject{{QStringLiteral("name"), remoteTool.toolName},
-                        {QStringLiteral("arguments"), args}},
-            sessionIt.value()->definition.requestTimeoutMs);
+        const RpcResult callResult =
+            Impl::sendRequestSync(sessionIt.value()->client.get(), QStringLiteral("tools/call"),
+                                  QJsonObject{{QStringLiteral("name"), remoteTool.toolName},
+                                              {QStringLiteral("arguments"), args}},
+                                  sessionIt.value()->definition.requestTimeoutMs);
 
         if (callResult.protocolError)
         {
@@ -889,7 +1006,8 @@ QString McpToolManager::executeTool(const QString &exposedToolName, const QJsonO
 
         if (!callResult.result.isObject())
         {
-            return QStringLiteral("Error: MCP tool `%1` on server `%2` returned a non-object result.")
+            return QStringLiteral(
+                       "Error: MCP tool `%1` on server `%2` returned a non-object result.")
                 .arg(remoteTool.toolName, remoteTool.serverName);
         }
 
@@ -899,14 +1017,16 @@ QString McpToolManager::executeTool(const QString &exposedToolName, const QJsonO
 
         if (isError)
         {
-            const QString message = flattened.isEmpty()
-                                        ? QStringLiteral("MCP tool reported an error without content.")
-                                        : flattened;
+            const QString message =
+                flattened.isEmpty() ? QStringLiteral("MCP tool reported an error without content.")
+                                    : flattened;
             return QStringLiteral("Error: %1").arg(message);
         }
 
         if (!flattened.isEmpty())
+        {
             return flattened;
+        }
 
         return QString::fromUtf8(QJsonDocument(resultObject).toJson(QJsonDocument::Indented))
             .trimmed();

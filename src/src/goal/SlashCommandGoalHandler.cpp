@@ -21,14 +21,20 @@ SlashTokenState leadingSlashTokenState(const QString &text)
 {
     int firstNonSpace = 0;
     while (firstNonSpace < text.size() && text.at(firstNonSpace).isSpace())
+    {
         ++firstNonSpace;
+    }
 
     if (firstNonSpace >= text.size() || text.at(firstNonSpace) != QLatin1Char('/'))
+    {
         return {};
+    }
 
     int end = firstNonSpace + 1;
     while (end < text.size() && !text.at(end).isSpace())
+    {
         ++end;
+    }
 
     SlashTokenState state;
     state.hasLeadingSlash = true;
@@ -44,15 +50,17 @@ SlashCommandGoalHandler::SlashCommandGoalHandler(const SlashCommandRegistry *reg
 {
 }
 
-GoalCompletionSession SlashCommandGoalHandler::completionSession(
-    const GoalCompletionRequest &request) const
+GoalCompletionSession
+SlashCommandGoalHandler::completionSession(const GoalCompletionRequest &request) const
 {
-    if (m_registry == nullptr)
+    if (((m_registry == nullptr) == true))
+    {
         return {};
+    }
 
     const SlashTokenState state = leadingSlashTokenState(request.text);
-    if (!state.hasLeadingSlash || request.cursorPosition < state.start + 1 ||
-        request.cursorPosition > state.end)
+    if (((!state.hasLeadingSlash || request.cursorPosition < state.start + 1 ||
+          request.cursorPosition > state.end) == true))
     {
         return {};
     }
@@ -66,7 +74,9 @@ GoalCompletionSession SlashCommandGoalHandler::completionSession(
     for (const SlashCommandRegistry::CommandInfo &command : m_registry->commands())
     {
         if (!command.name.startsWith(session.prefix, Qt::CaseInsensitive))
+        {
             continue;
+        }
 
         session.items.append({command.name, command.name, command.description});
     }
@@ -78,8 +88,10 @@ QList<GoalHighlightSpan> SlashCommandGoalHandler::highlightSpans(const QString &
                                                                  const QPalette &palette) const
 {
     const SlashTokenState state = leadingSlashTokenState(text);
-    if (!state.hasLeadingSlash)
+    if (state.hasLeadingSlash == false)
+    {
         return {};
+    }
 
     QTextCharFormat format;
     format.setForeground(palette.color(QPalette::Link));

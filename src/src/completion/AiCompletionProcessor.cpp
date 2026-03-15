@@ -46,16 +46,22 @@ void AiCompletionProcessor::cancel()
 TextEditor::IAssistProposal *AiCompletionProcessor::perform()
 {
     if ((m_provider == nullptr) || m_cancelled)
+    {
         return nullptr;
+    }
 
     const TextEditor::AssistInterface *iface = interface();
     if (iface == nullptr)
+    {
         return nullptr;
+    }
 
     const int pos = iface->position();
     const QTextDocument *doc = iface->textDocument();
     if (doc == nullptr)
+    {
         return nullptr;
+    }
 
     // Extract text before and after cursor
     const QString fullText = doc->toPlainText();
@@ -97,16 +103,22 @@ TextEditor::IAssistProposal *AiCompletionProcessor::perform()
         [this, pos, alive](const QString &response, const QString &error,
                            const ProviderUsage & /*usage*/) {
             if (!*alive)
+            {
                 return;  // processor was destroyed, bail out
+            }
 
             m_running = false;
 
             if (m_cancelled || !error.isEmpty() || response.trimmed().isEmpty())
             {
                 if (!error.isEmpty())
+                {
                     QCAI_WARN("Completion", QStringLiteral("Completion error: %1").arg(error));
+                }
                 else if (m_cancelled)
+                {
                     QCAI_DEBUG("Completion", QStringLiteral("Completion cancelled"));
+                }
                 setAsyncProposalAvailable(nullptr);
                 return;
             }
@@ -117,9 +129,13 @@ TextEditor::IAssistProposal *AiCompletionProcessor::perform()
             {
                 qsizetype firstNl = completion.indexOf(QLatin1Char('\n'));
                 if (firstNl >= 0)
+                {
                     completion = completion.mid(firstNl + 1);
+                }
                 if (completion.endsWith(QStringLiteral("```")))
+                {
                     completion.chop(3);
+                }
                 completion = completion.trimmed();
             }
 

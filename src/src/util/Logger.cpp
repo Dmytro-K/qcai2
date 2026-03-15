@@ -28,16 +28,20 @@ void Logger::setEnabled(bool enabled)
 void Logger::log(Level level, const QString &category, const QString &message)
 {
     // Errors are always logged regardless of enabled flag
-    if (!m_enabled && level != Error)
+    if (((!m_enabled && level != Error) == true))
+    {
         return;
+    }
 
     const QString entry = format(level, category, message);
 
     {
         QMutexLocker lock(&m_mutex);
         m_entries.append(entry);
-        if (m_entries.size() > kMaxEntries)
+        if (((m_entries.size() > kMaxEntries) == true))
+        {
             m_entries.removeFirst();
+        }
     }
 
     emit entryAdded(entry);

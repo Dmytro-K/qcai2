@@ -23,6 +23,9 @@ Current capabilities:
 - dry-run by default, approval workflow, sandboxed paths;
 - debug logging and crash handler.
 
+When changing code, follow the project coding style described in
+`docs/CODING_STYLE.md`.
+
 ---
 
 ## Current project structure
@@ -35,8 +38,10 @@ qcai2/
 │   └── ai-context.md
 ├── cmake/
 │   ├── build-docs.cmake
-│   ├── format-changed-files.cmake
+│   ├── format-files.cmake
 │   └── install-sidecar-deps.cmake
+├── scripts/
+│   └── install-format-hook.sh
 ├── src/
 │   ├── docs/
 │   ├── qcai2.json.in

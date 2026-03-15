@@ -27,14 +27,20 @@ HashTokenState hashTokenAtCursor(const QString &text, int cursorPosition)
     for (int i = 0; i < text.size(); ++i)
     {
         if (text.at(i) != QLatin1Char('#') || !isTokenBoundary(text, i))
+        {
             continue;
+        }
 
         int end = i + 1;
         while (end < text.size() && !text.at(end).isSpace())
+        {
             ++end;
+        }
 
-        if (cursorPosition < i + 1 || cursorPosition > end)
+        if (((cursorPosition < i + 1 || cursorPosition > end) == true))
+        {
             continue;
+        }
 
         return {true, i, end};
     }
@@ -48,11 +54,15 @@ QList<HashTokenState> allHashTokens(const QString &text)
     for (int i = 0; i < text.size(); ++i)
     {
         if (text.at(i) != QLatin1Char('#') || !isTokenBoundary(text, i))
+        {
             continue;
+        }
 
         int end = i + 1;
         while (end < text.size() && !text.at(end).isSpace())
+        {
             ++end;
+        }
         tokens.append({true, i, end});
         i = end - 1;
     }
@@ -62,8 +72,7 @@ QList<HashTokenState> allHashTokens(const QString &text)
 QColor fileReferenceColor(const QPalette &palette)
 {
     const QColor base = palette.color(QPalette::Highlight);
-    return palette.color(QPalette::Base).lightness() < 128 ? base.lighter(130)
-                                                           : base.darker(120);
+    return palette.color(QPalette::Base).lightness() < 128 ? base.lighter(130) : base.darker(120);
 }
 
 }  // namespace
@@ -73,15 +82,19 @@ FileReferenceGoalHandler::FileReferenceGoalHandler(CandidateProvider candidatePr
 {
 }
 
-GoalCompletionSession FileReferenceGoalHandler::completionSession(
-    const GoalCompletionRequest &request) const
+GoalCompletionSession
+FileReferenceGoalHandler::completionSession(const GoalCompletionRequest &request) const
 {
-    if (!m_candidateProvider)
+    if (((!m_candidateProvider) == true))
+    {
         return {};
+    }
 
     const HashTokenState token = hashTokenAtCursor(request.text, request.cursorPosition);
-    if (!token.active)
+    if (token.active == false)
+    {
         return {};
+    }
 
     GoalCompletionSession session;
     session.active = true;
@@ -96,14 +109,20 @@ GoalCompletionSession FileReferenceGoalHandler::completionSession(
     for (const QString &candidate : candidates)
     {
         if (!candidate.contains(filePrefix, Qt::CaseInsensitive))
+        {
             continue;
+        }
 
         GoalCompletionItem item{QStringLiteral("#%1").arg(candidate),
                                 QStringLiteral("#%1").arg(candidate), candidate};
         if (candidate.contains(filePrefix, Qt::CaseSensitive))
+        {
             caseSensitiveItems.append(item);
+        }
         else
+        {
             caseInsensitiveItems.append(item);
+        }
     }
 
     session.items = caseSensitiveItems;
@@ -120,7 +139,9 @@ QList<GoalHighlightSpan> FileReferenceGoalHandler::highlightSpans(const QString 
     format.setForeground(fileReferenceColor(palette));
 
     for (const HashTokenState &token : allHashTokens(text))
+    {
         spans.append({token.start, token.end - token.start, format});
+    }
 
     return spans;
 }

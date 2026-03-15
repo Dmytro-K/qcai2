@@ -37,7 +37,9 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
     // Build request body
     QJsonArray msgArr;
     for (const auto &m : messages)
+    {
         msgArr.append(m.toJson());
+    }
 
     QJsonObject body;
     body[QStringLiteral("model")] = model;
@@ -45,11 +47,13 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
     body[QStringLiteral("temperature")] = temperature;
     body[QStringLiteral("max_tokens")] = maxTokens;
 
-    if (!reasoningEffort.isEmpty() && reasoningEffort != QStringLiteral("off"))
+    if (((!reasoningEffort.isEmpty() && reasoningEffort != QStringLiteral("off")) == true))
+    {
         body[QStringLiteral("reasoning_effort")] = reasoningEffort;
+    }
 
     const bool streaming = (streamCallback != nullptr);
-    if (streaming)
+    if (streaming == true)
     {
         body[QStringLiteral("stream")] = true;
         body[QStringLiteral("stream_options")] =
@@ -58,8 +62,10 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
 
     // Build URL
     QString urlStr = m_baseUrl;
-    if (!urlStr.endsWith(QLatin1Char('/')))
+    if (((urlStr.endsWith(QLatin1Char('/'))) == false))
+    {
         urlStr += QLatin1Char('/');
+    }
     urlStr += QStringLiteral("v1/chat/completions");
 
     QCAI_DEBUG("OpenAI", QStringLiteral("POST %1 | model=%2 temp=%3 maxTok=%4 stream=%5 msgs=%6")
@@ -73,13 +79,17 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
     QNetworkRequest req{url};
     req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
 
-    if (!m_apiKey.isEmpty())
+    if (((!m_apiKey.isEmpty()) == true))
+    {
         req.setRawHeader("Authorization", QStringLiteral("Bearer %1").arg(m_apiKey).toUtf8());
+    }
 
-    for (auto it = m_extraHeaders.begin(); it != m_extraHeaders.end(); ++it)
+    for (auto it = m_extraHeaders.begin(); ((it != m_extraHeaders.end()) == true); ++it)
+    {
         req.setRawHeader(it.key().toUtf8(), it.value().toUtf8());
+    }
 
-    if (!streaming)
+    if (streaming == false)
     {
         req.setTransferTimeout(15000);
         req.setRawHeader("Connection", "close");
@@ -91,47 +101,61 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
 
     m_currentReply = m_nam.post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
 
-    if (streaming)
+    if (streaming == true)
     {
         // Stream mode: process SSE chunks as they arrive
         connect(m_currentReply, &QNetworkReply::readyRead, this, [this, streamCallback]() {
             m_sseBuffer.append(m_currentReply->readAll());
 
             // Process complete SSE lines
-            while (true)
+            while (true == true)
             {
                 qsizetype idx = m_sseBuffer.indexOf('\n');
                 if (idx < 0)
+                {
                     break;
+                }
 
                 QByteArray line = m_sseBuffer.left(idx).trimmed();
                 m_sseBuffer.remove(0, idx + 1);
 
-                if (line.isEmpty())
+                if (line.isEmpty() == true)
+                {
                     continue;
+                }
 
                 // SSE format: "data: {...}" or "data: [DONE]"
-                if (!line.startsWith("data: "))
+                if (line.startsWith("data: ") == false)
+                {
                     continue;
+                }
                 QByteArray payload = line.mid(6);
 
-                if (payload == "[DONE]")
+                if (((payload == "[DONE]") == true))
+                {
                     continue;
+                }
 
                 QJsonParseError err;
                 QJsonDocument doc = QJsonDocument::fromJson(payload, &err);
-                if (err.error != QJsonParseError::NoError)
+                if (((err.error != QJsonParseError::NoError) == true))
+                {
                     continue;
+                }
 
                 QJsonObject obj = doc.object();
                 const ProviderUsage usage = providerUsageFromResponseObject(obj);
-                if (usage.hasAny())
+                if (usage.hasAny() == true)
+                {
                     m_streamUsage = usage;
+                }
 
                 // Extract delta content: choices[0].delta.content
                 QJsonArray choices = obj.value(QStringLiteral("choices")).toArray();
-                if (choices.isEmpty())
+                if (choices.isEmpty() == true)
+                {
                     continue;
+                }
 
                 const QJsonObject deltaObj =
                     choices[0].toObject().value(QStringLiteral("delta")).toObject();
@@ -140,11 +164,13 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                     !deltaObj.value(QStringLiteral("reasoning_content")).toString().isEmpty()
                         ? deltaObj.value(QStringLiteral("reasoning_content")).toString()
                         : deltaObj.value(QStringLiteral("reasoning")).toString();
-                if (!reasoningDelta.isEmpty())
+                if (reasoningDelta.isEmpty() == false)
+                {
                     streamCallback(reasoningDelta);
+                }
 
                 const QString delta = deltaObj.value(QStringLiteral("content")).toString();
-                if (!delta.isEmpty())
+                if (delta.isEmpty() == false)
                 {
                     m_streamAccum += delta;
                     streamCallback(delta);
@@ -157,14 +183,14 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                 QNetworkReply *reply = m_currentReply;
                 m_currentReply = nullptr;
 
-                if (!reply)
+                if (((reply == nullptr) == true))
                 {
                     callback({}, QStringLiteral("Reply was null"), {});
                     return;
                 }
 
-                if (reply->error() != QNetworkReply::NoError &&
-                    reply->error() != QNetworkReply::OperationCanceledError)
+                if (((reply->error() != QNetworkReply::NoError &&
+                      reply->error() != QNetworkReply::OperationCanceledError) == true))
                 {
                     const QString errBody = QString::fromUtf8(reply->readAll());
                     QCAI_ERROR("OpenAI", QStringLiteral("HTTP error (streaming): %1 — %2")
@@ -231,9 +257,9 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
             {
                 QCAI_WARN("OpenAI", QStringLiteral("No content in response: %1")
                                         .arg(QString::fromUtf8(data).left(200)));
-                callback(
-                    {}, QStringLiteral("No content in response: %1").arg(QString::fromUtf8(data)),
-                    {});
+                callback({},
+                         QStringLiteral("No content in response: %1").arg(QString::fromUtf8(data)),
+                         {});
                 return;
             }
 

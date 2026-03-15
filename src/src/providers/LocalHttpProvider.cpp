@@ -25,15 +25,19 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
 {
     QJsonObject body;
 
-    if (m_simpleMode)
+    if (m_simpleMode == true)
     {
         // Simple mode: concatenate messages into a single prompt string
         QString prompt;
         for (const auto &m : messages)
+        {
             prompt += QStringLiteral("[%1]: %2\n").arg(m.role, m.content);
+        }
         body["prompt"] = prompt;
-        if (!model.isEmpty())
+        if (model.isEmpty() == false)
+        {
             body["model"] = model;
+        }
         body["temperature"] = temperature;
         body["max_tokens"] = maxTokens;
     }
@@ -42,18 +46,24 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
         // OpenAI-compatible format
         QJsonArray msgArr;
         for (const auto &m : messages)
+        {
             msgArr.append(m.toJson());
+        }
         body["model"] = model;
         body["messages"] = msgArr;
         body["temperature"] = temperature;
         body["max_tokens"] = maxTokens;
-        if (!reasoningEffort.isEmpty() && reasoningEffort != QStringLiteral("off"))
+        if (((!reasoningEffort.isEmpty() && reasoningEffort != QStringLiteral("off")) == true))
+        {
             body["reasoning_effort"] = reasoningEffort;
+        }
     }
 
     QString urlStr = m_baseUrl;
-    if (urlStr.endsWith('/'))
+    if (urlStr.endsWith('/') == true)
+    {
         urlStr.chop(1);
+    }
     urlStr += m_endpointPath;
 
     QCAI_DEBUG("LocalHTTP",
@@ -65,11 +75,15 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
     QNetworkRequest req{url};
     req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
 
-    if (!m_apiKey.isEmpty())
+    if (((!m_apiKey.isEmpty()) == true))
+    {
         req.setRawHeader("Authorization", QStringLiteral("Bearer %1").arg(m_apiKey).toUtf8());
+    }
 
-    for (auto it = m_customHeaders.begin(); it != m_customHeaders.end(); ++it)
+    for (auto it = m_customHeaders.begin(); ((it != m_customHeaders.end()) == true); ++it)
+    {
         req.setRawHeader(it.key().toUtf8(), it.value().toUtf8());
+    }
 
     req.setTransferTimeout(15000);
     req.setRawHeader("Connection", "close");
@@ -79,13 +93,13 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
     connect(m_currentReply, &QNetworkReply::finished, this, [this, callback]() {
         QNetworkReply *reply = m_currentReply;
         m_currentReply = nullptr;
-        if (!reply)
+        if (((reply == nullptr) == true))
         {
             callback({}, QStringLiteral("Reply was null"), {});
             return;
         }
 
-        if (reply->error() != QNetworkReply::NoError)
+        if (((reply->error() != QNetworkReply::NoError) == true))
         {
             const auto errBody = QString::fromUtf8(reply->readAll());
             QCAI_ERROR("LocalHTTP", QStringLiteral("HTTP error: %1 — %2")

@@ -21,8 +21,8 @@ endif()
 set(QCAI2_VERSION_COMPAT "${CMAKE_MATCH_1}")
 set(QCAI2_BUILD_SUFFIX "${CMAKE_MATCH_2}")
 
-set(QCAI2_FORMAT_CHANGED_SCRIPT
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/format-changed-files.cmake")
+set(QCAI2_FORMAT_FILES_SCRIPT
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/format-files.cmake")
 set(QCAI2_BUILD_DOCS_SCRIPT
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/build-docs.cmake")
 
@@ -543,17 +543,62 @@ file(RELATIVE_PATH QCAI2_BINARY_DIR_RELATIVE
     "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}")
 set(QCAI2_FORMAT_EXCLUDED_PREFIXES
     "${QCAI2_BINARY_DIR_RELATIVE};build/;cmake-build-debug/;cmake-build-release/;cmake-build-relwithdebinfo/;cmake-build-minsizerel/")
+string(REPLACE ";" "\\;" QCAI2_FORMAT_EXCLUDED_PREFIXES_ARG "${QCAI2_FORMAT_EXCLUDED_PREFIXES}")
 
 add_custom_target(format-changed-files
     COMMAND ${CMAKE_COMMAND}
         -DCLANG_FORMAT_EXECUTABLE=${QCAI2_CLANG_FORMAT_EXECUTABLE}
         -DGIT_EXECUTABLE=${QCAI2_GIT_EXECUTABLE}
         -DQCAI2_FORMAT_WORKTREE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-        "-DQCAI2_FORMAT_EXCLUDED_PREFIXES=${QCAI2_FORMAT_EXCLUDED_PREFIXES}"
-        -P "${QCAI2_FORMAT_CHANGED_SCRIPT}"
+        -DQCAI2_FORMAT_ALL=FALSE
+        -DQCAI2_FORMAT_DRY_RUN=TRUE
+        "-DQCAI2_FORMAT_EXCLUDED_PREFIXES=${QCAI2_FORMAT_EXCLUDED_PREFIXES_ARG}"
+        -P "${QCAI2_FORMAT_FILES_SCRIPT}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    COMMENT "Checking formatting of changed project files with clang-format"
+)
+
+add_custom_target(format-all-files
+    COMMAND ${CMAKE_COMMAND}
+        -DCLANG_FORMAT_EXECUTABLE=${QCAI2_CLANG_FORMAT_EXECUTABLE}
+        -DGIT_EXECUTABLE=${QCAI2_GIT_EXECUTABLE}
+        -DQCAI2_FORMAT_WORKTREE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DQCAI2_FORMAT_ALL=TRUE
+        -DQCAI2_FORMAT_DRY_RUN=TRUE
+        "-DQCAI2_FORMAT_EXCLUDED_PREFIXES=${QCAI2_FORMAT_EXCLUDED_PREFIXES_ARG}"
+        -P "${QCAI2_FORMAT_FILES_SCRIPT}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    COMMENT "Checking formatting of all project files with clang-format"
+)
+
+add_custom_target(format-changed-files-apply
+    COMMAND ${CMAKE_COMMAND}
+        -DCLANG_FORMAT_EXECUTABLE=${QCAI2_CLANG_FORMAT_EXECUTABLE}
+        -DGIT_EXECUTABLE=${QCAI2_GIT_EXECUTABLE}
+        -DQCAI2_FORMAT_WORKTREE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DQCAI2_FORMAT_ALL=FALSE
+        -DQCAI2_FORMAT_DRY_RUN=FALSE
+        "-DQCAI2_FORMAT_EXCLUDED_PREFIXES=${QCAI2_FORMAT_EXCLUDED_PREFIXES_ARG}"
+        -P "${QCAI2_FORMAT_FILES_SCRIPT}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     USES_TERMINAL
     COMMENT "Formatting changed project files with clang-format"
+)
+
+add_custom_target(format-all-files-apply
+    COMMAND ${CMAKE_COMMAND}
+        -DCLANG_FORMAT_EXECUTABLE=${QCAI2_CLANG_FORMAT_EXECUTABLE}
+        -DGIT_EXECUTABLE=${QCAI2_GIT_EXECUTABLE}
+        -DQCAI2_FORMAT_WORKTREE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DQCAI2_FORMAT_ALL=TRUE
+        -DQCAI2_FORMAT_DRY_RUN=FALSE
+        "-DQCAI2_FORMAT_EXCLUDED_PREFIXES=${QCAI2_FORMAT_EXCLUDED_PREFIXES_ARG}"
+        -P "${QCAI2_FORMAT_FILES_SCRIPT}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    COMMENT "Formatting all project files with clang-format"
 )
 
 find_package(Doxygen QUIET)
@@ -726,7 +771,6 @@ set(SRC_IDE
     .github/workflows/README.md
     .github/workflows/build_cmake.yml
     ai/ai-context.md
-    CMakeLists.txt
     LICENSE
     README.md
     CHANGELOG.md
@@ -734,10 +778,11 @@ set(SRC_IDE
     docs/CODING_STYLE.md
     .gitignore
     .clang-tidy
-    cmake/format-changed-files.cmake
+    cmake/format-files.cmake
     cmake/build-docs.cmake
     cmake/run-clang-tidy.cmake
     cmake/run-clang-static-analyzer.cmake
+    scripts/install-format-hook.sh
     src/docs/Doxyfile.in
     src/docs/conf.py.in
     src/docs/index.rst

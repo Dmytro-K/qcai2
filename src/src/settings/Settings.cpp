@@ -1,13 +1,13 @@
 #include "Settings.h"
-#include "../util/Migration.h"
 #include "../util/Logger.h"
+#include "../util/Migration.h"
 
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSettings>
 #include <QSaveFile>
+#include <QSettings>
 
 /*! Implements persistent plugin settings and model catalog helpers. */
 
@@ -34,7 +34,9 @@ QStringList normalizeModelList(const QStringList &models)
     {
         const QString trimmed = model.trimmed();
         if (trimmed.isEmpty() || normalized.contains(trimmed))
+        {
             continue;
+        }
         normalized.append(trimmed);
     }
 
@@ -47,40 +49,52 @@ QJsonObject mcpServerConnectionStatesToJson(const McpServerConnectionStates &sta
     for (auto it = states.cbegin(); it != states.cend(); ++it)
     {
         QJsonObject stateObject;
-        if (!it.value().state.trimmed().isEmpty())
+        if (((!it.value().state.trimmed().isEmpty()) == true))
+        {
             stateObject.insert(QStringLiteral("state"), it.value().state.trimmed());
-        if (!it.value().message.trimmed().isEmpty())
+        }
+        if (((!it.value().message.trimmed().isEmpty()) == true))
+        {
             stateObject.insert(QStringLiteral("message"), it.value().message.trimmed());
+        }
         root.insert(it.key(), stateObject);
     }
     return root;
 }
 
-bool mcpServerConnectionStatesFromJson(const QJsonValue &value,
-                                       McpServerConnectionStates *states,
+bool mcpServerConnectionStatesFromJson(const QJsonValue &value, McpServerConnectionStates *states,
                                        QString *error = nullptr)
 {
-    if (states == nullptr)
+    if (((states == nullptr) == true))
+    {
         return false;
+    }
 
     states->clear();
-    if (value.isUndefined() || value.isNull())
-        return true;
-    if (!value.isObject())
+    if (((value.isUndefined() || value.isNull()) == true))
     {
-        if (error != nullptr)
-            *error = QStringLiteral("Structured settings key 'mcpConnectionStates' must be an object.");
+        return true;
+    }
+    if (value.isObject() == false)
+    {
+        if (((error != nullptr) == true))
+        {
+            *error =
+                QStringLiteral("Structured settings key 'mcpConnectionStates' must be an object.");
+        }
         return false;
     }
 
     const QJsonObject connectionStatesObject = value.toObject();
-    for (auto it = connectionStatesObject.begin(); it != connectionStatesObject.end(); ++it)
+    for (auto it = connectionStatesObject.begin(); ((it != connectionStatesObject.end()) == true);
+         ++it)
     {
-        if (!it.value().isObject())
+        if (((!it.value().isObject()) == true))
         {
-            if (error != nullptr)
+            if (((error != nullptr) == true))
             {
-                *error = QStringLiteral("Structured settings key 'mcpConnectionStates.%1' must be an object.")
+                *error = QStringLiteral(
+                             "Structured settings key 'mcpConnectionStates.%1' must be an object.")
                              .arg(it.key());
             }
             return false;
@@ -89,22 +103,27 @@ bool mcpServerConnectionStatesFromJson(const QJsonValue &value,
         const QJsonObject stateObject = it.value().toObject();
         McpServerConnectionState state;
         const QJsonValue stateValue = stateObject.value(QStringLiteral("state"));
-        if (!stateValue.isUndefined() && !stateValue.isNull() && !stateValue.isString())
+        if (((!stateValue.isUndefined() && !stateValue.isNull() && !stateValue.isString()) ==
+             true))
         {
-            if (error != nullptr)
+            if (((error != nullptr) == true))
             {
-                *error = QStringLiteral("Structured settings key 'mcpConnectionStates.%1.state' must be a string.")
-                             .arg(it.key());
+                *error =
+                    QStringLiteral(
+                        "Structured settings key 'mcpConnectionStates.%1.state' must be a string.")
+                        .arg(it.key());
             }
             return false;
         }
 
         const QJsonValue messageValue = stateObject.value(QStringLiteral("message"));
-        if (!messageValue.isUndefined() && !messageValue.isNull() && !messageValue.isString())
+        if (((!messageValue.isUndefined() && !messageValue.isNull() && !messageValue.isString()) ==
+             true))
         {
-            if (error != nullptr)
+            if (((error != nullptr) == true))
             {
-                *error = QStringLiteral("Structured settings key 'mcpConnectionStates.%1.message' must be a string.")
+                *error = QStringLiteral("Structured settings key 'mcpConnectionStates.%1.message' "
+                                        "must be a string.")
                              .arg(it.key());
             }
             return false;
@@ -118,33 +137,42 @@ bool mcpServerConnectionStatesFromJson(const QJsonValue &value,
     return true;
 }
 
-QJsonObject readStructuredSettingsFile(const QString &path, bool *exists = nullptr, QString *error = nullptr)
+QJsonObject readStructuredSettingsFile(const QString &path, bool *exists = nullptr,
+                                       QString *error = nullptr)
 {
     QFile file(path);
-    if (!file.exists())
+    if (file.exists() == false)
     {
-        if (exists != nullptr)
+        if (((exists != nullptr) == true))
+        {
             *exists = false;
+        }
         return {};
     }
 
-    if (!file.open(QIODevice::ReadOnly))
+    if (file.open(QIODevice::ReadOnly) == false)
     {
-        if (exists != nullptr)
+        if (((exists != nullptr) == true))
+        {
             *exists = true;
-        if (error != nullptr)
-            *error = QStringLiteral("Failed to open %1 for reading: %2")
-                         .arg(path, file.errorString());
+        }
+        if (((error != nullptr) == true))
+        {
+            *error =
+                QStringLiteral("Failed to open %1 for reading: %2").arg(path, file.errorString());
+        }
         return {};
     }
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
-    if (parseError.error != QJsonParseError::NoError || !document.isObject())
+    if (((parseError.error != QJsonParseError::NoError || !document.isObject()) == true))
     {
-        if (exists != nullptr)
+        if (((exists != nullptr) == true))
+        {
             *exists = true;
-        if (error != nullptr)
+        }
+        if (((error != nullptr) == true))
         {
             *error = QStringLiteral("Failed to parse structured settings JSON %1: %2")
                          .arg(path, parseError.error == QJsonParseError::NoError
@@ -154,35 +182,44 @@ QJsonObject readStructuredSettingsFile(const QString &path, bool *exists = nullp
         return {};
     }
 
-    if (exists != nullptr)
+    if (((exists != nullptr) == true))
+    {
         *exists = true;
+    }
     return document.object();
 }
 
-bool writeStructuredSettingsFile(const QString &path, const QJsonObject &root, QString *error = nullptr)
+bool writeStructuredSettingsFile(const QString &path, const QJsonObject &root,
+                                 QString *error = nullptr)
 {
     const QFileInfo fileInfo(path);
-    if (!QDir().mkpath(fileInfo.absolutePath()))
+    if (((!QDir().mkpath(fileInfo.absolutePath())) == true))
     {
-        if (error != nullptr)
+        if (((error != nullptr) == true))
+        {
             *error = QStringLiteral("Failed to create directory for %1").arg(path);
+        }
         return false;
     }
 
     QSaveFile file(path);
-    if (!file.open(QIODevice::WriteOnly))
+    if (file.open(QIODevice::WriteOnly) == false)
     {
-        if (error != nullptr)
-            *error = QStringLiteral("Failed to open %1 for writing: %2")
-                         .arg(path, file.errorString());
+        if (((error != nullptr) == true))
+        {
+            *error =
+                QStringLiteral("Failed to open %1 for writing: %2").arg(path, file.errorString());
+        }
         return false;
     }
 
     file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
-    if (!file.commit())
+    if (file.commit() == false)
     {
-        if (error != nullptr)
+        if (((error != nullptr) == true))
+        {
             *error = QStringLiteral("Failed to commit %1").arg(path);
+        }
         return false;
     }
 
@@ -197,8 +234,10 @@ void Settings::load()
     s.beginGroup(kGroup);
     QString migrationError;
     const bool migrationOk = Migration::migrateGlobalSettings(s, &migrationError);
-    if ((!migrationOk || !migrationError.isEmpty()) && !migrationError.isEmpty())
+    if ((((!migrationOk || !migrationError.isEmpty()) && !migrationError.isEmpty()) == true))
+    {
         QCAI_WARN("Settings", migrationError);
+    }
 
     provider = s.value("provider", provider).toString();
     baseUrl = s.value("baseUrl", baseUrl).toString();
@@ -247,18 +286,18 @@ void Settings::load()
     QString structuredError;
     const QJsonObject structuredRoot = readStructuredSettingsFile(
         Migration::globalStructuredSettingsFilePath(), &structuredSettingsExist, &structuredError);
-    if (!structuredError.isEmpty())
+    if (structuredError.isEmpty() == false)
     {
         QCAI_WARN("Settings", structuredError);
     }
-    else if (structuredSettingsExist)
+    else if (structuredSettingsExist == true)
     {
         const QJsonValue mcpServersValue = structuredRoot.value(QStringLiteral("mcpServers"));
-        if (mcpServersValue.isUndefined() || mcpServersValue.isNull())
+        if (((mcpServersValue.isUndefined() || mcpServersValue.isNull()) == true))
         {
             mcpServers.clear();
         }
-        else if (!mcpServersValue.isObject())
+        else if (mcpServersValue.isObject() == false)
         {
             QCAI_WARN("Settings",
                       QStringLiteral("Structured settings key 'mcpServers' must be an object."));
@@ -266,8 +305,11 @@ void Settings::load()
         else
         {
             QString mcpError;
-            if (!qtmcp::serverDefinitionsFromJson(mcpServersValue.toObject(), &mcpServers, &mcpError))
+            if (((!qtmcp::serverDefinitionsFromJson(mcpServersValue.toObject(), &mcpServers,
+                                                    &mcpError)) == true))
+            {
                 QCAI_WARN("Settings", mcpError);
+            }
         }
     }
     QCAI_INFO("Settings", QStringLiteral("Loaded: provider=%1 model=%2 debug=%3")
@@ -323,28 +365,36 @@ void Settings::save() const
     const QString structuredSettingsPath = Migration::globalStructuredSettingsFilePath();
     bool structuredSettingsExist = false;
     QString structuredError;
-    QJsonObject structuredRoot =
-        readStructuredSettingsFile(structuredSettingsPath, &structuredSettingsExist, &structuredError);
-    if (!structuredError.isEmpty())
+    QJsonObject structuredRoot = readStructuredSettingsFile(
+        structuredSettingsPath, &structuredSettingsExist, &structuredError);
+    if (structuredError.isEmpty() == false)
     {
         QCAI_WARN("Settings", structuredError);
         structuredRoot = QJsonObject{};
     }
 
-    if (mcpServers.isEmpty())
+    if (mcpServers.isEmpty() == true)
+    {
         structuredRoot.remove(QStringLiteral("mcpServers"));
+    }
     else
-        structuredRoot.insert(QStringLiteral("mcpServers"), qtmcp::serverDefinitionsToJson(mcpServers));
+    {
+        structuredRoot.insert(QStringLiteral("mcpServers"),
+                              qtmcp::serverDefinitionsToJson(mcpServers));
+    }
 
-    if (structuredRoot.isEmpty())
+    if (structuredRoot.isEmpty() == true)
     {
         QFile::remove(structuredSettingsPath);
     }
     else
     {
         structuredError.clear();
-        if (!writeStructuredSettingsFile(structuredSettingsPath, structuredRoot, &structuredError))
+        if (((writeStructuredSettingsFile(structuredSettingsPath, structuredRoot,
+                                          &structuredError)) == false))
+        {
             QCAI_WARN("Settings", structuredError);
+        }
     }
 
     QCAI_DEBUG("Settings", QStringLiteral("Settings saved"));
@@ -363,22 +413,28 @@ McpServerConnectionStates loadMcpServerConnectionStates(QString *error)
     QString structuredError;
     const QJsonObject structuredRoot = readStructuredSettingsFile(
         Migration::globalStructuredSettingsFilePath(), &structuredSettingsExist, &structuredError);
-    if (!structuredError.isEmpty())
+    if (structuredError.isEmpty() == false)
     {
-        if (error != nullptr)
+        if (((error != nullptr) == true))
+        {
             *error = structuredError;
+        }
         return states;
     }
 
-    if (!structuredSettingsExist)
+    if (structuredSettingsExist == false)
+    {
         return states;
+    }
 
     QString parseError;
-    if (!mcpServerConnectionStatesFromJson(structuredRoot.value(QStringLiteral("mcpConnectionStates")),
-                                           &states, &parseError))
+    if (!mcpServerConnectionStatesFromJson(
+            structuredRoot.value(QStringLiteral("mcpConnectionStates")), &states, &parseError))
     {
-        if (error != nullptr)
+        if (((error != nullptr) == true))
+        {
             *error = parseError;
+        }
     }
 
     return states;
@@ -389,23 +445,31 @@ bool saveMcpServerConnectionStates(const McpServerConnectionStates &states, QStr
     const QString structuredSettingsPath = Migration::globalStructuredSettingsFilePath();
     bool structuredSettingsExist = false;
     QString structuredError;
-    QJsonObject structuredRoot =
-        readStructuredSettingsFile(structuredSettingsPath, &structuredSettingsExist, &structuredError);
-    if (!structuredError.isEmpty())
+    QJsonObject structuredRoot = readStructuredSettingsFile(
+        structuredSettingsPath, &structuredSettingsExist, &structuredError);
+    if (structuredError.isEmpty() == false)
     {
-        if (error != nullptr)
+        if (((error != nullptr) == true))
+        {
             *error = structuredError;
+        }
         return false;
     }
 
     if (states.isEmpty())
+    {
         structuredRoot.remove(QStringLiteral("mcpConnectionStates"));
+    }
     else
+    {
         structuredRoot.insert(QStringLiteral("mcpConnectionStates"),
                               mcpServerConnectionStatesToJson(states));
+    }
 
-    if (structuredRoot.isEmpty())
+    if (structuredRoot.isEmpty() == true)
+    {
         return !QFile::exists(structuredSettingsPath) || QFile::remove(structuredSettingsPath);
+    }
 
     return writeStructuredSettingsFile(structuredSettingsPath, structuredRoot, error);
 }
@@ -423,8 +487,10 @@ QStringList ModelCatalog::copilotModels() const
 void ModelCatalog::setCopilotModels(const QStringList &models)
 {
     const QStringList normalized = normalizeModelList(models);
-    if (normalized.isEmpty() || normalized == m_copilotModels)
+    if (((normalized.isEmpty() || normalized == m_copilotModels) == true))
+    {
         return;
+    }
 
     m_copilotModels = normalized;
     emit copilotModelsChanged(m_copilotModels);

@@ -9,8 +9,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
-#include <QSettings>
 #include <QSaveFile>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 
@@ -59,8 +59,10 @@ void MigrationTest::migrateGlobalSettings_copiesLegacyReasoningAndStampsRevision
     QDir backupDir(Migration::globalBackupDirPath());
     qInfo() << "Using settings path" << settingsPath;
     qInfo() << "Using global backup dir" << backupDir.path();
-    if (backupDir.exists())
+    if (backupDir.exists() == true)
+    {
         QVERIFY(backupDir.removeRecursively());
+    }
 
     QSettings settings(settingsPath, QSettings::IniFormat);
     settings.beginGroup("qcai2");
@@ -153,10 +155,10 @@ void MigrationTest::migrateProjectState_renamesIgnoredLinkedFilesKey()
     {
         QSaveFile file(storagePath);
         QVERIFY(file.open(QIODevice::WriteOnly));
-        const QJsonObject root{{"excludedDefaultLinkedFiles",
-                                QJsonArray{QStringLiteral("src/Main.cpp"),
-                                           QStringLiteral("README.md")}},
-                               {"storageRevision", "0.0.5-001"}};
+        const QJsonObject root{
+            {"excludedDefaultLinkedFiles",
+             QJsonArray{QStringLiteral("src/Main.cpp"), QStringLiteral("README.md")}},
+            {"storageRevision", "0.0.5-001"}};
         file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
         QVERIFY(file.commit());
     }

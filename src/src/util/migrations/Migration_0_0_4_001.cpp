@@ -15,25 +15,29 @@ namespace
 
 bool writeTextFile(const QString &path, const QString &content, QString *error)
 {
-    if (content.isEmpty())
+    if (content.isEmpty() == true)
     {
         QFile::remove(path);
         return true;
     }
 
     QSaveFile file(path);
-    if (!file.open(QIODevice::WriteOnly))
+    if (file.open(QIODevice::WriteOnly) == false)
     {
-        if (error != nullptr)
+        if (((error != nullptr) == true))
+        {
             *error = QStringLiteral("Failed to open %1 for writing").arg(path);
+        }
         return false;
     }
 
     file.write(content.toUtf8());
-    if (!file.commit())
+    if (file.commit() == false)
     {
-        if (error != nullptr)
+        if (((error != nullptr) == true))
+        {
             *error = QStringLiteral("Failed to commit %1").arg(path);
+        }
         return false;
     }
 
@@ -43,24 +47,32 @@ bool writeTextFile(const QString &path, const QString &content, QString *error)
 QString readTextFile(const QString &path, bool *exists = nullptr, QString *error = nullptr)
 {
     QFile file(path);
-    if (!file.exists())
+    if (file.exists() == false)
     {
-        if (exists != nullptr)
+        if (((exists != nullptr) == true))
+        {
             *exists = false;
+        }
         return {};
     }
 
-    if (!file.open(QIODevice::ReadOnly))
+    if (file.open(QIODevice::ReadOnly) == false)
     {
-        if (exists != nullptr)
+        if (((exists != nullptr) == true))
+        {
             *exists = true;
-        if (error != nullptr)
+        }
+        if (((error != nullptr) == true))
+        {
             *error = QStringLiteral("Failed to open %1 for reading").arg(path);
+        }
         return {};
     }
 
-    if (exists != nullptr)
+    if (((exists != nullptr) == true))
+    {
         *exists = true;
+    }
     return QString::fromUtf8(file.readAll());
 }
 
@@ -70,8 +82,8 @@ bool migrateGlobalSettingsTo_0_0_4_001(QSettings &settings)
 {
     bool changed = false;
 
-    if (!settings.contains(QStringLiteral("reasoningEffort")) &&
-        settings.contains(QStringLiteral("thinkingLevel")))
+    if (((!settings.contains(QStringLiteral("reasoningEffort")) &&
+          settings.contains(QStringLiteral("thinkingLevel"))) == true))
     {
         settings.setValue(QStringLiteral("reasoningEffort"),
                           settings.value(QStringLiteral("thinkingLevel")));
@@ -92,19 +104,23 @@ bool migrateProjectStateTo_0_0_4_001(const QString &storagePath, QJsonObject &ro
     bool goalExists = false;
     QString readError;
     (void)readTextFile(goalPath, &goalExists, &readError);
-    if (!readError.isEmpty())
+    if (readError.isEmpty() == false)
     {
-        if (error != nullptr)
+        if (((error != nullptr) == true))
+        {
             *error = readError;
+        }
         return false;
     }
-    if (!goalExists && !legacyGoal.isEmpty())
+    if (((!goalExists && !legacyGoal.isEmpty()) == true))
     {
-        if (!writeTextFile(goalPath, legacyGoal, error))
+        if (writeTextFile(goalPath, legacyGoal, error) == false)
+        {
             return false;
+        }
         changed = true;
     }
-    if (root.contains(QStringLiteral("goal")))
+    if (((root.contains(QStringLiteral("goal"))) == true))
     {
         root.remove(QStringLiteral("goal"));
         changed = true;
@@ -115,28 +131,32 @@ bool migrateProjectStateTo_0_0_4_001(const QString &storagePath, QJsonObject &ro
     bool logExists = false;
     readError.clear();
     (void)readTextFile(logPath, &logExists, &readError);
-    if (!readError.isEmpty())
+    if (readError.isEmpty() == false)
     {
-        if (error != nullptr)
+        if (((error != nullptr) == true))
+        {
             *error = readError;
+        }
         return false;
     }
-    if (!logExists)
+    if (logExists == false)
     {
         const QString migratedLog = !legacyLogMarkdown.isEmpty() ? legacyLogMarkdown : legacyLog;
-        if (!migratedLog.isEmpty())
+        if (migratedLog.isEmpty() == false)
         {
-            if (!writeTextFile(logPath, migratedLog, error))
+            if (writeTextFile(logPath, migratedLog, error) == false)
+            {
                 return false;
+            }
             changed = true;
         }
     }
-    if (root.contains(QStringLiteral("logMarkdown")))
+    if (((root.contains(QStringLiteral("logMarkdown"))) == true))
     {
         root.remove(QStringLiteral("logMarkdown"));
         changed = true;
     }
-    if (root.contains(QStringLiteral("log")))
+    if (((root.contains(QStringLiteral("log"))) == true))
     {
         root.remove(QStringLiteral("log"));
         changed = true;

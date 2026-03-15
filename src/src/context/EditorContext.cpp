@@ -27,10 +27,11 @@ namespace
 
 ProjectExplorer::Project *resolveProject(const QString &selectedProjectFilePath)
 {
-    if (!selectedProjectFilePath.isEmpty())
+    if (selectedProjectFilePath.isEmpty() == false)
     {
         if (auto *project = ProjectExplorer::ProjectManager::projectWithProjectFilePath(
-                Utils::FilePath::fromString(selectedProjectFilePath)))
+                Utils::FilePath::fromString(selectedProjectFilePath));
+            ((project != nullptr) == true))
         {
             return project;
         }
@@ -41,8 +42,10 @@ ProjectExplorer::Project *resolveProject(const QString &selectedProjectFilePath)
 
 bool belongsToProject(const Utils::FilePath &filePath, ProjectExplorer::Project *project)
 {
-    if ((project == nullptr) || filePath.isEmpty())
+    if ((((project == nullptr) || filePath.isEmpty()) == true))
+    {
         return project == nullptr;
+    }
 
     return ProjectExplorer::ProjectManager::projectsForFile(filePath).contains(project);
 }
@@ -59,17 +62,21 @@ EditorContext::Snapshot EditorContext::capture() const
     ProjectExplorer::Project *project = resolveProject(m_selectedProjectFilePath);
 
     // Current editor file & selection
-    if (Core::IEditor *editor = Core::EditorManager::currentEditor())
+    if (Core::IEditor *editor = Core::EditorManager::currentEditor();
+        ((editor != nullptr) == true))
     {
-        if (Core::IDocument *doc = editor->document())
+        if (Core::IDocument *doc = editor->document(); ((doc != nullptr) == true))
         {
-            if (belongsToProject(doc->filePath(), project))
+            if (((belongsToProject(doc->filePath(), project)) == true))
+            {
                 s.filePath = doc->filePath().toUrlishString();
+            }
         }
 
-        if (!s.filePath.isEmpty())
+        if (((!s.filePath.isEmpty()) == true))
         {
-            if (auto *textEditor = qobject_cast<TextEditor::BaseTextEditor *>(editor))
+            if (auto *textEditor = qobject_cast<TextEditor::BaseTextEditor *>(editor);
+                ((textEditor != nullptr) == true))
             {
                 QTextCursor tc = textEditor->textCursor();
                 s.cursorLine = tc.blockNumber() + 1;
@@ -84,30 +91,33 @@ EditorContext::Snapshot EditorContext::capture() const
     for (Core::IDocument *doc : docs)
     {
         if (belongsToProject(doc->filePath(), project))
+        {
             s.openFiles.append(doc->filePath().toUrlishString());
+        }
     }
 
     // Project & build directories
-    if (project != nullptr)
+    if (((project != nullptr) == true))
     {
         s.projectName = project->displayName();
         s.projectDir = project->projectDirectory().toUrlishString();
         s.projectFilePath = project->projectFilePath().toUrlishString();
 
-        if (auto *target = project->activeTarget())
+        if (auto *target = project->activeTarget(); ((target != nullptr) == true))
         {
             s.targetName = target->displayName();
 
-            if (auto *bc = target->activeBuildConfiguration())
+            if (auto *bc = target->activeBuildConfiguration(); ((bc != nullptr) == true))
             {
                 s.buildDir = bc->buildDirectory().toUrlishString();
                 s.buildType = ProjectExplorer::BuildConfiguration::buildTypeName(bc->buildType());
             }
 
-            if (auto *kit = target->kit())
+            if (auto *kit = target->kit(); ((kit != nullptr) == true))
             {
                 s.kitName = kit->displayName();
-                if (auto *tc = ProjectExplorer::ToolchainKitAspect::cxxToolchain(kit))
+                if (auto *tc = ProjectExplorer::ToolchainKitAspect::cxxToolchain(kit);
+                    ((tc != nullptr) == true))
                 {
                     s.compilerName = tc->displayName();
                     s.compilerPath = tc->compilerCommand().toUrlishString();
@@ -135,7 +145,9 @@ QList<EditorContext::ProjectInfo> EditorContext::openProjects() const
     for (auto *project : openProjects)
     {
         if (project == nullptr)
+        {
             continue;
+        }
 
         ProjectInfo info;
         info.projectName = project->displayName();
@@ -162,27 +174,45 @@ QString EditorContext::toPromptFragment() const
     Snapshot s = capture();
     QString f;
     f += QStringLiteral("Active file: %1\n").arg(s.filePath.isEmpty() ? "(none)" : s.filePath);
-    if (s.cursorLine > 0)
+    if (((s.cursorLine > 0) == true))
+    {
         f += QStringLiteral("Cursor: line %1, col %2\n").arg(s.cursorLine).arg(s.cursorColumn);
-    if (!s.selectedText.isEmpty())
+    }
+    if (((!s.selectedText.isEmpty()) == true))
+    {
         f += QStringLiteral("Selected text: \"%1\"\n").arg(s.selectedText.left(500));
+    }
 
-    if (!s.projectName.isEmpty())
+    if (((!s.projectName.isEmpty()) == true))
+    {
         f += QStringLiteral("Project: %1\n").arg(s.projectName);
+    }
     f += QStringLiteral("Project dir: %1\n").arg(s.projectDir.isEmpty() ? "(none)" : s.projectDir);
-    if (!s.projectFilePath.isEmpty())
+    if (((!s.projectFilePath.isEmpty()) == true))
+    {
         f += QStringLiteral("Project file: %1\n").arg(s.projectFilePath);
+    }
     f += QStringLiteral("Build dir: %1\n").arg(s.buildDir.isEmpty() ? "(none)" : s.buildDir);
-    if (!s.buildType.isEmpty())
+    if (((!s.buildType.isEmpty()) == true))
+    {
         f += QStringLiteral("Build type: %1\n").arg(s.buildType);
-    if (!s.kitName.isEmpty())
+    }
+    if (((!s.kitName.isEmpty()) == true))
+    {
         f += QStringLiteral("Kit: %1\n").arg(s.kitName);
-    if (!s.compilerName.isEmpty())
+    }
+    if (((!s.compilerName.isEmpty()) == true))
+    {
         f += QStringLiteral("Compiler: %1 (%2)\n").arg(s.compilerName, s.compilerPath);
-    if (!s.targetName.isEmpty())
+    }
+    if (((!s.targetName.isEmpty()) == true))
+    {
         f += QStringLiteral("Target: %1\n").arg(s.targetName);
-    if (!s.openFiles.isEmpty())
+    }
+    if (((!s.openFiles.isEmpty()) == true))
+    {
         f += QStringLiteral("Open files: %1\n").arg(s.openFiles.join(", "));
+    }
     return f;
 }
 
@@ -195,31 +225,42 @@ QString EditorContext::fileContentsFragment(int maxChars) const
     // Collect documents: active file first, then other open tabs
     QList<Core::IDocument *> ordered;
     Core::IDocument *activeDoc = nullptr;
-    if (Core::IEditor *editor = Core::EditorManager::currentEditor())
+    if (Core::IEditor *editor = Core::EditorManager::currentEditor();
+        ((editor != nullptr) == true))
     {
         Core::IDocument *candidate = editor->document();
-        if ((candidate != nullptr) && belongsToProject(candidate->filePath(), project))
+        if ((((candidate != nullptr) && belongsToProject(candidate->filePath(), project)) == true))
+        {
             activeDoc = candidate;
+        }
     }
 
-    if (activeDoc != nullptr)
+    if (((activeDoc != nullptr) == true))
+    {
         ordered.append(activeDoc);
+    }
 
     const auto docs = Core::DocumentModel::openedDocuments();
     for (Core::IDocument *doc : docs)
     {
         if (doc != activeDoc && belongsToProject(doc->filePath(), project))
+        {
             ordered.append(doc);
+        }
     }
 
     for (Core::IDocument *doc : ordered)
     {
         if (remaining <= 0)
+        {
             break;
+        }
 
         const QString path = doc->filePath().toUrlishString();
         if (path.isEmpty())
+        {
             continue;
+        }
 
         // Read content from the editor buffer (in-memory, no disk I/O)
         QString content;
@@ -229,12 +270,16 @@ QString EditorContext::fileContentsFragment(int maxChars) const
             if (auto *te = qobject_cast<TextEditor::BaseTextEditor *>(editors.first()))
             {
                 if (auto *tw = te->editorWidget())
+                {
                     content = tw->toPlainText();
+                }
             }
         }
 
         if (content.isEmpty())
+        {
             continue;
+        }
 
         // Truncate if needed
         if (content.length() > remaining)
