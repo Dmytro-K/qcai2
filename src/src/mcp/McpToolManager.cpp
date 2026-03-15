@@ -11,6 +11,7 @@
 #include <qtmcp/Client.h>
 #include <qtmcp/HttpTransport.h>
 #include <qtmcp/ServerDefinition.h>
+#include <qtmcp/SseTransport.h>
 #include <qtmcp/StdioTransport.h>
 
 #include <QDir>
@@ -40,6 +41,7 @@ namespace
 
 constexpr auto kMcpProtocolVersionStdio = "2024-11-05";
 constexpr auto kMcpProtocolVersionHttp = "2025-03-26";
+constexpr auto kMcpProtocolVersionSse = "2024-11-05";
 constexpr int kMaxToolsListPages = 32;
 
 QString sanitizeToolSegment(const QString &value)
@@ -706,11 +708,13 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
         ++enabledServerCount;
 
         if (definition.transport != QStringLiteral("stdio") &&
-            definition.transport != QStringLiteral("http"))
+            definition.transport != QStringLiteral("http") &&
+            definition.transport != QStringLiteral("sse"))
         {
-            messages.append(QStringLiteral("ℹ MCP: server `%1` uses unsupported runtime transport "
-                                           "`%2`; supported transports are `stdio` and `http`.")
-                                .arg(serverName, definition.transport));
+            messages.append(
+                QStringLiteral("ℹ MCP: server `%1` uses unsupported runtime transport "
+                               "`%2`; supported transports are `stdio`, `http`, and `sse`.")
+                    .arg(serverName, definition.transport));
             continue;
         }
 
@@ -723,7 +727,9 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             continue;
         }
 
-        if (definition.transport == QStringLiteral("http") && definition.url.trimmed().isEmpty())
+        if ((definition.transport == QStringLiteral("http") ||
+             definition.transport == QStringLiteral("sse")) &&
+            definition.url.trimmed().isEmpty())
         {
             messages.append(
                 QStringLiteral("⚠ MCP: server `%1` is enabled but has no URL configured.")
@@ -753,6 +759,27 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             session->client->setTransport(
                 std::make_unique<qtmcp::StdioTransport>(std::move(transportConfig)));
             protocolVersion = QString::fromLatin1(kMcpProtocolVersionStdio);
+        }
+        else if (definition.transport == QStringLiteral("sse"))
+        {
+            qtmcp::SseTransportConfig transportConfig;
+            transportConfig.endpoint = QUrl(expandEnvironmentPlaceholders(
+                definition.url, serverName, QStringLiteral("the endpoint URL"), processEnvironment,
+                &messages));
+            transportConfig.requestTimeoutMs = definition.requestTimeoutMs;
+            for (auto headerIt = definition.headers.begin(); headerIt != definition.headers.end();
+                 ++headerIt)
+            {
+                transportConfig.headers.insert(
+                    headerIt.key(), expandEnvironmentPlaceholders(
+                                        headerIt.value(), serverName,
+                                        QStringLiteral("header `%1`").arg(headerIt.key()),
+                                        processEnvironment, &messages));
+            }
+
+            session->client->setTransport(
+                std::make_unique<qtmcp::SseTransport>(std::move(transportConfig)));
+            protocolVersion = QString::fromLatin1(kMcpProtocolVersionSse);
         }
         else
         {

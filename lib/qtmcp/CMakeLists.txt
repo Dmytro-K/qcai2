@@ -15,11 +15,13 @@ add_library(qtmcp
     include/qtmcp/Client.h
     include/qtmcp/HttpTransport.h
     include/qtmcp/ServerDefinition.h
+    include/qtmcp/SseTransport.h
     include/qtmcp/StdioTransport.h
     include/qtmcp/Transport.h
     src/Client.cpp
     src/HttpTransport.cpp
     src/ServerDefinition.cpp
+    src/SseTransport.cpp
     src/StdioTransport.cpp
     src/Transport.cpp
 )
