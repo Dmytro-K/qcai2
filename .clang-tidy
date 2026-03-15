@@ -28,6 +28,8 @@ Checks: >
   -modernize-loop-convert,
   -performance-avoid-endl,
   -portability-avoid-pragma-once,
+  -clazy-qt-keywords,
+  -clazy-qt-keywords-emit,
   -readability-function-cognitive-complexity,
   -readability-identifier-naming,
   -readability-magic-numbers
