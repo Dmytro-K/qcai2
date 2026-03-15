@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../models/AgentMessages.h"
+#include "ProviderUsage.h"
 
 #include <QList>
 #include <QObject>
@@ -38,11 +39,13 @@ public:
     using StreamCallback = std::function<void(const QString &delta)>;
 
     /**
-     * Receives the final response text or an error message.
+     * Receives the final response text, an error message, and optional usage metadata.
      * @param response Provider response text.
      * @param error Error text.
+     * @param usage Provider token-usage counters when available.
      */
-    using CompletionCallback = std::function<void(const QString &response, const QString &error)>;
+    using CompletionCallback =
+        std::function<void(const QString &response, const QString &error, const ProviderUsage &usage)>;
 
     /**
      * Starts a completion request.

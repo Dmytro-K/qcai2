@@ -128,7 +128,8 @@ void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
     auto alive = m_alive;
     m_provider->complete(
         messages, model, 0.0, 128, settings().completionReasoningEffort,
-        [editor, pos, alive](const QString &response, const QString &error) {
+        [editor, pos, alive](const QString &response, const QString &error,
+                             const ProviderUsage & /*usage*/) {
             if (!*alive)
                 return;
             if (!error.isEmpty())

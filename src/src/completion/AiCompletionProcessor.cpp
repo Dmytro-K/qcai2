@@ -94,7 +94,8 @@ TextEditor::IAssistProposal *AiCompletionProcessor::perform()
     auto alive = m_alive;  // capture shared_ptr for safe use-after-free check
     m_provider->complete(
         messages, m_model, 0.0, 128, settings().completionReasoningEffort,
-        [this, pos, alive](const QString &response, const QString &error) {
+        [this, pos, alive](const QString &response, const QString &error,
+                           const ProviderUsage & /*usage*/) {
             if (!*alive)
                 return;  // processor was destroyed, bail out
 

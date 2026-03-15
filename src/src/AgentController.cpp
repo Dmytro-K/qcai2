@@ -259,19 +259,18 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
     m_goal = goal;
     m_runMode = runMode;
     m_modelName = modelName.trimmed().isEmpty() ? s.modelName : modelName.trimmed();
-    m_reasoningEffort = reasoningEffort.trimmed().isEmpty() ? s.reasoningEffort
-                                                            : reasoningEffort.trimmed();
-    m_thinkingLevel = thinkingLevel.trimmed().isEmpty() ? s.thinkingLevel
-                                                        : thinkingLevel.trimmed();
+    m_reasoningEffort =
+        reasoningEffort.trimmed().isEmpty() ? s.reasoningEffort : reasoningEffort.trimmed();
+    m_thinkingLevel =
+        thinkingLevel.trimmed().isEmpty() ? s.thinkingLevel : thinkingLevel.trimmed();
     m_plan.clear();
     m_accumulatedDiff.clear();
     m_pendingApprovals.clear();
     m_messages.clear();
 
     QCAI_INFO("Agent",
-              QStringLiteral(
-                  "Starting run — mode: %1, provider: %2, model: %3, reasoning: %4, "
-                  "thinking: %5, dryRun: %6, goal: %7")
+              QStringLiteral("Starting run — mode: %1, provider: %2, model: %3, reasoning: %4, "
+                             "thinking: %5, dryRun: %6, goal: %7")
                   .arg(runModeLabel(m_runMode), m_provider->id(), m_modelName, m_reasoningEffort,
                        m_thinkingLevel, dryRun ? QStringLiteral("yes") : QStringLiteral("no"),
                        goal.left(100)));
@@ -283,21 +282,21 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
         m_messages.append({QStringLiteral("system"), m_requestContext.trimmed()});
 
     if (isEnabledEffort(m_thinkingLevel))
-        m_messages.append({QStringLiteral("system"),
-                           QStringLiteral("Use %1 thinking depth for this task.")
-                               .arg(m_thinkingLevel)});
+        m_messages.append(
+            {QStringLiteral("system"),
+             QStringLiteral("Use %1 thinking depth for this task.").arg(m_thinkingLevel)});
 
     // User goal
     m_messages.append({QStringLiteral("user"), goal});
 
-    emit logMessage(QStringLiteral("%1 %2 started. Goal: %3")
-                        .arg(m_runMode == RunMode::Ask ? QStringLiteral("💬")
-                                                       : QStringLiteral("▶"))
-                        .arg(m_runMode == RunMode::Ask ? QStringLiteral("Ask mode")
-                                                       : QStringLiteral("Agent"))
-                        .arg(goal));
+    emit logMessage(
+        QStringLiteral("%1 %2 started. Goal: %3")
+            .arg(m_runMode == RunMode::Ask ? QStringLiteral("💬") : QStringLiteral("▶"))
+            .arg(m_runMode == RunMode::Ask ? QStringLiteral("Ask mode") : QStringLiteral("Agent"))
+            .arg(goal));
     if (!m_linkedFiles.isEmpty())
-        emit logMessage(QStringLiteral("📎 Linked files: %1").arg(m_linkedFiles.join(QStringLiteral(", "))));
+        emit logMessage(
+            QStringLiteral("📎 Linked files: %1").arg(m_linkedFiles.join(QStringLiteral(", "))));
     for (const QString &message : std::as_const(mcpRefreshMessages))
         emit logMessage(message);
     runNextIteration();
@@ -340,15 +339,14 @@ void AgentController::runNextIteration()
 
     const auto &s = settings();
     QCAI_DEBUG("Agent",
-               QStringLiteral(
-                    "Iteration %1: sending %2 messages to %3 (model: %4, reasoning: %5, "
-                    "thinking: %6, temp: %7)")
-                    .arg(m_iteration)
-                    .arg(m_messages.size())
-                    .arg(m_provider->id(), m_modelName)
-                    .arg(m_reasoningEffort)
-                     .arg(m_thinkingLevel)
-                     .arg(s.temperature));
+               QStringLiteral("Iteration %1: sending %2 messages to %3 (model: %4, reasoning: %5, "
+                              "thinking: %6, temp: %7)")
+                   .arg(m_iteration)
+                   .arg(m_messages.size())
+                   .arg(m_provider->id(), m_modelName)
+                   .arg(m_reasoningEffort)
+                   .arg(m_thinkingLevel)
+                   .arg(s.temperature));
 
     m_waitingForProvider = true;
     m_providerActivitySeen = false;
@@ -357,9 +355,10 @@ void AgentController::runNextIteration()
 
     m_provider->complete(
         m_messages, m_modelName, s.temperature, s.maxTokens, m_reasoningEffort,
-        [this](const QString &response, const QString &error) {
-            QTimer::singleShot(0, this,
-                               [this, response, error]() { handleResponse(response, error); });
+        [this](const QString &response, const QString &error, const ProviderUsage &usage) {
+            QTimer::singleShot(0, this, [this, response, error, usage]() {
+                handleResponse(response, error, usage);
+            });
         },
         [this](const QString &delta) {
             if (!delta.isEmpty())
@@ -375,7 +374,8 @@ void AgentController::runNextIteration()
         });
 }
 
-void AgentController::handleResponse(const QString &response, const QString &error)
+void AgentController::handleResponse(const QString &response, const QString &error,
+                                     const ProviderUsage &usage)
 {
     if (!m_running)
         return;
@@ -391,6 +391,9 @@ void AgentController::handleResponse(const QString &response, const QString &err
         emit stopped(QStringLiteral("Provider error."));
         return;
     }
+
+    if (usage.hasAny())
+        emit providerUsageAvailable(usage);
 
     // Add assistant message to history
     m_messages.append({QStringLiteral("assistant"), response});
@@ -431,8 +434,7 @@ void AgentController::handleResponse(const QString &response, const QString &err
         case ResponseType::Plan:
             m_plan = parsed.steps;
             emit planUpdated(m_plan);
-            emit logMessage(
-                QStringLiteral("📋 Plan with %1 step(s) received.").arg(m_plan.size()));
+            emit logMessage(QStringLiteral("📋 Plan with %1 step(s) received.").arg(m_plan.size()));
             // Ask model to start executing the plan
             m_messages.append(
                 {QStringLiteral("user"),
@@ -502,7 +504,8 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
     if (!m_running)
         return;
 
-    const int maxCalls = (m_safetyPolicy != nullptr) ? m_safetyPolicy->maxToolCalls() : settings().maxToolCalls;
+    const int maxCalls =
+        (m_safetyPolicy != nullptr) ? m_safetyPolicy->maxToolCalls() : settings().maxToolCalls;
     if (m_toolCallCount >= maxCalls)
     {
         m_running = false;
@@ -526,7 +529,7 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
     if (tool->requiresApproval() && !m_dryRun)
     {
         QString reason = (m_safetyPolicy != nullptr) ? m_safetyPolicy->requiresApproval(name)
-                                        : QStringLiteral("Tool requires approval.");
+                                                     : QStringLiteral("Tool requires approval.");
 
         if (!reason.isEmpty())
         {
@@ -538,7 +541,8 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
             emit approvalRequested(
                 pa.id, name, reason,
                 QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)));
-            emit logMessage(QStringLiteral("⏸ Approval required for '%1': %2").arg(name, reason));
+            emit logMessage(
+                QStringLiteral("⏸ Approval required for '%1': %2").arg(name, reason));
             return;
         }
     }

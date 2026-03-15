@@ -111,6 +111,9 @@ private:
     /** Accumulated streamed text returned to the caller at completion. */
     QString m_streamAccum;
 
+    /** Usage counters captured from the current streaming response. */
+    ProviderUsage m_streamUsage;
+
 };
 
 }  // namespace qcai2

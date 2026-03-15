@@ -81,7 +81,7 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
         m_currentReply = nullptr;
         if (!reply)
         {
-            callback({}, QStringLiteral("Reply was null"));
+            callback({}, QStringLiteral("Reply was null"), {});
             return;
         }
 
@@ -90,7 +90,8 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
             const auto errBody = QString::fromUtf8(reply->readAll());
             QCAI_ERROR("LocalHTTP", QStringLiteral("HTTP error: %1 — %2")
                                         .arg(reply->errorString(), errBody.left(300)));
-            callback({}, QStringLiteral("HTTP error: %1 — %2").arg(reply->errorString(), errBody));
+            callback({}, QStringLiteral("HTTP error: %1 — %2").arg(reply->errorString(), errBody),
+                     {});
             reply->deleteLater();
             return;
         }
@@ -102,11 +103,12 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
         QJsonDocument doc = QJsonDocument::fromJson(data, &err);
         if (err.error != QJsonParseError::NoError)
         {
-            callback({}, QStringLiteral("JSON parse error: %1").arg(err.errorString()));
+            callback({}, QStringLiteral("JSON parse error: %1").arg(err.errorString()), {});
             return;
         }
 
         const QJsonObject root = doc.object();
+        const ProviderUsage usage = providerUsageFromResponseObject(root);
 
         // Try OpenAI format first
         QString content = Json::getString(root, QStringLiteral("choices/0/message/content"));
@@ -124,11 +126,12 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
         {
             callback(
                 {},
-                QStringLiteral("Could not extract content from: %1").arg(QString::fromUtf8(data)));
+                QStringLiteral("Could not extract content from: %1").arg(QString::fromUtf8(data)),
+                {});
             return;
         }
 
-        callback(content, {});
+        callback(content, {}, usage);
         QCAI_DEBUG("LocalHTTP",
                    QStringLiteral("Response received, %1 chars").arg(content.length()));
     });

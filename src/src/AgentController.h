@@ -175,6 +175,12 @@ signals:
     void streamingToken(const QString &token);
 
     /**
+     * Publishes provider token-usage counters for one completed model request.
+     * @param usage Usage counters returned by the provider.
+     */
+    void providerUsageAvailable(const ProviderUsage &usage);
+
+    /**
      * Publishes the latest multi-step plan returned by the model.
      * @param steps Plan steps to display.
      */
@@ -224,8 +230,9 @@ private:
      * Parses one provider response and dispatches the next controller action.
      * @param response Provider response text.
      * @param error Error text.
+     * @param usage Provider token-usage counters when available.
      */
-    void handleResponse(const QString &response, const QString &error);
+    void handleResponse(const QString &response, const QString &error, const ProviderUsage &usage);
 
     /**
      * Runs a tool call, handling approvals, limits, and result truncation.

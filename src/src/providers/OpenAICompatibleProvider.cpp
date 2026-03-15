@@ -50,7 +50,11 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
 
     const bool streaming = (streamCallback != nullptr);
     if (streaming)
+    {
         body[QStringLiteral("stream")] = true;
+        body[QStringLiteral("stream_options")] =
+            QJsonObject{{QStringLiteral("include_usage"), true}};
+    }
 
     // Build URL
     QString urlStr = m_baseUrl;
@@ -83,6 +87,7 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
 
     m_sseBuffer.clear();
     m_streamAccum.clear();
+    m_streamUsage = {};
 
     m_currentReply = m_nam.post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
 
@@ -118,8 +123,12 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                 if (err.error != QJsonParseError::NoError)
                     continue;
 
-                // Extract delta content: choices[0].delta.content
                 QJsonObject obj = doc.object();
+                const ProviderUsage usage = providerUsageFromResponseObject(obj);
+                if (usage.hasAny())
+                    m_streamUsage = usage;
+
+                // Extract delta content: choices[0].delta.content
                 QJsonArray choices = obj.value(QStringLiteral("choices")).toArray();
                 if (choices.isEmpty())
                     continue;
@@ -150,7 +159,7 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
 
                 if (!reply)
                 {
-                    callback({}, QStringLiteral("Reply was null"));
+                    callback({}, QStringLiteral("Reply was null"), {});
                     return;
                 }
 
@@ -162,18 +171,21 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                                              .arg(reply->errorString(), errBody.left(300)));
                     callback(
                         {},
-                        QStringLiteral("HTTP error: %1 — %2").arg(reply->errorString(), errBody));
+                        QStringLiteral("HTTP error: %1 — %2").arg(reply->errorString(), errBody),
+                        {});
                     reply->deleteLater();
                     return;
                 }
 
+                const ProviderUsage usage = m_streamUsage;
                 reply->deleteLater();
                 QCAI_DEBUG("OpenAI", QStringLiteral("Stream complete, accumulated %1 chars")
                                          .arg(m_streamAccum.length()));
                 streamCallback({});  // signal stream end
-                callback(m_streamAccum, {});
+                callback(m_streamAccum, {}, usage);
                 m_streamAccum.clear();
                 m_sseBuffer.clear();
+                m_streamUsage = {};
             });
     }
     else
@@ -185,7 +197,7 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
 
             if (!reply)
             {
-                callback({}, QStringLiteral("Reply was null"));
+                callback({}, QStringLiteral("Reply was null"), {});
                 return;
             }
 
@@ -195,7 +207,8 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                 QCAI_ERROR("OpenAI", QStringLiteral("HTTP error: %1 — %2")
                                          .arg(reply->errorString(), errBody.left(300)));
                 callback({},
-                         QStringLiteral("HTTP error: %1 — %2").arg(reply->errorString(), errBody));
+                         QStringLiteral("HTTP error: %1 — %2").arg(reply->errorString(), errBody),
+                         {});
                 reply->deleteLater();
                 return;
             }
@@ -207,10 +220,11 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
             QJsonDocument doc = QJsonDocument::fromJson(data, &err);
             if (err.error != QJsonParseError::NoError)
             {
-                callback({}, QStringLiteral("JSON parse error: %1").arg(err.errorString()));
+                callback({}, QStringLiteral("JSON parse error: %1").arg(err.errorString()), {});
                 return;
             }
 
+            const ProviderUsage usage = providerUsageFromResponseObject(doc.object());
             const QString content =
                 Json::getString(doc.object(), QStringLiteral("choices/0/message/content"));
             if (content.isEmpty())
@@ -218,13 +232,14 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                 QCAI_WARN("OpenAI", QStringLiteral("No content in response: %1")
                                         .arg(QString::fromUtf8(data).left(200)));
                 callback(
-                    {}, QStringLiteral("No content in response: %1").arg(QString::fromUtf8(data)));
+                    {}, QStringLiteral("No content in response: %1").arg(QString::fromUtf8(data)),
+                    {});
                 return;
             }
 
             QCAI_DEBUG("OpenAI",
                        QStringLiteral("Response received, %1 chars").arg(content.length()));
-            callback(content, {});
+            callback(content, {}, usage);
         });
     }
 }

@@ -30,6 +30,56 @@ function sendError(id, message) {
     send({ id, error: message });
 }
 
+function firstNonNull(...values) {
+    for (const value of values) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+            return value;
+        }
+    }
+    return undefined;
+}
+
+function normalizeUsage(usage) {
+    if (!usage || typeof usage !== "object") {
+        return undefined;
+    }
+
+    const normalized = {};
+    const inputTokens = firstNonNull(
+        usage.input_tokens,
+        usage.prompt_tokens,
+        usage.inputTokens,
+    );
+    const outputTokens = firstNonNull(
+        usage.output_tokens,
+        usage.completion_tokens,
+        usage.outputTokens,
+    );
+    const totalTokens = firstNonNull(
+        usage.total_tokens,
+        usage.totalTokens,
+    );
+    const reasoningTokens = firstNonNull(
+        usage.reasoning_tokens,
+        usage.output_tokens_details?.reasoning_tokens,
+        usage.completion_tokens_details?.reasoning_tokens,
+    );
+    const cachedInputTokens = firstNonNull(
+        usage.cached_input_tokens,
+        usage.input_tokens_details?.cached_tokens,
+        usage.prompt_tokens_details?.cached_tokens,
+        usage.cacheReadTokens,
+    );
+
+    if (inputTokens !== undefined) normalized.input_tokens = inputTokens;
+    if (outputTokens !== undefined) normalized.output_tokens = outputTokens;
+    if (totalTokens !== undefined) normalized.total_tokens = totalTokens;
+    if (reasoningTokens !== undefined) normalized.reasoning_tokens = reasoningTokens;
+    if (cachedInputTokens !== undefined) normalized.cached_input_tokens = cachedInputTokens;
+
+    return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
 // ── Handlers ───────────────────────────────────────────────────
 
 let clientStarting = null; // promise for in-progress start
@@ -93,6 +143,7 @@ async function handleComplete(id, params) {
         log(`Request #${id}: sending prompt (${prompt.length} chars), active=${activeRequests.size}`);
 
         const seenEventIds = new Set();
+        let latestUsage = undefined;
         const unsubscribe = session.on("assistant.message_delta", (event) => {
             if (state.cancelled) return;
             // Deduplicate — SDK may dispatch the same event twice
@@ -103,14 +154,26 @@ async function handleComplete(id, params) {
                 send({ id, stream_delta: delta });
             }
         });
+        const unsubscribeUsage = session.on("assistant.usage", (event) => {
+            if (state.cancelled) return;
+            const usage = normalizeUsage(event.data);
+            if (usage) {
+                latestUsage = usage;
+                log(`Request #${id} usage: ${JSON.stringify(usage)}`);
+            }
+        });
 
         const response = await session.sendAndWait({ prompt }, 300000);
         unsubscribe();
+        unsubscribeUsage();
 
         if (!state.cancelled) {
             const content = response?.data?.content || "";
+            const usage = latestUsage || normalizeUsage(
+                response?.data?.usage || response?.usage || response?.usageMetadata || null,
+            );
             log(`Request #${id} done: ${content.length} chars`);
-            sendResult(id, { content });
+            sendResult(id, usage ? { content, usage } : { content });
         } else {
             log(`Request #${id} done but was cancelled`);
         }

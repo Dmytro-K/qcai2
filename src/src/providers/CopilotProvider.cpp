@@ -222,7 +222,7 @@ bool CopilotProvider::ensureSidecar()
         m_streamCallbacks.clear();
         m_modelListCallbacks.clear();
         for (auto it = pendingCallbacks.begin(); it != pendingCallbacks.end(); ++it)
-            it.value()({}, errMsg);
+            it.value()({}, errMsg, {});
         for (auto it = pendingModelListCallbacks.begin(); it != pendingModelListCallbacks.end();
              ++it)
             it.value()({}, errMsg);
@@ -364,16 +364,17 @@ void CopilotProvider::handleSidecarOutput()
             QCAI_ERROR("Copilot", QStringLiteral("Request #%1 error: %2")
                                       .arg(id)
                                       .arg(obj.value(QStringLiteral("error")).toString()));
-            cb({}, obj.value(QStringLiteral("error")).toString());
+            cb({}, obj.value(QStringLiteral("error")).toString(), {});
         }
         else
         {
             QJsonObject result = obj.value(QStringLiteral("result")).toObject();
+            const ProviderUsage usage = providerUsageFromResponseObject(result);
             QCAI_DEBUG("Copilot",
                        QStringLiteral("Request #%1 complete, %2 chars")
-                           .arg(id)
-                           .arg(result.value(QStringLiteral("content")).toString().length()));
-            cb(result.value(QStringLiteral("content")).toString(), {});
+                            .arg(id)
+                            .arg(result.value(QStringLiteral("content")).toString().length()));
+            cb(result.value(QStringLiteral("content")).toString(), {}, usage);
         }
     }
 }
@@ -399,7 +400,8 @@ void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString
                                     "1) Ensure Node.js is installed and available in PATH.\n"
                                     "2) Re-run 'cmake --install' or run 'npm install' in: %1\n"
                                     "3) Run 'copilot /login' to authenticate.")
-                         .arg(sidecarDir));
+                         .arg(sidecarDir),
+                 {});
         return;
     }
 
@@ -491,7 +493,7 @@ void CopilotProvider::cancel()
     m_pending.clear();
     m_streamCallbacks.clear();
     for (auto it = pendingCallbacks.begin(); it != pendingCallbacks.end(); ++it)
-        it.value()({}, QStringLiteral("Cancelled"));
+        it.value()({}, QStringLiteral("Cancelled"), {});
 
     // Tell sidecar to cancel too (drop queued/active requests)
     if ((m_process != nullptr) && m_process->state() == QProcess::Running)

@@ -181,6 +181,17 @@ QString redactReadFilePayloads(const QString &markdown)
     return rewritten;
 }
 
+QString providerUsageMarkdown(const ProviderUsage &usage)
+{
+    const QString summary = formatProviderUsageSummary(usage);
+    if (summary.isEmpty())
+        return {};
+
+    return QStringLiteral(
+               "<span style=\"color:#7aa2f7;\"><strong>Usage:</strong> %1</span>")
+        .arg(summary.toHtmlEscaped());
+}
+
 class DiffHighlighter final : public QSyntaxHighlighter
 {
 public:
@@ -578,6 +589,8 @@ AgentDockWidget::AgentDockWidget(AgentController *controller, QWidget *parent)
 
     // Connect controller signals
     connect(m_controller, &AgentController::logMessage, this, &AgentDockWidget::onLogMessage);
+    connect(m_controller, &AgentController::providerUsageAvailable, this,
+            &AgentDockWidget::onProviderUsageAvailable);
     connect(m_controller, &AgentController::streamingToken, this, [this](const QString &token) {
         m_streamingMarkdown += token;
         m_streamingMarkdown = redactReadFilePayloads(m_streamingMarkdown);
@@ -1081,6 +1094,23 @@ void AgentDockWidget::onLogMessage(const QString &msg)
     if (text.isEmpty())
         return;
 
+    appendStampedLogEntry(text);
+}
+
+void AgentDockWidget::onProviderUsageAvailable(const ProviderUsage &usage)
+{
+    const QString body = providerUsageMarkdown(usage);
+    if (body.isEmpty())
+        return;
+
+    appendStampedLogEntry(body);
+}
+
+void AgentDockWidget::appendStampedLogEntry(const QString &body)
+{
+    if (body.trimmed().isEmpty())
+        return;
+
     if (!m_streamingMarkdown.isEmpty())
     {
         if (!m_logMarkdown.isEmpty())
@@ -1091,7 +1121,7 @@ void AgentDockWidget::onLogMessage(const QString &msg)
 
     const QString stamped =
         QStringLiteral("`[%1]`  %2")
-            .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss")), text);
+            .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss")), body);
 
     if (!m_logMarkdown.isEmpty())
         m_logMarkdown += QStringLiteral("\n\n");

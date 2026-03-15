@@ -46,6 +46,23 @@ target_link_libraries(tst_qcai2_agent_messages PRIVATE
 )
 add_test(NAME qcai2_agent_messages COMMAND tst_qcai2_agent_messages)
 
+add_executable(tst_qcai2_provider_usage
+    tst_provider_usage.cpp
+    ../src/providers/ProviderUsage.cpp
+    ../src/util/Json.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_provider_usage)
+
+target_include_directories(tst_qcai2_provider_usage PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_provider_usage PRIVATE
+    Qt::Core
+    Qt::Test
+)
+add_test(NAME qcai2_provider_usage COMMAND tst_qcai2_provider_usage)
+
 add_executable(tst_qcai2_slash_commands
     tst_slash_commands.cpp
     ../src/commands/SlashCommandRegistry.cpp

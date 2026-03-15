@@ -447,6 +447,8 @@ add_qtc_plugin(qcai2
     src/src/tools/IdeTools.h
     src/src/tools/IdeTools.cpp
     src/src/providers/IAIProvider.h
+    src/src/providers/ProviderUsage.h
+    src/src/providers/ProviderUsage.cpp
     src/src/providers/OpenAICompatibleProvider.h
     src/src/providers/OpenAICompatibleProvider.cpp
     src/src/providers/LocalHttpProvider.h
@@ -637,7 +639,7 @@ endif()
 
 qcai2_collect_target_cpp_sources(QCAI2_CLANG_TIDY_SOURCES qcai2)
 set(QCAI2_CLANG_ANALYZER_BUILD_TARGETS qcai2)
-foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_slash_commands tst_qcai2_migration)
+foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_agent_messages tst_qcai2_provider_usage tst_qcai2_slash_commands tst_qcai2_safety_policy tst_qcai2_mcp_config tst_qcai2_tool_registry tst_qcai2_migration)
     if(TARGET ${qcai2_test_target})
         qcai2_collect_target_cpp_sources(qcai2_test_sources ${qcai2_test_target})
         list(APPEND QCAI2_CLANG_TIDY_SOURCES ${qcai2_test_sources})

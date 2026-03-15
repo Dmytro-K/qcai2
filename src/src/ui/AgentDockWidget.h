@@ -85,6 +85,12 @@ private slots:
     void onLogMessage(const QString &msg);
 
     /**
+     * Appends a highlighted provider usage summary line to the log view.
+     * @param usage Usage counters returned by the provider.
+     */
+    void onProviderUsageAvailable(const ProviderUsage &usage);
+
+    /**
      * Rebuilds the plan tab from the latest plan steps.
      * @param steps Plan steps to display.
      */
@@ -151,6 +157,11 @@ private:
      * Flushes buffered log text into the visible log widget.
      */
     void renderLog();
+
+    /**
+     * Appends one timestamped markdown entry to the committed log buffer.
+     */
+    void appendStampedLogEntry(const QString &body);
 
     /**
      * Returns the combined committed and streaming markdown for the Actions Log.
