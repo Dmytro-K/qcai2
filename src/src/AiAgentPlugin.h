@@ -21,6 +21,8 @@ class IdeOutputCapture;
 namespace Internal
 {
 
+class AiAgentNavigationWidgetFactory;
+
 /** Qt Creator plugin that assembles providers, tools, controller state, and UI. */
 class AiAgentPlugin final : public ExtensionSystem::IPlugin
 {
@@ -55,9 +57,9 @@ public:
 
 private:
     /**
-     * Creates the dock widget once the main window is available.
+     * Activates the AI Agent sidebar widget once the main window is available.
      */
-    void createDockWidget();
+    void showNavigationWidget();
 
     /**
      * Instantiates all supported providers and selects the active one.
@@ -106,6 +108,9 @@ private:
 
     /** Captures Qt Creator Compile Output and Application Output for agent tools. */
     IdeOutputCapture *m_outputCapture = nullptr;
+
+    /** Sidebar factory that hosts the AI Agent inside Qt Creator navigation panels. */
+    AiAgentNavigationWidgetFactory *m_navigationWidgetFactory = nullptr;
 
 };
 

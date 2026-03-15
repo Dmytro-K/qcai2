@@ -31,19 +31,41 @@
 #include <coreplugin/coreconstants.h>
 #include <coreplugin/editormanager/editormanager.h>
 #include <coreplugin/icore.h>
+#include <coreplugin/inavigationwidgetfactory.h>
 #include <coreplugin/navigationwidget.h>
 #include <texteditor/textdocument.h>
 #include <texteditor/texteditor.h>
 
 #include <QAction>
-#include <QDockWidget>
-#include <QMainWindow>
 #include <QMenu>
 
 using namespace Core;
 
 namespace qcai2::Internal
 {
+
+class AiAgentNavigationWidgetFactory final : public INavigationWidgetFactory
+{
+public:
+    explicit AiAgentNavigationWidgetFactory(AgentController *controller, QObject *parent = nullptr)
+        : INavigationWidgetFactory(), m_controller(controller)
+    {
+        setParent(parent);
+        setDisplayName(Tr::tr("AI Agent"));
+        setId(Constants::NAVIGATION_ID);
+        setPriority(200);
+    }
+
+private:
+    NavigationView createWidget() override
+    {
+        auto *widget = new AgentDockWidget(m_controller);
+        widget->setObjectName(QStringLiteral("qcai2.AgentNavigationWidget"));
+        return {widget, {}};
+    }
+
+    AgentController *m_controller = nullptr;
+};
 
 AiAgentPlugin::AiAgentPlugin() = default;
 
@@ -91,6 +113,7 @@ void AiAgentPlugin::initialize()
     m_controller->setEditorContext(m_editorContext);
     m_controller->setMcpToolManager(m_mcpToolManager);
     m_controller->setSafetyPolicy(m_safetyPolicy);
+    m_navigationWidgetFactory = new AiAgentNavigationWidgetFactory(m_controller, this);
 
     // Set up AI code completion
     m_completionProvider = new AiCompletionProvider(this);
@@ -135,7 +158,7 @@ void AiAgentPlugin::initialize()
     // Register settings page
     new SettingsPage;  // auto-registers with Core
 
-    // Add menu action to show the agent dock
+    // Add menu action to show the agent sidebar
     ActionContainer *menu = ActionManager::createMenu(Constants::MENU_ID);
     menu->menu()->setTitle(Tr::tr("AI Agent"));
     ActionManager::actionContainer(Core::Constants::M_TOOLS)->addMenu(menu);
@@ -144,13 +167,13 @@ void AiAgentPlugin::initialize()
         .addToContainer(Constants::MENU_ID)
         .setText(Tr::tr("Show AI Agent"))
         .setDefaultKeySequence(Tr::tr("Ctrl+Alt+Meta+A"))
-        .addOnTriggered(this, &AiAgentPlugin::createDockWidget);
+        .addOnTriggered(this, &AiAgentPlugin::showNavigationWidget);
 }
 
 void AiAgentPlugin::extensionsInitialized()
 {
-    // Create dock on startup
-    createDockWidget();
+    // Show the navigation widget on startup
+    showNavigationWidget();
 }
 
 AiAgentPlugin::ShutdownFlag AiAgentPlugin::aboutToShutdown()
@@ -161,30 +184,24 @@ AiAgentPlugin::ShutdownFlag AiAgentPlugin::aboutToShutdown()
     return SynchronousShutdown;
 }
 
-void AiAgentPlugin::createDockWidget()
+void AiAgentPlugin::showNavigationWidget()
 {
-    static bool created = false;
-    if (created)
-        return;
-    created = true;
-
-    QMainWindow *mw = ICore::mainWindow();
-    if (mw == nullptr)
+    if (ICore::mainWindow() == nullptr)
     {
         QCAI_ERROR("Plugin",
-                   QStringLiteral("Main window not available yet, deferring dock creation"));
-        created = false;
+                   QStringLiteral("Main window not available yet, deferring AI Agent sidebar activation"));
         // Retry later
-        QMetaObject::invokeMethod(this, &AiAgentPlugin::createDockWidget, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, &AiAgentPlugin::showNavigationWidget, Qt::QueuedConnection);
         return;
     }
 
-    auto *dockWidget = new QDockWidget(Tr::tr("AI Agent"), mw);
-    dockWidget->setObjectName(QStringLiteral("qcai2.AgentDock"));
-    auto *agentWidget = new AgentDockWidget(m_controller, dockWidget);
-    dockWidget->setWidget(agentWidget);
-    mw->addDockWidget(Qt::RightDockWidgetArea, dockWidget);
-    QCAI_INFO("Plugin", QStringLiteral("Dock widget created"));
+    if (NavigationWidget::activateSubWidget(Constants::NAVIGATION_ID, Side::Right) == nullptr)
+    {
+        QCAI_ERROR("Plugin", QStringLiteral("Failed to activate AI Agent navigation widget"));
+        return;
+    }
+
+    QCAI_INFO("Plugin", QStringLiteral("AI Agent navigation widget activated"));
 }
 
 void AiAgentPlugin::setupProviders()

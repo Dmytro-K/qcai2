@@ -13,6 +13,7 @@
 
 - The dock now auto-reloads project session state when session files are changed externally.
 - Project session files now use stable `.qcai2/session.*` names.
+- Moved `AI Agent` from a standalone dock widget into Qt Creator's navigation/sidebar area
 
 ## [0.0.4] - 2026-03-12
 

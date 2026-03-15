@@ -7,6 +7,9 @@ namespace qcai2::Constants
 /** Action id used to register the sample menu command. */
 const char ACTION_ID[] = "qcai2.ShowAgent";
 
+/** Navigation widget id used to register the AI Agent in Qt Creator sidebars. */
+const char NAVIGATION_ID[] = "qcai2.Navigation.AiAgent";
+
 /** Menu id used to create the sample Tools submenu. */
 const char MENU_ID[] = "qcai2.Menu";
 
