@@ -327,7 +327,8 @@ McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
     m_enabledCheck = new QCheckBox(tr("Enabled"), editorGroup);
     m_transportCombo = new QComboBox(editorGroup);
     m_transportCombo->setEditable(true);
-    m_transportCombo->addItems({QStringLiteral("stdio"), QStringLiteral("http")});
+    m_transportCombo->addItems(
+        {QStringLiteral("stdio"), QStringLiteral("http"), QStringLiteral("sse")});
     m_startupTimeoutSpin = new QSpinBox(editorGroup);
     m_startupTimeoutSpin->setRange(0, 600000);
     m_startupTimeoutSpin->setSuffix(tr(" ms"));
@@ -729,7 +730,7 @@ void McpServersWidget::updateTransportPage(const QString &transport)
     {
         m_transportPages->setCurrentIndex(0);
     }
-    else if (((normalized == QStringLiteral("http")) == true))
+    else if (normalized == QStringLiteral("http") || normalized == QStringLiteral("sse"))
     {
         m_transportPages->setCurrentIndex(1);
     }

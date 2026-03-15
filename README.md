@@ -6,7 +6,7 @@
 
 - [x] Autonomous agent loop (plan → act → observe → verify) with Ask and Agent modes
 - [x] Multiple LLM providers: OpenAI-compatible, GitHub Copilot, Ollama, custom local
-- [x] MCP support (stdio + HTTP/OAuth) with per-project and global server configs
+- [x] MCP support (stdio, HTTP/OAuth, SSE) with per-project and global server configs
 - [x] Diff review with per-line accept/reject and inline editor markers
 - [x] AI code completion with inline ghost-text suggestions
 - [x] Chat history, rolling summaries, and context budgeting
