@@ -182,9 +182,9 @@ QString redactReadFilePayloads(const QString &markdown)
     return rewritten;
 }
 
-QString providerUsageMarkdown(const ProviderUsage &usage)
+QString providerUsageMarkdown(const ProviderUsage &usage, qint64 durationMs)
 {
-    const QString summary = formatProviderUsageSummary(usage);
+    const QString summary = formatProviderUsageSummary(usage, durationMs);
     if (summary.isEmpty() == true)
     {
         return {};
@@ -1179,9 +1179,9 @@ void AgentDockWidget::onLogMessage(const QString &msg)
     appendStampedLogEntry(text);
 }
 
-void AgentDockWidget::onProviderUsageAvailable(const ProviderUsage &usage)
+void AgentDockWidget::onProviderUsageAvailable(const ProviderUsage &usage, qint64 durationMs)
 {
-    const QString body = providerUsageMarkdown(usage);
+    const QString body = providerUsageMarkdown(usage, durationMs);
     if (body.isEmpty())
     {
         return;

@@ -538,6 +538,7 @@ void AgentController::runNextIteration()
 
     m_waitingForProvider = true;
     m_providerActivitySeen = false;
+    m_providerRequestTimer.start();
     emit logMessage(QStringLiteral("⏳ Waiting for model response..."));
     armProviderWatchdog();
 
@@ -571,6 +572,8 @@ void AgentController::handleResponse(const QString &response, const QString &err
     }
 
     disarmProviderWatchdog();
+    const qint64 requestDurationMs =
+        (m_providerRequestTimer.isValid() == true) ? m_providerRequestTimer.elapsed() : -1;
 
     if (!error.isEmpty())
     {
@@ -584,10 +587,10 @@ void AgentController::handleResponse(const QString &response, const QString &err
         return;
     }
 
-    if (usage.hasAny())
+    if ((usage.hasAny() == true) || (requestDurationMs >= 0))
     {
         m_accumulatedUsage = accumulateUsage(m_accumulatedUsage, usage);
-        emit providerUsageAvailable(usage);
+        emit providerUsageAvailable(usage, requestDurationMs);
     }
 
     // Add assistant message to history

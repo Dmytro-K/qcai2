@@ -89,8 +89,9 @@ private slots:
     /**
      * Appends a highlighted provider usage summary line to the log view.
      * @param usage Usage counters returned by the provider.
+     * @param durationMs Wall-clock duration of the completed request in milliseconds.
      */
-    void onProviderUsageAvailable(const ProviderUsage &usage);
+    void onProviderUsageAvailable(const ProviderUsage &usage, qint64 durationMs);
 
     /**
      * Rebuilds the plan tab from the latest plan steps.

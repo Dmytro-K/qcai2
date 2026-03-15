@@ -24,6 +24,35 @@ int firstNonNegative(std::initializer_list<int> values)
     return -1;
 }
 
+QString formatDurationPart(std::int64_t durationMs)
+{
+    if (durationMs < 0)
+    {
+        return {};
+    }
+    if (durationMs < 1000)
+    {
+        return QStringLiteral("time %1 ms").arg(durationMs);
+    }
+
+    const double seconds = static_cast<double>(durationMs) / 1000.0;
+    if (seconds < 10.0)
+    {
+        return QStringLiteral("time %1 s").arg(QString::number(seconds, 'f', 2));
+    }
+    if (seconds < 60.0)
+    {
+        return QStringLiteral("time %1 s").arg(QString::number(seconds, 'f', 1));
+    }
+
+    const qint64 totalSeconds = durationMs / 1000;
+    const qint64 minutes = totalSeconds / 60;
+    const qint64 remainingSeconds = totalSeconds % 60;
+    return QStringLiteral("time %1m %2s")
+        .arg(minutes)
+        .arg(remainingSeconds, 2, 10, QLatin1Char('0'));
+}
+
 }  // namespace
 
 bool ProviderUsage::hasAny() const
@@ -73,9 +102,9 @@ ProviderUsage providerUsageFromResponseObject(const QJsonObject &responseObject)
     return usage;
 }
 
-QString formatProviderUsageSummary(const ProviderUsage &usage)
+QString formatProviderUsageSummary(const ProviderUsage &usage, std::int64_t durationMs)
 {
-    if (usage.hasAny() == false)
+    if ((usage.hasAny() == false) && (durationMs < 0))
     {
         return {};
     }
@@ -102,6 +131,12 @@ QString formatProviderUsageSummary(const ProviderUsage &usage)
     if (((usage.cachedInputTokens >= 0) == true))
     {
         parts.append(QStringLiteral("cached input %1").arg(usage.cachedInputTokens));
+    }
+
+    const QString durationPart = formatDurationPart(durationMs);
+    if (durationPart.isEmpty() == false)
+    {
+        parts.append(durationPart);
     }
 
     return parts.join(QStringLiteral(" | "));
