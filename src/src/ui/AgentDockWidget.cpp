@@ -610,10 +610,11 @@ void DiffLineNumberArea::mousePressEvent(QMouseEvent *event)
 
 }  // namespace
 
-AgentDockWidget::AgentDockWidget(AgentController *controller, QWidget *parent)
+AgentDockWidget::AgentDockWidget(AgentController *controller,
+                                 ChatContextManager *chatContextManager, QWidget *parent)
     : QWidget(parent), m_controller(controller),
       m_linkedFilesController(std::make_unique<AgentDockLinkedFilesController>(*this)),
-      m_sessionController(std::make_unique<AgentDockSessionController>(*this))
+      m_sessionController(std::make_unique<AgentDockSessionController>(*this, chatContextManager))
 {
     setupUi();
 
@@ -943,6 +944,7 @@ void AgentDockWidget::setupUi()
             onStopClicked();
         }
 
+        m_sessionController->startNewConversation();
         clearChatState();
         m_sessionController->saveChat();
     });

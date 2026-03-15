@@ -9,6 +9,7 @@ namespace qcai2
 {
 
 class IAIProvider;
+class ChatContextManager;
 
 /**
  * Runs an asynchronous AI completion request for a single assist session.
@@ -21,7 +22,8 @@ public:
      * @param provider Non-owning AI backend.
      * @param model Model name used for the request.
      */
-    AiCompletionProcessor(IAIProvider *provider, const QString &model);
+    AiCompletionProcessor(IAIProvider *provider, ChatContextManager *chatContextManager,
+                          const QString &model);
 
     /**
      * Marks the processor as no longer alive for async callbacks.
@@ -53,6 +55,9 @@ private:
     /** Model name passed to the provider. */
     QString m_model;
 
+    /** Shared persistent chat context used for lightweight completion retrieval. */
+    ChatContextManager *m_chatContextManager = nullptr;
+
     /** True while an async request is in flight. */
     bool m_running = false;
 
@@ -61,7 +66,6 @@ private:
 
     /** Guards callbacks against use-after-free after the processor is destroyed. */
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
-
 };
 
 }  // namespace qcai2

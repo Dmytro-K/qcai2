@@ -1,6 +1,5 @@
 /*! Declares the core plan-act-observe controller that drives an agent session. */
 #include <cstdint>
-#include <cstdint>
 #pragma once
 
 #include "context/EditorContext.h"
@@ -9,6 +8,7 @@
 #include "safety/SafetyPolicy.h"
 #include "tools/ToolRegistry.h"
 
+#include <QJsonObject>
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -18,6 +18,7 @@ namespace qcai2
 {
 
 class McpToolManager;
+class ChatContextManager;
 
 /**
  * Coordinates one agent run from planning through tool execution and completion.
@@ -64,6 +65,12 @@ public:
      * @param ctx Editor context used for prompt generation.
      */
     void setEditorContext(EditorContext *ctx);
+
+    /**
+     * Sets the persistent chat context manager used for long-lived history.
+     * @param manager Shared context manager instance.
+     */
+    void setChatContextManager(ChatContextManager *manager);
 
     /**
      * Sets the MCP runtime bridge used to expose configured MCP tools.
@@ -261,6 +268,23 @@ private:
      */
     void handleProviderInactivityTimeout();
 
+    /**
+     * Persists one controller-authored user message in both prompt state and chat history.
+     */
+    void appendControllerUserMessage(const QString &content, const QString &source,
+                                     const QJsonObject &metadata = {});
+
+    /**
+     * Persists one assistant response in both prompt state and chat history.
+     */
+    void appendAssistantHistoryMessage(const QString &content, const QString &source,
+                                       const QJsonObject &metadata = {});
+
+    /**
+     * Finalizes the current persistent run record, if any.
+     */
+    void finalizePersistentRun(const QString &status, const QJsonObject &metadata = {});
+
     /** Active provider used for the current run. */
     IAIProvider *m_provider = nullptr;
 
@@ -272,6 +296,9 @@ private:
 
     /** Editor and project snapshot provider. */
     EditorContext *m_editorContext = nullptr;
+
+    /** Persistent chat context manager shared across runs and workspaces. */
+    ChatContextManager *m_chatContextManager = nullptr;
 
     /** Runtime bridge that injects configured MCP tools before agent runs. */
     McpToolManager *m_mcpToolManager = nullptr;
@@ -321,6 +348,12 @@ private:
     /** Conversation history replayed to the provider every iteration. */
     QList<ChatMessage> m_messages;
 
+    /** Persistent run id backing the current controller run. */
+    QString m_runId;
+
+    /** Accumulated provider usage across all model requests in the current run. */
+    ProviderUsage m_accumulatedUsage;
+
     /** Most recent multi-step plan returned by the model. */
     QList<PlanStep> m_plan;
 
@@ -338,7 +371,6 @@ private:
 
         /** Tool arguments to replay after approval. */
         QJsonObject toolArgs;
-
     };
     /** Queue of tool calls waiting for user approval. */
     QList<PendingApproval> m_pendingApprovals;
@@ -354,7 +386,6 @@ private:
 
     /** Tracks whether the current request has produced any visible activity yet. */
     bool m_providerActivitySeen = false;
-
 };
 
 }  // namespace qcai2

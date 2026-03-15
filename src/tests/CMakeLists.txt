@@ -63,6 +63,31 @@ target_link_libraries(tst_qcai2_provider_usage PRIVATE
 )
 add_test(NAME qcai2_provider_usage COMMAND tst_qcai2_provider_usage)
 
+add_executable(tst_qcai2_chat_context
+    tst_chat_context.cpp
+    ../src/context/ChatContext.h
+    ../src/context/ChatContext.cpp
+    ../src/context/ChatContextStore.h
+    ../src/context/ChatContextStore.cpp
+    ../src/context/ChatContextManager.h
+    ../src/context/ChatContextManager.cpp
+    ../src/models/AgentMessages.cpp
+    ../src/providers/ProviderUsage.cpp
+    ../src/util/Json.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_chat_context)
+
+target_include_directories(tst_qcai2_chat_context PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/lib/qtmcp/include"
+)
+target_link_libraries(tst_qcai2_chat_context PRIVATE
+    Qt::Core
+    Qt::Test
+)
+add_test(NAME qcai2_chat_context COMMAND tst_qcai2_chat_context)
+
 add_executable(tst_qcai2_slash_commands
     tst_slash_commands.cpp
     ../src/commands/SlashCommandRegistry.cpp

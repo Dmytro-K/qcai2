@@ -3,6 +3,7 @@
 */
 
 #include "AiCompletionProcessor.h"
+#include "../context/ChatContextManager.h"
 #include "../models/AgentMessages.h"
 #include "../providers/IAIProvider.h"
 #include "../settings/Settings.h"
@@ -20,8 +21,10 @@ namespace qcai2
 static const int kContextBefore = 2000;  // chars before cursor
 static const int kContextAfter = 500;    // chars after cursor
 
-AiCompletionProcessor::AiCompletionProcessor(IAIProvider *provider, const QString &model)
-    : m_provider(provider), m_model(model)
+AiCompletionProcessor::AiCompletionProcessor(IAIProvider *provider,
+                                             ChatContextManager *chatContextManager,
+                                             const QString &model)
+    : m_provider(provider), m_model(model), m_chatContextManager(chatContextManager)
 {
 }
 
@@ -85,6 +88,21 @@ TextEditor::IAssistProposal *AiCompletionProcessor::perform()
                                     "Return only the code that should be inserted at the cursor. "
                                     "No explanations, no markdown fences, no comments. "
                                     "Keep completions short (1-5 lines).")});
+    if (m_chatContextManager != nullptr)
+    {
+        QString contextError;
+        const QString completionContext =
+            m_chatContextManager->buildCompletionContextBlock(fileName, 128, &contextError);
+        if (contextError.isEmpty() == false)
+        {
+            QCAI_WARN("Completion",
+                      QStringLiteral("Failed to build completion context: %1").arg(contextError));
+        }
+        else if (completionContext.isEmpty() == false)
+        {
+            messages.append({QStringLiteral("system"), completionContext});
+        }
+    }
     messages.append({QStringLiteral("user"), prompt});
 
     m_running = true;

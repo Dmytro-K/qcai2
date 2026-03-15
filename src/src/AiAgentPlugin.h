@@ -9,6 +9,7 @@ namespace qcai2
 class AgentController;
 class AgentDockWidget;
 class EditorContext;
+class ChatContextManager;
 class McpToolManager;
 class ToolRegistry;
 class SafetyPolicy;
@@ -82,6 +83,9 @@ private:
     /** Captures active editor and project context for prompts. */
     EditorContext *m_editorContext = nullptr;
 
+    /** Owns persistent SQLite-backed chat context for each workspace. */
+    ChatContextManager *m_chatContextManager = nullptr;
+
     /** Loads configured MCP servers and exposes their tools at runtime. */
     McpToolManager *m_mcpToolManager = nullptr;
 
@@ -111,7 +115,6 @@ private:
 
     /** Sidebar factory that hosts the AI Agent inside Qt Creator navigation panels. */
     AiAgentNavigationWidgetFactory *m_navigationWidgetFactory = nullptr;
-
 };
 
 }  // namespace Internal

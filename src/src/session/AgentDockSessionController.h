@@ -15,17 +15,20 @@ namespace qcai2
 {
 
 class AgentDockWidget;
+class ChatContextManager;
 
 class AgentDockSessionController
 {
 public:
-    explicit AgentDockSessionController(AgentDockWidget &dock);
+    explicit AgentDockSessionController(AgentDockWidget &dock,
+                                        ChatContextManager *chatContextManager);
     ~AgentDockSessionController();
 
     void saveChat();
     void restoreChat();
     void refreshProjectSelector();
     void switchProjectContext(const QString &projectFilePath);
+    void startNewConversation();
 
     QString currentProjectFilePath() const;
     QString currentProjectStorageFilePath() const;
@@ -43,7 +46,9 @@ private:
     QString projectDirForPath(const QString &projectFilePath) const;
 
     AgentDockWidget &m_dock;
+    ChatContextManager *m_chatContextManager = nullptr;
     QString m_activeProjectFilePath;
+    QString m_activeConversationId;
     qtmcp::ServerDefinitions m_projectMcpServers;
     std::unique_ptr<QFileSystemWatcher> m_sessionFileWatcher;
     std::unique_ptr<QTimer> m_sessionReloadTimer;
