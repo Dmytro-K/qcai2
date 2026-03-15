@@ -79,7 +79,9 @@ void macroTestCommand(const SlashCommandInvocation &invocation, const SlashComma
     Q_UNUSED(invocation);
 
     if (context.logMessage)
+    {
         context.logMessage(QStringLiteral("Macro test"));
+    }
 }
 
 DECLARE_COMMAND(macro_test, "Auto-registered test command.", macroTestCommand)
@@ -96,8 +98,8 @@ void SlashCommandRegistryTest::dispatch_nonSlashInput_isIgnored()
 {
     SlashCommandRegistry registry;
 
-    const SlashCommandDispatchResult result = registry.dispatch(
-        QStringLiteral("explain this file"), SlashCommandContext{});
+    const SlashCommandDispatchResult result =
+        registry.dispatch(QStringLiteral("explain this file"), SlashCommandContext{});
 
     QVERIFY(!result.isSlashCommand);
     QVERIFY(!result.executed);
@@ -123,8 +125,9 @@ void SlashCommandRegistryTest::dispatch_hello_logsHelloWorld()
     QStringList logEntries;
 
     const SlashCommandDispatchResult result = registry.dispatch(
-        QStringLiteral("/hello"),
-        SlashCommandContext{[&logEntries](const QString &message) { logEntries.append(message); }});
+        QStringLiteral("/hello"), SlashCommandContext{[&logEntries](const QString &message) {
+            logEntries.append(message);
+        }});
 
     QVERIFY(result.isSlashCommand);
     QVERIFY(result.executed);
@@ -138,8 +141,9 @@ void SlashCommandRegistryTest::dispatch_macroDeclaredCommand_isRegistered()
     QStringList logEntries;
 
     const SlashCommandDispatchResult result = registry.dispatch(
-        QStringLiteral("/macro_test"),
-        SlashCommandContext{[&logEntries](const QString &message) { logEntries.append(message); }});
+        QStringLiteral("/macro_test"), SlashCommandContext{[&logEntries](const QString &message) {
+            logEntries.append(message);
+        }});
 
     QVERIFY(result.isSlashCommand);
     QVERIFY(result.executed);

@@ -30,18 +30,24 @@ QJsonObject SearchRepoTool::argsSchema() const
 QString SearchRepoTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString pattern = args.value("pattern").toString();
-    if (pattern.isEmpty())
+    if (pattern.isEmpty() == true)
+    {
         return QStringLiteral("Error: 'pattern' argument is required.");
+    }
 
     const QString glob = args.value("glob").toString();
     int maxResults = args.value("max_results").toInt(30);
-    if (maxResults < 1)
+    if (((maxResults < 1) == true))
+    {
         maxResults = 30;
+    }
 
     // Try ripgrep first
     const QString rgPath = QStandardPaths::findExecutable(QStringLiteral("rg"));
-    if (!rgPath.isEmpty())
+    if (rgPath.isEmpty() == false)
+    {
         return searchWithRipgrep(pattern, glob, maxResults, workDir);
+    }
 
     return searchFallback(pattern, glob, maxResults, workDir);
 }
@@ -61,8 +67,10 @@ QString SearchRepoTool::searchWithRipgrep(const QString &pattern, const QString 
     args << QStringLiteral("--no-heading") << QStringLiteral("--line-number")
          << QStringLiteral("--max-count") << QString::number(maxResults);
 
-    if (!glob.isEmpty())
+    if (glob.isEmpty() == false)
+    {
         args << QStringLiteral("--glob") << glob;
+    }
 
     args << pattern << QStringLiteral(".");
 
@@ -70,9 +78,13 @@ QString SearchRepoTool::searchWithRipgrep(const QString &pattern, const QString 
     auto result = runner.run(QStringLiteral("rg"), args, workDir, 15000);
 
     if (result.exitCode == 1)
+    {
         return QStringLiteral("No matches found.");
+    }
     if (!result.success && result.exitCode != 1)
+    {
         return QStringLiteral("Error running rg: %1").arg(result.stdErr);
+    }
 
     return result.stdOut;
 }
@@ -89,12 +101,16 @@ QString SearchRepoTool::searchFallback(const QString &pattern, const QString &gl
                                        const QString &workDir)
 {
     QRegularExpression re(pattern);
-    if (!re.isValid())
+    if (re.isValid() == false)
+    {
         return QStringLiteral("Error: invalid regex: %1").arg(re.errorString());
+    }
 
     QStringList nameFilters;
-    if (!glob.isEmpty())
+    if (glob.isEmpty() == false)
+    {
         nameFilters << glob;
+    }
 
     QDirIterator it(workDir,
                     nameFilters.isEmpty() ? QStringList{QStringLiteral("*")} : nameFilters,
@@ -102,16 +118,18 @@ QString SearchRepoTool::searchFallback(const QString &pattern, const QString &gl
 
     QStringList results;
     int count = 0;
-    while (it.hasNext() && count < maxResults)
+    while (((it.hasNext() && count < maxResults) == true))
     {
         it.next();
         QFile file(it.filePath());
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text) == false)
+        {
             continue;
+        }
 
         QTextStream in(&file);
         int lineNum = 0;
-        while (!in.atEnd() && count < maxResults)
+        while (((!in.atEnd() && count < maxResults) == true))
         {
             ++lineNum;
             const QString line = in.readLine();

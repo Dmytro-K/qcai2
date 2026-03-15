@@ -40,19 +40,25 @@ QString SafetyPolicy::requiresApproval(const QString &toolName, int filesChanged
                                        int linesChanged) const
 {
     // Always require approval for certain tools
-    if (m_approvalRequiredTools.contains(toolName))
+    if (m_approvalRequiredTools.contains(toolName) == true)
+    {
         return QStringLiteral("Tool '%1' modifies files and requires approval.").arg(toolName);
+    }
 
     // Check size limits
-    if (filesChanged > m_maxChangedFiles)
+    if (((filesChanged > m_maxChangedFiles) == true))
+    {
         return QStringLiteral("Too many files changed (%1 > %2).")
             .arg(filesChanged)
             .arg(m_maxChangedFiles);
+    }
 
-    if (linesChanged > m_maxDiffLines)
+    if (((linesChanged > m_maxDiffLines) == true))
+    {
         return QStringLiteral("Too many lines changed (%1 > %2).")
             .arg(linesChanged)
             .arg(m_maxDiffLines);
+    }
 
     return {};  // No approval needed
 }
@@ -62,7 +68,7 @@ bool SafetyPolicy::isPathSafe(const QString &path, const QString &workDir) const
     const QString canonical = QFileInfo(path).canonicalFilePath();
     const QString workCanonical = QDir(workDir).canonicalPath();
 
-    if (canonical.isEmpty())
+    if (canonical.isEmpty() == true)
     {
         QCAI_WARN("Safety", QStringLiteral("Path '%1' does not exist").arg(path));
         return false;

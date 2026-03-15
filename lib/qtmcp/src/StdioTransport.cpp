@@ -77,7 +77,7 @@ StdioTransport::StdioTransport(StdioTransportConfig config, QObject *parent)
             const QString reason = status == QProcess::CrashExit ? QStringLiteral("crashed")
                                                                  : QStringLiteral("exited");
             setState(State::Disconnected);
-            if (!m_stdoutBuffer.trimmed().isEmpty())
+            if (((!m_stdoutBuffer.trimmed().isEmpty()) == true))
             {
                 emit errorOccurred(QStringLiteral(
                     "MCP stdio transport stopped with an incomplete buffered message."));
@@ -108,10 +108,12 @@ const StdioTransportConfig &StdioTransport::config() const
 
 void StdioTransport::start()
 {
-    if (m_state != State::Disconnected)
+    if (((m_state != State::Disconnected) == true))
+    {
         return;
+    }
 
-    if (m_config.program.trimmed().isEmpty())
+    if (((m_config.program.trimmed().isEmpty()) == true))
     {
         emit errorOccurred(
             QStringLiteral("MCP stdio transport requires a non-empty program path."));
@@ -121,8 +123,10 @@ void StdioTransport::start()
     m_stdoutBuffer.clear();
     m_process->setProgram(m_config.program);
     m_process->setArguments(m_config.arguments);
-    if (!m_config.workingDirectory.trimmed().isEmpty())
+    if (((!m_config.workingDirectory.trimmed().isEmpty()) == true))
+    {
         m_process->setWorkingDirectory(m_config.workingDirectory);
+    }
     m_process->setProcessEnvironment(m_config.environment);
 
     emit logMessage(QStringLiteral("Starting stdio transport: program=%1 args=[%2] cwd=%3")
@@ -135,30 +139,36 @@ void StdioTransport::start()
 
 void StdioTransport::stop()
 {
-    if (m_state == State::Disconnected || m_state == State::Stopping)
+    if (((m_state == State::Disconnected || m_state == State::Stopping) == true))
+    {
         return;
+    }
 
-    if (m_process->state() == QProcess::NotRunning)
+    if (((m_process->state() == QProcess::NotRunning) == true))
     {
         setState(State::Disconnected);
-        emit logMessage(QStringLiteral("stdio transport stop requested, process already stopped."));
+        emit logMessage(
+            QStringLiteral("stdio transport stop requested, process already stopped."));
         emit stopped();
         return;
     }
 
     setState(State::Stopping);
-    emit logMessage(QStringLiteral("Stopping stdio transport: pid=%1").arg(m_process->processId()));
+    emit logMessage(
+        QStringLiteral("Stopping stdio transport: pid=%1").arg(m_process->processId()));
     m_process->closeWriteChannel();
     m_process->terminate();
     QTimer::singleShot(3000, m_process, [process = m_process]() {
-        if (process->state() != QProcess::NotRunning)
+        if (((process->state() != QProcess::NotRunning) == true))
+        {
             process->kill();
+        }
     });
 }
 
 bool StdioTransport::sendMessage(const QJsonObject &message)
 {
-    if (m_state != State::Connected)
+    if (((m_state != State::Connected) == true))
     {
         emit errorOccurred(QStringLiteral(
             "Cannot send an MCP stdio message while the transport is disconnected."));
@@ -181,8 +191,10 @@ bool StdioTransport::sendMessage(const QJsonObject &message)
 
 void StdioTransport::setState(State state)
 {
-    if (m_state == state)
+    if (((m_state == state) == true))
+    {
         return;
+    }
 
     m_state = state;
     QString stateLabel = QStringLiteral("unknown");
@@ -221,38 +233,46 @@ void StdioTransport::consumeStderr()
     {
         const QString trimmed = line.trimmed();
         if (!trimmed.isEmpty())
+        {
             emit logMessage(trimmed);
+        }
     }
 }
 
 void StdioTransport::processBufferedMessages()
 {
-    while (true)
+    while (true == true)
     {
         const qsizetype newlineIndex = m_stdoutBuffer.indexOf('\n');
         if (newlineIndex < 0)
+        {
             return;
+        }
 
         QByteArray line = m_stdoutBuffer.left(newlineIndex);
         m_stdoutBuffer.remove(0, newlineIndex + 1);
 
-        if (line.endsWith('\r'))
+        if (line.endsWith('\r') == true)
+        {
             line.chop(1);
-        if (line.trimmed().isEmpty())
+        }
+        if (((line.trimmed().isEmpty()) == true))
+        {
             continue;
+        }
 
         emit logMessage(QStringLiteral("stdio <- %1").arg(formatPayloadForLog(line)));
 
         QJsonParseError parseError;
         const QJsonDocument document = QJsonDocument::fromJson(line, &parseError);
-        if (parseError.error != QJsonParseError::NoError)
+        if (((parseError.error != QJsonParseError::NoError) == true))
         {
             emit errorOccurred(QStringLiteral("Failed to parse MCP stdio JSON message: %1")
                                    .arg(parseError.errorString()));
             continue;
         }
 
-        if (!document.isObject())
+        if (document.isObject() == false)
         {
             emit errorOccurred(QStringLiteral("Received a non-object MCP stdio JSON message."));
             continue;

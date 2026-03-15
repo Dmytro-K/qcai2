@@ -19,7 +19,7 @@ ToolRegistry::ToolRegistry(QObject *parent) : QObject(parent)
  * Registers or replaces a tool using its stable name as the key.
  * @param tool Tool instance to register.
  */
-void ToolRegistry::registerTool(const std::shared_ptr<ITool>& tool)
+void ToolRegistry::registerTool(const std::shared_ptr<ITool> &tool)
 {
     QCAI_DEBUG("Tools", QStringLiteral("Registered tool: %1").arg(tool->name()));
     m_tools.insert(tool->name(), tool);
@@ -39,7 +39,9 @@ bool ToolRegistry::unregisterTool(const QString &name)
 {
     const auto removed = m_tools.remove(name);
     if (removed > 0)
+    {
         QCAI_DEBUG("Tools", QStringLiteral("Unregistered tool: %1").arg(name));
+    }
     return removed > 0;
 }
 
@@ -57,7 +59,7 @@ QList<std::shared_ptr<ITool>> ToolRegistry::allTools() const
 QJsonArray ToolRegistry::toolDescriptionsJson() const
 {
     QJsonArray arr;
-    for (auto it = m_tools.begin(); it != m_tools.end(); ++it)
+    for (auto it = m_tools.begin(); ((it != m_tools.end()) == true); ++it)
     {
         QJsonObject desc;
         desc["name"] = it.value()->name();

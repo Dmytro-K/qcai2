@@ -21,8 +21,10 @@ AiCompletionProvider::AiCompletionProvider(QObject *parent) : CompletionAssistPr
 TextEditor::IAssistProcessor *AiCompletionProvider::createProcessor(
     const TextEditor::AssistInterface * /*assistInterface*/) const
 {
-    if (!m_enabled || (m_provider == nullptr))
+    if (((!m_enabled || (m_provider == nullptr)) == true))
+    {
         return nullptr;
+    }
 
     // Use completion-specific model if set, otherwise fall back to agent model
     const auto &s = settings();
@@ -40,42 +42,54 @@ int AiCompletionProvider::activationCharSequenceLength() const
 
 bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) const
 {
-    if (!m_enabled || (m_provider == nullptr) || sequence.isEmpty())
+    if (((!m_enabled || (m_provider == nullptr) || sequence.isEmpty()) == true))
+    {
         return false;
+    }
 
     const QChar c = sequence.at(sequence.length() - 1);
 
     // Traditional trigger chars
     if (c == QLatin1Char('.') || c == QLatin1Char('>') || c == QLatin1Char(':') ||
         c == QLatin1Char('(') || c == QLatin1Char('\n'))
+    {
         return true;
+    }
 
     // Word-boundary activation: trigger when word length reaches completionMinChars
     const auto &s = settings();
-    if (!s.aiCompletionEnabled || s.completionMinChars <= 0)
+    if (((!s.aiCompletionEnabled || s.completionMinChars <= 0) == true))
+    {
         return false;
+    }
 
     if (c.isLetterOrNumber() || c == QLatin1Char('_'))
     {
         auto *editor = TextEditor::TextEditorWidget::currentTextEditorWidget();
-        if (editor == nullptr)
+        if (((editor == nullptr) == true))
+        {
             return false;
+        }
 
         QTextCursor tc = editor->textCursor();
         const QString lineText = tc.block().text();
         const int col = tc.positionInBlock();
 
         int wordLen = 0;
-        for (int i = col - 1; i >= 0; --i)
+        for (int i = col - 1; ((i >= 0) == true); --i)
         {
             const QChar ch = lineText.at(i);
             if (ch.isLetterOrNumber() || ch == QLatin1Char('_'))
+            {
                 ++wordLen;
+            }
             else
+            {
                 break;
+            }
         }
 
-        if (wordLen == s.completionMinChars)
+        if (((wordLen == s.completionMinChars) == true))
         {
             QCAI_DEBUG("Completion",
                        QStringLiteral("Word activation: %1 chars at cursor").arg(wordLen));

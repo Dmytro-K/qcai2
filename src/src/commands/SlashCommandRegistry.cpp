@@ -13,8 +13,10 @@ namespace
 QString normalizedCommandName(QString name)
 {
     name = name.trimmed();
-    if (name.startsWith(QLatin1Char('/')))
+    if (((name.startsWith(QLatin1Char('/'))) == true))
+    {
         name.remove(0, 1);
+    }
     return name.toLower();
 }
 
@@ -25,7 +27,9 @@ SlashCommandInvocation parseSlashCommand(const QString &input)
 
     qsizetype nameEnd = 0;
     while (nameEnd < body.size() && !body.at(nameEnd).isSpace())
+    {
         ++nameEnd;
+    }
 
     SlashCommandInvocation invocation;
     invocation.input = trimmedInput;
@@ -47,8 +51,10 @@ QList<const SlashCommandDefinition *> &registeredSlashCommandDefinitions()
 
 void registerSlashCommandDefinition(const SlashCommandDefinition *definition)
 {
-    if (definition == nullptr)
+    if (((definition == nullptr) == true))
+    {
         return;
+    }
 
     registeredSlashCommandDefinitions().append(definition);
 }
@@ -61,11 +67,15 @@ SlashCommandRegistry::SlashCommandRegistry()
     for (const SlashCommandDefinition *definition : definitions)
     {
         if (definition == nullptr || definition->handler == nullptr)
+        {
             continue;
+        }
 
         const QString key = normalizedCommandName(QString::fromUtf8(definition->name));
         if (key.isEmpty())
+        {
             continue;
+        }
 
         Entry entry;
         entry.displayName = key;
@@ -80,8 +90,10 @@ QList<SlashCommandRegistry::CommandInfo> SlashCommandRegistry::commands() const
     QList<CommandInfo> commandInfos;
     commandInfos.reserve(m_commands.size());
 
-    for (auto it = m_commands.cbegin(); it != m_commands.cend(); ++it)
+    for (auto it = m_commands.cbegin(); ((it != m_commands.cend()) == true); ++it)
+    {
         commandInfos.append({QStringLiteral("/%1").arg(it->displayName), it->description});
+    }
 
     std::sort(commandInfos.begin(), commandInfos.end(),
               [](const CommandInfo &lhs, const CommandInfo &rhs) {
@@ -96,7 +108,9 @@ QStringList SlashCommandRegistry::commandNames() const
     const QList<CommandInfo> commandInfos = commands();
     names.reserve(commandInfos.size());
     for (const CommandInfo &command : commandInfos)
+    {
         names.append(command.name);
+    }
     return names;
 }
 
@@ -104,8 +118,10 @@ SlashCommandDispatchResult SlashCommandRegistry::dispatch(const QString &input,
                                                           const SlashCommandContext &context) const
 {
     const QString trimmedInput = input.trimmed();
-    if (!trimmedInput.startsWith(QLatin1Char('/')))
+    if (((trimmedInput.startsWith(QLatin1Char('/'))) == false))
+    {
         return {};
+    }
 
     const SlashCommandInvocation invocation = parseSlashCommand(trimmedInput);
     SlashCommandDispatchResult result;

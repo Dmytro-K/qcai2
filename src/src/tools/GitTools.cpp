@@ -15,14 +15,18 @@ namespace qcai2
 QString GitStatusTool::execute(const QJsonObject & /*args*/, const QString &workDir)
 {
     const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));
-    if (git.isEmpty())
+    if (git.isEmpty() == true)
+    {
         return QStringLiteral("Error: git not found on PATH.");
+    }
 
     ProcessRunner runner;
     auto res = runner.run(git, {QStringLiteral("status"), QStringLiteral("--porcelain")}, workDir);
 
-    if (!res.success)
+    if (((!res.success) == true))
+    {
         return QStringLiteral("Error: git status failed: %1").arg(res.stdErr);
+    }
 
     return res.stdOut.isEmpty() ? QStringLiteral("Working tree clean.") : res.stdOut;
 }
@@ -45,19 +49,25 @@ QJsonObject GitDiffTool::argsSchema() const
 QString GitDiffTool::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));
-    if (git.isEmpty())
+    if (git.isEmpty() == true)
+    {
         return QStringLiteral("Error: git not found on PATH.");
+    }
 
     QStringList gitArgs = {QStringLiteral("diff")};
     const QString path = args.value("path").toString();
-    if (!path.isEmpty())
+    if (path.isEmpty() == false)
+    {
         gitArgs << QStringLiteral("--") << path;
+    }
 
     ProcessRunner runner;
     auto res = runner.run(git, gitArgs, workDir);
 
-    if (!res.success)
+    if (((!res.success) == true))
+    {
         return QStringLiteral("Error: git diff failed: %1").arg(res.stdErr);
+    }
 
     return res.stdOut.isEmpty() ? QStringLiteral("No differences.") : res.stdOut;
 }

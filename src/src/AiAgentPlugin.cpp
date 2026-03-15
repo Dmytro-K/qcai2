@@ -3,9 +3,9 @@
 #include "../qcai2constants.h"
 #include "../qcai2tr.h"
 #include "AgentController.h"
-#include "ui/AgentDockWidget.h"
 #include "completion/AiCompletionProvider.h"
 #include "completion/GhostTextManager.h"
+#include "ui/AgentDockWidget.h"
 // CompletionTrigger removed — completion triggers via isActivationCharSequence instead
 #include "context/EditorContext.h"
 #include "mcp/McpToolManager.h"
@@ -148,7 +148,9 @@ void AiAgentPlugin::initialize()
                                                .arg(doc->filePath().toUrlishString()));
                                 // Attach ghost-text overlay to the editor widget
                                 if (auto *widget = textEditor->editorWidget())
+                                {
                                     m_ghostTextManager->attachToEditor(widget);
+                                }
                             }
                         },
                         Qt::QueuedConnection);
@@ -179,7 +181,9 @@ void AiAgentPlugin::extensionsInitialized()
 AiAgentPlugin::ShutdownFlag AiAgentPlugin::aboutToShutdown()
 {
     if ((m_controller != nullptr) && m_controller->isRunning())
+    {
         m_controller->stop();
+    }
     settings().save();
     return SynchronousShutdown;
 }
@@ -189,9 +193,11 @@ void AiAgentPlugin::showNavigationWidget()
     if (ICore::mainWindow() == nullptr)
     {
         QCAI_ERROR("Plugin",
-                   QStringLiteral("Main window not available yet, deferring AI Agent sidebar activation"));
+                   QStringLiteral(
+                       "Main window not available yet, deferring AI Agent sidebar activation"));
         // Retry later
-        QMetaObject::invokeMethod(this, &AiAgentPlugin::showNavigationWidget, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, &AiAgentPlugin::showNavigationWidget,
+                                  Qt::QueuedConnection);
         return;
     }
 
@@ -231,9 +237,13 @@ void AiAgentPlugin::setupProviders()
     // GitHub Copilot (Node.js sidecar)
     auto *copilot = new CopilotProvider(this);
     if (!s.copilotNodePath.isEmpty())
+    {
         copilot->setNodePath(s.copilotNodePath);
+    }
     if (!s.copilotSidecarPath.isEmpty())
+    {
         copilot->setSidecarPath(s.copilotSidecarPath);
+    }
     m_copilotProvider = copilot;
     m_providers.append(copilot);
 
@@ -248,7 +258,9 @@ void AiAgentPlugin::setupProviders()
         }
     }
     if ((m_currentProvider == nullptr) && !m_providers.isEmpty())
+    {
         m_currentProvider = m_providers.first();
+    }
 
     m_controller->setProvider(m_currentProvider);
     m_controller->setProviders(m_providers);
@@ -262,7 +274,9 @@ void AiAgentPlugin::setupProviders()
 void AiAgentPlugin::refreshCopilotModels()
 {
     if (m_copilotProvider == nullptr)
+    {
         return;
+    }
 
     m_copilotProvider->listModels([](const QStringList &models, const QString &error) {
         if (!error.isEmpty())

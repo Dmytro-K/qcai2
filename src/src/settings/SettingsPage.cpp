@@ -3,9 +3,9 @@
 */
 
 #include "SettingsPage.h"
-#include "McpServersWidget.h"
 #include "../../qcai2tr.h"
 #include "../util/Logger.h"
+#include "McpServersWidget.h"
 #include "Settings.h"
 #include "ui_SettingsWidget.h"
 
@@ -44,13 +44,17 @@ void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
     {
         const QString trimmed = item.trimmed();
         if (trimmed.isEmpty() || uniqueItems.contains(trimmed))
+        {
             continue;
+        }
         uniqueItems.append(trimmed);
     }
 
     const QString selected = selectedText.trimmed();
     if (!selected.isEmpty() && !uniqueItems.contains(selected))
+    {
         uniqueItems.append(selected);
+    }
 
     const QSignalBlocker blocker(combo);
     combo->clear();
@@ -124,8 +128,10 @@ public:
         m_providerCombo->addItem(Tr::tr("Local HTTP"), QStringLiteral("local"));
         m_providerCombo->addItem(Tr::tr("Ollama (Local)"), QStringLiteral("ollama"));
         int idx = m_providerCombo->findData(s.provider);
-        if (idx >= 0)
+        if (((idx >= 0) == true))
+        {
             m_providerCombo->setCurrentIndex(idx);
+        }
 
         // OpenAI settings
         // Base URL combo: editable, with popular providers
@@ -275,9 +281,13 @@ public:
             QStringLiteral("codellama"),
         });
         if (s.completionModel.isEmpty())
+        {
             m_completionModelCombo->setCurrentIndex(0);
+        }
         else
+        {
             m_completionModelCombo->setCurrentText(s.completionModel);
+        }
 
         populateEffortCombo(m_completionThinkingCombo);
         selectEffortValue(m_completionThinkingCombo, s.completionThinkingLevel, 0);
@@ -364,7 +374,6 @@ private:
     QCheckBox *m_debugLoggingCheck;
     QCheckBox *m_agentDebugCheck;
     McpServersWidget *m_mcpServersWidget = nullptr;
-
 };
 
 SettingsPage::SettingsPage()

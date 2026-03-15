@@ -25,8 +25,10 @@ ProcessRunner::Result ProcessRunner::run(const QString &program, const QStringLi
                                          const QString &stdinData)
 {
     QProcess proc;
-    if (!workDir.isEmpty())
+    if (workDir.isEmpty() == false)
+    {
         proc.setWorkingDirectory(workDir);
+    }
     proc.setProgram(program);
     proc.setArguments(args);
 
@@ -34,7 +36,7 @@ ProcessRunner::Result ProcessRunner::run(const QString &program, const QStringLi
     QCAI_DEBUG("Process", QStringLiteral("Running: %1 %2 (workDir: %3, timeout: %4ms)")
                               .arg(program, args.join(QLatin1Char(' ')), workDir)
                               .arg(timeoutMs));
-    if (!stdinData.isEmpty())
+    if (stdinData.isEmpty() == false)
     {
         proc.write(stdinData.toUtf8());
         proc.closeWriteChannel();
@@ -42,7 +44,7 @@ ProcessRunner::Result ProcessRunner::run(const QString &program, const QStringLi
 
     Result res;
     bool finished = proc.waitForFinished(timeoutMs);
-    if (!finished)
+    if (finished == false)
     {
         proc.kill();
         QCAI_WARN("Process", QStringLiteral("Process timed out: %1").arg(program));
@@ -68,8 +70,10 @@ void ProcessRunner::runAsync(const QString &program, const QStringList &args,
                              const QString &workDir, int timeoutMs)
 {
     auto *proc = new QProcess(this);
-    if (!workDir.isEmpty())
+    if (workDir.isEmpty() == false)
+    {
         proc->setWorkingDirectory(workDir);
+    }
 
     // Stream stdout lines
     connect(proc, &QProcess::readyReadStandardOutput, this, [this, proc]() {

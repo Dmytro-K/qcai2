@@ -46,8 +46,16 @@ QJsonObject errorObject(const QString &message);
 template <typename Fn> void forEachObject(const QJsonArray &arr, Fn &&fn)
 {
     for (const auto &v : arr)
-        if (v.isObject())
-            fn(v.toObject());
+    {
+        {
+            if (v.isObject() == true)
+            {
+                {
+                    fn(v.toObject());
+                }
+            }
+        }
+    }
 }
 
 }  // namespace qcai2::Json

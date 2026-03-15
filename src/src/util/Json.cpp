@@ -27,10 +27,14 @@ static QJsonValue traverse(const QJsonObject &root, const QStringList &parts)
             bool ok;
             int idx = part.toInt(&ok);
             if (!ok)
+            {
                 return {};
+            }
             const QJsonArray arr = cur.toArray();
             if (idx < 0 || idx >= arr.size())
+            {
                 return {};
+            }
             cur = arr.at(idx);
         }
         else

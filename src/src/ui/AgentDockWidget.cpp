@@ -3,15 +3,15 @@
 */
 
 #include "AgentDockWidget.h"
+#include "../goal/FileReferenceGoalHandler.h"
+#include "../goal/SlashCommandGoalHandler.h"
 #include "../linked_files/AgentDockLinkedFilesController.h"
 #include "../session/AgentDockSessionController.h"
 #include "../settings/Settings.h"
-#include "ui_AgentDockWidget.h"
-#include "../goal/FileReferenceGoalHandler.h"
 #include "../util/Diff.h"
 #include "../util/Logger.h"
 #include "../util/Migration.h"
-#include "../goal/SlashCommandGoalHandler.h"
+#include "ui_AgentDockWidget.h"
 
 #include <coreplugin/editormanager/editormanager.h>
 #include <projectexplorer/project.h>
@@ -19,9 +19,9 @@
 #include <utils/filepath.h>
 #include <utils/link.h>
 
+#include <QAction>
 #include <QClipboard>
 #include <QColor>
-#include <QAction>
 #include <QDateTime>
 #include <QDir>
 #include <QDirIterator>
@@ -39,12 +39,12 @@
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
-#include <QSizePolicy>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
 #include <QShortcut>
 #include <QSignalBlocker>
+#include <QSizePolicy>
 #include <QSplitter>
 #include <QSyntaxHighlighter>
 #include <QTextBlock>
@@ -69,16 +69,11 @@ int boundedInt(qsizetype value)
 QStringList openAiAgentModels()
 {
     return {
-        QStringLiteral("gpt-5.4"),
-        QStringLiteral("gpt-5.2"),
-        QStringLiteral("gpt-5.3-codex"),
-        QStringLiteral("gpt-5-mini"),
-        QStringLiteral("gpt-4.1"),
-        QStringLiteral("o3"),
-        QStringLiteral("o4-mini"),
-        QStringLiteral("claude-opus-4.6"),
-        QStringLiteral("claude-sonnet-4.6"),
-        QStringLiteral("gemini-3-flash"),
+        QStringLiteral("gpt-5.4"),           QStringLiteral("gpt-5.2"),
+        QStringLiteral("gpt-5.3-codex"),     QStringLiteral("gpt-5-mini"),
+        QStringLiteral("gpt-4.1"),           QStringLiteral("o3"),
+        QStringLiteral("o4-mini"),           QStringLiteral("claude-opus-4.6"),
+        QStringLiteral("claude-sonnet-4.6"), QStringLiteral("gemini-3-flash"),
     };
 }
 
@@ -112,13 +107,17 @@ void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
     {
         const QString trimmed = item.trimmed();
         if (trimmed.isEmpty() || uniqueItems.contains(trimmed))
+        {
             continue;
+        }
         uniqueItems.append(trimmed);
     }
 
     const QString selected = selectedText.trimmed();
     if (!selected.isEmpty() && !uniqueItems.contains(selected))
+    {
         uniqueItems.append(selected);
+    }
 
     const QSignalBlocker blocker(combo);
     combo->clear();
@@ -132,15 +131,17 @@ QString wrapMarkdownPayloadBlocks(const QString &markdown)
         QString rewritten;
         qsizetype cursor = 0;
         QRegularExpressionMatchIterator it = pattern.globalMatch(text);
-        while (it.hasNext())
+        while (it.hasNext() == true)
         {
             const QRegularExpressionMatch match = it.next();
             rewritten += text.mid(cursor, match.capturedStart() - cursor);
             rewritten += match.captured(1);
             rewritten += QStringLiteral("\n\n~~~~text\n");
             rewritten += match.captured(2);
-            if (!match.captured(2).endsWith(QLatin1Char('\n')))
+            if (((match.captured(2).endsWith(QLatin1Char('\n'))) == false))
+            {
                 rewritten += QLatin1Char('\n');
+            }
             rewritten += QStringLiteral("~~~~");
             rewritten += match.captured(3);
             cursor = match.capturedEnd();
@@ -150,8 +151,8 @@ QString wrapMarkdownPayloadBlocks(const QString &markdown)
     };
 
     QString rewritten = markdown;
-    static const QRegularExpression toolReturnedRe(
-        QStringLiteral(R"((Tool '[^']+' returned:)\n([\s\S]*?)(\n\nContinue with the next step\.))"));
+    static const QRegularExpression toolReturnedRe(QStringLiteral(
+        R"((Tool '[^']+' returned:)\n([\s\S]*?)(\n\nContinue with the next step\.))"));
     static const QRegularExpression approvedResultRe(
         QStringLiteral(R"((Approved and executed '[^']+'. Result:)\n([\s\S]*?)(\n\nContinue\.))"));
 
@@ -168,7 +169,7 @@ QString redactReadFilePayloads(const QString &markdown)
         R"(((?:Human:\s*)?Tool 'read_file' returned:)([\s\S]*?)(?=\n\nContinue with the next step\.|\n(?:Human:|Assistant:|\{"type":)|$))"));
 
     QRegularExpressionMatchIterator it = readFileReturnedRe.globalMatch(markdown);
-    while (it.hasNext())
+    while (it.hasNext() == true)
     {
         const QRegularExpressionMatch match = it.next();
         rewritten += markdown.mid(cursor, match.capturedStart() - cursor);
@@ -184,11 +185,12 @@ QString redactReadFilePayloads(const QString &markdown)
 QString providerUsageMarkdown(const ProviderUsage &usage)
 {
     const QString summary = formatProviderUsageSummary(usage);
-    if (summary.isEmpty())
+    if (summary.isEmpty() == true)
+    {
         return {};
+    }
 
-    return QStringLiteral(
-               "<span style=\"color:#7aa2f7;\"><strong>Usage:</strong> %1</span>")
+    return QStringLiteral("<span style=\"color:#7aa2f7;\"><strong>Usage:</strong> %1</span>")
         .arg(summary.toHtmlEscaped());
 }
 
@@ -222,19 +224,30 @@ public:
 protected:
     void highlightBlock(const QString &text) override
     {
-        if (text.startsWith(QStringLiteral("@@")))
+        if (((text.startsWith(QStringLiteral("@@"))) == true))
+        {
             return setFormat(0, boundedInt(text.size()), m_hunkFormat);
-        if (text.startsWith(QStringLiteral("+++ ")) || text.startsWith(QStringLiteral("--- ")))
+        }
+        if (((text.startsWith(QStringLiteral("+++ ")) ||
+              text.startsWith(QStringLiteral("--- "))) == true))
+        {
             return setFormat(0, boundedInt(text.size()), m_fileHeaderFormat);
-        if (text.startsWith(QStringLiteral("diff --")) ||
-            text.startsWith(QStringLiteral("index ")) ||
-            text.startsWith(QStringLiteral("new file")) ||
-            text.startsWith(QStringLiteral("deleted file")))
+        }
+        if (((text.startsWith(QStringLiteral("diff --")) ||
+              text.startsWith(QStringLiteral("index ")) ||
+              text.startsWith(QStringLiteral("new file")) ||
+              text.startsWith(QStringLiteral("deleted file"))) == true))
+        {
             return setFormat(0, boundedInt(text.size()), m_metaFormat);
-        if (text.startsWith(QLatin1Char('+')))
+        }
+        if (((text.startsWith(QLatin1Char('+'))) == true))
+        {
             return setFormat(0, boundedInt(text.size()), m_addedFormat);
-        if (text.startsWith(QLatin1Char('-')))
+        }
+        if (((text.startsWith(QLatin1Char('-'))) == true))
+        {
             return setFormat(0, boundedInt(text.size()), m_removedFormat);
+        }
     }
 
 private:
@@ -243,7 +256,6 @@ private:
     QTextCharFormat m_hunkFormat;
     QTextCharFormat m_fileHeaderFormat;
     QTextCharFormat m_metaFormat;
-
 };
 
 class DiffPreviewEdit;
@@ -260,7 +272,6 @@ protected:
 
 private:
     DiffPreviewEdit *m_editor;
-
 };
 
 class DiffPreviewEdit final : public QPlainTextEdit
@@ -305,7 +316,9 @@ public:
     {
         const QStringList lines = toPlainText().split('\n');
         if (lines.isEmpty())
+        {
             return QString();
+        }
 
         auto isFileStart = [&lines](int index) {
             const QString &line = lines[index];
@@ -314,7 +327,6 @@ public:
                    line.startsWith(QStringLiteral("Index: ")) ||
                    (line.startsWith(QStringLiteral("--- ")) &&
                     next.startsWith(QStringLiteral("+++ ")));
-
         };
 
         QStringList outputLines;
@@ -323,7 +335,7 @@ public:
         bool inFileSection = false;
 
         auto flushFileSection = [&]() {
-            if (!keptHunkLines.isEmpty())
+            if (((!keptHunkLines.isEmpty()) == true))
             {
                 outputLines.append(fileHeaderLines);
                 outputLines.append(keptHunkLines);
@@ -331,7 +343,6 @@ public:
             fileHeaderLines.clear();
             keptHunkLines.clear();
             inFileSection = false;
-
         };
 
         int i = 0;
@@ -339,22 +350,24 @@ public:
         {
             if (isFileStart(i))
             {
-                if (inFileSection)
+                if (inFileSection == true)
+                {
                     flushFileSection();
+                }
                 inFileSection = true;
                 fileHeaderLines.append(lines[i]);
                 ++i;
                 continue;
             }
 
-            if (!inFileSection)
+            if (inFileSection == false)
             {
                 outputLines.append(lines[i]);
                 ++i;
                 continue;
             }
 
-            if (!lines[i].startsWith(QStringLiteral("@@ ")))
+            if (((!lines[i].startsWith(QStringLiteral("@@ "))) == true))
             {
                 fileHeaderLines.append(lines[i]);
                 ++i;
@@ -372,19 +385,19 @@ public:
                 const QString &hunkLine = lines[i];
                 const int lineNumber = i + 1;
 
-                if (hunkLine.startsWith(QLatin1Char('+')) &&
-                    !hunkLine.startsWith(QStringLiteral("+++ ")))
+                if (((hunkLine.startsWith(QLatin1Char('+')) &&
+                      !hunkLine.startsWith(QStringLiteral("+++ "))) == true))
                 {
-                    if (m_approvedLines.contains(lineNumber))
+                    if (m_approvedLines.contains(lineNumber) == true)
                     {
                         candidateHunk.append(hunkLine);
                         hunkHasApprovedChanges = true;
                     }
                 }
-                else if (hunkLine.startsWith(QLatin1Char('-')) &&
-                         !hunkLine.startsWith(QStringLiteral("--- ")))
+                else if (((hunkLine.startsWith(QLatin1Char('-')) &&
+                           !hunkLine.startsWith(QStringLiteral("--- "))) == true))
                 {
-                    if (m_approvedLines.contains(lineNumber))
+                    if (m_approvedLines.contains(lineNumber) == true)
                     {
                         candidateHunk.append(hunkLine);
                         hunkHasApprovedChanges = true;
@@ -401,12 +414,16 @@ public:
                 ++i;
             }
 
-            if (hunkHasApprovedChanges)
+            if (hunkHasApprovedChanges == true)
+            {
                 keptHunkLines.append(candidateHunk);
+            }
         }
 
-        if (inFileSection)
+        if (inFileSection == true)
+        {
             flushFileSection();
+        }
 
         return Diff::normalize(outputLines.join('\n'));
     }
@@ -414,22 +431,27 @@ public:
     void lineNumberAreaMousePressEvent(QMouseEvent *event)
     {
         if (event->button() != Qt::LeftButton)
+        {
             return;
+        }
 
         QTextBlock block = firstVisibleBlock();
         int blockNumber = block.blockNumber();
         int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
         int bottom = top + qRound(blockBoundingRect(block).height());
 
-        while (block.isValid())
+        while (block.isValid() == true)
         {
-            if (block.isVisible() && event->pos().y() >= top && event->pos().y() < bottom)
+            if (((block.isVisible() && event->pos().y() >= top && event->pos().y() < bottom) ==
+                 true))
             {
                 toggleApproval(blockNumber + 1);
                 break;
             }
-            if (top > event->pos().y())
+            if (((top > event->pos().y()) == true))
+            {
                 break;
+            }
             block = block.next();
             top = bottom;
             bottom = top + qRound(blockBoundingRect(block).height());
@@ -441,7 +463,7 @@ public:
     {
         int digits = 1;
         int max = qMax(1, blockCount());
-        while (max >= 10)
+        while (((max >= 10) == true))
         {
             max /= 10;
             ++digits;
@@ -460,12 +482,12 @@ public:
         int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
         int bottom = top + qRound(blockBoundingRect(block).height());
 
-        while (block.isValid() && top <= event->rect().bottom())
+        while (((block.isValid() && top <= event->rect().bottom()) == true))
         {
-            if (block.isVisible() && bottom >= event->rect().top())
+            if (((block.isVisible() && bottom >= event->rect().top()) == true))
             {
                 const int lineNumber = blockNumber + 1;
-                if (m_approvableLines.contains(lineNumber))
+                if (m_approvableLines.contains(lineNumber) == true)
                 {
                     const QRect markerRect(2, top + (fontMetrics().height() - 9) / 2, 9, 9);
                     painter.setPen(palette().color(QPalette::Mid));
@@ -502,12 +524,18 @@ private:
     }
     void updateLineNumberArea(const QRect &rect, int dy)
     {
-        if (dy != 0)
+        if (((dy != 0) == true))
+        {
             m_lineNumberArea->scroll(0, dy);
+        }
         else
+        {
             m_lineNumberArea->update(0, rect.y(), m_lineNumberArea->width(), rect.height());
+        }
         if (rect.contains(viewport()->rect()))
+        {
             updateLineNumberAreaWidth(0);
+        }
     }
 
     void recalculateApprovals()
@@ -515,11 +543,14 @@ private:
         m_approvableLines.clear();
         m_approvedLines.clear();
 
-        for (QTextBlock block = document()->firstBlock(); block.isValid(); block = block.next())
+        for (QTextBlock block = document()->firstBlock(); ((block.isValid()) == true);
+             block = block.next())
         {
             const QString text = block.text();
-            if ((text.startsWith(QLatin1Char('+')) && !text.startsWith(QStringLiteral("+++ "))) ||
-                (text.startsWith(QLatin1Char('-')) && !text.startsWith(QStringLiteral("--- "))))
+            if ((((text.startsWith(QLatin1Char('+')) &&
+                   !text.startsWith(QStringLiteral("+++ "))) ||
+                  (text.startsWith(QLatin1Char('-')) &&
+                   !text.startsWith(QStringLiteral("--- ")))) == true))
             {
                 m_approvableLines.insert(block.blockNumber() + 1);
             }
@@ -528,13 +559,19 @@ private:
 
     void toggleApproval(int line)
     {
-        if (!m_approvableLines.contains(line))
+        if (((!m_approvableLines.contains(line)) == true))
+        {
             return;
+        }
 
-        if (m_approvedLines.contains(line))
+        if (m_approvedLines.contains(line) == true)
+        {
             m_approvedLines.remove(line);
+        }
         else
+        {
             m_approvedLines.insert(line);
+        }
 
         notifyApprovalChanged();
         m_lineNumberArea->update();
@@ -542,8 +579,10 @@ private:
 
     void notifyApprovalChanged()
     {
-        if (m_approvalChangedCallback)
+        if (static_cast<bool>(m_approvalChangedCallback) == true)
+        {
             m_approvalChangedCallback(m_approvedLines.size(), m_approvableLines.size());
+        }
     }
 
     DiffLineNumberArea *m_lineNumberArea;
@@ -551,7 +590,6 @@ private:
     QSet<int> m_approvableLines;
     QSet<int> m_approvedLines;
     std::function<void(qsizetype, qsizetype)> m_approvalChangedCallback;
-
 };
 
 DiffLineNumberArea::DiffLineNumberArea(DiffPreviewEdit *editor) : QWidget(editor), m_editor(editor)
@@ -595,7 +633,9 @@ AgentDockWidget::AgentDockWidget(AgentController *controller, QWidget *parent)
         m_streamingMarkdown += token;
         m_streamingMarkdown = redactReadFilePayloads(m_streamingMarkdown);
         if (!m_renderThrottle->isActive())
+        {
             m_renderThrottle->start();
+        }
     });
     connect(m_controller, &AgentController::planUpdated, this, &AgentDockWidget::onPlanUpdated);
     connect(m_controller, &AgentController::diffAvailable, this,
@@ -634,18 +674,24 @@ AgentDockWidget::AgentDockWidget(AgentController *controller, QWidget *parent)
     // Load existing log entries
     const auto existingEntries = Logger::instance().entries();
     for (const auto &e : existingEntries)
+    {
         m_debugLogView->appendPlainText(e);
+    }
 
     if (auto *projectManager = ProjectExplorer::ProjectManager::instance())
     {
-        connect(projectManager, &ProjectExplorer::ProjectManager::projectAdded, this,
-                [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
-        connect(projectManager, &ProjectExplorer::ProjectManager::projectRemoved, this,
-                [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
-        connect(projectManager, &ProjectExplorer::ProjectManager::projectDisplayNameChanged, this,
-                [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
-        connect(projectManager, &ProjectExplorer::ProjectManager::startupProjectChanged, this,
-                [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
+        connect(
+            projectManager, &ProjectExplorer::ProjectManager::projectAdded, this,
+            [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
+        connect(
+            projectManager, &ProjectExplorer::ProjectManager::projectRemoved, this,
+            [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
+        connect(
+            projectManager, &ProjectExplorer::ProjectManager::projectDisplayNameChanged, this,
+            [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
+        connect(
+            projectManager, &ProjectExplorer::ProjectManager::startupProjectChanged, this,
+            [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
     }
 
     if (auto *editorManager = Core::EditorManager::instance())
@@ -668,7 +714,9 @@ QString AgentDockWidget::currentLogMarkdown() const
     if (!m_streamingMarkdown.isEmpty())
     {
         if (!text.isEmpty())
+        {
             text += QStringLiteral("\n\n");
+        }
         text += m_streamingMarkdown;
     }
     return redactReadFilePayloads(text);
@@ -687,7 +735,9 @@ void AgentDockWidget::syncDiffUi(const QString &diff, bool focusDiffTab, bool re
     if (focusDiffTab)
     {
         if (auto *page = m_diffView->parentWidget())
+        {
             m_tabs->setCurrentWidget(page);
+        }
     }
 
     m_diffFileList->clear();
@@ -703,7 +753,9 @@ void AgentDockWidget::syncDiffUi(const QString &diff, bool focusDiffTab, bool re
         {
             const QString f = it.next().captured(1);
             if (!files.contains(f))
+            {
                 files.append(f);
+            }
         }
 
         for (const auto &f : files)
@@ -724,9 +776,13 @@ void AgentDockWidget::syncDiffUi(const QString &diff, bool focusDiffTab, bool re
     if (refreshInlineMarkers)
     {
         if (!diff.isEmpty() && !workDir.isEmpty())
+        {
             m_inlineDiffManager->showDiff(diff, workDir);
+        }
         else
+        {
             m_inlineDiffManager->clearAll();
+        }
     }
 
     m_diffFileList->setVisible(m_diffFileList->count() != 0);
@@ -816,15 +872,16 @@ void AgentDockWidget::setupUi()
             [this]() { m_linkedFilesController->refreshUi(); });
     connect(m_goalEdit, &GoalTextEdit::filesDropped, this,
             [this](const QStringList &paths) { m_linkedFilesController->addLinkedFiles(paths); });
-    connect(m_linkedFilesView, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *item) {
-        const QString absolutePath =
-            m_linkedFilesController->linkedFileAbsolutePath(item->data(Qt::UserRole).toString());
-        if (!absolutePath.isEmpty())
-        {
-            Core::EditorManager::openEditorAt(
-                Utils::Link(Utils::FilePath::fromString(absolutePath), 0, 0));
-        }
-    });
+    connect(m_linkedFilesView, &QListWidget::itemDoubleClicked, this,
+            [this](QListWidgetItem *item) {
+                const QString absolutePath = m_linkedFilesController->linkedFileAbsolutePath(
+                    item->data(Qt::UserRole).toString());
+                if (!absolutePath.isEmpty())
+                {
+                    Core::EditorManager::openEditorAt(
+                        Utils::Link(Utils::FilePath::fromString(absolutePath), 0, 0));
+                }
+            });
     m_linkedFilesView->installEventFilter(this);
     m_linkedFilesController->refreshUi();
 
@@ -834,7 +891,9 @@ void AgentDockWidget::setupUi()
     diffPreview->setLineWrapMode(QPlainTextEdit::NoWrap);
     diffPreview->setFont(QFont(QStringLiteral("monospace")));
     if (auto *layout = m_ui->diffViewPlaceholder->parentWidget()->layout())
+    {
         layout->replaceWidget(m_ui->diffViewPlaceholder, diffPreview);
+    }
     m_ui->diffViewPlaceholder->deleteLater();
     m_diffView = diffPreview;
 
@@ -852,7 +911,9 @@ void AgentDockWidget::setupUi()
     connect(&modelCatalog(), &ModelCatalog::copilotModelsChanged, this,
             [this](const QStringList &models) {
                 if (settings().provider != QStringLiteral("copilot"))
+                {
                     return;
+                }
                 repopulateEditableCombo(m_modelCombo, models, m_modelCombo->currentText());
             });
 
@@ -878,7 +939,9 @@ void AgentDockWidget::setupUi()
         }
 
         if (m_stopBtn->isEnabled())
+        {
             onStopClicked();
+        }
 
         clearChatState();
         m_sessionController->saveChat();
@@ -895,12 +958,16 @@ void AgentDockWidget::setupUi()
     connect(m_stopBtn, &QPushButton::clicked, this, &AgentDockWidget::onStopClicked);
     connect(m_projectCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
         if (index < 0)
+        {
             return;
+        }
         m_sessionController->switchProjectContext(m_projectCombo->itemData(index).toString());
     });
     const auto persistProjectUiState = [this]() {
         if (!m_sessionController->currentProjectFilePath().isEmpty())
+        {
             m_sessionController->saveChat();
+        }
     };
     connect(m_modeCombo, &QComboBox::currentIndexChanged, this,
             [persistProjectUiState](int) { persistProjectUiState(); });
@@ -925,7 +992,6 @@ void AgentDockWidget::setupUi()
         selectAllShortcut->setContext(Qt::WidgetShortcut);
         QObject::connect(selectAllShortcut, &QShortcut::activated, edit,
                          &QPlainTextEdit::selectAll);
-
     };
     auto addCopyShortcutRich = [](QTextEdit *edit) {
         auto *copyShortcut = new QShortcut(QKeySequence::Copy, edit);
@@ -934,7 +1000,6 @@ void AgentDockWidget::setupUi()
         auto *selectAllShortcut = new QShortcut(QKeySequence::SelectAll, edit);
         selectAllShortcut->setContext(Qt::WidgetShortcut);
         QObject::connect(selectAllShortcut, &QShortcut::activated, edit, &QTextEdit::selectAll);
-
     };
     addCopyShortcutRich(m_logView);
     addCopyShortcut(m_rawMarkdownView);
@@ -960,7 +1025,7 @@ void AgentDockWidget::updateRunState(bool running)
     m_thinkingCombo->setEnabled(!running);
     m_dryRunCheck->setEnabled(!running);
     m_projectCombo->setEnabled(!running && m_projectCombo->count() > 0 &&
-                                !m_projectCombo->itemData(0).toString().isEmpty());
+                               !m_projectCombo->itemData(0).toString().isEmpty());
 }
 
 bool AgentDockWidget::tryExecuteSlashCommand(const QString &goal)
@@ -968,18 +1033,22 @@ bool AgentDockWidget::tryExecuteSlashCommand(const QString &goal)
     const SlashCommandDispatchResult result = m_slashCommands.dispatch(
         goal, SlashCommandContext{[this](const QString &message) { onLogMessage(message); }});
     if (!result.isSlashCommand)
+    {
         return false;
+    }
 
     m_tabs->setCurrentWidget(m_logView);
 
     if (!result.errorMessage.isEmpty())
+    {
         onLogMessage(result.errorMessage);
+    }
 
     if (result.executed)
     {
         m_goalEdit->clear();
-        m_statusLabel->setText(QStringLiteral("Slash command executed: /%1")
-                                   .arg(result.commandName));
+        m_statusLabel->setText(
+            QStringLiteral("Slash command executed: /%1").arg(result.commandName));
     }
 
     m_sessionController->saveChat();
@@ -990,10 +1059,14 @@ void AgentDockWidget::onRunClicked()
 {
     const QString goal = m_goalEdit->toPlainText().trimmed();
     if (goal.isEmpty())
+    {
         return;
+    }
 
     if (tryExecuteSlashCommand(goal))
+    {
         return;
+    }
 
     const QString selectedModel = m_modelCombo->currentText().trimmed();
     const QString selectedMode = m_modeCombo->currentData().toString();
@@ -1003,12 +1076,11 @@ void AgentDockWidget::onRunClicked()
 
     updateRunState(true);
     m_tabs->setCurrentWidget(m_logView);
-    m_controller->start(
-        goal, m_dryRunCheck->isChecked(),
-        selectedMode == QStringLiteral("ask") ? AgentController::RunMode::Ask
-                                              : AgentController::RunMode::Agent,
-        selectedModel, m_reasoningCombo->currentData().toString(),
-        m_thinkingCombo->currentData().toString());
+    m_controller->start(goal, m_dryRunCheck->isChecked(),
+                        selectedMode == QStringLiteral("ask") ? AgentController::RunMode::Ask
+                                                              : AgentController::RunMode::Agent,
+                        selectedModel, m_reasoningCombo->currentData().toString(),
+                        m_thinkingCombo->currentData().toString());
 }
 
 void AgentDockWidget::onStopClicked()
@@ -1020,7 +1092,9 @@ void AgentDockWidget::onStopClicked()
 void AgentDockWidget::onApplyPatchClicked()
 {
     if (m_currentDiff.isEmpty())
+    {
         return;
+    }
 
     auto *diffPreview = static_cast<DiffPreviewEdit *>(m_diffView);
     if (!diffPreview->hasApprovedChanges())
@@ -1063,7 +1137,9 @@ void AgentDockWidget::onRevertPatchClicked()
 {
     const QString diffToRevert = m_appliedDiff.isEmpty() ? m_currentDiff : m_appliedDiff;
     if (diffToRevert.isEmpty())
+    {
         return;
+    }
 
     const QString workDir = m_sessionController->currentProjectDir();
 
@@ -1084,7 +1160,9 @@ void AgentDockWidget::onCopyPlanClicked()
 {
     QStringList items;
     for (int i = 0; i < m_planList->count(); ++i)
+    {
         items.append(m_planList->item(i)->text());
+    }
     QGuiApplication::clipboard()->setText(items.join('\n'));
 }
 
@@ -1092,7 +1170,9 @@ void AgentDockWidget::onLogMessage(const QString &msg)
 {
     const QString text = msg.trimmed();
     if (text.isEmpty())
+    {
         return;
+    }
 
     appendStampedLogEntry(text);
 }
@@ -1101,7 +1181,9 @@ void AgentDockWidget::onProviderUsageAvailable(const ProviderUsage &usage)
 {
     const QString body = providerUsageMarkdown(usage);
     if (body.isEmpty())
+    {
         return;
+    }
 
     appendStampedLogEntry(body);
 }
@@ -1109,12 +1191,16 @@ void AgentDockWidget::onProviderUsageAvailable(const ProviderUsage &usage)
 void AgentDockWidget::appendStampedLogEntry(const QString &body)
 {
     if (body.trimmed().isEmpty())
+    {
         return;
+    }
 
     if (!m_streamingMarkdown.isEmpty())
     {
         if (!m_logMarkdown.isEmpty())
+        {
             m_logMarkdown += QStringLiteral("\n\n");
+        }
         m_logMarkdown += redactReadFilePayloads(m_streamingMarkdown);
         m_streamingMarkdown.clear();
     }
@@ -1124,7 +1210,9 @@ void AgentDockWidget::appendStampedLogEntry(const QString &body)
             .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss")), body);
 
     if (!m_logMarkdown.isEmpty())
+    {
         m_logMarkdown += QStringLiteral("\n\n");
+    }
     m_logMarkdown += stamped;
 
     m_renderThrottle->stop();
@@ -1240,7 +1328,9 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
         if (ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter)
         {
             if ((ke->modifiers() & Qt::ShiftModifier) != 0u)
+            {
                 return false;  // Shift+Enter — newline
+            }
             onRunClicked();
             return true;
         }

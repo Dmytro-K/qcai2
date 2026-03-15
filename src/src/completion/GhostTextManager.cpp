@@ -35,8 +35,10 @@ void GhostTextManager::setEnabled(bool enabled)
 
 void GhostTextManager::attachToEditor(TextEditor::TextEditorWidget *editor)
 {
-    if ((editor == nullptr) || m_debounceTimers.contains(editor))
+    if ((((editor == nullptr) || m_debounceTimers.contains(editor)) == true))
+    {
         return;
+    }
 
     auto *timer = new QTimer(this);
     timer->setSingleShot(true);
@@ -47,18 +49,24 @@ void GhostTextManager::attachToEditor(TextEditor::TextEditorWidget *editor)
 
     connect(editor->document(), &QTextDocument::contentsChange, this,
             [this, editor](int position, int charsRemoved, int charsAdded) {
-                if (charsRemoved == 0 && charsAdded == 0)
+                if (((charsRemoved == 0 && charsAdded == 0) == true))
+                {
                     return;
+                }
                 // Only trigger when the cursor is right after the edit (user is typing/pasting).
                 // Background reformatting fires at a different position, so this filters it out.
                 if (editor->textCursor().position() != position + charsAdded)
+                {
                     return;
+                }
                 onContentsChanged(editor);
             });
 
     connect(editor, &QObject::destroyed, this, [this, editor]() {
-        if (auto *t = m_debounceTimers.take(editor))
+        if (auto *t = m_debounceTimers.take(editor); ((t != nullptr) == true))
+        {
             t->deleteLater();
+        }
         m_lastEditPositions.remove(editor);
     });
 
@@ -67,35 +75,49 @@ void GhostTextManager::attachToEditor(TextEditor::TextEditorWidget *editor)
 
 void GhostTextManager::onContentsChanged(TextEditor::TextEditorWidget *editor)
 {
-    if (!m_enabled || (m_provider == nullptr))
+    if (((!m_enabled || (m_provider == nullptr)) == true))
+    {
         return;
+    }
 
     const auto &s = settings();
-    if (!s.aiCompletionEnabled)
+    if (s.aiCompletionEnabled == false)
+    {
         return;
+    }
 
     m_lastEditPositions.insert(editor, editor->textCursor().position());
-    if (auto *timer = m_debounceTimers.value(editor))
+    if (auto *timer = m_debounceTimers.value(editor); ((timer != nullptr) == true))
+    {
         timer->start();
+    }
 }
 
 void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
 {
-    if (!m_enabled || (m_provider == nullptr) || (editor == nullptr))
+    if (((!m_enabled || (m_provider == nullptr) || (editor == nullptr)) == true))
+    {
         return;
+    }
 
     const auto &s = settings();
-    if (!s.aiCompletionEnabled)
+    if (s.aiCompletionEnabled == false)
+    {
         return;
+    }
 
     QTextCursor tc = editor->textCursor();
     const int pos = tc.position();
-    if (pos != m_lastEditPositions.value(editor, pos))
+    if (((pos != m_lastEditPositions.value(editor, pos)) == true))
+    {
         return;
+    }
 
     const QTextDocument *doc = editor->document();
-    if (doc == nullptr)
+    if (((doc == nullptr) == true))
+    {
         return;
+    }
 
     const QString fullText = doc->toPlainText();
     const int startBefore = qMax(0, pos - kContextBefore);
@@ -130,21 +152,27 @@ void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
         messages, model, 0.0, 128, settings().completionReasoningEffort,
         [editor, pos, alive](const QString &response, const QString &error,
                              const ProviderUsage & /*usage*/) {
-            if (!*alive)
+            if (((!*alive) == true))
+            {
                 return;
-            if (!error.isEmpty())
+            }
+            if (error.isEmpty() == false)
             {
                 QCAI_WARN("GhostText", QStringLiteral("Error: %1").arg(error));
                 return;
             }
 
             const QString completion = cleanCompletion(response);
-            if (completion.isEmpty())
+            if (completion.isEmpty() == true)
+            {
                 return;
+            }
 
             // Verify cursor hasn't moved
             if (editor->textCursor().position() != pos)
+            {
                 return;
+            }
 
             QTextCursor tc = editor->textCursor();
             const int line = tc.blockNumber() + 1;  // 1-based
@@ -172,13 +200,17 @@ void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
 QString GhostTextManager::cleanCompletion(const QString &raw)
 {
     QString text = raw.trimmed();
-    if (text.startsWith(QStringLiteral("```")))
+    if (((text.startsWith(QStringLiteral("```"))) == true))
     {
         qsizetype firstNl = text.indexOf(QLatin1Char('\n'));
         if (firstNl >= 0)
+        {
             text = text.mid(firstNl + 1);
-        if (text.endsWith(QStringLiteral("```")))
+        }
+        if (((text.endsWith(QStringLiteral("```"))) == true))
+        {
             text.chop(3);
+        }
         text = text.trimmed();
     }
     return text;

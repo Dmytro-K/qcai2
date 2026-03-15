@@ -29,7 +29,9 @@ QString asIndentedCodeBlock(const QString &text)
     const QString normalized = text.isEmpty() ? QStringLiteral("(empty)") : text;
     QStringList lines = normalized.split(QLatin1Char('\n'));
     for (QString &line : lines)
+    {
         line.prepend(QStringLiteral("    "));
+    }
     return lines.join(QLatin1Char('\n'));
 }
 
@@ -166,7 +168,9 @@ QString AgentController::buildSystemPrompt() const
         // Include file contents from open editors
         const QString files = m_editorContext->fileContentsFragment(30000);
         if (!files.isEmpty())
+        {
             sys += QStringLiteral("File contents (from open tabs):\n%1\n").arg(files);
+        }
     }
 
     // Safety info
@@ -195,7 +199,9 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
                             const QString &thinkingLevel)
 {
     if (m_running)
+    {
         return;
+    }
 
     // Re-select and reconfigure provider from current settings
     auto &s = settings();
@@ -216,7 +222,9 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
             }
         }
         if (m_provider == nullptr)
+        {
             m_provider = m_allProviders.first();
+        }
 
         // Reconfigure the selected provider
         if (s.provider == QStringLiteral("openai"))
@@ -246,7 +254,9 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
     {
         QString projectDir;
         if (m_editorContext != nullptr)
+        {
             projectDir = m_editorContext->capture().projectDir;
+        }
         mcpRefreshMessages = m_mcpToolManager->refreshForProject(projectDir);
     }
 
@@ -279,12 +289,16 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
     m_messages.append({QStringLiteral("system"), buildSystemPrompt()});
 
     if (!m_requestContext.trimmed().isEmpty())
+    {
         m_messages.append({QStringLiteral("system"), m_requestContext.trimmed()});
+    }
 
     if (isEnabledEffort(m_thinkingLevel))
+    {
         m_messages.append(
             {QStringLiteral("system"),
              QStringLiteral("Use %1 thinking depth for this task.").arg(m_thinkingLevel)});
+    }
 
     // User goal
     m_messages.append({QStringLiteral("user"), goal});
@@ -295,23 +309,31 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
             .arg(m_runMode == RunMode::Ask ? QStringLiteral("Ask mode") : QStringLiteral("Agent"))
             .arg(goal));
     if (!m_linkedFiles.isEmpty())
+    {
         emit logMessage(
             QStringLiteral("📎 Linked files: %1").arg(m_linkedFiles.join(QStringLiteral(", "))));
+    }
     for (const QString &message : std::as_const(mcpRefreshMessages))
+    {
         emit logMessage(message);
+    }
     runNextIteration();
 }
 
 void AgentController::stop()
 {
     if (!m_running)
+    {
         return;
+    }
     m_running = false;
     QCAI_INFO("Agent", QStringLiteral("Agent stopped by user at iteration %1, tool calls: %2")
                            .arg(m_iteration)
                            .arg(m_toolCallCount));
     if (m_provider != nullptr)
+    {
         m_provider->cancel();
+    }
     disarmProviderWatchdog();
     emit logMessage(QStringLiteral("⏹ Agent stopped by user."));
     emit stopped(QStringLiteral("Stopped by user at iteration %1.").arg(m_iteration));
@@ -320,7 +342,9 @@ void AgentController::stop()
 void AgentController::runNextIteration()
 {
     if (!m_running)
+    {
         return;
+    }
 
     // Check limits
     const int maxIter =
@@ -378,7 +402,9 @@ void AgentController::handleResponse(const QString &response, const QString &err
                                      const ProviderUsage &usage)
 {
     if (!m_running)
+    {
         return;
+    }
 
     disarmProviderWatchdog();
 
@@ -393,7 +419,9 @@ void AgentController::handleResponse(const QString &response, const QString &err
     }
 
     if (usage.hasAny())
+    {
         emit providerUsageAvailable(usage);
+    }
 
     // Add assistant message to history
     m_messages.append({QStringLiteral("assistant"), response});
@@ -406,7 +434,9 @@ void AgentController::handleResponse(const QString &response, const QString &err
 
     // Reset text retry counter on valid JSON
     if (parsed.type != ResponseType::Text && parsed.type != ResponseType::Error)
+    {
         m_textRetries = 0;
+    }
 
     if (m_runMode == RunMode::Ask && parsed.type != ResponseType::Final &&
         parsed.type != ResponseType::Text && parsed.type != ResponseType::Error)
@@ -434,7 +464,8 @@ void AgentController::handleResponse(const QString &response, const QString &err
         case ResponseType::Plan:
             m_plan = parsed.steps;
             emit planUpdated(m_plan);
-            emit logMessage(QStringLiteral("📋 Plan with %1 step(s) received.").arg(m_plan.size()));
+            emit logMessage(
+                QStringLiteral("📋 Plan with %1 step(s) received.").arg(m_plan.size()));
             // Ask model to start executing the plan
             m_messages.append(
                 {QStringLiteral("user"),
@@ -455,7 +486,9 @@ void AgentController::handleResponse(const QString &response, const QString &err
                 const QString cleanDiff = nf.remainingDiff.trimmed();
                 m_accumulatedDiff = Diff::normalize(cleanDiff);
                 if (!m_accumulatedDiff.isEmpty())
+                {
                     emit diffAvailable(m_accumulatedDiff);
+                }
             }
             m_running = false;
             emit stopped(parsed.summary);
@@ -478,11 +511,15 @@ void AgentController::handleResponse(const QString &response, const QString &err
             // If model keeps responding with text, treat it as final answer
             if (m_textRetries >= 1)
             {
-                if (settings().agentDebug)
+                if (((settings().agentDebug) == true))
+                {
                     emit logMessage(QStringLiteral("💬 %1").arg(response.left(1000)));
+                }
                 else
+                {
                     emit logMessage(
                         QStringLiteral("💬 Agent finished with unstructured response."));
+                }
                 m_running = false;
                 emit stopped(QStringLiteral("Agent finished (text response)."));
             }
@@ -502,7 +539,9 @@ void AgentController::handleResponse(const QString &response, const QString &err
 void AgentController::executeTool(const QString &name, const QJsonObject &args)
 {
     if (!m_running)
+    {
         return;
+    }
 
     const int maxCalls =
         (m_safetyPolicy != nullptr) ? m_safetyPolicy->maxToolCalls() : settings().maxToolCalls;
@@ -541,8 +580,7 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
             emit approvalRequested(
                 pa.id, name, reason,
                 QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)));
-            emit logMessage(
-                QStringLiteral("⏸ Approval required for '%1': %2").arg(name, reason));
+            emit logMessage(QStringLiteral("⏸ Approval required for '%1': %2").arg(name, reason));
             return;
         }
     }
@@ -551,7 +589,9 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
     ++m_toolCallCount;
     const bool suppressReadFileLog = (name == QStringLiteral("read_file"));
     if (!suppressReadFileLog)
+    {
         emit logMessage(formatToolExecutionLog(name, args));
+    }
     QCAI_DEBUG(
         "Agent",
         QStringLiteral("Tool call #%1: %2, args: %3")
@@ -569,7 +609,9 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
 
     QString result = tool->execute(args, workDir);
     if (!suppressReadFileLog)
+    {
         emit logMessage(formatToolResultLog(result));
+    }
     QCAI_DEBUG("Agent",
                QStringLiteral("Tool '%1' result length: %2").arg(name).arg(result.length()));
 
@@ -589,7 +631,9 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
 void AgentController::armProviderWatchdog()
 {
     if (m_running && m_waitingForProvider)
+    {
         m_providerWatchdog.start();
+    }
 }
 
 void AgentController::disarmProviderWatchdog()
@@ -602,15 +646,20 @@ void AgentController::disarmProviderWatchdog()
 void AgentController::handleProviderInactivityTimeout()
 {
     if (!m_running || !m_waitingForProvider)
+    {
         return;
+    }
 
     QCAI_ERROR("Agent", QStringLiteral("Provider response timed out after %1 ms of inactivity")
                             .arg(kProviderInactivityTimeoutMs));
     if (m_provider != nullptr)
+    {
         m_provider->cancel();
+    }
 
-    emit logMessage(QStringLiteral("⌛ Provider response timed out after %1 seconds of inactivity.")
-                        .arg(kProviderInactivityTimeoutMs / 1000));
+    emit logMessage(
+        QStringLiteral("⌛ Provider response timed out after %1 seconds of inactivity.")
+            .arg(kProviderInactivityTimeoutMs / 1000));
     emit errorOccurred(QStringLiteral("Provider response timed out."));
     m_running = false;
     disarmProviderWatchdog();
@@ -621,7 +670,7 @@ void AgentController::approveAction(int approvalId)
 {
     for (int i = 0; i < m_pendingApprovals.size(); ++i)
     {
-        if (m_pendingApprovals[i].id == approvalId)
+        if (((m_pendingApprovals[i].id == approvalId) == true))
         {
             auto pa = m_pendingApprovals.takeAt(i);
             emit logMessage(QStringLiteral("✅ Approved: %1").arg(pa.toolName));
@@ -634,7 +683,9 @@ void AgentController::approveAction(int approvalId)
                     ++m_toolCallCount;
                     QString workDir;
                     if (m_editorContext != nullptr)
+                    {
                         workDir = m_editorContext->capture().projectDir;
+                    }
                     QString result = tool->execute(pa.toolArgs, workDir);
                     m_messages.append(
                         {QStringLiteral("user"),
@@ -652,7 +703,7 @@ void AgentController::denyAction(int approvalId)
 {
     for (int i = 0; i < m_pendingApprovals.size(); ++i)
     {
-        if (m_pendingApprovals[i].id == approvalId)
+        if (((m_pendingApprovals[i].id == approvalId) == true))
         {
             auto pa = m_pendingApprovals.takeAt(i);
             emit logMessage(QStringLiteral("❌ Denied: %1").arg(pa.toolName));
