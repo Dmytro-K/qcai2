@@ -2,21 +2,28 @@
 
 `qcai2` is a Qt Creator plugin built with Qt 6 and C++23. It embeds an autonomous coding agent, provider-backed chat/completion, diff review, and safety checks directly into the IDE.
 
-## Current capabilities
+## Features
 
-- **Autonomous agent loop** — `AgentController` runs a structured plan → act → observe → verify loop and expects JSON responses (`plan`, `tool_call`, `final`, `need_approval`).
-- **Built-in tools** — `read_file`, `apply_patch`, `search_repo`, `run_build`, `run_tests`, `show_diagnostics`, `git_status`, `git_diff`, and `open_file_at_location`.
-- **Multiple providers** — OpenAI-compatible HTTP APIs, GitHub Copilot through a Node.js sidecar, custom local HTTP endpoints, and Ollama.
-- **Dock widget workflow** — Plan, Actions Log, Raw Markdown, Diff Preview, Approvals, and Debug Log tabs, plus an open-project selector, goal input, Ask/Agent mode, model/reasoning/thinking selectors, run/stop, and dry-run controls.
-- **Editor assistance** — classic completion assist plus inline ghost-text suggestions via Qt Creator's `TextSuggestion` API.
-- **Diff review** — unified diff preview, per-line approval in the preview gutter, file navigation, and inline diff markers in editors.
-- **Safety gates** — dry-run by default, approval-required patch application, sandboxed file paths, and configurable limits for iterations, tool calls, diff size, and changed files.
-- **Per-project context** — each open project keeps its own persisted agent session under the project-local `.qcai2/` directory.
+- [x] Autonomous agent loop (plan → act → observe → verify) with Ask and Agent modes
+- [x] Multiple LLM providers: OpenAI-compatible, GitHub Copilot, Ollama, custom local
+- [x] MCP support (stdio + HTTP/OAuth) with per-project and global server configs
+- [x] Diff review with per-line accept/reject and inline editor markers
+- [x] AI code completion with inline ghost-text suggestions
+- [x] Chat history, rolling summaries, and context budgeting
+- [x] Per-project sessions under `.qcai2/` with migration and auto-reload
+- [x] Safety: dry-run by default, approval gates, path sandboxing, command allowlisting
+- [x] `#file` references and `/command` slash commands with auto-completion
+- [ ] More tools: create_file, list_directory, run_command, find_symbol
+- [ ] More slash commands: /clear, /diff, /explain, /refactor, /test
+- [ ] Streaming markdown rendering
+- [ ] Per-project custom instructions (`.qcai2/rules.md`)
+- [ ] Semantic search over chat history
 
 ## Repository layout
 
 - `ai/` — internal context and supporting materials for AI-assisted development.
 - `cmake/` — helper CMake scripts for formatting, documentation, installation, and repository maintenance tasks.
+- `lib/qtmcp/` — reusable Qt MCP client library (stdio + HTTP transports with OAuth).
 - `src/` — the main plugin contents:
   - `docs/` — documentation templates and source material;
   - `resources/` — icons and other Qt resources;
@@ -56,11 +63,6 @@ cmake --build build --parallel
 ```bash
 ctest --test-dir build --output-on-failure
 ```
-
-With `-DWITH_TESTS=ON`, the repository currently builds two QtTest executables:
-
-- `qcai2_json`
-- `qcai2_toolcall`
 
 ### Format files
 
@@ -139,7 +141,7 @@ cmake --install build --prefix /path/to/qtcreator-root
 
 ## Configuration
 
-Open **Tools → Options → AI Agent** in Qt Creator.
+Open **Edit → Preferences → Qcai2** in Qt Creator.
 
 ### Providers tab
 
