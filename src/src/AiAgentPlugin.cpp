@@ -18,9 +18,13 @@
 #include "settings/Settings.h"
 #include "settings/SettingsPage.h"
 #include "tools/BuildTools.h"
+#include "tools/CreateFileTool.h"
 #include "tools/FileTools.h"
+#include "tools/FindSymbolTool.h"
 #include "tools/GitTools.h"
 #include "tools/IdeTools.h"
+#include "tools/ListDirectoryTool.h"
+#include "tools/RunCommandTool.h"
 #include "tools/SearchTools.h"
 #include "tools/ToolRegistry.h"
 #include "util/CrashHandler.h"
@@ -308,8 +312,12 @@ void AiAgentPlugin::refreshCopilotModels()
 void AiAgentPlugin::registerTools()
 {
     m_toolRegistry->registerTool(std::make_shared<ReadFileTool>());
+    m_toolRegistry->registerTool(std::make_shared<CreateFileTool>());
     m_toolRegistry->registerTool(std::make_shared<ApplyPatchTool>());
     m_toolRegistry->registerTool(std::make_shared<SearchRepoTool>());
+    m_toolRegistry->registerTool(std::make_shared<ListDirectoryTool>());
+    m_toolRegistry->registerTool(std::make_shared<RunCommandTool>());
+    m_toolRegistry->registerTool(std::make_shared<FindSymbolTool>());
 
     auto buildTool = std::make_shared<RunBuildTool>();
     auto testsTool = std::make_shared<RunTestsTool>();
