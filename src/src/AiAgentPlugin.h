@@ -63,6 +63,11 @@ private:
     void showNavigationWidget();
 
     /**
+     * Activates the AI Agent sidebar widget and focuses the goal editor.
+     */
+    void focusGoalInput();
+
+    /**
      * Instantiates all supported providers and selects the active one.
      */
     void setupProviders();
