@@ -1,4 +1,4 @@
-set(sidecar_dir "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/plugins/18.0.2/qcai2/sidecar")
+set(sidecar_dir "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@QCAI2_SIDECAR_INSTALL_DIR@")
 
 if(NOT EXISTS "${sidecar_dir}/package.json")
     message(FATAL_ERROR "qcai2 sidecar package.json not found in ${sidecar_dir}")
@@ -14,9 +14,16 @@ if(NOT NPM_EXECUTABLE)
     message(FATAL_ERROR "npm executable not found; required to install qcai2 sidecar dependencies in ${sidecar_dir}")
 endif()
 
-message(STATUS "Installing qcai2 sidecar dependencies in ${sidecar_dir}")
+set(npm_command install --no-audit --no-fund)
+set(npm_command_name "npm install")
+if(EXISTS "${sidecar_dir}/package-lock.json")
+    set(npm_command ci --no-audit --no-fund)
+    set(npm_command_name "npm ci")
+endif()
+
+message(STATUS "Installing qcai2 sidecar dependencies in ${sidecar_dir} using ${npm_command_name}")
 execute_process(
-    COMMAND "${NPM_EXECUTABLE}" install --no-audit --no-fund
+    COMMAND "${NPM_EXECUTABLE}" ${npm_command}
     WORKING_DIRECTORY "${sidecar_dir}"
     COMMAND_ECHO STDOUT
     RESULT_VARIABLE npm_result
@@ -26,7 +33,7 @@ execute_process(
 
 if(NOT npm_result EQUAL 0)
     message(FATAL_ERROR
-        "npm install failed in ${sidecar_dir} with exit code ${npm_result}\n"
+        "${npm_command_name} failed in ${sidecar_dir} with exit code ${npm_result}\n"
         "stdout:\n${npm_stdout}\n"
         "stderr:\n${npm_stderr}")
 endif()

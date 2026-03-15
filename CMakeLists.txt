@@ -514,6 +514,7 @@ target_compile_definitions(qcai2 PRIVATE
 install(FILES
     src/sidecar/copilot-sidecar.js
     src/sidecar/package.json
+    src/sidecar/package-lock.json
     DESTINATION ${QCAI2_SIDECAR_INSTALL_DIR}
 )
 
@@ -525,6 +526,11 @@ configure_file(
     @ONLY
 )
 install(SCRIPT "${QCAI2_INSTALL_SIDECAR_DEPS_SCRIPT}")
+
+add_custom_target(uninstall
+    COMMAND xargs rm -vf < install_manifest.txt
+    COMMENT "Removing installed files (based on install_manifest.txt)"
+)
 
 find_program(QCAI2_CLANG_FORMAT_EXECUTABLE NAMES clang-format clang-format-18 clang-format-17)
 find_program(QCAI2_GIT_EXECUTABLE NAMES git)
