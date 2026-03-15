@@ -526,6 +526,11 @@ configure_file(
 )
 install(SCRIPT "${QCAI2_INSTALL_SIDECAR_DEPS_SCRIPT}")
 
+add_custom_target(uninstall
+    COMMAND xargs rm -vf < install_manifest.txt
+    COMMENT "Removing installed files (based on install_manifest.txt)"
+)
+
 find_program(QCAI2_CLANG_FORMAT_EXECUTABLE NAMES clang-format clang-format-18 clang-format-17)
 find_program(QCAI2_GIT_EXECUTABLE NAMES git)
 find_program(QCAI2_RUN_CLANG_TIDY_EXECUTABLE NAMES run-clang-tidy run-clang-tidy-18 run-clang-tidy-17)
