@@ -142,7 +142,13 @@ SlashCommandDispatchResult SlashCommandRegistry::dispatch(const QString &input,
     }
 
     result.commandName = it->displayName;
-    it->handler(invocation, context);
+
+    QString goalOverride;
+    SlashCommandContext handlerContext = context;
+    handlerContext.goalOverride = &goalOverride;
+    it->handler(invocation, handlerContext);
+
+    result.goalOverride = goalOverride;
     result.executed = true;
     return result;
 }

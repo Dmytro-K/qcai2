@@ -25,6 +25,7 @@ namespace
 constexpr int kDefaultPromptResultLimit = 15000;
 constexpr int kVerboseToolPromptResultLimit = 4000;
 constexpr int kProviderInactivityTimeoutMs = 75000;
+constexpr int kProviderThinkingInactivityTimeoutMs = 180000;
 
 QString asIndentedCodeBlock(const QString &text)
 {
@@ -840,6 +841,12 @@ void AgentController::armProviderWatchdog()
 {
     if (m_running && m_waitingForProvider)
     {
+        const bool thinkingEnabled = !m_thinkingLevel.isEmpty() &&
+                                     m_thinkingLevel != QStringLiteral("off") &&
+                                     m_thinkingLevel != QStringLiteral("none");
+        const int timeoutMs =
+            thinkingEnabled ? kProviderThinkingInactivityTimeoutMs : kProviderInactivityTimeoutMs;
+        m_providerWatchdog.setInterval(timeoutMs);
         m_providerWatchdog.start();
     }
 }
@@ -858,8 +865,9 @@ void AgentController::handleProviderInactivityTimeout()
         return;
     }
 
+    const int actualTimeoutMs = m_providerWatchdog.interval();
     QCAI_ERROR("Agent", QStringLiteral("Provider response timed out after %1 ms of inactivity")
-                            .arg(kProviderInactivityTimeoutMs));
+                            .arg(actualTimeoutMs));
     if (m_provider != nullptr)
     {
         m_provider->cancel();
@@ -867,7 +875,7 @@ void AgentController::handleProviderInactivityTimeout()
 
     emit logMessage(
         QStringLiteral("⌛ Provider response timed out after %1 seconds of inactivity.")
-            .arg(kProviderInactivityTimeoutMs / 1000));
+            .arg(actualTimeoutMs / 1000));
     emit errorOccurred(QStringLiteral("Provider response timed out."));
     m_running = false;
     disarmProviderWatchdog();

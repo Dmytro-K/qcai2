@@ -147,7 +147,7 @@ private:
      * @param goal Trimmed goal text from the editor.
      * @return True when the input was treated as a slash command.
      */
-    bool tryExecuteSlashCommand(const QString &goal);
+    bool tryExecuteSlashCommand(QString &goal);
 
     /**
      * Handles keyboard shortcuts from the goal editor.
