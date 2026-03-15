@@ -21,6 +21,8 @@ struct ServerDefinition
     QString url;
     QMap<QString, QString> headers;
     QJsonObject extraFields;
+
+    friend bool operator==(const ServerDefinition &, const ServerDefinition &) = default;
 };
 
 using ServerDefinitions = QMap<QString, ServerDefinition>;

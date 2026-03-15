@@ -49,6 +49,10 @@ public:
 
     void setServers(const qtmcp::ServerDefinitions &servers);
     qtmcp::ServerDefinitions servers() const;
+
+signals:
+    void changed();
+
 private:
     QString currentServerName() const;
     qtmcp::ServerDefinition *currentServer();
