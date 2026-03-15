@@ -4,8 +4,8 @@
 #include "../AgentController.h"
 #include "../commands/SlashCommandRegistry.h"
 #include "../diff/InlineDiffManager.h"
-#include "../goal/LinkedFilesListWidget.h"
 #include "../goal/GoalTextEdit.h"
+#include "../goal/LinkedFilesListWidget.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -32,6 +32,7 @@ namespace qcai2
 
 class AgentDockLinkedFilesController;
 class AgentDockSessionController;
+class ChatContextManager;
 
 /**
  * Main dock widget for goal entry, logs, diff review, and approval prompts.
@@ -45,7 +46,8 @@ public:
      * @param controller Agent controller that drives the UI.
      * @param parent Optional parent widget.
      */
-    explicit AgentDockWidget(AgentController *controller, QWidget *parent = nullptr);
+    explicit AgentDockWidget(AgentController *controller, ChatContextManager *chatContextManager,
+                             QWidget *parent = nullptr);
 
     /**
      * Persists the current chat session before the widget is destroyed.
@@ -241,7 +243,6 @@ private:
 
     /** Non-UI project session persistence extracted out of the widget. */
     std::unique_ptr<AgentDockSessionController> m_sessionController;
-
 };
 
 }  // namespace qcai2

@@ -5,6 +5,7 @@
 #include "AgentController.h"
 #include "completion/AiCompletionProvider.h"
 #include "completion/GhostTextManager.h"
+#include "context/ChatContextManager.h"
 #include "ui/AgentDockWidget.h"
 // CompletionTrigger removed — completion triggers via isActivationCharSequence instead
 #include "context/EditorContext.h"
@@ -47,8 +48,11 @@ namespace qcai2::Internal
 class AiAgentNavigationWidgetFactory final : public INavigationWidgetFactory
 {
 public:
-    explicit AiAgentNavigationWidgetFactory(AgentController *controller, QObject *parent = nullptr)
-        : INavigationWidgetFactory(), m_controller(controller)
+    explicit AiAgentNavigationWidgetFactory(AgentController *controller,
+                                            ChatContextManager *chatContextManager,
+                                            QObject *parent = nullptr)
+        : INavigationWidgetFactory(), m_controller(controller),
+          m_chatContextManager(chatContextManager)
     {
         setParent(parent);
         setDisplayName(Tr::tr("AI Agent"));
@@ -59,12 +63,13 @@ public:
 private:
     NavigationView createWidget() override
     {
-        auto *widget = new AgentDockWidget(m_controller);
+        auto *widget = new AgentDockWidget(m_controller, m_chatContextManager);
         widget->setObjectName(QStringLiteral("qcai2.AgentNavigationWidget"));
         return {widget, {}};
     }
 
     AgentController *m_controller = nullptr;
+    ChatContextManager *m_chatContextManager = nullptr;
 };
 
 AiAgentPlugin::AiAgentPlugin() = default;
@@ -86,6 +91,7 @@ void AiAgentPlugin::initialize()
 
     // Create components
     m_editorContext = new EditorContext(this);
+    m_chatContextManager = new ChatContextManager(this);
     m_toolRegistry = new ToolRegistry(this);
     m_mcpToolManager = new McpToolManager(m_toolRegistry, this);
     m_safetyPolicy = new SafetyPolicy(this);
@@ -111,13 +117,16 @@ void AiAgentPlugin::initialize()
     // Wire controller
     m_controller->setToolRegistry(m_toolRegistry);
     m_controller->setEditorContext(m_editorContext);
+    m_controller->setChatContextManager(m_chatContextManager);
     m_controller->setMcpToolManager(m_mcpToolManager);
     m_controller->setSafetyPolicy(m_safetyPolicy);
-    m_navigationWidgetFactory = new AiAgentNavigationWidgetFactory(m_controller, this);
+    m_navigationWidgetFactory =
+        new AiAgentNavigationWidgetFactory(m_controller, m_chatContextManager, this);
 
     // Set up AI code completion
     m_completionProvider = new AiCompletionProvider(this);
     m_completionProvider->setAiProvider(m_currentProvider);
+    m_completionProvider->setChatContextManager(m_chatContextManager);
     m_completionProvider->setModel(s.modelName);
     m_completionProvider->setEnabled(s.aiCompletionEnabled);
     QCAI_DEBUG("Plugin", QStringLiteral("AI completion: %1, model: %2")
@@ -128,6 +137,7 @@ void AiAgentPlugin::initialize()
     // Set up ghost-text overlay completion
     m_ghostTextManager = new GhostTextManager(this);
     m_ghostTextManager->setProvider(m_currentProvider);
+    m_ghostTextManager->setChatContextManager(m_chatContextManager);
     m_ghostTextManager->setModel(s.completionModel.isEmpty() ? s.modelName : s.completionModel);
     m_ghostTextManager->setEnabled(s.aiCompletionEnabled);
 

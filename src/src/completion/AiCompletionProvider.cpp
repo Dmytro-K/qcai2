@@ -3,6 +3,7 @@
 */
 
 #include "AiCompletionProvider.h"
+#include "../context/ChatContextManager.h"
 #include "../settings/Settings.h"
 #include "../util/Logger.h"
 #include "AiCompletionProcessor.h"
@@ -32,7 +33,7 @@ TextEditor::IAssistProcessor *AiCompletionProvider::createProcessor(
     QCAI_DEBUG("Completion",
                QStringLiteral("createProcessor: completionModel='%1' agentModel='%2' using='%3'")
                    .arg(s.completionModel, m_model, model));
-    return new AiCompletionProcessor(m_provider, model);
+    return new AiCompletionProcessor(m_provider, m_chatContextManager, model);
 }
 
 int AiCompletionProvider::activationCharSequenceLength() const

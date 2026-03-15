@@ -4,6 +4,7 @@
 
 #include "../ui/AgentDockWidget.h"
 
+#include "../context/ChatContextManager.h"
 #include "../linked_files/AgentDockLinkedFilesController.h"
 
 #include "../settings/Settings.h"
@@ -121,8 +122,10 @@ QString readContextTextFile(const QString &path, const QString &description, boo
 
 }  // namespace
 
-AgentDockSessionController::AgentDockSessionController(AgentDockWidget &dock)
-    : m_dock(dock), m_sessionFileWatcher(std::make_unique<QFileSystemWatcher>()),
+AgentDockSessionController::AgentDockSessionController(AgentDockWidget &dock,
+                                                       ChatContextManager *chatContextManager)
+    : m_dock(dock), m_chatContextManager(chatContextManager),
+      m_sessionFileWatcher(std::make_unique<QFileSystemWatcher>()),
       m_sessionReloadTimer(std::make_unique<QTimer>())
 {
     m_sessionReloadTimer->setSingleShot(true);
@@ -169,12 +172,12 @@ void AgentDockSessionController::saveChat()
         m_dock.m_thinkingCombo->currentData().toString() != cfg.thinkingLevel ||
         m_dock.m_dryRunCheck->isChecked() != cfg.dryRunDefault;
 
-    const bool hasContent = !goalText.trimmed().isEmpty() ||
-                            !persistedMarkdown.trimmed().isEmpty() ||
-                            !m_dock.m_currentDiff.isEmpty() || !planItems.isEmpty() ||
-                            !m_dock.m_linkedFilesController->manualLinkedFiles().isEmpty() ||
-                            !m_dock.m_linkedFilesController->ignoredLinkedFiles().isEmpty() ||
-                            !m_projectMcpServers.isEmpty() || uiStateDiffers;
+    const bool hasContent =
+        !goalText.trimmed().isEmpty() || !persistedMarkdown.trimmed().isEmpty() ||
+        !m_dock.m_currentDiff.isEmpty() || !planItems.isEmpty() ||
+        !m_dock.m_linkedFilesController->manualLinkedFiles().isEmpty() ||
+        !m_dock.m_linkedFilesController->ignoredLinkedFiles().isEmpty() ||
+        !m_projectMcpServers.isEmpty() || uiStateDiffers || !m_activeConversationId.isEmpty();
 
     if (((!hasContent) == true))
     {
@@ -209,6 +212,7 @@ void AgentDockSessionController::saveChat()
     root[QStringLiteral("reasoningEffort")] = m_dock.m_reasoningCombo->currentData().toString();
     root[QStringLiteral("thinkingLevel")] = m_dock.m_thinkingCombo->currentData().toString();
     root[QStringLiteral("dryRun")] = m_dock.m_dryRunCheck->isChecked();
+    root[QStringLiteral("conversationId")] = m_activeConversationId;
     root[QStringLiteral("linkedFiles")] =
         QJsonArray::fromStringList(m_dock.m_linkedFilesController->manualLinkedFiles());
     root[QStringLiteral("ignoredLinkedFiles")] =
@@ -285,6 +289,38 @@ void AgentDockSessionController::restoreChat()
     }
 
     const QJsonObject root = doc.object();
+    m_activeConversationId = root.value(QStringLiteral("conversationId")).toString().trimmed();
+
+    if ((m_chatContextManager != nullptr) && (m_activeProjectFilePath.isEmpty() == false))
+    {
+        QString contextError;
+        const QString projectDir = currentProjectDir();
+        if (projectDir.isEmpty() == false)
+        {
+            if (m_chatContextManager->setActiveWorkspace(m_activeProjectFilePath, projectDir,
+                                                         m_activeConversationId,
+                                                         &contextError) == true)
+            {
+                if (m_activeConversationId.isEmpty() == true)
+                {
+                    m_activeConversationId =
+                        m_chatContextManager->startNewConversation({}, &contextError);
+                }
+                else
+                {
+                    m_activeConversationId =
+                        m_chatContextManager->ensureActiveConversation(&contextError);
+                }
+            }
+        }
+
+        if (contextError.isEmpty() == false)
+        {
+            QCAI_WARN(
+                "Dock",
+                QStringLiteral("Failed to restore persistent chat context: %1").arg(contextError));
+        }
+    }
 
     {
         const QSignalBlocker modeBlocker(m_dock.m_modeCombo);
@@ -542,6 +578,7 @@ void AgentDockSessionController::switchProjectContext(const QString &projectFile
     applyProjectUiDefaults();
     m_dock.m_linkedFilesController->invalidateCandidates();
     m_activeProjectFilePath = projectFilePath;
+    m_activeConversationId.clear();
     m_projectMcpServers.clear();
 
     if (auto *ctx = m_dock.m_controller->editorContext())
@@ -549,8 +586,59 @@ void AgentDockSessionController::switchProjectContext(const QString &projectFile
         ctx->setSelectedProjectFilePath(projectFilePath);
     }
 
+    if ((m_chatContextManager != nullptr) && (projectFilePath.isEmpty() == false))
+    {
+        QString contextError;
+        const QString projectDir = projectDirForPath(projectFilePath);
+        if (projectDir.isEmpty() == false)
+        {
+            m_chatContextManager->setActiveWorkspace(projectFilePath, projectDir, {},
+                                                     &contextError);
+        }
+        if (contextError.isEmpty() == false)
+        {
+            QCAI_WARN(
+                "Dock",
+                QStringLiteral("Failed to switch persistent chat context: %1").arg(contextError));
+        }
+    }
+
     restoreChat();
+    if ((m_activeConversationId.isEmpty() == true) && (m_chatContextManager != nullptr) &&
+        (projectFilePath.isEmpty() == false))
+    {
+        QString contextError;
+        m_activeConversationId = m_chatContextManager->startNewConversation({}, &contextError);
+        if (contextError.isEmpty() == false)
+        {
+            QCAI_WARN(
+                "Dock",
+                QStringLiteral("Failed to create project conversation: %1").arg(contextError));
+        }
+    }
     updateSessionFileWatcher();
+}
+
+void AgentDockSessionController::startNewConversation()
+{
+    if (m_chatContextManager == nullptr)
+    {
+        m_activeConversationId.clear();
+        return;
+    }
+    if (m_activeProjectFilePath.isEmpty() == true)
+    {
+        m_activeConversationId.clear();
+        return;
+    }
+
+    QString contextError;
+    m_activeConversationId = m_chatContextManager->startNewConversation({}, &contextError);
+    if (contextError.isEmpty() == false)
+    {
+        QCAI_WARN("Dock",
+                  QStringLiteral("Failed to start new conversation: %1").arg(contextError));
+    }
 }
 
 QString AgentDockSessionController::currentProjectFilePath() const

@@ -6,6 +6,7 @@ namespace qcai2
 {
 
 class IAIProvider;
+class ChatContextManager;
 
 /**
  * Provides AI-powered code completions for editor assist requests.
@@ -60,6 +61,15 @@ public:
     }
 
     /**
+     * Sets the persistent chat context manager used for tiny completion context retrieval.
+     * @param manager Shared context manager instance.
+     */
+    void setChatContextManager(ChatContextManager *manager)
+    {
+        m_chatContextManager = manager;
+    }
+
+    /**
      * Enables or disables AI completion.
      * @param enabled True to allow this provider to create processors.
      */
@@ -84,9 +94,11 @@ private:
     /** Default model name used when no completion-specific model is configured. */
     QString m_model;
 
+    /** Shared persistent chat context used for lightweight completion context. */
+    ChatContextManager *m_chatContextManager = nullptr;
+
     /** Enables or disables the provider. */
     bool m_enabled = true;
-
 };
 
 }  // namespace qcai2

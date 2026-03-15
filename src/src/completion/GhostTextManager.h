@@ -14,6 +14,7 @@ namespace qcai2
 {
 
 class IAIProvider;
+class ChatContextManager;
 
 /**
  * Manages debounced inline ghost-text suggestions for attached editors.
@@ -44,6 +45,15 @@ public:
     void setModel(const QString &model)
     {
         m_model = model;
+    }
+
+    /**
+     * Sets the persistent chat context manager used for lightweight completion context.
+     * @param manager Shared context manager instance.
+     */
+    void setChatContextManager(ChatContextManager *manager)
+    {
+        m_chatContextManager = manager;
     }
 
     /**
@@ -93,6 +103,9 @@ private:
     /** Default model name used when settings do not override it. */
     QString m_model;
 
+    /** Shared persistent chat context used for lightweight completion retrieval. */
+    ChatContextManager *m_chatContextManager = nullptr;
+
     /** Enables or disables inline suggestions globally. */
     bool m_enabled = true;
 
@@ -104,7 +117,6 @@ private:
 
     /** Guards async callbacks against use-after-free after destruction. */
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
-
 };
 
 }  // namespace qcai2

@@ -1,5 +1,5 @@
 if(NOT DEFINED QCAI2_FORMAT_WORKTREE_DIR OR QCAI2_FORMAT_WORKTREE_DIR STREQUAL "")
-    set(QCAI2_FORMAT_WORKTREE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+    set(QCAI2_FORMAT_WORKTREE_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 endif()
 
 if(NOT DEFINED QCAI2_FORMAT_ALL OR QCAI2_FORMAT_ALL STREQUAL "")
@@ -217,4 +217,7 @@ else()
     if(NOT clang_format_result EQUAL 0)
         message(FATAL_ERROR "clang-format failed with exit code ${clang_format_result}")
     endif()
+
+    message(STATUS
+        "Applied clang-format to ${format_scope_label} in ${QCAI2_FORMAT_WORKTREE_DIR}")
 endif()

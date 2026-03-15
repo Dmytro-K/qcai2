@@ -3,6 +3,7 @@
 */
 
 #include "GhostTextManager.h"
+#include "../context/ChatContextManager.h"
 #include "../models/AgentMessages.h"
 #include "../providers/IAIProvider.h"
 #include "../settings/Settings.h"
@@ -143,6 +144,21 @@ void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
                                     "Return only the code that should be inserted at the cursor. "
                                     "No explanations, no markdown fences, no comments. "
                                     "Keep completions short (1-5 lines).")});
+    if (m_chatContextManager != nullptr)
+    {
+        QString contextError;
+        const QString completionContext =
+            m_chatContextManager->buildCompletionContextBlock(fileName, 128, &contextError);
+        if (contextError.isEmpty() == false)
+        {
+            QCAI_WARN("GhostText",
+                      QStringLiteral("Failed to build completion context: %1").arg(contextError));
+        }
+        else if (completionContext.isEmpty() == false)
+        {
+            messages.append({QStringLiteral("system"), completionContext});
+        }
+    }
     messages.append({QStringLiteral("user"), prompt});
 
     QCAI_DEBUG("GhostText", QStringLiteral("Requesting completion at pos %1").arg(pos));
