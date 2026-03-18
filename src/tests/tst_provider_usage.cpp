@@ -2,7 +2,7 @@
 
 #include <QtTest>
 
-#include "src/providers/ProviderUsage.h"
+#include "src/providers/provider_usage.h"
 
 using namespace qcai2;
 

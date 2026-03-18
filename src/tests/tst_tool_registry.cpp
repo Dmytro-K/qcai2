@@ -4,8 +4,8 @@
 
 #include <QJsonArray>
 
-#include "src/tools/ITool.h"
-#include "src/tools/ToolRegistry.h"
+#include "src/tools/i_tool.h"
+#include "src/tools/tool_registry.h"
 
 #include <memory>
 

@@ -2,7 +2,7 @@
 
 #include <QtTest>
 
-#include "src/safety/SafetyPolicy.h"
+#include "src/safety/safety_policy.h"
 
 #include <QFile>
 #include <QTemporaryDir>

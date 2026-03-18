@@ -34,17 +34,17 @@ client, transport, and auth abstractions.
 
 ## Layout
 
-- `include/qtmcp/Transport.h` - abstract transport interface
-- `include/qtmcp/StdioTransport.h` - subprocess-backed stdio transport
-- `include/qtmcp/HttpTransport.h` - streamable HTTP transport with custom headers
-- `include/qtmcp/Client.h` - transport-agnostic JSON-RPC client core
+- `include/qtmcp/transport.h` - abstract transport interface
+- `include/qtmcp/stdio_transport.h` - subprocess-backed stdio transport
+- `include/qtmcp/http_transport.h` - streamable HTTP transport with custom headers
+- `include/qtmcp/client.h` - transport-agnostic JSON-RPC client core
 - `src/` - implementations
 
 ## Example
 
 ```cpp
-#include <qtmcp/Client.h>
-#include <qtmcp/StdioTransport.h>
+#include <qtmcp/client.h>
+#include <qtmcp/stdio_transport.h>
 
 auto client = new qtmcp::Client(this);
 

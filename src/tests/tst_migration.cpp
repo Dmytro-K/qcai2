@@ -4,7 +4,7 @@
 
 #include <QtTest>
 
-#include "src/util/Migration.h"
+#include "src/util/migration.h"
 
 #include <QDir>
 #include <QFileInfo>

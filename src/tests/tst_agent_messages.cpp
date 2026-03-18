@@ -2,7 +2,7 @@
 
 #include <QtTest>
 
-#include "src/models/AgentMessages.h"
+#include "src/models/agent_messages.h"
 
 #include <QJsonDocument>
 

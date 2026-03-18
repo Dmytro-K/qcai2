@@ -2,7 +2,7 @@
 
 #include <QtTest>
 
-#include <qtmcp/ServerDefinition.h>
+#include <qtmcp/server_definition.h>
 
 #include <QJsonObject>
 

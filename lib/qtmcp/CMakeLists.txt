@@ -12,18 +12,18 @@ endif()
 find_package(Qt6 REQUIRED COMPONENTS Core Network Gui NetworkAuth)
 
 add_library(qtmcp
-    include/qtmcp/Client.h
-    include/qtmcp/HttpTransport.h
-    include/qtmcp/ServerDefinition.h
-    include/qtmcp/SseTransport.h
-    include/qtmcp/StdioTransport.h
-    include/qtmcp/Transport.h
-    src/Client.cpp
-    src/HttpTransport.cpp
-    src/ServerDefinition.cpp
-    src/SseTransport.cpp
-    src/StdioTransport.cpp
-    src/Transport.cpp
+    include/qtmcp/client.h
+    include/qtmcp/http_transport.h
+    include/qtmcp/server_definition.h
+    include/qtmcp/sse_transport.h
+    include/qtmcp/stdio_transport.h
+    include/qtmcp/transport.h
+    src/client.cpp
+    src/http_transport.cpp
+    src/server_definition.cpp
+    src/sse_transport.cpp
+    src/stdio_transport.cpp
+    src/transport.cpp
 )
 
 add_library(qtmcp::qtmcp ALIAS qtmcp)

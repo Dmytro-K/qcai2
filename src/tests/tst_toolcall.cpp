@@ -4,7 +4,7 @@
 
 #include <QtTest>
 
-#include "src/models/ToolCall.h"
+#include "src/models/tool_call.h"
 
 using namespace qcai2;
 

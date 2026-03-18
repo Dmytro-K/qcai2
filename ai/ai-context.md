@@ -53,50 +53,50 @@ qcai2/
 │   │   ├── package-lock.json
 │   │   └── package.json
 │   ├── src/
-│   │   ├── AiAgentPlugin.h/.cpp
-│   │   ├── AgentController.h/.cpp
+│   │   ├── ai_agent_plugin.h/.cpp
+│   │   ├── agent_controller.h/.cpp
 │   │   ├── ui/
-│   │   │   └── AgentDockWidget.h/.cpp/.ui
+│   │   │   └── agent_dock_widget.h/.cpp/.ui
 │   │   ├── session/
-│   │   │   └── AgentDockSessionController.h/.cpp
+│   │   │   └── agent_dock_session_controller.h/.cpp
 │   │   ├── linked_files/
-│   │   │   └── AgentDockLinkedFilesController.h/.cpp
+│   │   │   └── agent_dock_linked_files_controller.h/.cpp
 │   │   ├── completion/
-│   │   │   ├── AiCompletionProvider.h/.cpp
-│   │   │   ├── AiCompletionProcessor.h/.cpp
-│   │   │   ├── GhostTextManager.h/.cpp
+│   │   │   ├── ai_completion_provider.h/.cpp
+│   │   │   ├── ai_completion_processor.h/.cpp
+│   │   │   ├── ghost_text_manager.h/.cpp
 │   │   ├── context/
-│   │   │   └── EditorContext.h/.cpp
+│   │   │   └── editor_context.h/.cpp
 │   │   ├── diff/
-│   │   │   └── InlineDiffManager.h/.cpp
+│   │   │   └── inline_diff_manager.h/.cpp
 │   │   ├── models/
-│   │   │   ├── AgentMessages.h/.cpp
-│   │   │   └── ToolCall.h/.cpp
+│   │   │   ├── agent_messages.h/.cpp
+│   │   │   └── tool_call.h/.cpp
 │   │   ├── providers/
-│   │   │   ├── IAIProvider.h
-│   │   │   ├── OpenAICompatibleProvider.h/.cpp
-│   │   │   ├── CopilotProvider.h/.cpp
-│   │   │   ├── LocalHttpProvider.h/.cpp
-│   │   │   └── OllamaProvider.h/.cpp
+│   │   │   ├── iai_provider.h
+│   │   │   ├── open_ai_compatible_provider.h/.cpp
+│   │   │   ├── copilot_provider.h/.cpp
+│   │   │   ├── local_http_provider.h/.cpp
+│   │   │   └── ollama_provider.h/.cpp
 │   │   ├── safety/
-│   │   │   └── SafetyPolicy.h/.cpp
+│   │   │   └── safety_policy.h/.cpp
 │   │   ├── settings/
-│   │   │   ├── Settings.h/.cpp
-│   │   │   └── SettingsPage.h/.cpp
+│   │   │   ├── settings.h/.cpp
+│   │   │   └── settings_page.h/.cpp
 │   │   ├── tools/
-│   │   │   ├── BuildTools.h/.cpp
-│   │   │   ├── FileTools.h/.cpp
-│   │   │   ├── GitTools.h/.cpp
-│   │   │   ├── IdeTools.h/.cpp
-│   │   │   ├── ITool.h
-│   │   │   ├── SearchTools.h/.cpp
-│   │   │   └── ToolRegistry.h/.cpp
+│   │   │   ├── build_tools.h/.cpp
+│   │   │   ├── file_tools.h/.cpp
+│   │   │   ├── git_tools.h/.cpp
+│   │   │   ├── ide_tools.h/.cpp
+│   │   │   ├── i_tool.h
+│   │   │   ├── search_tools.h/.cpp
+│   │   │   └── tool_registry.h/.cpp
 │   │   └── util/
-│   │       ├── CrashHandler.h/.cpp
-│   │       ├── Diff.h/.cpp
-│   │       ├── Json.h/.cpp
-│   │       ├── Logger.h/.cpp
-│   │       └── ProcessRunner.h/.cpp
+│   │       ├── crash_handler.h/.cpp
+│   │       ├── diff.h/.cpp
+│   │       ├── json.h/.cpp
+│   │       ├── logger.h/.cpp
+│   │       └── process_runner.h/.cpp
 │   └── tests/
 │       ├── tst_json.cpp
 │       └── tst_toolcall.cpp

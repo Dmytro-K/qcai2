@@ -1,5 +1,5 @@
-#include "../src/context/ChatContextManager.h"
-#include "../src/settings/Settings.h"
+#include "../src/context/chat_context_manager.h"
+#include "../src/settings/settings.h"
 
 #include <QDir>
 #include <QFile>

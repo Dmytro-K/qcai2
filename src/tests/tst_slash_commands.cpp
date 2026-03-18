@@ -4,9 +4,9 @@
 
 #include <QtTest>
 
-#include "src/commands/SlashCommandRegistry.h"
-#include "src/goal/FileReferenceGoalHandler.h"
-#include "src/goal/SlashCommandGoalHandler.h"
+#include "src/commands/slash_command_registry.h"
+#include "src/goal/file_reference_goal_handler.h"
+#include "src/goal/slash_command_goal_handler.h"
 
 using namespace qcai2;
 

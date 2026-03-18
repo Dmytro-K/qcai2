@@ -3,9 +3,9 @@
     @brief Tests provider-agnostic agent progress mapping, classification, and rendering.
 */
 
-#include "../src/progress/AgentProgress.h"
-#include "../src/progress/AgentProgressTracker.h"
-#include "../src/progress/AgentStatusFormatter.h"
+#include "../src/progress/agent_progress.h"
+#include "../src/progress/agent_progress_tracker.h"
+#include "../src/progress/agent_status_formatter.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>

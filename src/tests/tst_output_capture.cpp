@@ -4,7 +4,7 @@
 
 #include <QtTest>
 
-#include "src/util/OutputCaptureSupport.h"
+#include "src/util/output_capture_support.h"
 
 using namespace qcai2;
 

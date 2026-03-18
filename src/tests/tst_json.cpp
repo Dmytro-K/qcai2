@@ -4,7 +4,7 @@
 
 #include <QtTest>
 
-#include "src/util/Json.h"
+#include "src/util/json.h"
 
 using namespace qcai2;
 
