@@ -10,6 +10,7 @@
 // CompletionTrigger removed — completion triggers via isActivationCharSequence instead
 #include "context/EditorContext.h"
 #include "mcp/McpToolManager.h"
+#include "providers/AnthropicProvider.h"
 #include "providers/CopilotProvider.h"
 #include "providers/LocalHttpProvider.h"
 #include "providers/OllamaProvider.h"
@@ -267,6 +268,12 @@ void AiAgentPlugin::setupProviders()
     openai->setBaseUrl(s.baseUrl);
     openai->setApiKey(s.apiKey);
     m_providers.append(openai);
+
+    // Anthropic API
+    auto *anthropic = new AnthropicProvider(this);
+    anthropic->setBaseUrl(s.baseUrl);
+    anthropic->setApiKey(s.apiKey);
+    m_providers.append(anthropic);
 
     // Local HTTP
     auto *local = new LocalHttpProvider(this);

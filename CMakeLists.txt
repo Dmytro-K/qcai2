@@ -481,6 +481,8 @@ add_qtc_plugin(qcai2
     src/src/providers/ProviderUsage.cpp
     src/src/providers/OpenAICompatibleProvider.h
     src/src/providers/OpenAICompatibleProvider.cpp
+    src/src/providers/AnthropicProvider.h
+    src/src/providers/AnthropicProvider.cpp
     src/src/providers/LocalHttpProvider.h
     src/src/providers/LocalHttpProvider.cpp
     src/src/providers/OllamaProvider.h

@@ -70,10 +70,10 @@
             </layout>
            </item>
            <item>
-            <widget class="QGroupBox" name="openaiGroup">
-             <property name="title">
-              <string>OpenAI-Compatible</string>
-             </property>
+             <widget class="QGroupBox" name="openaiGroup">
+              <property name="title">
+               <string>Remote API (OpenAI-compatible / Anthropic)</string>
+              </property>
              <layout class="QFormLayout" name="openaiLayout">
               <item row="0" column="0">
                <widget class="QLabel" name="baseUrlLabel">

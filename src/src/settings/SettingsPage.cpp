@@ -164,6 +164,7 @@ public:
 
         // Provider selection
         m_providerCombo->addItem(Tr::tr("OpenAI-Compatible"), QStringLiteral("openai"));
+        m_providerCombo->addItem(Tr::tr("Anthropic API"), QStringLiteral("anthropic"));
         m_providerCombo->addItem(Tr::tr("GitHub Copilot"), QStringLiteral("copilot"));
         m_providerCombo->addItem(Tr::tr("Local HTTP"), QStringLiteral("local"));
         m_providerCombo->addItem(Tr::tr("Ollama (Local)"), QStringLiteral("ollama"));
