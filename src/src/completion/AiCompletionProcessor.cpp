@@ -20,37 +20,37 @@
 namespace qcai2
 {
 
-static const int kContextBefore = 2000;  // chars before cursor
-static const int kContextAfter = 500;    // chars after cursor
+static const int k_context_before = 2000;  // chars before cursor
+static const int k_context_after = 500;    // chars after cursor
 
-AiCompletionProcessor::AiCompletionProcessor(IAIProvider *provider,
-                                             ChatContextManager *chatContextManager,
-                                             const QString &model)
-    : m_provider(provider), m_model(model), m_chatContextManager(chatContextManager)
+ai_completion_processor_t::ai_completion_processor_t(iai_provider_t *provider,
+                                                     chat_context_manager_t *chat_context_manager,
+                                                     const QString &model)
+    : provider(provider), model(model), chat_context_manager(chat_context_manager)
 {
 }
 
-AiCompletionProcessor::~AiCompletionProcessor()
+ai_completion_processor_t::~ai_completion_processor_t()
 {
-    *m_alive = false;
+    *this->alive = false;
 }
 
-bool AiCompletionProcessor::running()
+bool ai_completion_processor_t::running()
 {
-    return m_running;
+    return this->request_running;
 }
 
-void AiCompletionProcessor::cancel()
+void ai_completion_processor_t::cancel()
 {
-    m_cancelled = true;
-    m_running = false;
-    // Don't call m_provider->cancel() — it can trigger synchronous callbacks
+    this->cancelled = true;
+    this->request_running = false;
+    // Don't call this->provider_->cancel() — it can trigger synchronous callbacks
     // that cause re-entrancy crash in Qt Creator's CodeAssistantPrivate::cancelCurrentRequest()
 }
 
-TextEditor::IAssistProposal *AiCompletionProcessor::perform()
+TextEditor::IAssistProposal *ai_completion_processor_t::perform()
 {
-    if ((m_provider == nullptr) || m_cancelled)
+    if ((this->provider == nullptr) || this->cancelled)
     {
         return nullptr;
     }
@@ -69,11 +69,11 @@ TextEditor::IAssistProposal *AiCompletionProcessor::perform()
     }
 
     // Extract text before and after cursor
-    const QString fullText = doc->toPlainText();
-    const int startBefore = qMax(0, pos - kContextBefore);
-    const QString prefix = fullText.mid(startBefore, pos - startBefore);
-    const QString suffix = fullText.mid(pos, qMin(kContextAfter, fullText.length() - pos));
-    const QString fileName = iface->filePath().toUrlishString();
+    const QString full_text = doc->toPlainText();
+    const int start_before = qMax(0, pos - k_context_before);
+    const QString prefix = full_text.mid(start_before, pos - start_before);
+    const QString suffix = full_text.mid(pos, qMin(k_context_after, full_text.length() - pos));
+    const QString file_name = iface->filePath().toUrlishString();
 
     // Build FIM (fill-in-the-middle) prompt
     const QString prompt =
@@ -82,55 +82,54 @@ TextEditor::IAssistProposal *AiCompletionProcessor::perform()
                        "File: %1\n"
                        "Return ONLY the completion text, no explanation, no markdown.\n\n"
                        "```\n%2<CURSOR>%3\n```")
-            .arg(fileName, prefix, suffix);
+            .arg(file_name, prefix, suffix);
 
-    QList<ChatMessage> messages;
+    QList<chat_message_t> messages;
     messages.append({QStringLiteral("system"),
                      QStringLiteral("You are a code completion assistant. "
                                     "Return only the code that should be inserted at the cursor. "
                                     "No explanations, no markdown fences, no comments. "
                                     "Keep completions short (1-5 lines).")});
-    if (m_chatContextManager != nullptr)
+    if (this->chat_context_manager != nullptr)
     {
-        QString contextError;
-        const QString completionContext =
-            m_chatContextManager->buildCompletionContextBlock(fileName, 128, &contextError);
-        if (contextError.isEmpty() == false)
+        QString context_error;
+        const QString completion_context =
+            this->chat_context_manager->build_completion_context_block(file_name, 128,
+                                                                       &context_error);
+        if (context_error.isEmpty() == false)
         {
             QCAI_WARN("Completion",
-                      QStringLiteral("Failed to build completion context: %1").arg(contextError));
+                      QStringLiteral("Failed to build completion context: %1").arg(context_error));
         }
-        else if (completionContext.isEmpty() == false)
+        else if (completion_context.isEmpty() == false)
         {
-            messages.append({QStringLiteral("system"), completionContext});
+            messages.append({QStringLiteral("system"), completion_context});
         }
     }
     messages.append({QStringLiteral("user"), prompt});
 
-    m_running = true;
+    this->request_running = true;
     QCAI_DEBUG("Completion",
                QStringLiteral(
                    "Requesting completion at pos %1 in %2 (prefix: %3 chars, suffix: %4 chars)")
                    .arg(pos)
-                   .arg(fileName)
+                   .arg(file_name)
                    .arg(prefix.length())
                    .arg(suffix.length()));
 
     using namespace std::placeholders;
-    const auto alive = m_alive;
-    const IAIProvider::CompletionCallback completionCallback = std::bind(
-        &AiCompletionProcessor::dispatchCompletionResponse, this, pos, alive, _1, _2, _3);
-    m_provider->complete(messages, m_model, 0.0, 128, settings().completionReasoningEffort,
-                         completionCallback);
+    const auto alive = this->alive;
+    const iai_provider_t::completion_callback_t completion_callback = std::bind(
+        &ai_completion_processor_t::dispatch_completion_response, this, pos, alive, _1, _2, _3);
+    this->provider->complete(messages, this->model, 0.0, 128,
+                             settings().completion_reasoning_effort, completion_callback);
 
     return nullptr;  // async — proposal delivered via setAsyncProposalAvailable
 }
 
-void AiCompletionProcessor::dispatchCompletionResponse(AiCompletionProcessor *processor, int pos,
-                                                       const std::shared_ptr<bool> &alive,
-                                                       const QString &response,
-                                                       const QString &error,
-                                                       const ProviderUsage &usage)
+void ai_completion_processor_t::dispatch_completion_response(
+    ai_completion_processor_t *processor, int pos, const std::shared_ptr<bool> &alive,
+    const QString &response, const QString &error, const provider_usage_t &usage)
 {
     Q_UNUSED(usage);
 
@@ -139,21 +138,21 @@ void AiCompletionProcessor::dispatchCompletionResponse(AiCompletionProcessor *pr
         return;
     }
 
-    processor->handleCompletionResponse(pos, response, error);
+    processor->handle_completion_response(pos, response, error);
 }
 
-void AiCompletionProcessor::handleCompletionResponse(int pos, const QString &response,
-                                                     const QString &error)
+void ai_completion_processor_t::handle_completion_response(int pos, const QString &response,
+                                                           const QString &error)
 {
-    m_running = false;
+    this->request_running = false;
 
-    if (m_cancelled || !error.isEmpty() || response.trimmed().isEmpty())
+    if (this->cancelled || !error.isEmpty() || response.trimmed().isEmpty())
     {
         if (!error.isEmpty())
         {
             QCAI_WARN("Completion", QStringLiteral("Completion error: %1").arg(error));
         }
-        else if (m_cancelled)
+        else if (this->cancelled)
         {
             QCAI_DEBUG("Completion", QStringLiteral("Completion cancelled"));
         }
@@ -164,10 +163,10 @@ void AiCompletionProcessor::handleCompletionResponse(int pos, const QString &res
     QString completion = response.trimmed();
     if (completion.startsWith(QStringLiteral("```")))
     {
-        const qsizetype firstNl = completion.indexOf(QLatin1Char('\n'));
-        if (firstNl >= 0)
+        const qsizetype first_nl = completion.indexOf(QLatin1Char('\n'));
+        if (first_nl >= 0)
         {
-            completion = completion.mid(firstNl + 1);
+            completion = completion.mid(first_nl + 1);
         }
         if (completion.endsWith(QStringLiteral("```")))
         {
@@ -185,10 +184,10 @@ void AiCompletionProcessor::handleCompletionResponse(int pos, const QString &res
     QList<TextEditor::AssistProposalItemInterface *> items;
 
     auto *item = new TextEditor::AssistProposalItem;
-    const qsizetype nlPos = completion.indexOf(QLatin1Char('\n'));
-    if (nlPos > 0)
+    const qsizetype nl_pos = completion.indexOf(QLatin1Char('\n'));
+    if (nl_pos > 0)
     {
-        item->setText(completion.left(nlPos));
+        item->setText(completion.left(nl_pos));
         item->setDetail(completion);
     }
     else
@@ -199,13 +198,13 @@ void AiCompletionProcessor::handleCompletionResponse(int pos, const QString &res
     item->setData(completion);
     items.append(item);
 
-    if (nlPos > 0)
+    if (nl_pos > 0)
     {
-        auto *lineItem = new TextEditor::AssistProposalItem;
-        lineItem->setText(completion.left(nlPos));
-        lineItem->setDetail(QStringLiteral("AI (first line)"));
-        lineItem->setData(completion.left(nlPos));
-        items.append(lineItem);
+        auto *line_item = new TextEditor::AssistProposalItem;
+        line_item->setText(completion.left(nl_pos));
+        line_item->setDetail(QStringLiteral("AI (first line)"));
+        line_item->setData(completion.left(nl_pos));
+        items.append(line_item);
     }
 
     auto *proposal = new TextEditor::GenericProposal(pos, items);

@@ -11,47 +11,47 @@
 namespace qtmcp
 {
 
-class Transport;
+class transport_t;
 
-class Client : public QObject
+class client_t : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit Client(QObject *parent = nullptr);
-    ~Client() override;
+    explicit client_t(QObject *parent = nullptr);
+    ~client_t() override;
 
-    void setTransport(std::unique_ptr<Transport> transport);
-    Transport *transport() const;
-    bool isConnected() const;
+    void set_transport(std::unique_ptr<transport_t> transport);
+    transport_t *transport() const;
+    bool is_connected() const;
 
     void start();
     void stop();
 
-    qint64 sendRequest(const QString &method, const QJsonValue &params = QJsonValue());
-    bool sendNotification(const QString &method, const QJsonValue &params = QJsonValue());
-    bool sendResult(const QJsonValue &id, const QJsonValue &result);
-    bool sendError(const QJsonValue &id, int code, const QString &message,
-                   const QJsonValue &data = QJsonValue());
+    qint64 send_request(const QString &method, const QJsonValue &params = QJsonValue());
+    bool send_notification(const QString &method, const QJsonValue &params = QJsonValue());
+    bool send_result(const QJsonValue &id, const QJsonValue &result);
+    bool send_error(const QJsonValue &id, int code, const QString &message,
+                    const QJsonValue &data = QJsonValue());
 
 signals:
     void connected();
     void disconnected();
-    void transportErrorOccurred(const QString &message);
-    void transportLogMessage(const QString &message);
-    void requestReceived(const QJsonValue &id, const QString &method, const QJsonValue &params);
-    void notificationReceived(const QString &method, const QJsonValue &params);
-    void responseReceived(const QJsonValue &id, const QJsonValue &result);
-    void errorResponseReceived(const QJsonValue &id, int code, const QString &message,
-                               const QJsonValue &data);
+    void transport_error_occurred(const QString &message);
+    void transport_log_message(const QString &message);
+    void request_received(const QJsonValue &id, const QString &method, const QJsonValue &params);
+    void notification_received(const QString &method, const QJsonValue &params);
+    void response_received(const QJsonValue &id, const QJsonValue &result);
+    void error_response_received(const QJsonValue &id, int code, const QString &message,
+                                 const QJsonValue &data);
 
 private:
-    bool sendEnvelope(QJsonObject message);
-    void attachTransport();
-    void handleTransportMessage(const QJsonObject &message);
+    bool send_envelope(QJsonObject message);
+    void attach_transport();
+    void handle_transport_message(const QJsonObject &message);
 
-    std::unique_ptr<Transport> m_transport;
-    qint64 m_nextRequestId = 1;
+    std::unique_ptr<transport_t> current_transport;
+    qint64 next_request_id = 1;
 };
 
 }  // namespace qtmcp

@@ -10,314 +10,314 @@ namespace qcai2
 namespace
 {
 
-QJsonObject providerUsageToJson(const ProviderUsage &usage)
+QJsonObject provider_usage_to_json(const provider_usage_t &usage)
 {
     QJsonObject obj;
-    if (usage.inputTokens >= 0)
+    if (usage.input_tokens >= 0)
     {
-        obj[QStringLiteral("inputTokens")] = usage.inputTokens;
+        obj[QStringLiteral("inputTokens")] = usage.input_tokens;
     }
-    if (usage.outputTokens >= 0)
+    if (usage.output_tokens >= 0)
     {
-        obj[QStringLiteral("outputTokens")] = usage.outputTokens;
+        obj[QStringLiteral("outputTokens")] = usage.output_tokens;
     }
-    if (usage.totalTokens >= 0)
+    if (usage.total_tokens >= 0)
     {
-        obj[QStringLiteral("totalTokens")] = usage.totalTokens;
+        obj[QStringLiteral("totalTokens")] = usage.total_tokens;
     }
-    if (usage.reasoningTokens >= 0)
+    if (usage.reasoning_tokens >= 0)
     {
-        obj[QStringLiteral("reasoningTokens")] = usage.reasoningTokens;
+        obj[QStringLiteral("reasoningTokens")] = usage.reasoning_tokens;
     }
-    if (usage.cachedInputTokens >= 0)
+    if (usage.cached_input_tokens >= 0)
     {
-        obj[QStringLiteral("cachedInputTokens")] = usage.cachedInputTokens;
+        obj[QStringLiteral("cachedInputTokens")] = usage.cached_input_tokens;
     }
     return obj;
 }
 
-ProviderUsage providerUsageFromJson(const QJsonObject &obj)
+provider_usage_t provider_usage_from_json(const QJsonObject &obj)
 {
-    ProviderUsage usage;
-    usage.inputTokens = obj.value(QStringLiteral("inputTokens")).toInt(-1);
-    usage.outputTokens = obj.value(QStringLiteral("outputTokens")).toInt(-1);
-    usage.totalTokens = obj.value(QStringLiteral("totalTokens")).toInt(-1);
-    usage.reasoningTokens = obj.value(QStringLiteral("reasoningTokens")).toInt(-1);
-    usage.cachedInputTokens = obj.value(QStringLiteral("cachedInputTokens")).toInt(-1);
+    provider_usage_t usage;
+    usage.input_tokens = obj.value(QStringLiteral("inputTokens")).toInt(-1);
+    usage.output_tokens = obj.value(QStringLiteral("outputTokens")).toInt(-1);
+    usage.total_tokens = obj.value(QStringLiteral("totalTokens")).toInt(-1);
+    usage.reasoning_tokens = obj.value(QStringLiteral("reasoningTokens")).toInt(-1);
+    usage.cached_input_tokens = obj.value(QStringLiteral("cachedInputTokens")).toInt(-1);
     return usage;
 }
 
-QJsonArray memoryItemsToJson(const QList<MemoryItem> &items)
+QJsonArray memory_items_to_json(const QList<memory_item_t> &items)
 {
     QJsonArray array;
-    for (const MemoryItem &item : items)
+    for (const memory_item_t &item : items)
     {
-        array.append(item.toJson());
+        array.append(item.to_json());
     }
     return array;
 }
 
-QJsonArray messagesToJson(const QList<ContextMessage> &items)
+QJsonArray messages_to_json(const QList<context_message_t> &items)
 {
     QJsonArray array;
-    for (const ContextMessage &item : items)
+    for (const context_message_t &item : items)
     {
-        array.append(item.toJson());
+        array.append(item.to_json());
     }
     return array;
 }
 
-QJsonArray artifactsToJson(const QList<ArtifactRecord> &items)
+QJsonArray artifacts_to_json(const QList<artifact_record_t> &items)
 {
     QJsonArray array;
-    for (const ArtifactRecord &item : items)
+    for (const artifact_record_t &item : items)
     {
-        array.append(item.toJson());
+        array.append(item.to_json());
     }
     return array;
 }
 
-QJsonArray providerMessagesToJson(const QList<ChatMessage> &items)
+QJsonArray provider_messages_to_json(const QList<chat_message_t> &items)
 {
     QJsonArray array;
-    for (const ChatMessage &item : items)
+    for (const chat_message_t &item : items)
     {
-        array.append(item.toJson());
+        array.append(item.to_json());
     }
     return array;
 }
 
 }  // namespace
 
-QJsonObject ContextMessage::toJson() const
+QJsonObject context_message_t::to_json() const
 {
-    return QJsonObject{{QStringLiteral("messageId"), messageId},
-                       {QStringLiteral("workspaceId"), workspaceId},
-                       {QStringLiteral("conversationId"), conversationId},
-                       {QStringLiteral("runId"), runId},
+    return QJsonObject{{QStringLiteral("message_id"), message_id},
+                       {QStringLiteral("workspace_id"), workspace_id},
+                       {QStringLiteral("conversation_id"), conversation_id},
+                       {QStringLiteral("run_id"), run_id},
                        {QStringLiteral("sequence"), sequence},
                        {QStringLiteral("role"), role},
                        {QStringLiteral("source"), source},
                        {QStringLiteral("content"), content},
-                       {QStringLiteral("createdAt"), createdAt},
-                       {QStringLiteral("tokenEstimate"), tokenEstimate},
+                       {QStringLiteral("createdAt"), created_at},
+                       {QStringLiteral("token_estimate"), token_estimate},
                        {QStringLiteral("metadata"), metadata}};
 }
 
-ContextMessage ContextMessage::fromJson(const QJsonObject &obj)
+context_message_t context_message_t::from_json(const QJsonObject &obj)
 {
-    ContextMessage message;
-    message.messageId = obj.value(QStringLiteral("messageId")).toString();
-    message.workspaceId = obj.value(QStringLiteral("workspaceId")).toString();
-    message.conversationId = obj.value(QStringLiteral("conversationId")).toString();
-    message.runId = obj.value(QStringLiteral("runId")).toString();
+    context_message_t message;
+    message.message_id = obj.value(QStringLiteral("message_id")).toString();
+    message.workspace_id = obj.value(QStringLiteral("workspace_id")).toString();
+    message.conversation_id = obj.value(QStringLiteral("conversation_id")).toString();
+    message.run_id = obj.value(QStringLiteral("run_id")).toString();
     message.sequence = obj.value(QStringLiteral("sequence")).toInt();
     message.role = obj.value(QStringLiteral("role")).toString();
     message.source = obj.value(QStringLiteral("source")).toString();
     message.content = obj.value(QStringLiteral("content")).toString();
-    message.createdAt = obj.value(QStringLiteral("createdAt")).toString();
-    message.tokenEstimate = obj.value(QStringLiteral("tokenEstimate")).toInt();
+    message.created_at = obj.value(QStringLiteral("createdAt")).toString();
+    message.token_estimate = obj.value(QStringLiteral("token_estimate")).toInt();
     message.metadata = obj.value(QStringLiteral("metadata")).toObject();
     return message;
 }
 
-ChatMessage ContextMessage::toChatMessage() const
+chat_message_t context_message_t::to_chat_message() const
 {
     return {role, content};
 }
 
-bool ContextSummary::isValid() const
+bool context_summary_t::is_valid() const
 {
-    return !summaryId.isEmpty() && !conversationId.isEmpty() && endSequence >= startSequence;
+    return !summary_id.isEmpty() && !conversation_id.isEmpty() && end_sequence >= start_sequence;
 }
 
-QJsonObject ContextSummary::toJson() const
+QJsonObject context_summary_t::to_json() const
 {
-    return QJsonObject{{QStringLiteral("summaryId"), summaryId},
-                       {QStringLiteral("workspaceId"), workspaceId},
-                       {QStringLiteral("conversationId"), conversationId},
+    return QJsonObject{{QStringLiteral("summary_id"), summary_id},
+                       {QStringLiteral("workspace_id"), workspace_id},
+                       {QStringLiteral("conversation_id"), conversation_id},
                        {QStringLiteral("version"), version},
-                       {QStringLiteral("startSequence"), startSequence},
-                       {QStringLiteral("endSequence"), endSequence},
-                       {QStringLiteral("createdAt"), createdAt},
+                       {QStringLiteral("start_sequence"), start_sequence},
+                       {QStringLiteral("end_sequence"), end_sequence},
+                       {QStringLiteral("createdAt"), created_at},
                        {QStringLiteral("content"), content},
-                       {QStringLiteral("tokenEstimate"), tokenEstimate},
+                       {QStringLiteral("token_estimate"), token_estimate},
                        {QStringLiteral("metadata"), metadata}};
 }
 
-ContextSummary ContextSummary::fromJson(const QJsonObject &obj)
+context_summary_t context_summary_t::from_json(const QJsonObject &obj)
 {
-    ContextSummary summary;
-    summary.summaryId = obj.value(QStringLiteral("summaryId")).toString();
-    summary.workspaceId = obj.value(QStringLiteral("workspaceId")).toString();
-    summary.conversationId = obj.value(QStringLiteral("conversationId")).toString();
+    context_summary_t summary;
+    summary.summary_id = obj.value(QStringLiteral("summary_id")).toString();
+    summary.workspace_id = obj.value(QStringLiteral("workspace_id")).toString();
+    summary.conversation_id = obj.value(QStringLiteral("conversation_id")).toString();
     summary.version = obj.value(QStringLiteral("version")).toInt();
-    summary.startSequence = obj.value(QStringLiteral("startSequence")).toInt();
-    summary.endSequence = obj.value(QStringLiteral("endSequence")).toInt();
-    summary.createdAt = obj.value(QStringLiteral("createdAt")).toString();
+    summary.start_sequence = obj.value(QStringLiteral("start_sequence")).toInt();
+    summary.end_sequence = obj.value(QStringLiteral("end_sequence")).toInt();
+    summary.created_at = obj.value(QStringLiteral("createdAt")).toString();
     summary.content = obj.value(QStringLiteral("content")).toString();
-    summary.tokenEstimate = obj.value(QStringLiteral("tokenEstimate")).toInt();
+    summary.token_estimate = obj.value(QStringLiteral("token_estimate")).toInt();
     summary.metadata = obj.value(QStringLiteral("metadata")).toObject();
     return summary;
 }
 
-QJsonObject MemoryItem::toJson() const
+QJsonObject memory_item_t::to_json() const
 {
-    return QJsonObject{{QStringLiteral("memoryId"), memoryId},
-                       {QStringLiteral("workspaceId"), workspaceId},
+    return QJsonObject{{QStringLiteral("memory_id"), memory_id},
+                       {QStringLiteral("workspace_id"), workspace_id},
                        {QStringLiteral("key"), key},
                        {QStringLiteral("category"), category},
                        {QStringLiteral("value"), value},
                        {QStringLiteral("source"), source},
-                       {QStringLiteral("updatedAt"), updatedAt},
+                       {QStringLiteral("updatedAt"), updated_at},
                        {QStringLiteral("importance"), importance},
-                       {QStringLiteral("tokenEstimate"), tokenEstimate},
+                       {QStringLiteral("token_estimate"), token_estimate},
                        {QStringLiteral("metadata"), metadata}};
 }
 
-MemoryItem MemoryItem::fromJson(const QJsonObject &obj)
+memory_item_t memory_item_t::from_json(const QJsonObject &obj)
 {
-    MemoryItem item;
-    item.memoryId = obj.value(QStringLiteral("memoryId")).toString();
-    item.workspaceId = obj.value(QStringLiteral("workspaceId")).toString();
+    memory_item_t item;
+    item.memory_id = obj.value(QStringLiteral("memory_id")).toString();
+    item.workspace_id = obj.value(QStringLiteral("workspace_id")).toString();
     item.key = obj.value(QStringLiteral("key")).toString();
     item.category = obj.value(QStringLiteral("category")).toString();
     item.value = obj.value(QStringLiteral("value")).toString();
     item.source = obj.value(QStringLiteral("source")).toString();
-    item.updatedAt = obj.value(QStringLiteral("updatedAt")).toString();
+    item.updated_at = obj.value(QStringLiteral("updatedAt")).toString();
     item.importance = obj.value(QStringLiteral("importance")).toInt();
-    item.tokenEstimate = obj.value(QStringLiteral("tokenEstimate")).toInt();
+    item.token_estimate = obj.value(QStringLiteral("token_estimate")).toInt();
     item.metadata = obj.value(QStringLiteral("metadata")).toObject();
     return item;
 }
 
-QJsonObject ArtifactRecord::toJson() const
+QJsonObject artifact_record_t::to_json() const
 {
-    return QJsonObject{{QStringLiteral("artifactId"), artifactId},
-                       {QStringLiteral("workspaceId"), workspaceId},
-                       {QStringLiteral("conversationId"), conversationId},
-                       {QStringLiteral("runId"), runId},
+    return QJsonObject{{QStringLiteral("artifact_id"), artifact_id},
+                       {QStringLiteral("workspace_id"), workspace_id},
+                       {QStringLiteral("conversation_id"), conversation_id},
+                       {QStringLiteral("run_id"), run_id},
                        {QStringLiteral("kind"), kind},
                        {QStringLiteral("title"), title},
-                       {QStringLiteral("storagePath"), storagePath},
+                       {QStringLiteral("storage_path"), storage_path},
                        {QStringLiteral("preview"), preview},
-                       {QStringLiteral("createdAt"), createdAt},
-                       {QStringLiteral("tokenEstimate"), tokenEstimate},
+                       {QStringLiteral("createdAt"), created_at},
+                       {QStringLiteral("token_estimate"), token_estimate},
                        {QStringLiteral("metadata"), metadata}};
 }
 
-ArtifactRecord ArtifactRecord::fromJson(const QJsonObject &obj)
+artifact_record_t artifact_record_t::from_json(const QJsonObject &obj)
 {
-    ArtifactRecord artifact;
-    artifact.artifactId = obj.value(QStringLiteral("artifactId")).toString();
-    artifact.workspaceId = obj.value(QStringLiteral("workspaceId")).toString();
-    artifact.conversationId = obj.value(QStringLiteral("conversationId")).toString();
-    artifact.runId = obj.value(QStringLiteral("runId")).toString();
+    artifact_record_t artifact;
+    artifact.artifact_id = obj.value(QStringLiteral("artifact_id")).toString();
+    artifact.workspace_id = obj.value(QStringLiteral("workspace_id")).toString();
+    artifact.conversation_id = obj.value(QStringLiteral("conversation_id")).toString();
+    artifact.run_id = obj.value(QStringLiteral("run_id")).toString();
     artifact.kind = obj.value(QStringLiteral("kind")).toString();
     artifact.title = obj.value(QStringLiteral("title")).toString();
-    artifact.storagePath = obj.value(QStringLiteral("storagePath")).toString();
+    artifact.storage_path = obj.value(QStringLiteral("storage_path")).toString();
     artifact.preview = obj.value(QStringLiteral("preview")).toString();
-    artifact.createdAt = obj.value(QStringLiteral("createdAt")).toString();
-    artifact.tokenEstimate = obj.value(QStringLiteral("tokenEstimate")).toInt();
+    artifact.created_at = obj.value(QStringLiteral("createdAt")).toString();
+    artifact.token_estimate = obj.value(QStringLiteral("token_estimate")).toInt();
     artifact.metadata = obj.value(QStringLiteral("metadata")).toObject();
     return artifact;
 }
 
-bool ConversationRecord::isValid() const
+bool conversation_record_t::is_valid() const
 {
-    return !conversationId.isEmpty() && !workspaceId.isEmpty();
+    return !conversation_id.isEmpty() && !workspace_id.isEmpty();
 }
 
-QJsonObject ConversationRecord::toJson() const
+QJsonObject conversation_record_t::to_json() const
 {
-    return QJsonObject{{QStringLiteral("conversationId"), conversationId},
-                       {QStringLiteral("workspaceId"), workspaceId},
-                       {QStringLiteral("workspaceRoot"), workspaceRoot},
+    return QJsonObject{{QStringLiteral("conversation_id"), conversation_id},
+                       {QStringLiteral("workspace_id"), workspace_id},
+                       {QStringLiteral("workspaceRoot"), workspace_root},
                        {QStringLiteral("title"), title},
-                       {QStringLiteral("createdAt"), createdAt},
-                       {QStringLiteral("updatedAt"), updatedAt},
-                       {QStringLiteral("lastMessageSequence"), lastMessageSequence},
+                       {QStringLiteral("createdAt"), created_at},
+                       {QStringLiteral("updatedAt"), updated_at},
+                       {QStringLiteral("lastMessageSequence"), last_message_sequence},
                        {QStringLiteral("metadata"), metadata}};
 }
 
-ConversationRecord ConversationRecord::fromJson(const QJsonObject &obj)
+conversation_record_t conversation_record_t::from_json(const QJsonObject &obj)
 {
-    ConversationRecord conversation;
-    conversation.conversationId = obj.value(QStringLiteral("conversationId")).toString();
-    conversation.workspaceId = obj.value(QStringLiteral("workspaceId")).toString();
-    conversation.workspaceRoot = obj.value(QStringLiteral("workspaceRoot")).toString();
+    conversation_record_t conversation;
+    conversation.conversation_id = obj.value(QStringLiteral("conversation_id")).toString();
+    conversation.workspace_id = obj.value(QStringLiteral("workspace_id")).toString();
+    conversation.workspace_root = obj.value(QStringLiteral("workspaceRoot")).toString();
     conversation.title = obj.value(QStringLiteral("title")).toString();
-    conversation.createdAt = obj.value(QStringLiteral("createdAt")).toString();
-    conversation.updatedAt = obj.value(QStringLiteral("updatedAt")).toString();
-    conversation.lastMessageSequence = obj.value(QStringLiteral("lastMessageSequence")).toInt();
+    conversation.created_at = obj.value(QStringLiteral("createdAt")).toString();
+    conversation.updated_at = obj.value(QStringLiteral("updatedAt")).toString();
+    conversation.last_message_sequence = obj.value(QStringLiteral("lastMessageSequence")).toInt();
     conversation.metadata = obj.value(QStringLiteral("metadata")).toObject();
     return conversation;
 }
 
-QJsonObject RunRecord::toJson() const
+QJsonObject run_record_t::to_json() const
 {
-    return QJsonObject{{QStringLiteral("runId"), runId},
-                       {QStringLiteral("workspaceId"), workspaceId},
-                       {QStringLiteral("conversationId"), conversationId},
+    return QJsonObject{{QStringLiteral("run_id"), run_id},
+                       {QStringLiteral("workspace_id"), workspace_id},
+                       {QStringLiteral("conversation_id"), conversation_id},
                        {QStringLiteral("kind"), kind},
-                       {QStringLiteral("providerId"), providerId},
+                       {QStringLiteral("providerId"), provider_id},
                        {QStringLiteral("model"), model},
-                       {QStringLiteral("reasoningEffort"), reasoningEffort},
-                       {QStringLiteral("thinkingLevel"), thinkingLevel},
-                       {QStringLiteral("dryRun"), dryRun},
+                       {QStringLiteral("reasoningEffort"), reasoning_effort},
+                       {QStringLiteral("thinkingLevel"), thinking_level},
+                       {QStringLiteral("dryRun"), dry_run},
                        {QStringLiteral("status"), status},
-                       {QStringLiteral("startedAt"), startedAt},
-                       {QStringLiteral("finishedAt"), finishedAt},
-                       {QStringLiteral("usage"), providerUsageToJson(usage)},
+                       {QStringLiteral("startedAt"), started_at},
+                       {QStringLiteral("finishedAt"), finished_at},
+                       {QStringLiteral("usage"), provider_usage_to_json(usage)},
                        {QStringLiteral("metadata"), metadata}};
 }
 
-RunRecord RunRecord::fromJson(const QJsonObject &obj)
+run_record_t run_record_t::from_json(const QJsonObject &obj)
 {
-    RunRecord run;
-    run.runId = obj.value(QStringLiteral("runId")).toString();
-    run.workspaceId = obj.value(QStringLiteral("workspaceId")).toString();
-    run.conversationId = obj.value(QStringLiteral("conversationId")).toString();
+    run_record_t run;
+    run.run_id = obj.value(QStringLiteral("run_id")).toString();
+    run.workspace_id = obj.value(QStringLiteral("workspace_id")).toString();
+    run.conversation_id = obj.value(QStringLiteral("conversation_id")).toString();
     run.kind = obj.value(QStringLiteral("kind")).toString();
-    run.providerId = obj.value(QStringLiteral("providerId")).toString();
+    run.provider_id = obj.value(QStringLiteral("providerId")).toString();
     run.model = obj.value(QStringLiteral("model")).toString();
-    run.reasoningEffort = obj.value(QStringLiteral("reasoningEffort")).toString();
-    run.thinkingLevel = obj.value(QStringLiteral("thinkingLevel")).toString();
-    run.dryRun = obj.value(QStringLiteral("dryRun")).toBool(true);
+    run.reasoning_effort = obj.value(QStringLiteral("reasoningEffort")).toString();
+    run.thinking_level = obj.value(QStringLiteral("thinkingLevel")).toString();
+    run.dry_run = obj.value(QStringLiteral("dryRun")).toBool(true);
     run.status = obj.value(QStringLiteral("status")).toString();
-    run.startedAt = obj.value(QStringLiteral("startedAt")).toString();
-    run.finishedAt = obj.value(QStringLiteral("finishedAt")).toString();
-    run.usage = providerUsageFromJson(obj.value(QStringLiteral("usage")).toObject());
+    run.started_at = obj.value(QStringLiteral("startedAt")).toString();
+    run.finished_at = obj.value(QStringLiteral("finishedAt")).toString();
+    run.usage = provider_usage_from_json(obj.value(QStringLiteral("usage")).toObject());
     run.metadata = obj.value(QStringLiteral("metadata")).toObject();
     return run;
 }
 
-QJsonObject ContextBudget::toJson() const
+QJsonObject context_budget_t::to_json() const
 {
-    return QJsonObject{{QStringLiteral("totalTokens"), totalTokens},
-                       {QStringLiteral("memoryTokens"), memoryTokens},
-                       {QStringLiteral("summaryTokens"), summaryTokens},
-                       {QStringLiteral("recentMessageTokens"), recentMessageTokens},
-                       {QStringLiteral("artifactTokens"), artifactTokens},
-                       {QStringLiteral("maxRecentMessages"), maxRecentMessages},
-                       {QStringLiteral("maxArtifacts"), maxArtifacts}};
+    return QJsonObject{{QStringLiteral("totalTokens"), total_tokens},
+                       {QStringLiteral("memoryTokens"), memory_tokens},
+                       {QStringLiteral("summaryTokens"), summary_tokens},
+                       {QStringLiteral("recentMessageTokens"), recent_message_tokens},
+                       {QStringLiteral("artifactTokens"), artifact_tokens},
+                       {QStringLiteral("maxRecentMessages"), max_recent_messages},
+                       {QStringLiteral("maxArtifacts"), max_artifacts}};
 }
 
-QJsonObject ContextEnvelope::toJson() const
+QJsonObject context_envelope_t::to_json() const
 {
     QJsonObject obj;
-    obj[QStringLiteral("workspaceId")] = workspaceId;
-    obj[QStringLiteral("conversationId")] = conversationId;
-    obj[QStringLiteral("budget")] = budget.toJson();
-    obj[QStringLiteral("memoryItems")] = memoryItemsToJson(memoryItems);
-    obj[QStringLiteral("summary")] = summary.toJson();
-    obj[QStringLiteral("recentMessages")] = messagesToJson(recentMessages);
-    obj[QStringLiteral("artifacts")] = artifactsToJson(artifacts);
-    obj[QStringLiteral("providerMessages")] = providerMessagesToJson(providerMessages);
+    obj[QStringLiteral("workspace_id")] = workspace_id;
+    obj[QStringLiteral("conversation_id")] = conversation_id;
+    obj[QStringLiteral("budget")] = budget.to_json();
+    obj[QStringLiteral("memory_items")] = memory_items_to_json(memory_items);
+    obj[QStringLiteral("summary")] = summary.to_json();
+    obj[QStringLiteral("recent_messages")] = messages_to_json(recent_messages);
+    obj[QStringLiteral("artifacts")] = artifacts_to_json(artifacts);
+    obj[QStringLiteral("provider_messages")] = provider_messages_to_json(provider_messages);
     return obj;
 }
 
-int estimateTokenCount(const QString &text)
+int estimate_token_count(const QString &text)
 {
     if (text.isEmpty() == true)
     {
@@ -327,80 +327,80 @@ int estimateTokenCount(const QString &text)
     return qMax(1, static_cast<int>(estimated));
 }
 
-QString truncateForContext(const QString &text, int maxChars)
+QString truncate_for_context(const QString &text, int max_chars)
 {
-    if (maxChars <= 0)
+    if (max_chars <= 0)
     {
         return {};
     }
-    if (text.size() <= maxChars)
+    if (text.size() <= max_chars)
     {
         return text;
     }
-    return text.left(maxChars) + QStringLiteral("\n… [truncated]");
+    return text.left(max_chars) + QStringLiteral("\n… [truncated]");
 }
 
-QString newContextId()
+QString new_context_id()
 {
     return QUuid::createUuid().toString(QUuid::WithoutBraces);
 }
 
-QString nowUtcIsoString()
+QString now_utc_iso_string()
 {
     return QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
 }
 
-QString requestKindName(ContextRequestKind kind)
+QString request_kind_name(context_request_kind_t kind)
 {
     switch (kind)
     {
-        case ContextRequestKind::AgentChat:
+        case context_request_kind_t::AGENT_CHAT:
             return QStringLiteral("agent");
-        case ContextRequestKind::Ask:
+        case context_request_kind_t::ASK:
             return QStringLiteral("ask");
-        case ContextRequestKind::Completion:
+        case context_request_kind_t::COMPLETION:
             return QStringLiteral("completion");
     }
     return QStringLiteral("agent");
 }
 
-ContextBudget budgetForRequest(ContextRequestKind kind, int maxOutputTokens)
+context_budget_t budget_for_request(context_request_kind_t kind, int max_output_tokens)
 {
-    ContextBudget budget;
+    context_budget_t budget;
     switch (kind)
     {
-        case ContextRequestKind::Completion:
-            budget.totalTokens = 320;
-            budget.memoryTokens = 80;
-            budget.summaryTokens = 120;
-            budget.recentMessageTokens = 80;
-            budget.artifactTokens = 40;
-            budget.maxRecentMessages = 2;
-            budget.maxArtifacts = 1;
+        case context_request_kind_t::COMPLETION:
+            budget.total_tokens = 320;
+            budget.memory_tokens = 80;
+            budget.summary_tokens = 120;
+            budget.recent_message_tokens = 80;
+            budget.artifact_tokens = 40;
+            budget.max_recent_messages = 2;
+            budget.max_artifacts = 1;
             break;
-        case ContextRequestKind::Ask:
-            budget.totalTokens = qBound(1200, maxOutputTokens * 2, 8000);
-            budget.memoryTokens = qMax(200, budget.totalTokens / 6);
-            budget.summaryTokens = qMax(300, budget.totalTokens / 3);
-            budget.recentMessageTokens = qMax(400, budget.totalTokens / 3);
-            budget.artifactTokens = qMax(150, budget.totalTokens / 8);
-            budget.maxRecentMessages = 10;
-            budget.maxArtifacts = 2;
+        case context_request_kind_t::ASK:
+            budget.total_tokens = qBound(1200, max_output_tokens * 2, 8000);
+            budget.memory_tokens = qMax(200, budget.total_tokens / 6);
+            budget.summary_tokens = qMax(300, budget.total_tokens / 3);
+            budget.recent_message_tokens = qMax(400, budget.total_tokens / 3);
+            budget.artifact_tokens = qMax(150, budget.total_tokens / 8);
+            budget.max_recent_messages = 10;
+            budget.max_artifacts = 2;
             break;
-        case ContextRequestKind::AgentChat:
-            budget.totalTokens = qBound(2000, maxOutputTokens * 3, 12000);
-            budget.memoryTokens = qMax(300, budget.totalTokens / 6);
-            budget.summaryTokens = qMax(500, budget.totalTokens / 3);
-            budget.recentMessageTokens = qMax(700, budget.totalTokens / 3);
-            budget.artifactTokens = qMax(250, budget.totalTokens / 10);
-            budget.maxRecentMessages = 14;
-            budget.maxArtifacts = 3;
+        case context_request_kind_t::AGENT_CHAT:
+            budget.total_tokens = qBound(2000, max_output_tokens * 3, 12000);
+            budget.memory_tokens = qMax(300, budget.total_tokens / 6);
+            budget.summary_tokens = qMax(500, budget.total_tokens / 3);
+            budget.recent_message_tokens = qMax(700, budget.total_tokens / 3);
+            budget.artifact_tokens = qMax(250, budget.total_tokens / 10);
+            budget.max_recent_messages = 14;
+            budget.max_artifacts = 3;
             break;
     }
     return budget;
 }
 
-QString defaultArtifactFileSuffix(const QString &kind)
+QString default_artifact_file_suffix(const QString &kind)
 {
     if (kind == QStringLiteral("diff"))
     {

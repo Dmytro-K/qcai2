@@ -17,44 +17,44 @@ namespace qcai2
  * The logger stores a bounded history for UI display and can suppress
  * non-error messages when debug logging is disabled.
  */
-class Logger : public QObject
+class logger_t : public QObject
 {
     Q_OBJECT
 public:
     /**
      * @brief Severity levels supported by the logger.
      */
-    enum Level : std::uint8_t
+    enum level_t : std::uint8_t
     {
         /** @brief Verbose diagnostic output. */
-        Debug,
+        DEBUG,
         /** @brief Routine informational messages. */
-        Info,
+        INFO,
         /** @brief Recoverable problems or suspicious conditions. */
-        Warning,
+        WARNING,
         /** @brief Failures that are always recorded. */
-        Error
+        ERROR
     };
 
     /**
      * @brief Returns the process-wide logger instance.
      * @return Singleton logger used across the plugin.
      */
-    static Logger &instance();
+    static logger_t &instance();
 
     /**
      * @brief Enables or disables non-error logging.
      * @param enabled True to keep debug, info, and warning entries.
      */
-    void setEnabled(bool enabled);
+    void set_enabled(bool enabled);
 
     /**
      * @brief Reports whether non-error logging is enabled.
      * @return True when debug, info, and warning entries are accepted.
      */
-    bool isEnabled() const
+    bool is_enabled() const
     {
-        return m_enabled;
+        return this->enabled;
     }
 
     /**
@@ -63,7 +63,7 @@ public:
      * @param category Short source category shown in the entry text.
      * @param message Log payload.
      */
-    void log(Level level, const QString &category, const QString &message);
+    void log(level_t level, const QString &category, const QString &message);
 
     /**
      * @brief Logs a debug entry when logging is enabled.
@@ -97,7 +97,7 @@ public:
      * @brief Returns a snapshot of the retained log history.
      * @return Thread-safe copy of the formatted entries buffer.
      */
-    QStringList entries() const;
+    QStringList log_entries() const;
 
     /**
      * @brief Removes all retained log entries.
@@ -109,20 +109,20 @@ signals:
      * @brief Emitted after a formatted entry is appended.
      * @param formatted Newly appended log line.
      */
-    void entryAdded(const QString &formatted);
+    void entry_added(const QString &formatted);
 
 private:
     /**
      * @brief Creates the singleton logger instance.
      */
-    Logger();
+    logger_t();
 
     /**
      * @brief Converts a severity level to its short tag.
      * @param level Severity level to stringify.
      * @return Three-letter level tag used in formatted entries.
      */
-    static QString levelStr(Level level);
+    static QString level_str(level_t level);
 
     /**
      * @brief Formats a log entry for storage and display.
@@ -131,30 +131,29 @@ private:
      * @param message Log payload.
      * @return Timestamped log line.
      */
-    QString format(Level level, const QString &category, const QString &message) const;
+    QString format(level_t level, const QString &category, const QString &message) const;
 
     /** @brief Guards access to the retained entries buffer. */
-    mutable QMutex m_mutex;
+    mutable QMutex mutex;
 
     /** @brief Ring buffer of formatted log lines. */
-    QStringList m_entries;
+    QStringList retained_entries;
 
     /** @brief Enables non-error logging when true. */
-    bool m_enabled = false;
+    bool enabled = false;
 
     /** @brief Maximum retained log entries. */
-    static constexpr int kMaxEntries = 5000;
-
+    static constexpr int k_max_entries = 5000;
 };
 
 /** @brief Shortcut for the process-wide logger singleton. */
-#define qcLog qcai2::Logger::instance()
+#define qcLog qcai2::logger_t::instance()
 
 /** @brief Logs a debug message when logging is enabled. */
 #define QCAI_DEBUG(cat, msg)                                                                      \
     do                                                                                            \
     {                                                                                             \
-        if (qcLog.isEnabled())                                                                    \
+        if (qcLog.is_enabled())                                                                   \
             qcLog.debug(cat, msg);                                                                \
     } while (0)
 
@@ -162,7 +161,7 @@ private:
 #define QCAI_INFO(cat, msg)                                                                       \
     do                                                                                            \
     {                                                                                             \
-        if (qcLog.isEnabled())                                                                    \
+        if (qcLog.is_enabled())                                                                   \
             qcLog.info(cat, msg);                                                                 \
     } while (0)
 
@@ -170,7 +169,7 @@ private:
 #define QCAI_WARN(cat, msg)                                                                       \
     do                                                                                            \
     {                                                                                             \
-        if (qcLog.isEnabled())                                                                    \
+        if (qcLog.is_enabled())                                                                   \
             qcLog.warn(cat, msg);                                                                 \
     } while (0)
 

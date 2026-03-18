@@ -5,16 +5,17 @@
 namespace qcai2
 {
 
-void helloCommand(const SlashCommandInvocation &invocation, const SlashCommandContext &context)
+void hello_command(const slash_command_invocation_t &invocation,
+                   const slash_command_context_t &context)
 {
     Q_UNUSED(invocation);
 
-    if (context.logMessage)
+    if (context.log_message)
     {
-        context.logMessage(QStringLiteral("Hello World"));
+        context.log_message(QStringLiteral("Hello World"));
     }
 }
 
-DECLARE_COMMAND(hello, "Write Hello World to the Actions Log.", helloCommand)
+DECLARE_COMMAND(hello, "Write Hello World to the Actions Log.", hello_command)
 
 }  // namespace qcai2

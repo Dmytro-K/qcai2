@@ -5,7 +5,7 @@
 namespace qcai2
 {
 
-QJsonObject ToolCall::toJson() const
+QJsonObject tool_call_t::to_json() const
 {
     QJsonObject o;
     if (((!id.isEmpty()) == true))
@@ -20,15 +20,15 @@ QJsonObject ToolCall::toJson() const
         o["failed"] = failed;
         if (failed == true)
         {
-            o["error"] = errorMsg;
+            o["error"] = error_msg;
         }
     }
     return o;
 }
 
-ToolCall ToolCall::fromJson(const QJsonObject &obj)
+tool_call_t tool_call_t::from_json(const QJsonObject &obj)
 {
-    ToolCall tc;
+    tool_call_t tc;
     tc.id = obj.value("id").toString();
     tc.name = obj.value("name").toString();
     tc.args = obj.value("args").toObject();

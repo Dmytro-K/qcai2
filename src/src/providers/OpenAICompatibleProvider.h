@@ -12,7 +12,7 @@ namespace qcai2
 /**
  * Provider for OpenAI-compatible chat completion endpoints.
  */
-class OpenAICompatibleProvider : public QObject, public IAIProvider
+class open_ai_compatible_provider_t : public QObject, public iai_provider_t
 {
     Q_OBJECT
 public:
@@ -20,7 +20,7 @@ public:
      * Creates a provider with default OpenAI endpoint settings.
      * @param parent Parent QObject that owns this instance.
      */
-    explicit OpenAICompatibleProvider(QObject *parent = nullptr);
+    explicit open_ai_compatible_provider_t(QObject *parent = nullptr);
 
     /**
      * Returns the provider identifier used in configuration.
@@ -33,7 +33,7 @@ public:
     /**
      * Returns the user-visible provider name.
      */
-    QString displayName() const override
+    QString display_name() const override
     {
         return QStringLiteral("OpenAI-Compatible");
     }
@@ -43,15 +43,15 @@ public:
      * @param messages Conversation history in OpenAI chat format.
      * @param model Remote model identifier.
      * @param temperature Sampling temperature.
-     * @param maxTokens Maximum completion token count.
-     * @param reasoningEffort Optional reasoning hint forwarded when enabled.
+     * @param max_tokens Maximum completion token count.
+     * @param reasoning_effort Optional reasoning hint forwarded when enabled.
      * @param callback Receives the final response text or an error.
-     * @param streamCallback Receives SSE deltas; an empty string ends the stream.
+     * @param stream_callback Receives SSE deltas; an empty string ends the stream.
      */
-    void complete(const QList<ChatMessage> &messages, const QString &model, double temperature,
-                  int maxTokens, const QString &reasoningEffort, CompletionCallback callback,
-                  StreamCallback streamCallback = nullptr,
-                  ProgressCallback progressCallback = nullptr) override;
+    void complete(const QList<chat_message_t> &messages, const QString &model, double temperature,
+                  int max_tokens, const QString &reasoning_effort, completion_callback_t callback,
+                  stream_callback_t stream_callback = nullptr,
+                  progress_callback_t progress_callback = nullptr) override;
 
     /**
      * Aborts the active network reply, if any.
@@ -62,58 +62,58 @@ public:
      * Sets the base URL for the compatible API server.
      * @param url Base URL to use.
      */
-    void setBaseUrl(const QString &url) override
+    void set_base_url(const QString &url) override
     {
-        m_baseUrl = url;
+        this->base_url = url;
     }
 
     /**
      * Sets the bearer token used for Authorization headers.
      * @param key API key or access token.
      */
-    void setApiKey(const QString &key) override
+    void set_api_key(const QString &key) override
     {
-        m_apiKey = key;
+        this->api_key = key;
     }
 
     /**
      * Sets extra request headers such as Azure-specific authentication fields.
      * @param headers Additional HTTP headers to send.
      */
-    void setExtraHeaders(const QMap<QString, QString> &headers)
+    void set_extra_headers(const QMap<QString, QString> &headers)
     {
-        m_extraHeaders = headers;
+        this->extra_headers = headers;
     }
 
 private:
     /**
      * Processes buffered SSE data for a streaming reply.
      */
-    void handleStreamChunk();
+    void handle_stream_chunk();
 
     /** Network access manager shared by provider requests. */
-    QNetworkAccessManager m_nam;
+    QNetworkAccessManager nam;
 
     /** Active reply for the current request, or null when idle. */
-    QNetworkReply *m_currentReply = nullptr;
+    QNetworkReply *current_reply = nullptr;
 
     /** Base URL for the remote API endpoint. */
-    QString m_baseUrl = QStringLiteral("https://api.openai.com");
+    QString base_url = QStringLiteral("https://api.openai.com");
 
     /** Bearer token sent in Authorization headers. */
-    QString m_apiKey;
+    QString api_key;
 
     /** Extra raw headers appended to each request. */
-    QMap<QString, QString> m_extraHeaders;
+    QMap<QString, QString> extra_headers;
 
     /** Partial SSE data waiting for a complete line. */
-    QByteArray m_sseBuffer;
+    QByteArray sse_buffer;
 
     /** Accumulated streamed text returned to the caller at completion. */
-    QString m_streamAccum;
+    QString stream_accum;
 
     /** Usage counters captured from the current streaming response. */
-    ProviderUsage m_streamUsage;
+    provider_usage_t stream_usage;
 };
 
 }  // namespace qcai2

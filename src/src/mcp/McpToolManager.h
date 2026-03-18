@@ -11,23 +11,23 @@
 namespace qcai2
 {
 
-class ToolRegistry;
+class tool_registry_t;
 
 /**
  * Loads configured MCP servers, initializes stdio sessions, and registers their tools.
  */
-class McpToolManager final : public QObject
+class mcp_tool_manager_t final : public QObject
 {
 public:
-    explicit McpToolManager(ToolRegistry *toolRegistry, QObject *parent = nullptr);
-    ~McpToolManager() override;
+    explicit mcp_tool_manager_t(tool_registry_t *tool_registry, QObject *parent = nullptr);
+    ~mcp_tool_manager_t() override;
 
     /**
      * Rebuilds the dynamic MCP tool set for the current project context.
      * @param projectDir Active project directory, or empty for global-only tools.
      * @return User-visible status lines describing what was loaded or skipped.
      */
-    QStringList refreshForProject(const QString &projectDir);
+    QStringList refresh_for_project(const QString &project_dir);
 
     /**
      * Calls one registered MCP tool synchronously.
@@ -35,11 +35,11 @@ public:
      * @param args JSON arguments supplied by the agent.
      * @return Flattened tool result or an explicit error string.
      */
-    QString executeTool(const QString &exposedToolName, const QJsonObject &args) const;
+    QString execute_tool(const QString &exposed_tool_name, const QJsonObject &args) const;
 
 private:
-    class Impl;
-    std::unique_ptr<Impl> m_impl;
+    class impl_t;
+    std::unique_ptr<impl_t> impl;
 };
 
 }  // namespace qcai2

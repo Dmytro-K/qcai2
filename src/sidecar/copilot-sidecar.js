@@ -118,7 +118,7 @@ async function handleComplete(id, params) {
         return;
     }
 
-    const { messages, model, temperature, maxTokens, streaming, reasoningEffort } = params;
+    const { messages, model, temperature, maxTokens, streaming, reasoningEffort: reasoning_effort } = params;
     const requestedModel = model || "gpt-4.1";
     const completionTimeoutSec = Number.isFinite(params?.completionTimeoutSec)
         ? Math.max(0, Math.trunc(params.completionTimeoutSec))
@@ -130,15 +130,15 @@ async function handleComplete(id, params) {
 
     let session = null;
     try {
-        log(`Request #${id}: creating session model=${requestedModel} reasoningEffort=${reasoningEffort || "default"} timeout=${completionTimeoutSec > 0 ? `${completionTimeoutSec}s` : "none"}`);
+        log(`Request #${id}: creating session model=${requestedModel} reasoning_effort=${reasoning_effort || "default"} timeout=${completionTimeoutSec > 0 ? `${completionTimeoutSec}s` : "none"}`);
         const sessionOpts = {
             model: requestedModel,
             streaming: true,
             availableTools: [],
             systemMessage: { mode: "replace", content: "" },
         };
-        if (reasoningEffort)
-            sessionOpts.reasoningEffort = reasoningEffort;
+        if (reasoning_effort)
+            sessionOpts.reasoningEffort = reasoning_effort;
         session = await client.createSession(sessionOpts);
         state.session = session;
 

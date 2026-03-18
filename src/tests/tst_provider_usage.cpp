@@ -6,19 +6,19 @@
 
 using namespace qcai2;
 
-class ProviderUsageTest : public QObject
+class provider_usage_test_t : public QObject
 {
     Q_OBJECT
 
 private slots:
-    void providerUsageFromResponseObject_readsOpenAiUsageShapes();
-    void providerUsageFromResponseObject_readsDirectTopLevelFields();
-    void formatProviderUsageSummary_omitsMissingFieldsAndDerivesTotal();
-    void formatProviderUsageSummary_appendsDuration();
-    void formatProviderUsageSummary_supportsDurationOnly();
+    void provider_usage_from_response_object_reads_open_ai_usage_shapes();
+    void provider_usage_from_response_object_reads_direct_top_level_fields();
+    void format_provider_usage_summary_omits_missing_fields_and_derives_total();
+    void format_provider_usage_summary_appends_duration();
+    void format_provider_usage_summary_supports_duration_only();
 };
 
-void ProviderUsageTest::providerUsageFromResponseObject_readsOpenAiUsageShapes()
+void provider_usage_test_t::provider_usage_from_response_object_reads_open_ai_usage_shapes()
 {
     const QJsonObject response{
         {QStringLiteral("usage"),
@@ -30,59 +30,59 @@ void ProviderUsageTest::providerUsageFromResponseObject_readsOpenAiUsageShapes()
                      {QStringLiteral("completion_tokens_details"),
                       QJsonObject{{QStringLiteral("reasoning_tokens"), 9}}}}}};
 
-    const ProviderUsage usage = providerUsageFromResponseObject(response);
+    const provider_usage_t usage = provider_usage_from_response_object(response);
 
-    QCOMPARE(usage.inputTokens, 120);
-    QCOMPARE(usage.outputTokens, 34);
-    QCOMPARE(usage.totalTokens, 154);
-    QCOMPARE(usage.reasoningTokens, 9);
-    QCOMPARE(usage.cachedInputTokens, 16);
-    QVERIFY(usage.hasAny());
+    QCOMPARE(usage.input_tokens, 120);
+    QCOMPARE(usage.output_tokens, 34);
+    QCOMPARE(usage.total_tokens, 154);
+    QCOMPARE(usage.reasoning_tokens, 9);
+    QCOMPARE(usage.cached_input_tokens, 16);
+    QVERIFY(usage.has_any());
 }
 
-void ProviderUsageTest::providerUsageFromResponseObject_readsDirectTopLevelFields()
+void provider_usage_test_t::provider_usage_from_response_object_reads_direct_top_level_fields()
 {
     const QJsonObject response{{QStringLiteral("input_tokens"), 80},
                                {QStringLiteral("output_tokens"), 25},
                                {QStringLiteral("reasoning_tokens"), 4},
                                {QStringLiteral("cached_input_tokens"), 10}};
 
-    const ProviderUsage usage = providerUsageFromResponseObject(response);
+    const provider_usage_t usage = provider_usage_from_response_object(response);
 
-    QCOMPARE(usage.inputTokens, 80);
-    QCOMPARE(usage.outputTokens, 25);
-    QCOMPARE(usage.totalTokens, -1);
-    QCOMPARE(usage.reasoningTokens, 4);
-    QCOMPARE(usage.cachedInputTokens, 10);
-    QCOMPARE(usage.resolvedTotalTokens(), 105);
+    QCOMPARE(usage.input_tokens, 80);
+    QCOMPARE(usage.output_tokens, 25);
+    QCOMPARE(usage.total_tokens, -1);
+    QCOMPARE(usage.reasoning_tokens, 4);
+    QCOMPARE(usage.cached_input_tokens, 10);
+    QCOMPARE(usage.resolved_total_tokens(), 105);
 }
 
-void ProviderUsageTest::formatProviderUsageSummary_omitsMissingFieldsAndDerivesTotal()
+void provider_usage_test_t::format_provider_usage_summary_omits_missing_fields_and_derives_total()
 {
-    ProviderUsage usage;
-    usage.inputTokens = 50;
-    usage.outputTokens = 12;
-    usage.cachedInputTokens = 5;
+    provider_usage_t usage;
+    usage.input_tokens = 50;
+    usage.output_tokens = 12;
+    usage.cached_input_tokens = 5;
 
-    QCOMPARE(formatProviderUsageSummary(usage),
+    QCOMPARE(format_provider_usage_summary(usage),
              QStringLiteral("input 50 | output 12 | total 62 | cached input 5"));
 }
 
-void ProviderUsageTest::formatProviderUsageSummary_appendsDuration()
+void provider_usage_test_t::format_provider_usage_summary_appends_duration()
 {
-    ProviderUsage usage;
-    usage.inputTokens = 50;
-    usage.outputTokens = 12;
+    provider_usage_t usage;
+    usage.input_tokens = 50;
+    usage.output_tokens = 12;
 
-    QCOMPARE(formatProviderUsageSummary(usage, 1534),
+    QCOMPARE(format_provider_usage_summary(usage, 1534),
              QStringLiteral("input 50 | output 12 | total 62 | time 1.53 s"));
 }
 
-void ProviderUsageTest::formatProviderUsageSummary_supportsDurationOnly()
+void provider_usage_test_t::format_provider_usage_summary_supports_duration_only()
 {
-    QCOMPARE(formatProviderUsageSummary(ProviderUsage{}, 87), QStringLiteral("time 87 ms"));
+    QCOMPARE(format_provider_usage_summary(provider_usage_t{}, 87), QStringLiteral("time 87 ms"));
 }
 
-QTEST_APPLESS_MAIN(ProviderUsageTest)
+QTEST_APPLESS_MAIN(provider_usage_test_t)
 
 #include "tst_provider_usage.moc"

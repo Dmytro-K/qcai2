@@ -8,7 +8,7 @@ namespace qcai2
 /**
  * Tool that runs an arbitrary shell command inside the project tree.
  */
-class RunCommandTool : public ITool
+class run_command_tool_t : public i_tool_t
 {
 public:
     /**
@@ -32,19 +32,19 @@ public:
     /**
      * Returns the JSON schema for run_command arguments.
      */
-    QJsonObject argsSchema() const override;
+    QJsonObject args_schema() const override;
 
     /**
      * Runs the command in the project directory.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
-    QString execute(const QJsonObject &args, const QString &workDir) override;
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 
     /**
      * Arbitrary commands require approval.
      */
-    bool requiresApproval() const override
+    bool requires_approval() const override
     {
         return true;
     }

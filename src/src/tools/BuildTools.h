@@ -5,12 +5,12 @@
 namespace qcai2
 {
 
-class IdeOutputCapture;
+class ide_output_capture_t;
 
 /**
  * Tool that runs cmake --build in the configured build directory.
  */
-class RunBuildTool : public ITool
+class run_build_tool_t : public i_tool_t
 {
 public:
     /**
@@ -33,42 +33,41 @@ public:
     /**
      * Returns the JSON schema for optional build arguments.
      */
-    QJsonObject argsSchema() const override;
+    QJsonObject args_schema() const override;
 
     /**
      * Executes a project build and returns combined output.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
-    QString execute(const QJsonObject &args, const QString &workDir) override;
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 
     /**
      * Overrides the build directory used by the tool.
      * @param dir Directory path.
      */
-    void setBuildDir(const QString &dir)
+    void set_build_dir(const QString &dir)
     {
-        m_buildDir = dir;
+        this->build_dir = dir;
     }
 
-    void setOutputCapture(IdeOutputCapture *outputCapture)
+    void set_output_capture(ide_output_capture_t *output_capture)
     {
-        m_outputCapture = outputCapture;
+        this->output_capture = output_capture;
     }
 
 private:
     /**
      * Build directory used for cmake and ctest commands.
      */
-    QString m_buildDir;
-    IdeOutputCapture *m_outputCapture = nullptr;
-
+    QString build_dir;
+    ide_output_capture_t *output_capture = nullptr;
 };
 
 /**
  * Tool that runs ctest in the configured build directory.
  */
-class RunTestsTool : public ITool
+class run_tests_tool_t : public i_tool_t
 {
 public:
     /**
@@ -90,36 +89,35 @@ public:
     /**
      * Returns the JSON schema for optional test filter arguments.
      */
-    QJsonObject argsSchema() const override;
+    QJsonObject args_schema() const override;
 
     /**
      * Executes project tests and returns combined output.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
-    QString execute(const QJsonObject &args, const QString &workDir) override;
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 
     /**
      * Overrides the build directory used by the tool.
      * @param dir Directory path.
      */
-    void setBuildDir(const QString &dir)
+    void set_build_dir(const QString &dir)
     {
-        m_buildDir = dir;
+        this->build_dir = dir;
     }
 
 private:
     /**
      * Build directory used for ctest commands.
      */
-    QString m_buildDir;
-
+    QString build_dir;
 };
 
 /**
  * Tool that extracts diagnostics from cached build output.
  */
-class ShowDiagnosticsTool : public ITool
+class show_diagnostics_tool_t : public i_tool_t
 {
 public:
     /**
@@ -141,37 +139,36 @@ public:
     /**
      * Returns the empty schema for this no-argument tool.
      */
-    QJsonObject argsSchema() const override;
+    QJsonObject args_schema() const override;
 
     /**
      * Extracts diagnostic lines from the last recorded build output.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
-    QString execute(const QJsonObject &args, const QString &workDir) override;
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 
     /**
      * Stores the build output that later diagnostics should inspect.
      * @param output Build output text to cache.
      */
-    void setLastBuildOutput(const QString &output)
+    void set_last_build_output(const QString &output)
     {
-        m_lastBuildOutput = output;
+        this->last_build_output = output;
     }
 
-    void setOutputCapture(IdeOutputCapture *outputCapture)
+    void set_output_capture(ide_output_capture_t *output_capture)
     {
-        m_outputCapture = outputCapture;
+        this->output_capture = output_capture;
     }
 
 private:
     /** Cached build output scanned by show_diagnostics. */
-    QString m_lastBuildOutput;
-    IdeOutputCapture *m_outputCapture = nullptr;
-
+    QString last_build_output;
+    ide_output_capture_t *output_capture = nullptr;
 };
 
-class ShowCompileOutputTool : public ITool
+class show_compile_output_tool_t : public i_tool_t
 {
 public:
     QString name() const override
@@ -181,24 +178,22 @@ public:
 
     QString description() const override
     {
-        return QStringLiteral(
-            "Show recent Qt Creator Compile Output and compile diagnostics.");
+        return QStringLiteral("Show recent Qt Creator Compile Output and compile diagnostics.");
     }
 
-    QJsonObject argsSchema() const override;
-    QString execute(const QJsonObject &args, const QString &workDir) override;
+    QJsonObject args_schema() const override;
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 
-    void setOutputCapture(IdeOutputCapture *outputCapture)
+    void set_output_capture(ide_output_capture_t *output_capture)
     {
-        m_outputCapture = outputCapture;
+        this->output_capture = output_capture;
     }
 
 private:
-    IdeOutputCapture *m_outputCapture = nullptr;
-
+    ide_output_capture_t *output_capture = nullptr;
 };
 
-class ShowApplicationOutputTool : public ITool
+class show_application_output_tool_t : public i_tool_t
 {
 public:
     QString name() const override
@@ -211,17 +206,16 @@ public:
         return QStringLiteral("Show recent Qt Creator Application Output.");
     }
 
-    QJsonObject argsSchema() const override;
-    QString execute(const QJsonObject &args, const QString &workDir) override;
+    QJsonObject args_schema() const override;
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 
-    void setOutputCapture(IdeOutputCapture *outputCapture)
+    void set_output_capture(ide_output_capture_t *output_capture)
     {
-        m_outputCapture = outputCapture;
+        this->output_capture = output_capture;
     }
 
 private:
-    IdeOutputCapture *m_outputCapture = nullptr;
-
+    ide_output_capture_t *output_capture = nullptr;
 };
 
 }  // namespace qcai2

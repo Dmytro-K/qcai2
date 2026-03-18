@@ -255,34 +255,34 @@ QString nonNullString(const QString &value)
     return value.isNull() == true ? QStringLiteral("") : value;
 }
 
-QJsonObject memoryStateToJson(const QString &workspaceId, const QList<MemoryItem> &items)
+QJsonObject memoryStateToJson(const QString &workspace_id, const QList<memory_item_t> &items)
 {
     QJsonArray array;
-    for (const MemoryItem &item : items)
+    for (const memory_item_t &item : items)
     {
-        array.append(item.toJson());
+        array.append(item.to_json());
     }
 
     return QJsonObject{{QStringLiteral("storageVersion"), kChatContextStorageVersion},
-                       {QStringLiteral("workspaceId"), workspaceId},
+                       {QStringLiteral("workspace_id"), workspace_id},
                        {QStringLiteral("items"), array}};
 }
 
-QList<MemoryItem> memoryItemsFromState(const QJsonObject &obj)
+QList<memory_item_t> memory_itemsFromState(const QJsonObject &obj)
 {
-    QList<MemoryItem> items;
+    QList<memory_item_t> items;
     const QJsonArray array = obj.value(QStringLiteral("items")).toArray();
     for (const QJsonValue &value : array)
     {
         if (value.isObject() == true)
         {
-            items.append(MemoryItem::fromJson(value.toObject()));
+            items.append(memory_item_t::from_json(value.toObject()));
         }
     }
     return items;
 }
 
-ConversationRecord loadConversationState(const QString &path, QString *error)
+conversation_record_t loadConversationState(const QString &path, QString *error)
 {
     bool exists = false;
     const QJsonObject obj = readJsonFile(path, &exists, error);
@@ -294,10 +294,10 @@ ConversationRecord loadConversationState(const QString &path, QString *error)
     {
         return {};
     }
-    return ConversationRecord::fromJson(obj);
+    return conversation_record_t::from_json(obj);
 }
 
-ContextSummary loadLatestSummaryState(const QString &path, QString *error)
+context_summary_t loadLatestSummaryState(const QString &path, QString *error)
 {
     bool exists = false;
     const QJsonObject obj = readJsonFile(path, &exists, error);
@@ -309,65 +309,65 @@ ContextSummary loadLatestSummaryState(const QString &path, QString *error)
     {
         return {};
     }
-    return ContextSummary::fromJson(obj);
+    return context_summary_t::from_json(obj);
 }
 
 }  // namespace
 
-ChatContextStore::ChatContextStore() = default;
+chat_context_store_t::chat_context_store_t() = default;
 
-ChatContextStore::~ChatContextStore()
+chat_context_store_t::~chat_context_store_t()
 {
     close();
 }
 
-bool ChatContextStore::open(const QString &databasePath, const QString &artifactDirPath,
-                            QString *error)
+bool chat_context_store_t::open(const QString &database_path, const QString &artifact_dir_path,
+                                QString *error)
 {
-    if ((isOpen() == true) && (m_databasePath == databasePath) &&
-        (m_artifactDirPath == artifactDirPath))
+    if ((this->is_open() == true) && (this->database_file_path == database_path) &&
+        (this->artifacts_directory_path == artifact_dir_path))
     {
         return true;
     }
 
-    close();
+    this->close();
 
-    m_databasePath = databasePath;
-    m_artifactDirPath = artifactDirPath;
+    this->database_file_path = database_path;
+    this->artifacts_directory_path = artifact_dir_path;
 
-    if (initializeLayout(error) == false)
+    if (this->initialize_layout(error) == false)
     {
-        close();
+        this->close();
         return false;
     }
 
-    m_isOpen = true;
+    this->open_state = true;
     return true;
 }
 
-void ChatContextStore::close()
+void chat_context_store_t::close()
 {
-    m_databasePath.clear();
-    m_artifactDirPath.clear();
-    m_isOpen = false;
+    this->database_file_path.clear();
+    this->artifacts_directory_path.clear();
+    this->open_state = false;
 }
 
-bool ChatContextStore::isOpen() const
+bool chat_context_store_t::is_open() const
 {
-    return m_isOpen == true;
+    return this->open_state == true;
 }
 
-QString ChatContextStore::databasePath() const
+QString chat_context_store_t::database_path() const
 {
-    return m_databasePath;
+    return this->database_file_path;
 }
 
-QString ChatContextStore::artifactDirPath() const
+QString chat_context_store_t::artifact_dir_path() const
 {
-    return m_artifactDirPath;
+    return this->artifacts_directory_path;
 }
 
-bool ChatContextStore::ensureConversation(ConversationRecord *conversation, QString *error)
+bool chat_context_store_t::ensure_conversation(conversation_record_t *conversation, QString *error)
 {
     if (conversation == nullptr)
     {
@@ -377,11 +377,11 @@ bool ChatContextStore::ensureConversation(ConversationRecord *conversation, QStr
         }
         return false;
     }
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return false;
     }
-    if (conversation->isValid() == false)
+    if (conversation->is_valid() == false)
     {
         if (error != nullptr)
         {
@@ -390,24 +390,24 @@ bool ChatContextStore::ensureConversation(ConversationRecord *conversation, QStr
         return false;
     }
 
-    if (conversation->createdAt.isEmpty() == true)
+    if (conversation->created_at.isEmpty() == true)
     {
-        conversation->createdAt = nowUtcIsoString();
+        conversation->created_at = now_utc_iso_string();
     }
-    if (conversation->updatedAt.isEmpty() == true)
+    if (conversation->updated_at.isEmpty() == true)
     {
-        conversation->updatedAt = conversation->createdAt;
+        conversation->updated_at = conversation->created_at;
     }
 
-    if (ensureDirectoryExists(conversationDirectoryPath(conversation->conversationId), error) ==
-        false)
+    if (ensureDirectoryExists(this->conversation_directory_path(conversation->conversation_id),
+                              error) == false)
     {
         return false;
     }
 
     QString localError;
-    ConversationRecord storedConversation =
-        this->conversation(conversation->conversationId, &localError);
+    conversation_record_t storedConversation =
+        this->conversation(conversation->conversation_id, &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -416,29 +416,29 @@ bool ChatContextStore::ensureConversation(ConversationRecord *conversation, QStr
         }
         return false;
     }
-    if (storedConversation.isValid() == false)
+    if (storedConversation.is_valid() == false)
     {
         storedConversation = *conversation;
     }
 
-    storedConversation.workspaceId = conversation->workspaceId;
-    storedConversation.workspaceRoot = nonNullString(conversation->workspaceRoot);
+    storedConversation.workspace_id = conversation->workspace_id;
+    storedConversation.workspace_root = nonNullString(conversation->workspace_root);
     storedConversation.title = nonNullString(conversation->title);
-    storedConversation.updatedAt = conversation->updatedAt;
+    storedConversation.updated_at = conversation->updated_at;
     storedConversation.metadata = conversation->metadata;
 
-    if (storedConversation.createdAt.isEmpty() == true)
+    if (storedConversation.created_at.isEmpty() == true)
     {
-        storedConversation.createdAt = conversation->createdAt;
+        storedConversation.created_at = conversation->created_at;
     }
 
-    if (writeJsonFile(conversationStatePath(conversation->conversationId),
-                      storedConversation.toJson(), error) == false)
+    if (writeJsonFile(this->conversation_state_path(conversation->conversation_id),
+                      storedConversation.to_json(), error) == false)
     {
         return false;
     }
 
-    *conversation = this->conversation(conversation->conversationId, &localError);
+    *conversation = this->conversation(conversation->conversation_id, &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -447,27 +447,27 @@ bool ChatContextStore::ensureConversation(ConversationRecord *conversation, QStr
         }
         return false;
     }
-    return conversation->isValid();
+    return conversation->is_valid();
 }
 
-ConversationRecord ChatContextStore::conversation(const QString &conversationId,
-                                                  QString *error) const
+conversation_record_t chat_context_store_t::conversation(const QString &conversation_id,
+                                                         QString *error) const
 {
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return {};
     }
 
-    return loadConversationState(conversationStatePath(conversationId), error);
+    return loadConversationState(this->conversation_state_path(conversation_id), error);
 }
 
-bool ChatContextStore::saveRun(const RunRecord &run, QString *error)
+bool chat_context_store_t::save_run(const run_record_t &run, QString *error)
 {
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return false;
     }
-    if (run.runId.isEmpty() == true)
+    if (run.run_id.isEmpty() == true)
     {
         if (error != nullptr)
         {
@@ -476,31 +476,31 @@ bool ChatContextStore::saveRun(const RunRecord &run, QString *error)
         return false;
     }
 
-    if (ensureDirectoryExists(runsDirectoryPath(), error) == false)
+    if (ensureDirectoryExists(this->runs_directory_path(), error) == false)
     {
         return false;
     }
 
-    const QString path = runPath(run.runId);
+    const QString path = this->run_path(run.run_id);
     if (QFileInfo::exists(path) == true)
     {
         if (error != nullptr)
         {
-            *error = QStringLiteral("Run already exists: %1").arg(run.runId);
+            *error = QStringLiteral("Run already exists: %1").arg(run.run_id);
         }
         return false;
     }
 
-    return writeJsonFile(path, run.toJson(), error);
+    return writeJsonFile(path, run.to_json(), error);
 }
 
-bool ChatContextStore::updateRun(const RunRecord &run, QString *error)
+bool chat_context_store_t::update_run(const run_record_t &run, QString *error)
 {
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return false;
     }
-    if (run.runId.isEmpty() == true)
+    if (run.run_id.isEmpty() == true)
     {
         if (error != nullptr)
         {
@@ -509,16 +509,16 @@ bool ChatContextStore::updateRun(const RunRecord &run, QString *error)
         return false;
     }
 
-    const QString path = runPath(run.runId);
+    const QString path = this->run_path(run.run_id);
     if (QFileInfo::exists(path) == false)
     {
         return false;
     }
 
-    return writeJsonFile(path, run.toJson(), error);
+    return writeJsonFile(path, run.to_json(), error);
 }
 
-bool ChatContextStore::appendMessage(ContextMessage *message, QString *error)
+bool chat_context_store_t::append_message(context_message_t *message, QString *error)
 {
     if (message == nullptr)
     {
@@ -528,26 +528,27 @@ bool ChatContextStore::appendMessage(ContextMessage *message, QString *error)
         }
         return false;
     }
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return false;
     }
 
-    if (message->messageId.isEmpty() == true)
+    if (message->message_id.isEmpty() == true)
     {
-        message->messageId = newContextId();
+        message->message_id = new_context_id();
     }
-    if (message->createdAt.isEmpty() == true)
+    if (message->created_at.isEmpty() == true)
     {
-        message->createdAt = nowUtcIsoString();
+        message->created_at = now_utc_iso_string();
     }
-    if (message->tokenEstimate <= 0)
+    if (message->token_estimate <= 0)
     {
-        message->tokenEstimate = estimateTokenCount(message->content);
+        message->token_estimate = estimate_token_count(message->content);
     }
 
     QString localError;
-    ConversationRecord storedConversation = conversation(message->conversationId, &localError);
+    conversation_record_t storedConversation =
+        this->conversation(message->conversation_id, &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -556,16 +557,17 @@ bool ChatContextStore::appendMessage(ContextMessage *message, QString *error)
         }
         return false;
     }
-    if (storedConversation.isValid() == false)
+    if (storedConversation.is_valid() == false)
     {
         if (error != nullptr)
         {
-            *error = QStringLiteral("Conversation not found: %1").arg(message->conversationId);
+            *error = QStringLiteral("Conversation not found: %1").arg(message->conversation_id);
         }
         return false;
     }
 
-    const int nextSequence = latestMessageSequence(message->conversationId, &localError) + 1;
+    const int nextSequence =
+        this->latest_message_sequence(message->conversation_id, &localError) + 1;
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -580,28 +582,29 @@ bool ChatContextStore::appendMessage(ContextMessage *message, QString *error)
     }
     message->sequence = nextSequence;
 
-    if (ensureDirectoryExists(conversationDirectoryPath(message->conversationId), error) == false)
+    if (ensureDirectoryExists(this->conversation_directory_path(message->conversation_id),
+                              error) == false)
     {
         return false;
     }
-    if (appendJsonLine(conversationMessagesPath(message->conversationId), message->toJson(),
-                       error) == false)
+    if (appendJsonLine(this->conversation_messages_path(message->conversation_id),
+                       message->to_json(), error) == false)
     {
         return false;
     }
 
-    storedConversation.updatedAt = message->createdAt;
-    storedConversation.lastMessageSequence = message->sequence;
+    storedConversation.updated_at = message->created_at;
+    storedConversation.last_message_sequence = message->sequence;
     if ((storedConversation.title.isEmpty() == true) && (message->role == QStringLiteral("user")))
     {
-        storedConversation.title = truncateForContext(message->content.simplified(), 96);
+        storedConversation.title = truncate_for_context(message->content.simplified(), 96);
     }
 
-    return writeJsonFile(conversationStatePath(message->conversationId),
-                         storedConversation.toJson(), error);
+    return writeJsonFile(this->conversation_state_path(message->conversation_id),
+                         storedConversation.to_json(), error);
 }
 
-bool ChatContextStore::upsertMemoryItem(MemoryItem *item, QString *error)
+bool chat_context_store_t::upsert_memory_item(memory_item_t *item, QString *error)
 {
     if (item == nullptr)
     {
@@ -611,13 +614,13 @@ bool ChatContextStore::upsertMemoryItem(MemoryItem *item, QString *error)
         }
         return false;
     }
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return false;
     }
 
     QString localError;
-    const QJsonObject memoryState = readJsonFile(memoryPath(), nullptr, &localError);
+    const QJsonObject memoryState = readJsonFile(this->memory_path(), nullptr, &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -626,13 +629,13 @@ bool ChatContextStore::upsertMemoryItem(MemoryItem *item, QString *error)
         }
         return false;
     }
-    QList<MemoryItem> items = memoryItemsFromState(memoryState);
+    QList<memory_item_t> items = memory_itemsFromState(memoryState);
 
     int existingIndex = -1;
     for (int index = 0; index < items.size(); ++index)
     {
-        const MemoryItem &existingItem = items.at(index);
-        if ((existingItem.workspaceId == item->workspaceId) && (existingItem.key == item->key))
+        const memory_item_t &existingItem = items.at(index);
+        if ((existingItem.workspace_id == item->workspace_id) && (existingItem.key == item->key))
         {
             existingIndex = index;
             break;
@@ -641,19 +644,19 @@ bool ChatContextStore::upsertMemoryItem(MemoryItem *item, QString *error)
 
     if (existingIndex >= 0)
     {
-        item->memoryId = items.at(existingIndex).memoryId;
+        item->memory_id = items.at(existingIndex).memory_id;
     }
-    if (item->memoryId.isEmpty() == true)
+    if (item->memory_id.isEmpty() == true)
     {
-        item->memoryId = newContextId();
+        item->memory_id = new_context_id();
     }
-    if (item->updatedAt.isEmpty() == true)
+    if (item->updated_at.isEmpty() == true)
     {
-        item->updatedAt = nowUtcIsoString();
+        item->updated_at = now_utc_iso_string();
     }
-    if (item->tokenEstimate <= 0)
+    if (item->token_estimate <= 0)
     {
-        item->tokenEstimate = estimateTokenCount(item->value);
+        item->token_estimate = estimate_token_count(item->value);
     }
 
     if (existingIndex >= 0)
@@ -665,10 +668,10 @@ bool ChatContextStore::upsertMemoryItem(MemoryItem *item, QString *error)
         items.append(*item);
     }
 
-    return writeJsonFile(memoryPath(), memoryStateToJson(item->workspaceId, items), error);
+    return writeJsonFile(this->memory_path(), memoryStateToJson(item->workspace_id, items), error);
 }
 
-bool ChatContextStore::addSummary(ContextSummary *summary, QString *error)
+bool chat_context_store_t::add_summary(context_summary_t *summary, QString *error)
 {
     if (summary == nullptr)
     {
@@ -678,26 +681,27 @@ bool ChatContextStore::addSummary(ContextSummary *summary, QString *error)
         }
         return false;
     }
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return false;
     }
 
-    if (summary->summaryId.isEmpty() == true)
+    if (summary->summary_id.isEmpty() == true)
     {
-        summary->summaryId = newContextId();
+        summary->summary_id = new_context_id();
     }
-    if (summary->createdAt.isEmpty() == true)
+    if (summary->created_at.isEmpty() == true)
     {
-        summary->createdAt = nowUtcIsoString();
+        summary->created_at = now_utc_iso_string();
     }
-    if (summary->tokenEstimate <= 0)
+    if (summary->token_estimate <= 0)
     {
-        summary->tokenEstimate = estimateTokenCount(summary->content);
+        summary->token_estimate = estimate_token_count(summary->content);
     }
 
     QString localError;
-    const ContextSummary currentSummary = latestSummary(summary->conversationId, &localError);
+    const context_summary_t currentSummary =
+        this->latest_summary(summary->conversation_id, &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -706,7 +710,7 @@ bool ChatContextStore::addSummary(ContextSummary *summary, QString *error)
         }
         return false;
     }
-    if ((currentSummary.isValid() == true) && (summary->version <= currentSummary.version))
+    if ((currentSummary.is_valid() == true) && (summary->version <= currentSummary.version))
     {
         if (error != nullptr)
         {
@@ -717,22 +721,23 @@ bool ChatContextStore::addSummary(ContextSummary *summary, QString *error)
         return false;
     }
 
-    if (ensureDirectoryExists(conversationDirectoryPath(summary->conversationId), error) == false)
+    if (ensureDirectoryExists(this->conversation_directory_path(summary->conversation_id),
+                              error) == false)
     {
         return false;
     }
-    if (appendJsonLine(conversationSummariesPath(summary->conversationId), summary->toJson(),
-                       error) == false)
+    if (appendJsonLine(this->conversation_summaries_path(summary->conversation_id),
+                       summary->to_json(), error) == false)
     {
         return false;
     }
 
-    return writeJsonFile(conversationLatestSummaryPath(summary->conversationId), summary->toJson(),
-                         error);
+    return writeJsonFile(this->conversation_latest_summary_path(summary->conversation_id),
+                         summary->to_json(), error);
 }
 
-bool ChatContextStore::addArtifact(ArtifactRecord *artifact, const QString &content,
-                                   QString *error)
+bool chat_context_store_t::add_artifact(artifact_record_t *artifact, const QString &content,
+                                        QString *error)
 {
     if (artifact == nullptr)
     {
@@ -742,34 +747,34 @@ bool ChatContextStore::addArtifact(ArtifactRecord *artifact, const QString &cont
         }
         return false;
     }
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return false;
     }
 
-    if (artifact->artifactId.isEmpty() == true)
+    if (artifact->artifact_id.isEmpty() == true)
     {
-        artifact->artifactId = newContextId();
+        artifact->artifact_id = new_context_id();
     }
-    if (artifact->createdAt.isEmpty() == true)
+    if (artifact->created_at.isEmpty() == true)
     {
-        artifact->createdAt = nowUtcIsoString();
+        artifact->created_at = now_utc_iso_string();
     }
     if (artifact->preview.isEmpty() == true)
     {
-        artifact->preview = truncateForContext(content, 800);
+        artifact->preview = truncate_for_context(content, 800);
     }
-    if (artifact->tokenEstimate <= 0)
+    if (artifact->token_estimate <= 0)
     {
-        artifact->tokenEstimate = estimateTokenCount(artifact->preview);
+        artifact->token_estimate = estimate_token_count(artifact->preview);
     }
 
     if (content.isEmpty() == false)
     {
-        const QString suffix = defaultArtifactFileSuffix(artifact->kind);
-        artifact->storagePath = QStringLiteral("%1%2").arg(artifact->artifactId, suffix);
+        const QString suffix = default_artifact_file_suffix(artifact->kind);
+        artifact->storage_path = QStringLiteral("%1%2").arg(artifact->artifact_id, suffix);
 
-        QSaveFile file(QDir(m_artifactDirPath).filePath(artifact->storagePath));
+        QSaveFile file(QDir(this->artifacts_directory_path).filePath(artifact->storage_path));
         if (file.open(QIODevice::WriteOnly | QIODevice::Text) == false)
         {
             if (error != nullptr)
@@ -797,18 +802,20 @@ bool ChatContextStore::addArtifact(ArtifactRecord *artifact, const QString &cont
         }
     }
 
-    if (ensureDirectoryExists(conversationDirectoryPath(artifact->conversationId), error) == false)
+    if (ensureDirectoryExists(this->conversation_directory_path(artifact->conversation_id),
+                              error) == false)
     {
         return false;
     }
-    if (appendJsonLine(conversationArtifactsPath(artifact->conversationId), artifact->toJson(),
-                       error) == false)
+    if (appendJsonLine(this->conversation_artifacts_path(artifact->conversation_id),
+                       artifact->to_json(), error) == false)
     {
         return false;
     }
 
     QString localError;
-    ConversationRecord storedConversation = conversation(artifact->conversationId, &localError);
+    conversation_record_t storedConversation =
+        this->conversation(artifact->conversation_id, &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -817,11 +824,11 @@ bool ChatContextStore::addArtifact(ArtifactRecord *artifact, const QString &cont
         }
         return false;
     }
-    if (storedConversation.isValid() == true)
+    if (storedConversation.is_valid() == true)
     {
-        storedConversation.updatedAt = artifact->createdAt;
-        if (writeJsonFile(conversationStatePath(artifact->conversationId),
-                          storedConversation.toJson(), error) == false)
+        storedConversation.updated_at = artifact->created_at;
+        if (writeJsonFile(this->conversation_state_path(artifact->conversation_id),
+                          storedConversation.to_json(), error) == false)
         {
             return false;
         }
@@ -830,18 +837,18 @@ bool ChatContextStore::addArtifact(ArtifactRecord *artifact, const QString &cont
     return true;
 }
 
-QList<ContextMessage> ChatContextStore::recentMessages(const QString &conversationId, int limit,
-                                                       QString *error) const
+QList<context_message_t> chat_context_store_t::recent_messages(const QString &conversation_id,
+                                                               int limit, QString *error) const
 {
-    QList<ContextMessage> messages;
-    if (ensureOpen(error) == false)
+    QList<context_message_t> messages;
+    if (this->ensure_open(error) == false)
     {
         return messages;
     }
 
     QString localError;
     const QList<QJsonObject> objects =
-        readRecentJsonLines(conversationMessagesPath(conversationId), limit, &localError);
+        readRecentJsonLines(this->conversation_messages_path(conversation_id), limit, &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -853,25 +860,25 @@ QList<ContextMessage> ChatContextStore::recentMessages(const QString &conversati
 
     for (const QJsonObject &obj : objects)
     {
-        messages.append(ContextMessage::fromJson(obj));
+        messages.append(context_message_t::from_json(obj));
     }
     return messages;
 }
 
-QList<ContextMessage> ChatContextStore::messagesRange(const QString &conversationId,
-                                                      int startSequenceExclusive,
-                                                      int endSequenceInclusive,
-                                                      QString *error) const
+QList<context_message_t> chat_context_store_t::messages_range(const QString &conversation_id,
+                                                              int start_sequenceExclusive,
+                                                              int end_sequenceInclusive,
+                                                              QString *error) const
 {
-    QList<ContextMessage> messages;
-    if (ensureOpen(error) == false)
+    QList<context_message_t> messages;
+    if (this->ensure_open(error) == false)
     {
         return messages;
     }
 
     QString localError;
     const QList<QJsonObject> objects =
-        readAllJsonLines(conversationMessagesPath(conversationId), &localError);
+        readAllJsonLines(this->conversation_messages_path(conversation_id), &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -883,9 +890,9 @@ QList<ContextMessage> ChatContextStore::messagesRange(const QString &conversatio
 
     for (const QJsonObject &obj : objects)
     {
-        const ContextMessage message = ContextMessage::fromJson(obj);
-        if ((message.sequence > startSequenceExclusive) &&
-            (message.sequence <= endSequenceInclusive))
+        const context_message_t message = context_message_t::from_json(obj);
+        if ((message.sequence > start_sequenceExclusive) &&
+            (message.sequence <= end_sequenceInclusive))
         {
             messages.append(message);
         }
@@ -893,17 +900,17 @@ QList<ContextMessage> ChatContextStore::messagesRange(const QString &conversatio
     return messages;
 }
 
-QList<MemoryItem> ChatContextStore::memoryItems(const QString &workspaceId, int limit,
-                                                QString *error) const
+QList<memory_item_t> chat_context_store_t::memory_items(const QString &workspace_id, int limit,
+                                                        QString *error) const
 {
-    QList<MemoryItem> items;
-    if (ensureOpen(error) == false)
+    QList<memory_item_t> items;
+    if (this->ensure_open(error) == false)
     {
         return items;
     }
 
     QString localError;
-    items = memoryItemsFromState(readJsonFile(memoryPath(), nullptr, &localError));
+    items = memory_itemsFromState(readJsonFile(this->memory_path(), nullptr, &localError));
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -913,23 +920,24 @@ QList<MemoryItem> ChatContextStore::memoryItems(const QString &workspaceId, int 
         return {};
     }
 
-    QList<MemoryItem> filteredItems;
-    for (const MemoryItem &item : items)
+    QList<memory_item_t> filteredItems;
+    for (const memory_item_t &item : items)
     {
-        if (item.workspaceId == workspaceId)
+        if (item.workspace_id == workspace_id)
         {
             filteredItems.append(item);
         }
     }
     items = filteredItems;
 
-    std::sort(items.begin(), items.end(), [](const MemoryItem &left, const MemoryItem &right) {
-        if (left.importance != right.importance)
-        {
-            return (left.importance > right.importance) ? true : false;
-        }
-        return (left.updatedAt > right.updatedAt) ? true : false;
-    });
+    std::sort(items.begin(), items.end(),
+              [](const memory_item_t &left, const memory_item_t &right) {
+                  if (left.importance != right.importance)
+                  {
+                      return (left.importance > right.importance) ? true : false;
+                  }
+                  return (left.updated_at > right.updated_at) ? true : false;
+              });
 
     if ((limit > 0) && (items.size() > limit))
     {
@@ -939,18 +947,18 @@ QList<MemoryItem> ChatContextStore::memoryItems(const QString &workspaceId, int 
     return items;
 }
 
-QList<ArtifactRecord> ChatContextStore::recentArtifacts(const QString &conversationId, int limit,
-                                                        QString *error) const
+QList<artifact_record_t> chat_context_store_t::recent_artifacts(const QString &conversation_id,
+                                                                int limit, QString *error) const
 {
-    QList<ArtifactRecord> artifacts;
-    if (ensureOpen(error) == false)
+    QList<artifact_record_t> artifacts;
+    if (this->ensure_open(error) == false)
     {
         return artifacts;
     }
 
     QString localError;
-    const QList<QJsonObject> objects =
-        readRecentJsonLines(conversationArtifactsPath(conversationId), limit, &localError);
+    const QList<QJsonObject> objects = readRecentJsonLines(
+        this->conversation_artifacts_path(conversation_id), limit, &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -962,21 +970,22 @@ QList<ArtifactRecord> ChatContextStore::recentArtifacts(const QString &conversat
 
     for (qsizetype index = objects.size() - 1; index >= 0; --index)
     {
-        artifacts.append(ArtifactRecord::fromJson(objects.at(static_cast<int>(index))));
+        artifacts.append(artifact_record_t::from_json(objects.at(static_cast<int>(index))));
     }
     return artifacts;
 }
 
-ContextSummary ChatContextStore::latestSummary(const QString &conversationId, QString *error) const
+context_summary_t chat_context_store_t::latest_summary(const QString &conversation_id,
+                                                       QString *error) const
 {
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return {};
     }
 
     QString localError;
-    const ContextSummary storedSummary =
-        loadLatestSummaryState(conversationLatestSummaryPath(conversationId), &localError);
+    const context_summary_t storedSummary = loadLatestSummaryState(
+        this->conversation_latest_summary_path(conversation_id), &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -985,14 +994,14 @@ ContextSummary ChatContextStore::latestSummary(const QString &conversationId, QS
         }
         return {};
     }
-    if (storedSummary.isValid() == true)
+    if (storedSummary.is_valid() == true)
     {
         return storedSummary;
     }
 
-    ContextSummary latest;
+    context_summary_t latest;
     const QList<QJsonObject> objects =
-        readAllJsonLines(conversationSummariesPath(conversationId), &localError);
+        readAllJsonLines(this->conversation_summaries_path(conversation_id), &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -1004,9 +1013,9 @@ ContextSummary ChatContextStore::latestSummary(const QString &conversationId, QS
 
     for (const QJsonObject &obj : objects)
     {
-        const ContextSummary candidate = ContextSummary::fromJson(obj);
-        if ((candidate.isValid() == true) &&
-            ((latest.isValid() == false) || (candidate.version > latest.version)))
+        const context_summary_t candidate = context_summary_t::from_json(obj);
+        if ((candidate.is_valid() == true) &&
+            ((latest.is_valid() == false) || (candidate.version > latest.version)))
         {
             latest = candidate;
         }
@@ -1015,19 +1024,21 @@ ContextSummary ChatContextStore::latestSummary(const QString &conversationId, QS
     return latest;
 }
 
-int ChatContextStore::latestSummaryVersion(const QString &conversationId, QString *error) const
+int chat_context_store_t::latest_summary_version(const QString &conversation_id,
+                                                 QString *error) const
 {
-    const ContextSummary summary = latestSummary(conversationId, error);
-    if (summary.isValid() == false)
+    const context_summary_t summary = this->latest_summary(conversation_id, error);
+    if (summary.is_valid() == false)
     {
         return 0;
     }
     return summary.version;
 }
 
-int ChatContextStore::latestMessageSequence(const QString &conversationId, QString *error) const
+int chat_context_store_t::latest_message_sequence(const QString &conversation_id,
+                                                  QString *error) const
 {
-    if (ensureOpen(error) == false)
+    if (this->ensure_open(error) == false)
     {
         return -1;
     }
@@ -1035,7 +1046,7 @@ int ChatContextStore::latestMessageSequence(const QString &conversationId, QStri
     int latestSequence = 0;
     QString localError;
     const QList<QJsonObject> objects =
-        readAllJsonLines(conversationMessagesPath(conversationId), &localError);
+        readAllJsonLines(this->conversation_messages_path(conversation_id), &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -1057,28 +1068,28 @@ int ChatContextStore::latestMessageSequence(const QString &conversationId, QStri
     return latestSequence;
 }
 
-bool ChatContextStore::initializeLayout(QString *error)
+bool chat_context_store_t::initialize_layout(QString *error)
 {
-    if (ensureDirectoryExists(m_databasePath, error) == false)
+    if (ensureDirectoryExists(this->database_file_path, error) == false)
     {
         return false;
     }
-    if (ensureDirectoryExists(conversationsDirectoryPath(), error) == false)
+    if (ensureDirectoryExists(this->conversations_directory_path(), error) == false)
     {
         return false;
     }
-    if (ensureDirectoryExists(runsDirectoryPath(), error) == false)
+    if (ensureDirectoryExists(this->runs_directory_path(), error) == false)
     {
         return false;
     }
-    if (ensureDirectoryExists(m_artifactDirPath, error) == false)
+    if (ensureDirectoryExists(this->artifacts_directory_path, error) == false)
     {
         return false;
     }
 
     bool formatExists = false;
     QString localError;
-    const QJsonObject formatObject = readJsonFile(formatPath(), &formatExists, &localError);
+    const QJsonObject formatObject = readJsonFile(this->format_path(), &formatExists, &localError);
     if (localError.isEmpty() == false)
     {
         if (error != nullptr)
@@ -1096,7 +1107,7 @@ bool ChatContextStore::initializeLayout(QString *error)
             if (error != nullptr)
             {
                 *error = QStringLiteral("Unsupported chat context store format in %1")
-                             .arg(formatPath());
+                             .arg(this->format_path());
             }
             return false;
         }
@@ -1108,20 +1119,20 @@ bool ChatContextStore::initializeLayout(QString *error)
             {QStringLiteral("backend"), QStringLiteral("jsonl")},
             {QStringLiteral("layout"), QStringLiteral("conversation-directories")},
         };
-        if (writeJsonFile(formatPath(), newFormat, error) == false)
+        if (writeJsonFile(this->format_path(), newFormat, error) == false)
         {
             return false;
         }
     }
 
-    if (QFileInfo::exists(memoryPath()) == false)
+    if (QFileInfo::exists(this->memory_path()) == false)
     {
         const QJsonObject initialMemory{
             {QStringLiteral("storageVersion"), kChatContextStorageVersion},
-            {QStringLiteral("workspaceId"), QStringLiteral("")},
+            {QStringLiteral("workspace_id"), QStringLiteral("")},
             {QStringLiteral("items"), QJsonArray{}},
         };
-        if (writeJsonFile(memoryPath(), initialMemory, error) == false)
+        if (writeJsonFile(memory_path(), initialMemory, error) == false)
         {
             return false;
         }
@@ -1130,9 +1141,9 @@ bool ChatContextStore::initializeLayout(QString *error)
     return true;
 }
 
-bool ChatContextStore::ensureOpen(QString *error) const
+bool chat_context_store_t::ensure_open(QString *error) const
 {
-    if (isOpen() == true)
+    if (this->is_open() == true)
     {
         return true;
     }
@@ -1143,64 +1154,65 @@ bool ChatContextStore::ensureOpen(QString *error) const
     return false;
 }
 
-QString ChatContextStore::conversationsDirectoryPath() const
+QString chat_context_store_t::conversations_directory_path() const
 {
-    return QDir(m_databasePath).filePath(QStringLiteral("conversations"));
+    return QDir(this->database_file_path).filePath(QStringLiteral("conversations"));
 }
 
-QString ChatContextStore::conversationDirectoryPath(const QString &conversationId) const
+QString chat_context_store_t::conversation_directory_path(const QString &conversation_id) const
 {
-    return QDir(conversationsDirectoryPath()).filePath(conversationId);
+    return QDir(this->conversations_directory_path()).filePath(conversation_id);
 }
 
-QString ChatContextStore::conversationStatePath(const QString &conversationId) const
+QString chat_context_store_t::conversation_state_path(const QString &conversation_id) const
 {
-    return QDir(conversationDirectoryPath(conversationId))
+    return QDir(this->conversation_directory_path(conversation_id))
         .filePath(QStringLiteral("conversation.json"));
 }
 
-QString ChatContextStore::conversationMessagesPath(const QString &conversationId) const
+QString chat_context_store_t::conversation_messages_path(const QString &conversation_id) const
 {
-    return QDir(conversationDirectoryPath(conversationId))
+    return QDir(this->conversation_directory_path(conversation_id))
         .filePath(QStringLiteral("messages.jsonl"));
 }
 
-QString ChatContextStore::conversationSummariesPath(const QString &conversationId) const
+QString chat_context_store_t::conversation_summaries_path(const QString &conversation_id) const
 {
-    return QDir(conversationDirectoryPath(conversationId))
+    return QDir(this->conversation_directory_path(conversation_id))
         .filePath(QStringLiteral("summaries.jsonl"));
 }
 
-QString ChatContextStore::conversationLatestSummaryPath(const QString &conversationId) const
+QString
+chat_context_store_t::conversation_latest_summary_path(const QString &conversation_id) const
 {
-    return QDir(conversationDirectoryPath(conversationId))
+    return QDir(this->conversation_directory_path(conversation_id))
         .filePath(QStringLiteral("latest-summary.json"));
 }
 
-QString ChatContextStore::conversationArtifactsPath(const QString &conversationId) const
+QString chat_context_store_t::conversation_artifacts_path(const QString &conversation_id) const
 {
-    return QDir(conversationDirectoryPath(conversationId))
+    return QDir(this->conversation_directory_path(conversation_id))
         .filePath(QStringLiteral("artifacts.jsonl"));
 }
 
-QString ChatContextStore::runsDirectoryPath() const
+QString chat_context_store_t::runs_directory_path() const
 {
-    return QDir(m_databasePath).filePath(QStringLiteral("runs"));
+    return QDir(this->database_file_path).filePath(QStringLiteral("runs"));
 }
 
-QString ChatContextStore::runPath(const QString &runId) const
+QString chat_context_store_t::run_path(const QString &run_id) const
 {
-    return QDir(runsDirectoryPath()).filePath(QStringLiteral("%1.json").arg(runId));
+    return QDir(this->runs_directory_path()).filePath(QStringLiteral("%1.json").arg(run_id));
 }
 
-QString ChatContextStore::memoryPath() const
+QString chat_context_store_t::memory_path() const
 {
-    return QDir(m_databasePath).filePath(QStringLiteral("memory.json"));
+    return QDir(this->database_file_path).filePath(QStringLiteral("memory.json"));
 }
 
-QString ChatContextStore::formatPath() const
+QString chat_context_store_t::format_path() const
 {
-    return QDir(m_databasePath).filePath(QStringLiteral("format.json"));
+    return QDir(this->database_file_path).filePath(QStringLiteral("format.json"));
 }
 
 }  // namespace qcai2

@@ -13,20 +13,19 @@ namespace qcai2::Diff
 /**
  * @brief Describes the outcome of unified diff validation.
  */
-struct ValidationResult
+struct validation_result_t
 {
     /** @brief True when the diff passes all checks. */
     bool valid = false;
 
     /** @brief Added plus removed hunk lines. */
-    int linesChanged = 0;
+    int lines_changed = 0;
 
     /** @brief Number of distinct files referenced by the diff. */
-    int filesChanged = 0;
+    int files_changed = 0;
 
     /** @brief Validation failure message when @c valid is false. */
     QString error;
-
 };
 
 /**
@@ -36,14 +35,14 @@ struct ValidationResult
  * @param maxFiles Maximum number of changed files allowed.
  * @return Validation details including counters and any error message.
  */
-ValidationResult validate(const QString &unifiedDiff, int maxLines = 300, int maxFiles = 10);
+validation_result_t validate(const QString &unified_diff, int max_lines = 300, int max_files = 10);
 
 /**
  * @brief Recomputes hunk counts in unified diff headers.
  * @param unifiedDiff Diff text to normalize.
  * @return Diff text with updated @@ header counts when hunks are present.
  */
-QString normalize(const QString &unifiedDiff);
+QString normalize(const QString &unified_diff);
 
 /**
  * @brief Applies a unified diff inside a working directory.
@@ -53,8 +52,8 @@ QString normalize(const QString &unifiedDiff);
  * @param errorMsg Receives stderr or process error details on failure.
  * @return True when the patch command exits successfully.
  */
-bool applyPatch(const QString &unifiedDiff, const QString &workDir, bool dryRun,
-                QString &errorMsg);
+bool apply_patch(const QString &unified_diff, const QString &work_dir, bool dry_run,
+                 QString &error_msg);
 
 /**
  * @brief Reverts a previously applied unified diff.
@@ -63,22 +62,21 @@ bool applyPatch(const QString &unifiedDiff, const QString &workDir, bool dryRun,
  * @param errorMsg Receives stderr or process error details on failure.
  * @return True when the reverse patch command exits successfully.
  */
-bool revertPatch(const QString &unifiedDiff, const QString &workDir, QString &errorMsg);
+bool revert_patch(const QString &unified_diff, const QString &work_dir, QString &error_msg);
 
 /**
  * @brief Describes files created from explicit new-file blocks.
  */
-struct NewFileResult
+struct new_file_result_t
 {
     /** @brief Remaining unified diff after new-file blocks are removed. */
-    QString remainingDiff;
+    QString remaining_diff;
 
     /** @brief Relative paths created or that would be created. */
-    QStringList createdFiles;
+    QStringList created_files;
 
     /** @brief Error message when extraction or creation fails. */
     QString error;
-
 };
 
 /**
@@ -88,7 +86,7 @@ struct NewFileResult
  * @param dryRun When true, validates paths without writing files.
  * @return Created-file details plus the remaining unified diff text.
  */
-NewFileResult extractAndCreateNewFiles(const QString &patchText, const QString &workDir,
-                                       bool dryRun = false);
+new_file_result_t extract_and_create_new_files(const QString &patch_text, const QString &work_dir,
+                                               bool dry_run = false);
 
 }  // namespace qcai2::Diff

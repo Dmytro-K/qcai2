@@ -19,89 +19,90 @@ using namespace qcai2;
 namespace
 {
 
-QString compactJson(const QJsonObject &object)
+QString compact_json(const QJsonObject &object)
 {
     return QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact));
 }
 
 }  // namespace
 
-class MigrationTest : public QObject
+class migration_test_t : public QObject
 {
     Q_OBJECT
 
 private slots:
-    void parseRevision_readsVersionAndBuildSuffix();
-    void migrateGlobalSettings_copiesLegacyReasoningAndStampsRevision();
-    void migrateProjectState_movesGoalAndLogToSiblingFiles();
-    void migrateProjectState_renamesIgnoredLinkedFilesKey();
+    void parse_revision_reads_version_and_build_suffix();
+    void migrate_global_settings_copies_legacy_reasoning_and_stamps_revision();
+    void migrate_project_state_moves_goal_and_log_to_sibling_files();
+    void migrate_project_state_renames_ignored_linked_files_key();
 };
 
-void MigrationTest::parseRevision_readsVersionAndBuildSuffix()
+void migration_test_t::parse_revision_reads_version_and_build_suffix()
 {
-    const Migration::Revision revision = Migration::parseRevision("0.0.4", "-001");
+    const Migration::revision_t revision = Migration::parse_revision("0.0.4", "-001");
 
     QVERIFY(revision.valid);
     QCOMPARE(revision.major, 0);
     QCOMPARE(revision.minor, 0);
     QCOMPARE(revision.patch, 4);
     QCOMPARE(revision.build, 1);
-    QCOMPARE(revision.revisionString(), QString("0.0.4-001"));
+    QCOMPARE(revision.revision_string(), QString("0.0.4-001"));
 }
 
-void MigrationTest::migrateGlobalSettings_copiesLegacyReasoningAndStampsRevision()
+void migration_test_t::migrate_global_settings_copies_legacy_reasoning_and_stamps_revision()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
 
-    const QString settingsPath = dir.filePath("settings.ini");
+    const QString settings_path = dir.filePath("settings.ini");
     QStandardPaths::setTestModeEnabled(true);
-    QDir backupDir(Migration::globalBackupDirPath());
-    qInfo() << "Using settings path" << settingsPath;
-    qInfo() << "Using global backup dir" << backupDir.path();
-    if (backupDir.exists() == true)
+    QDir backup_dir(Migration::global_backup_dir_path());
+    qInfo() << "Using settings path" << settings_path;
+    qInfo() << "Using global backup dir" << backup_dir.path();
+    if (backup_dir.exists() == true)
     {
-        QVERIFY(backupDir.removeRecursively());
+        QVERIFY(backup_dir.removeRecursively());
     }
 
-    QSettings settings(settingsPath, QSettings::IniFormat);
+    QSettings settings(settings_path, QSettings::IniFormat);
     settings.beginGroup("qcai2");
     settings.setValue("thinkingLevel", "high");
     settings.setValue("settingsRevision", "0.0.4-000");
 
     QString error;
-    const bool migrated = Migration::migrateGlobalSettings(settings, &error);
-    qInfo() << "migrateGlobalSettings returned" << migrated << "error" << error;
+    const bool migrated = Migration::migrate_global_settings(settings, &error);
+    qInfo() << "migrate_global_settings returned" << migrated << "error" << error;
     QVERIFY2(migrated, qPrintable(error));
     QVERIFY2(error.isEmpty(), qPrintable(error));
 
     QCOMPARE(settings.value("reasoningEffort").toString(), QString("high"));
-    QCOMPARE(settings.value("settingsRevision").toString(), Migration::currentRevisionString());
+    QCOMPARE(settings.value("settingsRevision").toString(), Migration::current_revision_string());
     qInfo() << "Migrated settings keys" << settings.allKeys();
 
-    backupDir = QDir(Migration::globalBackupDirPath());
-    qInfo() << "Global backup dir exists" << backupDir.exists() << "at" << backupDir.path();
-    QVERIFY2(backupDir.exists(), qPrintable(backupDir.path()));
-    const QStringList backups = backupDir.entryList(QStringList() << "*.tar.xz", QDir::Files);
+    backup_dir = QDir(Migration::global_backup_dir_path());
+    qInfo() << "Global backup dir exists" << backup_dir.exists() << "at" << backup_dir.path();
+    QVERIFY2(backup_dir.exists(), qPrintable(backup_dir.path()));
+    const QStringList backups = backup_dir.entryList(QStringList() << "*.tar.xz", QDir::Files);
     qInfo() << "Global backup archives" << backups;
     QCOMPARE(backups.size(), 1);
     QVERIFY(backups.constFirst().contains("global-settings__"));
 }
 
-void MigrationTest::migrateProjectState_movesGoalAndLogToSiblingFiles()
+void migration_test_t::migrate_project_state_moves_goal_and_log_to_sibling_files()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
 
-    const QString contextDirPath = dir.filePath("project/.qcai2");
-    QVERIFY(QDir().mkpath(contextDirPath));
-    const QString storagePath = QDir(contextDirPath).filePath("session.json");
-    qInfo() << "Using project state path" << storagePath;
-    qInfo() << "Expected goal path" << Migration::projectGoalFilePath(storagePath);
-    qInfo() << "Expected actions log path" << Migration::projectActionsLogFilePath(storagePath);
-    qInfo() << "Expected project backup dir" << Migration::projectBackupDirPath(storagePath);
+    const QString context_dir_path = dir.filePath("project/.qcai2");
+    QVERIFY(QDir().mkpath(context_dir_path));
+    const QString storage_path = QDir(context_dir_path).filePath("session.json");
+    qInfo() << "Using project state path" << storage_path;
+    qInfo() << "Expected goal path" << Migration::project_goal_file_path(storage_path);
+    qInfo() << "Expected actions log path"
+            << Migration::project_actions_log_file_path(storage_path);
+    qInfo() << "Expected project backup dir" << Migration::project_backup_dir_path(storage_path);
     {
-        QSaveFile file(storagePath);
+        QSaveFile file(storage_path);
         QVERIFY(file.open(QIODevice::WriteOnly));
         const QJsonObject root{{"goal", "Ship it"},
                                {"logMarkdown", "# Title\n\nSome log"},
@@ -112,48 +113,48 @@ void MigrationTest::migrateProjectState_movesGoalAndLogToSiblingFiles()
     }
 
     QString error;
-    const bool migrated = Migration::migrateProjectState(storagePath, &error);
-    qInfo() << "migrateProjectState returned" << migrated << "error" << error;
+    const bool migrated = Migration::migrate_project_state(storage_path, &error);
+    qInfo() << "migrate_project_state returned" << migrated << "error" << error;
     QVERIFY2(migrated, qPrintable(error));
     QVERIFY2(error.isEmpty(), qPrintable(error));
 
-    QFile goalFile(Migration::projectGoalFilePath(storagePath));
-    QVERIFY2(goalFile.open(QIODevice::ReadOnly), qPrintable(goalFile.errorString()));
-    QCOMPARE(QString::fromUtf8(goalFile.readAll()), QString("Ship it"));
+    QFile goal_file(Migration::project_goal_file_path(storage_path));
+    QVERIFY2(goal_file.open(QIODevice::ReadOnly), qPrintable(goal_file.errorString()));
+    QCOMPARE(QString::fromUtf8(goal_file.readAll()), QString("Ship it"));
 
-    QFile logFile(Migration::projectActionsLogFilePath(storagePath));
-    QVERIFY2(logFile.open(QIODevice::ReadOnly), qPrintable(logFile.errorString()));
-    QCOMPARE(QString::fromUtf8(logFile.readAll()), QString("# Title\n\nSome log"));
+    QFile log_file(Migration::project_actions_log_file_path(storage_path));
+    QVERIFY2(log_file.open(QIODevice::ReadOnly), qPrintable(log_file.errorString()));
+    QCOMPARE(QString::fromUtf8(log_file.readAll()), QString("# Title\n\nSome log"));
 
-    QFile stateFile(storagePath);
-    QVERIFY2(stateFile.open(QIODevice::ReadOnly), qPrintable(stateFile.errorString()));
-    const QJsonDocument doc = QJsonDocument::fromJson(stateFile.readAll());
+    QFile state_file(storage_path);
+    QVERIFY2(state_file.open(QIODevice::ReadOnly), qPrintable(state_file.errorString()));
+    const QJsonDocument doc = QJsonDocument::fromJson(state_file.readAll());
     QVERIFY(doc.isObject());
     const QJsonObject root = doc.object();
-    qInfo() << "Migrated project state" << compactJson(root);
+    qInfo() << "Migrated project state" << compact_json(root);
     QVERIFY(!root.contains("goal"));
     QVERIFY(!root.contains("logMarkdown"));
-    QCOMPARE(root.value("storageRevision").toString(), Migration::currentRevisionString());
+    QCOMPARE(root.value("storageRevision").toString(), Migration::current_revision_string());
 
-    const QDir backupDir(Migration::projectBackupDirPath(storagePath));
-    qInfo() << "Project backup dir exists" << backupDir.exists() << "at" << backupDir.path();
-    QVERIFY2(backupDir.exists(), qPrintable(backupDir.path()));
-    const QStringList backups = backupDir.entryList(QStringList() << "*.tar.xz", QDir::Files);
+    const QDir backup_dir(Migration::project_backup_dir_path(storage_path));
+    qInfo() << "Project backup dir exists" << backup_dir.exists() << "at" << backup_dir.path();
+    QVERIFY2(backup_dir.exists(), qPrintable(backup_dir.path()));
+    const QStringList backups = backup_dir.entryList(QStringList() << "*.tar.xz", QDir::Files);
     qInfo() << "Project backup archives" << backups;
     QCOMPARE(backups.size(), 1);
     QVERIFY(backups.constFirst().contains("session__"));
 }
 
-void MigrationTest::migrateProjectState_renamesIgnoredLinkedFilesKey()
+void migration_test_t::migrate_project_state_renames_ignored_linked_files_key()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
 
-    const QString contextDirPath = dir.filePath("project/.qcai2");
-    QVERIFY(QDir().mkpath(contextDirPath));
-    const QString storagePath = QDir(contextDirPath).filePath("session.json");
+    const QString context_dir_path = dir.filePath("project/.qcai2");
+    QVERIFY(QDir().mkpath(context_dir_path));
+    const QString storage_path = QDir(context_dir_path).filePath("session.json");
     {
-        QSaveFile file(storagePath);
+        QSaveFile file(storage_path);
         QVERIFY(file.open(QIODevice::WriteOnly));
         const QJsonObject root{
             {"excludedDefaultLinkedFiles",
@@ -164,25 +165,25 @@ void MigrationTest::migrateProjectState_renamesIgnoredLinkedFilesKey()
     }
 
     QString error;
-    const bool migrated = Migration::migrateProjectState(storagePath, &error);
+    const bool migrated = Migration::migrate_project_state(storage_path, &error);
     QVERIFY2(migrated, qPrintable(error));
     QVERIFY2(error.isEmpty(), qPrintable(error));
 
-    QFile stateFile(storagePath);
-    QVERIFY2(stateFile.open(QIODevice::ReadOnly), qPrintable(stateFile.errorString()));
-    const QJsonDocument doc = QJsonDocument::fromJson(stateFile.readAll());
+    QFile state_file(storage_path);
+    QVERIFY2(state_file.open(QIODevice::ReadOnly), qPrintable(state_file.errorString()));
+    const QJsonDocument doc = QJsonDocument::fromJson(state_file.readAll());
     QVERIFY(doc.isObject());
     const QJsonObject root = doc.object();
     QVERIFY(!root.contains("excludedDefaultLinkedFiles"));
     QVERIFY(root.contains("ignoredLinkedFiles"));
-    QCOMPARE(root.value("storageRevision").toString(), Migration::currentRevisionString());
+    QCOMPARE(root.value("storageRevision").toString(), Migration::current_revision_string());
 
-    const QJsonArray ignoredLinkedFiles = root.value("ignoredLinkedFiles").toArray();
-    QCOMPARE(ignoredLinkedFiles.size(), 2);
-    QCOMPARE(ignoredLinkedFiles.at(0).toString(), QString("src/Main.cpp"));
-    QCOMPARE(ignoredLinkedFiles.at(1).toString(), QString("README.md"));
+    const QJsonArray ignored_linked_files = root.value("ignoredLinkedFiles").toArray();
+    QCOMPARE(ignored_linked_files.size(), 2);
+    QCOMPARE(ignored_linked_files.at(0).toString(), QString("src/Main.cpp"));
+    QCOMPARE(ignored_linked_files.at(1).toString(), QString("README.md"));
 }
 
-QTEST_APPLESS_MAIN(MigrationTest)
+QTEST_APPLESS_MAIN(migration_test_t)
 
 #include "tst_migration.moc"

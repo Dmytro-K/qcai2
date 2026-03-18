@@ -7,6 +7,6 @@
 namespace qcai2::Migration
 {
 
-bool migrateProjectStateTo_0_0_5_002(QJsonObject &root);
+bool migrate_project_state_to_0_0_5_002(QJsonObject &root);
 
 }  // namespace qcai2::Migration

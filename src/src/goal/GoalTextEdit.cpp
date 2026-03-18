@@ -17,40 +17,41 @@
 namespace qcai2
 {
 
-GoalTextEdit::GoalTextEdit(QWidget *parent) : QTextEdit(parent)
+goal_text_edit_t::goal_text_edit_t(QWidget *parent) : QTextEdit(parent)
 {
     setAcceptDrops(true);
-    m_completionModel = new QStandardItemModel(this);
-    m_completer = new QCompleter(m_completionModel, this);
-    m_completer->setCaseSensitivity(Qt::CaseInsensitive);
-    m_completer->setCompletionMode(QCompleter::PopupCompletion);
-    m_completer->setFilterMode(Qt::MatchStartsWith);
-    m_completer->setWidget(this);
+    this->completion_model = new QStandardItemModel(this);
+    this->completer = new QCompleter(this->completion_model, this);
+    this->completer->setCaseSensitivity(Qt::CaseInsensitive);
+    this->completer->setCompletionMode(QCompleter::PopupCompletion);
+    this->completer->setFilterMode(Qt::MatchStartsWith);
+    this->completer->setWidget(this);
 
-    connect(m_completer, qOverload<const QModelIndex &>(&QCompleter::activated), this,
-            [this](const QModelIndex &index) { applyCompletionIndex(index); });
-    connect(this, &QTextEdit::textChanged, this, [this]() { refreshSpecialState(); });
-    connect(this, &QTextEdit::cursorPositionChanged, this, [this]() { refreshSpecialState(); });
+    connect(this->completer, qOverload<const QModelIndex &>(&QCompleter::activated), this,
+            [this](const QModelIndex &index) { this->apply_completion_index(index); });
+    connect(this, &QTextEdit::textChanged, this, [this]() { this->refresh_special_state(); });
+    connect(this, &QTextEdit::cursorPositionChanged, this,
+            [this]() { this->refresh_special_state(); });
 }
 
-void GoalTextEdit::addSpecialHandler(std::unique_ptr<GoalSpecialHandler> handler)
+void goal_text_edit_t::add_special_handler(std::unique_ptr<goal_special_handler_t> handler)
 {
     if (((!handler) == true))
     {
         return;
     }
 
-    m_specialHandlers.push_back(std::move(handler));
-    refreshSpecialState();
+    this->special_handlers.push_back(std::move(handler));
+    this->refresh_special_state();
 }
 
-bool GoalTextEdit::hasCompletionPopup() const
+bool goal_text_edit_t::has_completion_popup() const
 {
-    return m_completer != nullptr && m_completer->popup() != nullptr &&
-           m_completer->popup()->isVisible();
+    return this->completer != nullptr && this->completer->popup() != nullptr &&
+           this->completer->popup()->isVisible();
 }
 
-void GoalTextEdit::dragEnterEvent(QDragEnterEvent *event)
+void goal_text_edit_t::dragEnterEvent(QDragEnterEvent *event)
 {
     if (event->mimeData()->hasUrls())
     {
@@ -61,7 +62,7 @@ void GoalTextEdit::dragEnterEvent(QDragEnterEvent *event)
     QTextEdit::dragEnterEvent(event);
 }
 
-void GoalTextEdit::dragMoveEvent(QDragMoveEvent *event)
+void goal_text_edit_t::dragMoveEvent(QDragMoveEvent *event)
 {
     if (event->mimeData()->hasUrls())
     {
@@ -72,7 +73,7 @@ void GoalTextEdit::dragMoveEvent(QDragMoveEvent *event)
     QTextEdit::dragMoveEvent(event);
 }
 
-void GoalTextEdit::dropEvent(QDropEvent *event)
+void goal_text_edit_t::dropEvent(QDropEvent *event)
 {
     if (((event->mimeData()->hasUrls()) == true))
     {
@@ -88,7 +89,7 @@ void GoalTextEdit::dropEvent(QDropEvent *event)
 
         if (((!paths.isEmpty()) == true))
         {
-            emit filesDropped(paths);
+            emit this->files_dropped(paths);
             event->acceptProposedAction();
             return;
         }
@@ -97,9 +98,9 @@ void GoalTextEdit::dropEvent(QDropEvent *event)
     QTextEdit::dropEvent(event);
 }
 
-void GoalTextEdit::keyPressEvent(QKeyEvent *event)
+void goal_text_edit_t::keyPressEvent(QKeyEvent *event)
 {
-    if (hasCompletionPopup() == true)
+    if (this->has_completion_popup() == true)
     {
         switch (event->key())
         {
@@ -118,72 +119,72 @@ void GoalTextEdit::keyPressEvent(QKeyEvent *event)
     QTextEdit::keyPressEvent(event);
 }
 
-void GoalTextEdit::refreshSpecialState()
+void goal_text_edit_t::refresh_special_state()
 {
-    refreshHighlighting();
-    refreshCompletionPopup();
+    this->refresh_highlighting();
+    this->refresh_completion_popup();
 }
 
-void GoalTextEdit::refreshCompletionPopup()
+void goal_text_edit_t::refresh_completion_popup()
 {
-    m_activeCompletion = {};
+    this->active_completion = {};
 
-    const GoalCompletionRequest request{toPlainText(), textCursor().position()};
-    for (const auto &handler : m_specialHandlers)
+    const goal_completion_request_t request{toPlainText(), textCursor().position()};
+    for (const auto &handler : this->special_handlers)
     {
-        const GoalCompletionSession session = handler->completionSession(request);
+        const goal_completion_session_t session = handler->completion_session(request);
         if (session.active)
         {
-            m_activeCompletion = session;
+            this->active_completion = session;
             break;
         }
     }
 
-    if (((!m_activeCompletion.active || m_activeCompletion.items.isEmpty()) == true))
+    if (((!this->active_completion.active || this->active_completion.items.isEmpty()) == true))
     {
-        m_completionModel->clear();
-        if (((m_completer != nullptr && m_completer->popup() != nullptr) == true))
+        this->completion_model->clear();
+        if (((this->completer != nullptr && this->completer->popup() != nullptr) == true))
         {
-            m_completer->popup()->hide();
+            this->completer->popup()->hide();
         }
         return;
     }
 
-    m_completionModel->clear();
-    for (const GoalCompletionItem &item : m_activeCompletion.items)
+    this->completion_model->clear();
+    for (const goal_completion_item_t &item : this->active_completion.items)
     {
-        auto *modelItem = new QStandardItem(item.label.isEmpty() ? item.insertText : item.label);
-        modelItem->setData(item.insertText, Qt::UserRole);
+        auto *model_item = new QStandardItem(item.label.isEmpty() ? item.insert_text : item.label);
+        model_item->setData(item.insert_text, Qt::UserRole);
         if (!item.detail.isEmpty())
         {
-            modelItem->setToolTip(item.detail);
+            model_item->setToolTip(item.detail);
         }
-        m_completionModel->appendRow(modelItem);
+        this->completion_model->appendRow(model_item);
     }
 
-    if (((m_completer == nullptr || m_completer->popup() == nullptr) == true))
+    if (((this->completer == nullptr || this->completer->popup() == nullptr) == true))
     {
         return;
     }
 
-    m_completer->setCompletionPrefix(QString());
+    this->completer->setCompletionPrefix(QString());
 
-    QRect popupRect = cursorRect();
-    popupRect.setWidth(m_completer->popup()->sizeHintForColumn(0) +
-                       m_completer->popup()->verticalScrollBar()->sizeHint().width() + 16);
-    m_completer->complete(popupRect);
+    QRect popup_rect = cursorRect();
+    popup_rect.setWidth(this->completer->popup()->sizeHintForColumn(0) +
+                        this->completer->popup()->verticalScrollBar()->sizeHint().width() + 16);
+    this->completer->complete(popup_rect);
 }
 
-void GoalTextEdit::refreshHighlighting()
+void goal_text_edit_t::refresh_highlighting()
 {
     QList<QTextEdit::ExtraSelection> selections;
     const QString text = toPlainText();
-    const QPalette currentPalette = palette();
+    const QPalette current_palette = palette();
 
-    for (const auto &handler : m_specialHandlers)
+    for (const auto &handler : this->special_handlers)
     {
-        const QList<GoalHighlightSpan> spans = handler->highlightSpans(text, currentPalette);
-        for (const GoalHighlightSpan &span : spans)
+        const QList<goal_highlight_span_t> spans = handler->highlight_spans(text, current_palette);
+        for (const goal_highlight_span_t &span : spans)
         {
             if (span.length <= 0)
             {
@@ -204,30 +205,30 @@ void GoalTextEdit::refreshHighlighting()
     setExtraSelections(selections);
 }
 
-void GoalTextEdit::applyCompletionIndex(const QModelIndex &index)
+void goal_text_edit_t::apply_completion_index(const QModelIndex &index)
 {
-    if (((!m_activeCompletion.active || !index.isValid()) == true))
+    if (((!this->active_completion.active || !index.isValid()) == true))
     {
         return;
     }
 
-    const QString insertText = index.data(Qt::UserRole).toString();
-    if (insertText.isEmpty() == true)
+    const QString insert_text = index.data(Qt::UserRole).toString();
+    if (insert_text.isEmpty() == true)
     {
         return;
     }
 
     QTextCursor cursor = textCursor();
     cursor.beginEditBlock();
-    cursor.setPosition(m_activeCompletion.replaceStart);
-    cursor.setPosition(m_activeCompletion.replaceEnd, QTextCursor::KeepAnchor);
-    cursor.insertText(insertText);
+    cursor.setPosition(this->active_completion.replace_start);
+    cursor.setPosition(this->active_completion.replace_end, QTextCursor::KeepAnchor);
+    cursor.insertText(insert_text);
     cursor.endEditBlock();
     setTextCursor(cursor);
 
-    if (((m_completer != nullptr && m_completer->popup() != nullptr) == true))
+    if (((this->completer != nullptr && this->completer->popup() != nullptr) == true))
     {
-        m_completer->popup()->hide();
+        this->completer->popup()->hide();
     }
 }
 

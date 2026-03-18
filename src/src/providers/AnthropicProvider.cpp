@@ -25,7 +25,7 @@ QString anthropicErrorMessage(const QByteArray &data, const QString &fallback)
     if (((parseError.error == QJsonParseError::NoError) == true) && (doc.isObject() == true))
     {
         const QString message =
-            Json::getString(doc.object(), QStringLiteral("error/message"), fallback);
+            json::get_string(doc.object(), QStringLiteral("error/message"), fallback);
         if (message.isEmpty() == false)
         {
             return message;
@@ -35,13 +35,13 @@ QString anthropicErrorMessage(const QByteArray &data, const QString &fallback)
     return fallback;
 }
 
-QJsonArray anthropicMessagesFromChatMessages(const QList<ChatMessage> &messages,
+QJsonArray anthropicMessagesFromChatMessages(const QList<chat_message_t> &messages,
                                              QString *systemText)
 {
     QJsonArray anthropicMessages;
     QStringList systemParts;
 
-    for (const ChatMessage &message : messages)
+    for (const chat_message_t &message : messages)
     {
         if (message.content.trimmed().isEmpty() == true)
         {
@@ -111,24 +111,26 @@ QByteArray ssePayloadForLine(const QByteArray &line)
 
 }  // namespace
 
-AnthropicProvider::AnthropicProvider(QObject *parent) : QObject(parent)
+anthropic_provider_t::anthropic_provider_t(QObject *parent) : QObject(parent)
 {
 }
 
-void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QString &model,
-                                 double temperature, int maxTokens, const QString &reasoningEffort,
-                                 CompletionCallback callback, StreamCallback streamCallback,
-                                 ProgressCallback progressCallback)
+void anthropic_provider_t::complete(const QList<chat_message_t> &messages, const QString &model,
+                                    double temperature, int max_tokens,
+                                    const QString &reasoning_effort,
+                                    completion_callback_t callback,
+                                    stream_callback_t stream_callback,
+                                    progress_callback_t progress_callback)
 {
-    Q_UNUSED(reasoningEffort);
+    Q_UNUSED(reasoning_effort);
 
-    if (progressCallback != nullptr)
+    if (progress_callback != nullptr)
     {
-        progressCallback(ProviderRawEvent{ProviderRawEventKind::RequestStarted,
-                                          id(),
-                                          QStringLiteral("request.started"),
-                                          {},
-                                          {}});
+        progress_callback(provider_raw_event_t{provider_raw_event_kind_t::REQUEST_STARTED,
+                                               this->id(),
+                                               QStringLiteral("request.started"),
+                                               {},
+                                               {}});
     }
 
     QString systemText;
@@ -137,20 +139,20 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
     QJsonObject body;
     body.insert(QStringLiteral("model"), model);
     body.insert(QStringLiteral("messages"), anthropicMessages);
-    body.insert(QStringLiteral("max_tokens"), maxTokens);
+    body.insert(QStringLiteral("max_tokens"), max_tokens);
     body.insert(QStringLiteral("temperature"), temperature);
     if (systemText.isEmpty() == false)
     {
         body.insert(QStringLiteral("system"), systemText);
     }
 
-    const bool streaming = (streamCallback != nullptr);
+    const bool streaming = (stream_callback != nullptr);
     if (streaming == true)
     {
         body.insert(QStringLiteral("stream"), true);
     }
 
-    QString urlString = m_baseUrl.trimmed();
+    QString urlString = this->base_url.trimmed();
     if (urlString.endsWith(QLatin1Char('/')) == true)
     {
         urlString.chop(1);
@@ -161,16 +163,16 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                QStringLiteral("POST %1 | model=%2 temp=%3 maxTok=%4 stream=%5 msgs=%6")
                    .arg(urlString, model)
                    .arg(temperature)
-                   .arg(maxTokens)
+                   .arg(max_tokens)
                    .arg(streaming ? QStringLiteral("yes") : QStringLiteral("no"))
                    .arg(messages.size()));
 
     QNetworkRequest request{QUrl(urlString)};
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("anthropic-version", "2023-06-01");
-    if (((!m_apiKey.isEmpty()) == true))
+    if (((!this->api_key.isEmpty()) == true))
     {
-        request.setRawHeader("x-api-key", m_apiKey.toUtf8());
+        request.setRawHeader("x-api-key", this->api_key.toUtf8());
     }
     if (streaming == false)
     {
@@ -178,11 +180,12 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
         request.setRawHeader("Connection", "close");
     }
 
-    m_sseBuffer.clear();
-    m_streamAccum.clear();
-    m_streamUsage = {};
+    this->sse_buffer.clear();
+    this->stream_accum.clear();
+    this->stream_usage = {};
 
-    m_currentReply = m_nam.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    this->current_reply =
+        this->nam.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
 
     if (streaming == true)
     {
@@ -191,7 +194,7 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
         const auto currentEventData = std::make_shared<QByteArray>();
         const auto streamError = std::make_shared<QString>();
 
-        const auto processEvent = [this, streamCallback, progressCallback, activeToolBlocks,
+        const auto processEvent = [this, stream_callback, progress_callback, activeToolBlocks,
                                    streamError](const QString &eventName,
                                                 const QByteArray &eventData) {
             if (eventData.isEmpty() == true)
@@ -223,21 +226,21 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                                                          .toObject()
                                                          .value(QStringLiteral("message"))
                                                          .toString());
-                if (progressCallback != nullptr)
+                if (progress_callback != nullptr)
                 {
-                    progressCallback(ProviderRawEvent{ProviderRawEventKind::Error,
-                                                      id(),
-                                                      QStringLiteral("error"),
-                                                      {},
-                                                      *streamError});
+                    progress_callback(provider_raw_event_t{provider_raw_event_kind_t::ERROR_EVENT,
+                                                           this->id(),
+                                                           QStringLiteral("error"),
+                                                           {},
+                                                           *streamError});
                 }
                 return;
             }
 
-            const ProviderUsage usage = providerUsageFromResponseObject(payload);
-            if (usage.hasAny() == true)
+            const provider_usage_t usage = provider_usage_from_response_object(payload);
+            if (usage.has_any() == true)
             {
-                m_streamUsage = usage;
+                this->stream_usage = usage;
             }
 
             if (effectiveEvent == QStringLiteral("content_block_start"))
@@ -254,24 +257,26 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                     {
                         activeToolBlocks->insert(index, toolName);
                     }
-                    if (toolName.isEmpty() == false && progressCallback != nullptr)
+                    if (toolName.isEmpty() == false && progress_callback != nullptr)
                     {
-                        progressCallback(ProviderRawEvent{ProviderRawEventKind::ToolStarted,
-                                                          id(),
-                                                          QStringLiteral("content_block_start"),
-                                                          toolName,
-                                                          {}});
+                        progress_callback(
+                            provider_raw_event_t{provider_raw_event_kind_t::TOOL_STARTED,
+                                                 this->id(),
+                                                 QStringLiteral("content_block_start"),
+                                                 toolName,
+                                                 {}});
                     }
                 }
                 else if (blockType == QStringLiteral("thinking"))
                 {
-                    if (progressCallback != nullptr)
+                    if (progress_callback != nullptr)
                     {
-                        progressCallback(ProviderRawEvent{ProviderRawEventKind::ReasoningDelta,
-                                                          id(),
-                                                          QStringLiteral("content_block_start"),
-                                                          {},
-                                                          {}});
+                        progress_callback(
+                            provider_raw_event_t{provider_raw_event_kind_t::REASONING_DELTA,
+                                                 this->id(),
+                                                 QStringLiteral("content_block_start"),
+                                                 {},
+                                                 {}});
                     }
                 }
                 return;
@@ -286,28 +291,29 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                     const QString text = delta.value(QStringLiteral("text")).toString();
                     if (text.isEmpty() == false)
                     {
-                        m_streamAccum += text;
-                        if (progressCallback != nullptr)
+                        this->stream_accum += text;
+                        if (progress_callback != nullptr)
                         {
-                            progressCallback(
-                                ProviderRawEvent{ProviderRawEventKind::MessageDelta,
-                                                 id(),
-                                                 QStringLiteral("content_block_delta"),
-                                                 {},
-                                                 text});
+                            progress_callback(
+                                provider_raw_event_t{provider_raw_event_kind_t::MESSAGE_DELTA,
+                                                     this->id(),
+                                                     QStringLiteral("content_block_delta"),
+                                                     {},
+                                                     text});
                         }
-                        streamCallback(text);
+                        stream_callback(text);
                     }
                 }
                 else if (deltaType == QStringLiteral("thinking_delta"))
                 {
-                    if (progressCallback != nullptr)
+                    if (progress_callback != nullptr)
                     {
-                        progressCallback(ProviderRawEvent{ProviderRawEventKind::ReasoningDelta,
-                                                          id(),
-                                                          QStringLiteral("content_block_delta"),
-                                                          {},
-                                                          {}});
+                        progress_callback(
+                            provider_raw_event_t{provider_raw_event_kind_t::REASONING_DELTA,
+                                                 this->id(),
+                                                 QStringLiteral("content_block_delta"),
+                                                 {},
+                                                 {}});
                     }
                 }
                 return;
@@ -319,33 +325,34 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                 if (((index >= 0) == true) && (activeToolBlocks->contains(index) == true))
                 {
                     const QString toolName = activeToolBlocks->take(index);
-                    if (progressCallback != nullptr)
+                    if (progress_callback != nullptr)
                     {
-                        progressCallback(ProviderRawEvent{ProviderRawEventKind::ToolCompleted,
-                                                          id(),
-                                                          QStringLiteral("content_block_stop"),
-                                                          toolName,
-                                                          {}});
+                        progress_callback(
+                            provider_raw_event_t{provider_raw_event_kind_t::TOOL_COMPLETED,
+                                                 this->id(),
+                                                 QStringLiteral("content_block_stop"),
+                                                 toolName,
+                                                 {}});
                     }
                 }
                 return;
             }
         };
 
-        connect(m_currentReply, &QNetworkReply::readyRead, this,
+        connect(this->current_reply, &QNetworkReply::readyRead, this,
                 [this, currentEventName, currentEventData, processEvent]() {
-                    m_sseBuffer.append(m_currentReply->readAll());
+                    this->sse_buffer.append(this->current_reply->readAll());
 
                     while (true == true)
                     {
-                        const qsizetype lineEnd = m_sseBuffer.indexOf('\n');
+                        const qsizetype lineEnd = this->sse_buffer.indexOf('\n');
                         if (lineEnd < 0)
                         {
                             break;
                         }
 
-                        QByteArray line = m_sseBuffer.left(lineEnd);
-                        m_sseBuffer.remove(0, lineEnd + 1);
+                        QByteArray line = this->sse_buffer.left(lineEnd);
+                        this->sse_buffer.remove(0, lineEnd + 1);
                         if (line.endsWith('\r') == true)
                         {
                             line.chop(1);
@@ -384,11 +391,11 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                     }
                 });
 
-        connect(m_currentReply, &QNetworkReply::finished, this,
-                [this, callback, streamCallback, progressCallback, currentEventName,
+        connect(this->current_reply, &QNetworkReply::finished, this,
+                [this, callback, stream_callback, progress_callback, currentEventName,
                  currentEventData, processEvent, streamError]() {
-                    QNetworkReply *reply = m_currentReply;
-                    m_currentReply = nullptr;
+                    QNetworkReply *reply = this->current_reply;
+                    this->current_reply = nullptr;
 
                     processEvent(*currentEventName, *currentEventData);
                     currentEventName->clear();
@@ -405,13 +412,14 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                     {
                         const QByteArray data = reply->readAll();
                         const QString message = anthropicErrorMessage(data, reply->errorString());
-                        if (progressCallback != nullptr)
+                        if (progress_callback != nullptr)
                         {
-                            progressCallback(ProviderRawEvent{ProviderRawEventKind::Error,
-                                                              id(),
-                                                              QStringLiteral("response.error"),
-                                                              {},
-                                                              message});
+                            progress_callback(
+                                provider_raw_event_t{provider_raw_event_kind_t::ERROR_EVENT,
+                                                     this->id(),
+                                                     QStringLiteral("response.error"),
+                                                     {},
+                                                     message});
                         }
                         callback({}, message, {});
                         reply->deleteLater();
@@ -425,29 +433,31 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                         return;
                     }
 
-                    if (progressCallback != nullptr)
+                    if (progress_callback != nullptr)
                     {
-                        progressCallback(ProviderRawEvent{ProviderRawEventKind::ResponseCompleted,
-                                                          id(),
-                                                          QStringLiteral("message_stop"),
-                                                          {},
-                                                          {}});
+                        progress_callback(
+                            provider_raw_event_t{provider_raw_event_kind_t::RESPONSE_COMPLETED,
+                                                 this->id(),
+                                                 QStringLiteral("message_stop"),
+                                                 {},
+                                                 {}});
                     }
-                    const ProviderUsage usage = m_streamUsage;
+                    const provider_usage_t usage = this->stream_usage;
                     reply->deleteLater();
-                    streamCallback({});
-                    callback(m_streamAccum, {}, usage);
-                    m_streamAccum.clear();
-                    m_sseBuffer.clear();
-                    m_streamUsage = {};
+                    stream_callback({});
+                    callback(this->stream_accum, {}, usage);
+                    this->stream_accum.clear();
+                    this->sse_buffer.clear();
+                    this->stream_usage = {};
                 });
     }
     else
     {
         connect(
-            m_currentReply, &QNetworkReply::finished, this, [this, callback, progressCallback]() {
-                QNetworkReply *reply = m_currentReply;
-                m_currentReply = nullptr;
+            this->current_reply, &QNetworkReply::finished, this,
+            [this, callback, progress_callback]() {
+                QNetworkReply *reply = this->current_reply;
+                this->current_reply = nullptr;
 
                 if (((reply == nullptr) == true))
                 {
@@ -459,13 +469,14 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                 {
                     const QByteArray data = reply->readAll();
                     const QString message = anthropicErrorMessage(data, reply->errorString());
-                    if (progressCallback != nullptr)
+                    if (progress_callback != nullptr)
                     {
-                        progressCallback(ProviderRawEvent{ProviderRawEventKind::Error,
-                                                          id(),
-                                                          QStringLiteral("response.error"),
-                                                          {},
-                                                          message});
+                        progress_callback(
+                            provider_raw_event_t{provider_raw_event_kind_t::ERROR_EVENT,
+                                                 this->id(),
+                                                 QStringLiteral("response.error"),
+                                                 {},
+                                                 message});
                     }
                     callback({}, message, {});
                     reply->deleteLater();
@@ -486,7 +497,7 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                 }
 
                 const QJsonObject root = doc.object();
-                const ProviderUsage usage = providerUsageFromResponseObject(root);
+                const provider_usage_t usage = provider_usage_from_response_object(root);
                 const QString content =
                     anthropicTextFromBlocks(root.value(QStringLiteral("content")).toArray());
                 if (content.isEmpty() == true)
@@ -495,26 +506,27 @@ void AnthropicProvider::complete(const QList<ChatMessage> &messages, const QStri
                     return;
                 }
 
-                if (progressCallback != nullptr)
+                if (progress_callback != nullptr)
                 {
-                    progressCallback(ProviderRawEvent{ProviderRawEventKind::ResponseCompleted,
-                                                      id(),
-                                                      QStringLiteral("response.completed"),
-                                                      {},
-                                                      {}});
+                    progress_callback(
+                        provider_raw_event_t{provider_raw_event_kind_t::RESPONSE_COMPLETED,
+                                             this->id(),
+                                             QStringLiteral("response.completed"),
+                                             {},
+                                             {}});
                 }
                 callback(content, {}, usage);
             });
     }
 }
 
-void AnthropicProvider::cancel()
+void anthropic_provider_t::cancel()
 {
-    if (m_currentReply != nullptr)
+    if (this->current_reply != nullptr)
     {
-        m_currentReply->abort();
-        m_currentReply->deleteLater();
-        m_currentReply = nullptr;
+        this->current_reply->abort();
+        this->current_reply->deleteLater();
+        this->current_reply = nullptr;
     }
 }
 

@@ -18,17 +18,17 @@ constexpr int kSummaryChunkMaxTokens = 1400;
 constexpr int kSummaryCarryForwardChars = 1800;
 constexpr int kSummaryMaxChars = 4200;
 
-QString sidecarPathForWorkspace(const QString &workspaceRoot, const QString &fileName)
+QString sidecar_path_for_workspace(const QString &workspace_root, const QString &fileName)
 {
-    return QDir(workspaceRoot).filePath(QStringLiteral(".qcai2/%1").arg(fileName));
+    return QDir(workspace_root).filePath(QStringLiteral(".qcai2/%1").arg(fileName));
 }
 
-QString knownOrUnknown(const QString &value)
+QString known_or_unknown(const QString &value)
 {
     return value.isEmpty() == true ? QStringLiteral("<unknown>") : value;
 }
 
-QJsonObject mergeJsonObjects(const QJsonObject &base, const QJsonObject &extra)
+QJsonObject merge_json_objects(const QJsonObject &base, const QJsonObject &extra)
 {
     QJsonObject merged = base;
     for (auto it = extra.begin(); it != extra.end(); ++it)
@@ -38,12 +38,13 @@ QJsonObject mergeJsonObjects(const QJsonObject &base, const QJsonObject &extra)
     return merged;
 }
 
-MemoryItem makeMemoryItem(const QString &workspaceId, const QString &key, const QString &category,
-                          const QString &value, const QString &source, int importance,
-                          const QJsonObject &metadata = {})
+memory_item_t make_memory_item(const QString &workspace_id, const QString &key,
+                               const QString &category, const QString &value,
+                               const QString &source, int importance,
+                               const QJsonObject &metadata = {})
 {
-    MemoryItem item;
-    item.workspaceId = workspaceId;
+    memory_item_t item;
+    item.workspace_id = workspace_id;
     item.key = key;
     item.category = category;
     item.value = value;
@@ -53,7 +54,7 @@ MemoryItem makeMemoryItem(const QString &workspaceId, const QString &key, const 
     return item;
 }
 
-bool propagateError(QString *target, const QString &error)
+bool propagate_error(QString *target, const QString &error)
 {
     if (error.isEmpty() == true)
     {
@@ -68,73 +69,74 @@ bool propagateError(QString *target, const QString &error)
 
 }  // namespace
 
-ChatContextManager::ChatContextManager(QObject *parent) : QObject(parent)
+chat_context_manager_t::chat_context_manager_t(QObject *parent) : QObject(parent)
 {
-    m_store = std::make_unique<ChatContextStore>();
+    this->store = std::make_unique<chat_context_store_t>();
 }
 
-bool ChatContextManager::setActiveWorkspace(const QString &workspaceId,
-                                            const QString &workspaceRoot,
-                                            const QString &conversationId, QString *error)
+bool chat_context_manager_t::set_active_workspace(const QString &workspace_id,
+                                                  const QString &workspace_root,
+                                                  const QString &conversation_id, QString *error)
 {
-    m_workspaceId = workspaceId;
-    m_workspaceRoot = workspaceRoot;
-    m_conversation = {};
-    m_conversation.workspaceId = workspaceId;
-    m_conversation.workspaceRoot = workspaceRoot;
-    m_conversation.conversationId = conversationId;
-    m_activeRuns.clear();
+    this->workspace_id = workspace_id;
+    this->workspace_root = workspace_root;
+    this->conversation = {};
+    this->conversation.workspace_id = workspace_id;
+    this->conversation.workspace_root = workspace_root;
+    this->conversation.conversation_id = conversation_id;
+    this->active_runs.clear();
 
-    if (ensureStoreOpen(error) == false)
+    if (this->ensure_store_open(error) == false)
     {
         return false;
     }
 
-    if (conversationId.isEmpty() == false)
+    if (conversation_id.isEmpty() == false)
     {
-        const ConversationRecord storedConversation = m_store->conversation(conversationId, error);
-        if (storedConversation.isValid() == true)
+        const conversation_record_t storedConversation =
+            this->store->conversation(conversation_id, error);
+        if (storedConversation.is_valid() == true)
         {
-            m_conversation = storedConversation;
+            this->conversation = storedConversation;
         }
         else
         {
-            m_conversation.workspaceId = workspaceId;
-            m_conversation.workspaceRoot = workspaceRoot;
-            m_conversation.conversationId = conversationId;
+            this->conversation.workspace_id = workspace_id;
+            this->conversation.workspace_root = workspace_root;
+            this->conversation.conversation_id = conversation_id;
         }
     }
 
     return true;
 }
 
-QString ChatContextManager::activeWorkspaceId() const
+QString chat_context_manager_t::active_workspace_id() const
 {
-    return m_workspaceId;
+    return this->workspace_id;
 }
 
-QString ChatContextManager::activeWorkspaceRoot() const
+QString chat_context_manager_t::active_workspace_root() const
 {
-    return m_workspaceRoot;
+    return this->workspace_root;
 }
 
-QString ChatContextManager::activeConversationId() const
+QString chat_context_manager_t::active_conversation_id() const
 {
-    return m_conversation.conversationId;
+    return this->conversation.conversation_id;
 }
 
-QString ChatContextManager::ensureActiveConversation(QString *error)
+QString chat_context_manager_t::ensure_active_conversation(QString *error)
 {
-    if (ensureConversationAvailable(error) == false)
+    if (this->ensure_conversation_available(error) == false)
     {
         return {};
     }
-    return m_conversation.conversationId;
+    return this->conversation.conversation_id;
 }
 
-QString ChatContextManager::startNewConversation(const QString &title, QString *error)
+QString chat_context_manager_t::start_new_conversation(const QString &title, QString *error)
 {
-    if (m_workspaceId.isEmpty() == true || m_workspaceRoot.isEmpty() == true)
+    if (this->workspace_id.isEmpty() == true || this->workspace_root.isEmpty() == true)
     {
         if (error != nullptr)
         {
@@ -143,338 +145,346 @@ QString ChatContextManager::startNewConversation(const QString &title, QString *
         return {};
     }
 
-    m_conversation = {};
-    m_conversation.conversationId = newContextId();
-    m_conversation.workspaceId = m_workspaceId;
-    m_conversation.workspaceRoot = m_workspaceRoot;
-    m_conversation.title = title.isNull() == true ? QStringLiteral("") : title;
-    m_conversation.createdAt = nowUtcIsoString();
-    m_conversation.updatedAt = m_conversation.createdAt;
+    this->conversation = {};
+    this->conversation.conversation_id = new_context_id();
+    this->conversation.workspace_id = this->workspace_id;
+    this->conversation.workspace_root = this->workspace_root;
+    this->conversation.title = title.isNull() == true ? QStringLiteral("") : title;
+    this->conversation.created_at = now_utc_iso_string();
+    this->conversation.updated_at = this->conversation.created_at;
 
-    if (ensureStoreOpen(error) == false)
+    if (this->ensure_store_open(error) == false)
     {
         return {};
     }
-    if (m_store->ensureConversation(&m_conversation, error) == false)
+    if (this->store->ensure_conversation(&this->conversation, error) == false)
     {
         return {};
     }
-    return m_conversation.conversationId;
+    return this->conversation.conversation_id;
 }
 
-void ChatContextManager::syncWorkspaceState(const EditorContext::Snapshot &snapshot,
-                                            const Settings &settings, QString *error)
+void chat_context_manager_t::sync_workspace_state(const editor_context_t::snapshot_t &snapshot,
+                                                  const settings_t &settings, QString *error)
 {
-    if (ensureStoreOpen(error) == false)
+    if (this->ensure_store_open(error) == false)
     {
         return;
     }
-    if (m_workspaceId.isEmpty() == true)
+    if (this->workspace_id.isEmpty() == true)
     {
         return;
     }
 
     const QString codingStylePath =
-        QDir(m_workspaceRoot).filePath(QStringLiteral("docs/CODING_STYLE.md"));
+        QDir(this->workspace_root).filePath(QStringLiteral("docs/CODING_STYLE.md"));
     const bool codingStyleExists = QFileInfo::exists(codingStylePath);
 
-    QList<MemoryItem> items;
-    items.append(makeMemoryItem(m_workspaceId, QStringLiteral("workspace_root"),
-                                QStringLiteral("workspace"), knownOrUnknown(m_workspaceRoot),
-                                QStringLiteral("editor_context"), 100));
-    items.append(makeMemoryItem(m_workspaceId, QStringLiteral("build_directory"),
-                                QStringLiteral("workspace"), knownOrUnknown(snapshot.buildDir),
-                                QStringLiteral("editor_context"), 95));
-    items.append(makeMemoryItem(
-        m_workspaceId, QStringLiteral("active_project"), QStringLiteral("workspace"),
-        knownOrUnknown(snapshot.projectFilePath), QStringLiteral("editor_context"), 95));
-    if (snapshot.filePath.isEmpty() == false)
+    QList<memory_item_t> items;
+    items.append(make_memory_item(
+        this->workspace_id, QStringLiteral("workspace_root"), QStringLiteral("workspace"),
+        known_or_unknown(this->workspace_root), QStringLiteral("editor_context"), 100));
+    items.append(make_memory_item(
+        this->workspace_id, QStringLiteral("build_directory"), QStringLiteral("workspace"),
+        known_or_unknown(snapshot.build_dir), QStringLiteral("editor_context"), 95));
+    items.append(make_memory_item(
+        this->workspace_id, QStringLiteral("active_project"), QStringLiteral("workspace"),
+        known_or_unknown(snapshot.project_file_path), QStringLiteral("editor_context"), 95));
+    if (snapshot.file_path.isEmpty() == false)
     {
-        items.append(makeMemoryItem(m_workspaceId, QStringLiteral("active_file"),
-                                    QStringLiteral("workspace"), snapshot.filePath,
-                                    QStringLiteral("editor_context"), 80));
+        items.append(make_memory_item(this->workspace_id, QStringLiteral("active_file"),
+                                      QStringLiteral("workspace"), snapshot.file_path,
+                                      QStringLiteral("editor_context"), 80));
     }
     if (codingStyleExists == true)
     {
-        items.append(makeMemoryItem(m_workspaceId, QStringLiteral("coding_style"),
-                                    QStringLiteral("preference"),
-                                    QStringLiteral("Follow %1").arg(codingStylePath),
-                                    QStringLiteral("workspace_doc"), 90));
+        items.append(make_memory_item(this->workspace_id, QStringLiteral("coding_style"),
+                                      QStringLiteral("preference"),
+                                      QStringLiteral("Follow %1").arg(codingStylePath),
+                                      QStringLiteral("workspace_doc"), 90));
     }
-    items.append(makeMemoryItem(m_workspaceId, QStringLiteral("safety_rules"),
-                                QStringLiteral("constraint"),
-                                QStringLiteral("Do not reveal secrets, avoid destructive commands "
-                                               "without approval, and surface errors explicitly."),
-                                QStringLiteral("built_in"), 85));
-    items.append(makeMemoryItem(
-        m_workspaceId, QStringLiteral("agent_defaults"), QStringLiteral("preference"),
-        QStringLiteral("model=%1; reasoning=%2; thinking=%3; dryRunDefault=%4")
-            .arg(settings.modelName, settings.reasoningEffort, settings.thinkingLevel,
-                 settings.dryRunDefault == true ? QStringLiteral("true")
-                                                : QStringLiteral("false")),
+    items.append(make_memory_item(
+        this->workspace_id, QStringLiteral("safety_rules"), QStringLiteral("constraint"),
+        QStringLiteral("Do not reveal secrets, avoid destructive commands "
+                       "without approval, and surface errors explicitly."),
+        QStringLiteral("built_in"), 85));
+    items.append(make_memory_item(
+        this->workspace_id, QStringLiteral("agent_defaults"), QStringLiteral("preference"),
+        QStringLiteral("model=%1; reasoning=%2; thinking=%3; dry_run_default=%4")
+            .arg(settings.model_name, settings.reasoning_effort, settings.thinking_level,
+                 settings.dry_run_default == true ? QStringLiteral("true")
+                                                  : QStringLiteral("false")),
         QStringLiteral("settings"), 70));
-    items.append(makeMemoryItem(
-        m_workspaceId, QStringLiteral("completion_defaults"), QStringLiteral("preference"),
+    items.append(make_memory_item(
+        this->workspace_id, QStringLiteral("completion_defaults"), QStringLiteral("preference"),
         QStringLiteral("model=%1; reasoning=%2; thinking=%3")
-            .arg(settings.completionModel.isEmpty() == true ? settings.modelName
-                                                            : settings.completionModel,
-                 settings.completionReasoningEffort, settings.completionThinkingLevel),
+            .arg(settings.completion_model.isEmpty() == true ? settings.model_name
+                                                             : settings.completion_model,
+                 settings.completion_reasoning_effort, settings.completion_thinking_level),
         QStringLiteral("settings"), 60));
 
-    for (MemoryItem &item : items)
+    for (memory_item_t &item : items)
     {
-        if (m_store->upsertMemoryItem(&item, error) == false)
+        if (this->store->upsert_memory_item(&item, error) == false)
         {
             return;
         }
     }
 }
 
-QString ChatContextManager::beginRun(ContextRequestKind kind, const QString &providerId,
-                                     const QString &model, const QString &reasoningEffort,
-                                     const QString &thinkingLevel, bool dryRun,
-                                     const QJsonObject &metadata, QString *error)
+QString chat_context_manager_t::begin_run(context_request_kind_t kind, const QString &provider_id,
+                                          const QString &model, const QString &reasoning_effort,
+                                          const QString &thinking_level, bool dry_run,
+                                          const QJsonObject &metadata, QString *error)
 {
-    if (ensureConversationAvailable(error) == false)
+    if (this->ensure_conversation_available(error) == false)
     {
         return {};
     }
 
-    RunRecord run;
-    run.runId = newContextId();
-    run.workspaceId = m_workspaceId;
-    run.conversationId = m_conversation.conversationId;
-    run.kind = requestKindName(kind);
-    run.providerId = providerId;
+    run_record_t run;
+    run.run_id = new_context_id();
+    run.workspace_id = this->workspace_id;
+    run.conversation_id = this->conversation.conversation_id;
+    run.kind = request_kind_name(kind);
+    run.provider_id = provider_id;
     run.model = model;
-    run.reasoningEffort = reasoningEffort;
-    run.thinkingLevel = thinkingLevel;
-    run.dryRun = dryRun;
+    run.reasoning_effort = reasoning_effort;
+    run.thinking_level = thinking_level;
+    run.dry_run = dry_run;
     run.status = QStringLiteral("running");
-    run.startedAt = nowUtcIsoString();
-    run.finishedAt = QStringLiteral("");
+    run.started_at = now_utc_iso_string();
+    run.finished_at = QStringLiteral("");
     run.metadata = metadata;
 
-    if (m_store->saveRun(run, error) == false)
+    if (this->store->save_run(run, error) == false)
     {
         return {};
     }
 
-    m_activeRuns.insert(run.runId, run);
-    return run.runId;
+    this->active_runs.insert(run.run_id, run);
+    return run.run_id;
 }
 
-bool ChatContextManager::finishRun(const QString &runId, const QString &status,
-                                   const ProviderUsage &usage, const QJsonObject &metadata,
-                                   QString *error)
+bool chat_context_manager_t::finish_run(const QString &run_id, const QString &status,
+                                        const provider_usage_t &usage, const QJsonObject &metadata,
+                                        QString *error)
 {
-    if (ensureStoreOpen(error) == false)
+    if (this->ensure_store_open(error) == false)
     {
         return false;
     }
 
-    RunRecord run = m_activeRuns.value(runId);
-    if (run.runId.isEmpty() == true)
+    run_record_t run = this->active_runs.value(run_id);
+    if (run.run_id.isEmpty() == true)
     {
-        run.runId = runId;
+        run.run_id = run_id;
         run.status = status;
     }
 
     run.status = status;
-    run.finishedAt = nowUtcIsoString();
+    run.finished_at = now_utc_iso_string();
     run.usage = usage;
-    run.metadata = mergeJsonObjects(run.metadata, metadata);
+    run.metadata = merge_json_objects(run.metadata, metadata);
 
-    const bool updated = m_store->updateRun(run, error);
+    const bool updated = this->store->update_run(run, error);
     if (updated == false && error != nullptr && error->isEmpty() == true)
     {
         *error = QStringLiteral("Run record was not updated");
     }
-    m_activeRuns.remove(runId);
+    this->active_runs.remove(run_id);
     return updated;
 }
 
-bool ChatContextManager::appendUserMessage(const QString &runId, const QString &content,
-                                           const QString &source, const QJsonObject &metadata,
-                                           QString *error)
+bool chat_context_manager_t::append_user_message(const QString &run_id, const QString &content,
+                                                 const QString &source,
+                                                 const QJsonObject &metadata, QString *error)
 {
-    return appendMessage(runId, QStringLiteral("user"), content, source, metadata, error);
+    return this->append_message(run_id, QStringLiteral("user"), content, source, metadata, error);
 }
 
-bool ChatContextManager::appendAssistantMessage(const QString &runId, const QString &content,
-                                                const QString &source, const QJsonObject &metadata,
-                                                QString *error)
+bool chat_context_manager_t::append_assistant_message(const QString &run_id,
+                                                      const QString &content,
+                                                      const QString &source,
+                                                      const QJsonObject &metadata, QString *error)
 {
-    return appendMessage(runId, QStringLiteral("assistant"), content, source, metadata, error);
+    return this->append_message(run_id, QStringLiteral("assistant"), content, source, metadata,
+                                error);
 }
 
-bool ChatContextManager::appendArtifact(const QString &runId, const QString &kind,
-                                        const QString &title, const QString &content,
-                                        const QJsonObject &metadata, QString *error)
+bool chat_context_manager_t::append_artifact(const QString &run_id, const QString &kind,
+                                             const QString &title, const QString &content,
+                                             const QJsonObject &metadata, QString *error)
 {
-    if (ensureConversationAvailable(error) == false)
+    if (this->ensure_conversation_available(error) == false)
     {
         return false;
     }
 
-    ArtifactRecord artifact;
-    artifact.workspaceId = m_workspaceId;
-    artifact.conversationId = m_conversation.conversationId;
-    artifact.runId = runId;
+    artifact_record_t artifact;
+    artifact.workspace_id = this->workspace_id;
+    artifact.conversation_id = this->conversation.conversation_id;
+    artifact.run_id = run_id;
     artifact.kind = kind;
     artifact.title = title;
-    artifact.preview = truncateForContext(content, 1000);
+    artifact.preview = truncate_for_context(content, 1000);
     artifact.metadata = metadata;
 
-    return m_store->addArtifact(&artifact, content, error);
+    return this->store->add_artifact(&artifact, content, error);
 }
 
-ContextEnvelope ChatContextManager::buildContextEnvelope(ContextRequestKind kind,
-                                                         const QString &systemInstruction,
-                                                         const QStringList &dynamicSystemMessages,
-                                                         int maxOutputTokens, QString *error) const
+context_envelope_t chat_context_manager_t::build_context_envelope(
+    context_request_kind_t kind, const QString &system_instruction,
+    const QStringList &dynamic_system_messages, int max_output_tokens, QString *error) const
 {
-    ContextEnvelope envelope;
-    if (ensureStoreOpen(error) == false)
+    context_envelope_t envelope;
+    if (this->ensure_store_open(error) == false)
     {
         return envelope;
     }
-    if (m_conversation.isValid() == false)
+    if (this->conversation.is_valid() == false)
     {
         return envelope;
     }
 
-    envelope.workspaceId = m_workspaceId;
-    envelope.conversationId = m_conversation.conversationId;
-    envelope.budget = budgetForRequest(kind, maxOutputTokens);
+    envelope.workspace_id = this->workspace_id;
+    envelope.conversation_id = this->conversation.conversation_id;
+    envelope.budget = budget_for_request(kind, max_output_tokens);
 
     QString localError;
-    envelope.memoryItems = selectMemoryItems(envelope.budget, &localError);
-    if (propagateError(error, localError) == true)
+    envelope.memory_items = this->select_memory_items(envelope.budget, &localError);
+    if (propagate_error(error, localError) == true)
     {
-        return ContextEnvelope{};
+        return context_envelope_t{};
     }
 
-    envelope.summary = m_store->latestSummary(m_conversation.conversationId, &localError);
-    if (propagateError(error, localError) == true)
+    envelope.summary =
+        this->store->latest_summary(this->conversation.conversation_id, &localError);
+    if (propagate_error(error, localError) == true)
     {
-        return ContextEnvelope{};
+        return context_envelope_t{};
     }
 
-    envelope.artifacts = selectArtifacts(envelope.budget, &localError);
-    if (propagateError(error, localError) == true)
+    envelope.artifacts = this->select_artifacts(envelope.budget, &localError);
+    if (propagate_error(error, localError) == true)
     {
-        return ContextEnvelope{};
+        return context_envelope_t{};
     }
 
-    envelope.recentMessages = selectRecentMessages(envelope.budget, &localError);
-    if (propagateError(error, localError) == true)
+    envelope.recent_messages = this->select_recent_messages(envelope.budget, &localError);
+    if (propagate_error(error, localError) == true)
     {
-        return ContextEnvelope{};
+        return context_envelope_t{};
     }
 
-    if (systemInstruction.isEmpty() == false)
+    if (system_instruction.isEmpty() == false)
     {
-        envelope.providerMessages.append(ChatMessage{QStringLiteral("system"), systemInstruction});
+        envelope.provider_messages.append(
+            chat_message_t{QStringLiteral("system"), system_instruction});
     }
 
-    for (const QString &message : dynamicSystemMessages)
+    for (const QString &message : dynamic_system_messages)
     {
         if (message.isEmpty() == false)
         {
-            envelope.providerMessages.append(ChatMessage{QStringLiteral("system"), message});
+            envelope.provider_messages.append(chat_message_t{QStringLiteral("system"), message});
         }
     }
 
-    const QString memoryText = memoryBlock(envelope.memoryItems, envelope.budget.memoryTokens);
+    const QString memoryText =
+        this->memory_block(envelope.memory_items, envelope.budget.memory_tokens);
     if (memoryText.isEmpty() == false)
     {
-        envelope.providerMessages.append(ChatMessage{QStringLiteral("system"), memoryText});
+        envelope.provider_messages.append(chat_message_t{QStringLiteral("system"), memoryText});
     }
 
     const QString summaryText =
-        conversationSummaryBlock(envelope.summary, envelope.budget.summaryTokens);
+        this->conversation_summary_block(envelope.summary, envelope.budget.summary_tokens);
     if (summaryText.isEmpty() == false)
     {
-        envelope.providerMessages.append(ChatMessage{QStringLiteral("system"), summaryText});
+        envelope.provider_messages.append(chat_message_t{QStringLiteral("system"), summaryText});
     }
 
-    const QString artifactText = artifactBlock(envelope.artifacts, envelope.budget.artifactTokens);
+    const QString artifactText =
+        this->artifact_block(envelope.artifacts, envelope.budget.artifact_tokens);
     if (artifactText.isEmpty() == false)
     {
-        envelope.providerMessages.append(ChatMessage{QStringLiteral("system"), artifactText});
+        envelope.provider_messages.append(chat_message_t{QStringLiteral("system"), artifactText});
     }
 
-    for (const ContextMessage &message : envelope.recentMessages)
+    for (const context_message_t &message : envelope.recent_messages)
     {
-        envelope.providerMessages.append(message.toChatMessage());
+        envelope.provider_messages.append(message.to_chat_message());
     }
 
     return envelope;
 }
 
-QString ChatContextManager::buildCompletionContextBlock(const QString &filePath,
-                                                        int maxOutputTokens, QString *error) const
+QString chat_context_manager_t::build_completion_context_block(const QString &file_path,
+                                                               int max_output_tokens,
+                                                               QString *error) const
 {
-    if (ensureStoreOpen(error) == false)
+    if (this->ensure_store_open(error) == false)
     {
         return {};
     }
-    if (m_conversation.isValid() == false)
+    if (this->conversation.is_valid() == false)
     {
         return {};
     }
 
-    const ContextBudget budget = budgetForRequest(ContextRequestKind::Completion, maxOutputTokens);
+    const context_budget_t budget =
+        budget_for_request(context_request_kind_t::COMPLETION, max_output_tokens);
 
     QString localError;
-    const QList<MemoryItem> memoryItems = selectMemoryItems(budget, &localError);
-    if (propagateError(error, localError) == true)
+    const QList<memory_item_t> memory_items = this->select_memory_items(budget, &localError);
+    if (propagate_error(error, localError) == true)
     {
         return {};
     }
 
-    const ContextSummary summary =
-        m_store->latestSummary(m_conversation.conversationId, &localError);
-    if (propagateError(error, localError) == true)
+    const context_summary_t summary =
+        this->store->latest_summary(this->conversation.conversation_id, &localError);
+    if (propagate_error(error, localError) == true)
     {
         return {};
     }
 
-    const QList<ArtifactRecord> artifacts = selectArtifacts(budget, &localError);
-    if (propagateError(error, localError) == true)
+    const QList<artifact_record_t> artifacts = this->select_artifacts(budget, &localError);
+    if (propagate_error(error, localError) == true)
     {
         return {};
     }
 
-    const QList<ContextMessage> messages = selectRecentMessages(budget, &localError);
-    if (propagateError(error, localError) == true)
+    const QList<context_message_t> messages = this->select_recent_messages(budget, &localError);
+    if (propagate_error(error, localError) == true)
     {
         return {};
     }
 
     QStringList parts;
-    parts.append(QStringLiteral("Completion context for %1").arg(filePath));
+    parts.append(QStringLiteral("Completion context for %1").arg(file_path));
 
-    const QString memoryText = memoryBlock(memoryItems, budget.memoryTokens);
+    const QString memoryText = this->memory_block(memory_items, budget.memory_tokens);
     if (memoryText.isEmpty() == false)
     {
         parts.append(memoryText);
     }
 
-    const QString summaryText = conversationSummaryBlock(summary, budget.summaryTokens);
+    const QString summaryText = this->conversation_summary_block(summary, budget.summary_tokens);
     if (summaryText.isEmpty() == false)
     {
         parts.append(summaryText);
     }
 
-    const QString messageText = recentMessagesBlock(messages, budget.recentMessageTokens);
+    const QString messageText =
+        this->recent_messages_block(messages, budget.recent_message_tokens);
     if (messageText.isEmpty() == false)
     {
         parts.append(messageText);
     }
 
-    const QString artifactText = artifactBlock(artifacts, budget.artifactTokens);
+    const QString artifactText = this->artifact_block(artifacts, budget.artifact_tokens);
     if (artifactText.isEmpty() == false)
     {
         parts.append(artifactText);
@@ -483,43 +493,43 @@ QString ChatContextManager::buildCompletionContextBlock(const QString &filePath,
     return parts.join(QStringLiteral("\n\n"));
 }
 
-bool ChatContextManager::maybeRefreshSummary(QString *error)
+bool chat_context_manager_t::maybe_refresh_summary(QString *error)
 {
-    if (ensureConversationAvailable(error) == false)
+    if (this->ensure_conversation_available(error) == false)
     {
         return false;
     }
 
     QString localError;
-    const ContextSummary latest =
-        m_store->latestSummary(m_conversation.conversationId, &localError);
-    if (propagateError(error, localError) == true)
+    const context_summary_t latest =
+        this->store->latest_summary(this->conversation.conversation_id, &localError);
+    if (propagate_error(error, localError) == true)
     {
         return false;
     }
 
     const int latestSequence =
-        m_store->latestMessageSequence(m_conversation.conversationId, &localError);
-    if (propagateError(error, localError) == true)
+        this->store->latest_message_sequence(this->conversation.conversation_id, &localError);
+    if (propagate_error(error, localError) == true)
     {
         return false;
     }
-    if (latestSequence <= latest.endSequence)
+    if (latestSequence <= latest.end_sequence)
     {
         return true;
     }
 
-    const QList<ContextMessage> unsummarizedMessages = m_store->messagesRange(
-        m_conversation.conversationId, latest.endSequence, latestSequence, &localError);
-    if (propagateError(error, localError) == true)
+    const QList<context_message_t> unsummarizedMessages = this->store->messages_range(
+        this->conversation.conversation_id, latest.end_sequence, latestSequence, &localError);
+    if (propagate_error(error, localError) == true)
     {
         return false;
     }
 
     int unsummarizedTokens = 0;
-    for (const ContextMessage &message : unsummarizedMessages)
+    for (const context_message_t &message : unsummarizedMessages)
     {
-        unsummarizedTokens += message.tokenEstimate;
+        unsummarizedTokens += message.token_estimate;
     }
 
     if ((unsummarizedMessages.size() < kSummaryRefreshMessageThreshold) &&
@@ -528,57 +538,58 @@ bool ChatContextManager::maybeRefreshSummary(QString *error)
         return true;
     }
 
-    QList<ContextMessage> chunk;
+    QList<context_message_t> chunk;
     int chunkTokens = 0;
-    for (const ContextMessage &message : unsummarizedMessages)
+    for (const context_message_t &message : unsummarizedMessages)
     {
         if ((chunk.size() >= kSummaryChunkMaxMessages) ||
-            (((chunkTokens + message.tokenEstimate) > kSummaryChunkMaxTokens) &&
+            (((chunkTokens + message.token_estimate) > kSummaryChunkMaxTokens) &&
              (chunk.isEmpty() == false)))
         {
             break;
         }
         chunk.append(message);
-        chunkTokens += message.tokenEstimate;
+        chunkTokens += message.token_estimate;
     }
     if (chunk.isEmpty() == true)
     {
         return true;
     }
 
-    const QList<ArtifactRecord> artifacts =
-        m_store->recentArtifacts(m_conversation.conversationId, 4, &localError);
-    if (propagateError(error, localError) == true)
+    const QList<artifact_record_t> artifacts =
+        this->store->recent_artifacts(this->conversation.conversation_id, 4, &localError);
+    if (propagate_error(error, localError) == true)
     {
         return false;
     }
 
-    ContextSummary nextSummary = composeNextSummary(latest, chunk, artifacts, &localError);
-    if (propagateError(error, localError) == true)
+    context_summary_t nextSummary =
+        this->compose_next_summary(latest, chunk, artifacts, &localError);
+    if (propagate_error(error, localError) == true)
     {
         return false;
     }
-    if (nextSummary.isValid() == false)
+    if (nextSummary.is_valid() == false)
     {
         return true;
     }
 
-    return m_store->addSummary(&nextSummary, error);
+    return this->store->add_summary(&nextSummary, error);
 }
 
-QString ChatContextManager::databasePath() const
+QString chat_context_manager_t::database_path() const
 {
-    return databasePathForWorkspace();
+    return this->database_path_for_workspace();
 }
 
-QString ChatContextManager::artifactDirectoryPath() const
+QString chat_context_manager_t::artifact_directory_path() const
 {
-    return artifactPathForWorkspace();
+    return this->artifact_path_for_workspace();
 }
 
-bool ChatContextManager::ensureStoreOpen(QString *error) const
+bool chat_context_manager_t::ensure_store_open(QString *error) const
 {
-    if (m_workspaceRoot.isEmpty() == true)
+    if (this->workspace_root.isEmpty() == true)
     {
         if (error != nullptr)
         {
@@ -586,85 +597,87 @@ bool ChatContextManager::ensureStoreOpen(QString *error) const
         }
         return false;
     }
-    return m_store->open(databasePathForWorkspace(), artifactPathForWorkspace(), error);
+    return this->store->open(this->database_path_for_workspace(),
+                             this->artifact_path_for_workspace(), error);
 }
 
-bool ChatContextManager::ensureConversationAvailable(QString *error)
+bool chat_context_manager_t::ensure_conversation_available(QString *error)
 {
-    if (ensureStoreOpen(error) == false)
+    if (this->ensure_store_open(error) == false)
     {
         return false;
     }
-    if (m_conversation.isValid() == false)
+    if (this->conversation.is_valid() == false)
     {
-        return startNewConversation({}, error).isEmpty() == false;
+        return this->start_new_conversation({}, error).isEmpty() == false;
     }
-    return m_store->ensureConversation(&m_conversation, error);
+    return this->store->ensure_conversation(&this->conversation, error);
 }
 
-bool ChatContextManager::appendMessage(const QString &runId, const QString &role,
-                                       const QString &content, const QString &source,
-                                       const QJsonObject &metadata, QString *error)
+bool chat_context_manager_t::append_message(const QString &run_id, const QString &role,
+                                            const QString &content, const QString &source,
+                                            const QJsonObject &metadata, QString *error)
 {
     if (content.isEmpty() == true)
     {
         return true;
     }
-    if (ensureConversationAvailable(error) == false)
+    if (this->ensure_conversation_available(error) == false)
     {
         return false;
     }
 
-    ContextMessage message;
-    message.workspaceId = m_workspaceId;
-    message.conversationId = m_conversation.conversationId;
-    message.runId = runId;
+    context_message_t message;
+    message.workspace_id = this->workspace_id;
+    message.conversation_id = this->conversation.conversation_id;
+    message.run_id = run_id;
     message.role = role;
     message.source = source;
     message.content = content;
     message.metadata = metadata;
-    if (m_store->appendMessage(&message, error) == false)
+    if (this->store->append_message(&message, error) == false)
     {
         return false;
     }
 
-    m_conversation.lastMessageSequence = message.sequence;
-    m_conversation.updatedAt = message.createdAt;
-    return maybeRefreshSummary(error);
+    this->conversation.last_message_sequence = message.sequence;
+    this->conversation.updated_at = message.created_at;
+    return this->maybe_refresh_summary(error);
 }
 
-QString ChatContextManager::conversationSummaryBlock(const ContextSummary &summary,
-                                                     int maxTokens) const
+QString chat_context_manager_t::conversation_summary_block(const context_summary_t &summary,
+                                                           int max_tokens) const
 {
-    if (summary.isValid() == false || maxTokens <= 0)
+    if (summary.is_valid() == false || max_tokens <= 0)
     {
         return {};
     }
 
     return QStringLiteral("Rolling summary (version %1, messages %2-%3):\n%4")
         .arg(summary.version)
-        .arg(summary.startSequence)
-        .arg(summary.endSequence)
-        .arg(truncateForContext(summary.content, maxTokens * 4));
+        .arg(summary.start_sequence)
+        .arg(summary.end_sequence)
+        .arg(truncate_for_context(summary.content, max_tokens * 4));
 }
 
-QString ChatContextManager::memoryBlock(const QList<MemoryItem> &items, int maxTokens) const
+QString chat_context_manager_t::memory_block(const QList<memory_item_t> &items,
+                                             int max_tokens) const
 {
-    if (items.isEmpty() == true || maxTokens <= 0)
+    if (items.isEmpty() == true || max_tokens <= 0)
     {
         return {};
     }
 
     QStringList lines;
     lines.append(QStringLiteral("Stable workspace memory:"));
-    int usedTokens = estimateTokenCount(lines.constFirst());
-    for (const MemoryItem &item : items)
+    int usedTokens = estimate_token_count(lines.constFirst());
+    for (const memory_item_t &item : items)
     {
         const QString line =
             QStringLiteral("- %1 (%2): %3")
-                .arg(item.key, item.category, truncateForContext(item.value, 220));
-        const int itemTokens = estimateTokenCount(line);
-        if (((usedTokens + itemTokens) > maxTokens) == true)
+                .arg(item.key, item.category, truncate_for_context(item.value, 220));
+        const int itemTokens = estimate_token_count(line);
+        if (((usedTokens + itemTokens) > max_tokens) == true)
         {
             break;
         }
@@ -674,22 +687,22 @@ QString ChatContextManager::memoryBlock(const QList<MemoryItem> &items, int maxT
     return lines.join(QStringLiteral("\n"));
 }
 
-QString ChatContextManager::artifactBlock(const QList<ArtifactRecord> &artifacts,
-                                          int maxTokens) const
+QString chat_context_manager_t::artifact_block(const QList<artifact_record_t> &artifacts,
+                                               int max_tokens) const
 {
-    if (artifacts.isEmpty() == true || maxTokens <= 0)
+    if (artifacts.isEmpty() == true || max_tokens <= 0)
     {
         return {};
     }
 
     QStringList lines;
     lines.append(QStringLiteral("Relevant prior artifacts (referenced, not inlined):"));
-    int usedTokens = estimateTokenCount(lines.constFirst());
-    for (const ArtifactRecord &artifact : artifacts)
+    int usedTokens = estimate_token_count(lines.constFirst());
+    for (const artifact_record_t &artifact : artifacts)
     {
-        const QString line = renderArtifactBullet(artifact, 280);
-        const int itemTokens = estimateTokenCount(line);
-        if (((usedTokens + itemTokens) > maxTokens) == true)
+        const QString line = this->render_artifact_bullet(artifact, 280);
+        const int itemTokens = estimate_token_count(line);
+        if (((usedTokens + itemTokens) > max_tokens) == true)
         {
             break;
         }
@@ -699,22 +712,22 @@ QString ChatContextManager::artifactBlock(const QList<ArtifactRecord> &artifacts
     return lines.join(QStringLiteral("\n"));
 }
 
-QString ChatContextManager::recentMessagesBlock(const QList<ContextMessage> &messages,
-                                                int maxTokens) const
+QString chat_context_manager_t::recent_messages_block(const QList<context_message_t> &messages,
+                                                      int max_tokens) const
 {
-    if (messages.isEmpty() == true || maxTokens <= 0)
+    if (messages.isEmpty() == true || max_tokens <= 0)
     {
         return {};
     }
 
     QStringList lines;
     lines.append(QStringLiteral("Recent conversation excerpts:"));
-    int usedTokens = estimateTokenCount(lines.constFirst());
-    for (const ContextMessage &message : messages)
+    int usedTokens = estimate_token_count(lines.constFirst());
+    for (const context_message_t &message : messages)
     {
-        const QString line = renderMessageBullet(message, 180);
-        const int itemTokens = estimateTokenCount(line);
-        if (((usedTokens + itemTokens) > maxTokens) == true)
+        const QString line = this->render_message_bullet(message, 180);
+        const int itemTokens = estimate_token_count(line);
+        if (((usedTokens + itemTokens) > max_tokens) == true)
         {
             break;
         }
@@ -724,85 +737,87 @@ QString ChatContextManager::recentMessagesBlock(const QList<ContextMessage> &mes
     return lines.join(QStringLiteral("\n"));
 }
 
-QString ChatContextManager::renderMessageBullet(const ContextMessage &message, int maxChars) const
+QString chat_context_manager_t::render_message_bullet(const context_message_t &message,
+                                                      int max_chars) const
 {
     return QStringLiteral("- [%1/%2] %3")
         .arg(message.role, message.source,
-             truncateForContext(message.content.simplified(), maxChars));
+             truncate_for_context(message.content.simplified(), max_chars));
 }
 
-QString ChatContextManager::renderArtifactBullet(const ArtifactRecord &artifact,
-                                                 int maxChars) const
+QString chat_context_manager_t::render_artifact_bullet(const artifact_record_t &artifact,
+                                                       int max_chars) const
 {
-    QString location = artifact.storagePath;
+    QString location = artifact.storage_path;
     if (location.isEmpty() == true)
     {
         location = QStringLiteral("preview-only");
     }
     return QStringLiteral("- [%1] %2 (%3): %4")
         .arg(artifact.kind, artifact.title, location,
-             truncateForContext(artifact.preview.simplified(), maxChars));
+             truncate_for_context(artifact.preview.simplified(), max_chars));
 }
 
-QList<MemoryItem> ChatContextManager::selectMemoryItems(const ContextBudget &budget,
-                                                        QString *error) const
+QList<memory_item_t> chat_context_manager_t::select_memory_items(const context_budget_t &budget,
+                                                                 QString *error) const
 {
-    QList<MemoryItem> selected;
-    const QList<MemoryItem> items = m_store->memoryItems(m_workspaceId, 16, error);
+    QList<memory_item_t> selected;
+    const QList<memory_item_t> items = this->store->memory_items(this->workspace_id, 16, error);
     int usedTokens = 0;
-    for (const MemoryItem &item : items)
+    for (const memory_item_t &item : items)
     {
-        if (((usedTokens + item.tokenEstimate) > budget.memoryTokens) == true)
+        if (((usedTokens + item.token_estimate) > budget.memory_tokens) == true)
         {
             break;
         }
         selected.append(item);
-        usedTokens += item.tokenEstimate;
+        usedTokens += item.token_estimate;
     }
     return selected;
 }
 
-QList<ArtifactRecord> ChatContextManager::selectArtifacts(const ContextBudget &budget,
-                                                          QString *error) const
+QList<artifact_record_t> chat_context_manager_t::select_artifacts(const context_budget_t &budget,
+                                                                  QString *error) const
 {
-    QList<ArtifactRecord> selected;
-    const QList<ArtifactRecord> artifacts =
-        m_store->recentArtifacts(m_conversation.conversationId, budget.maxArtifacts * 3, error);
+    QList<artifact_record_t> selected;
+    const QList<artifact_record_t> artifacts = this->store->recent_artifacts(
+        this->conversation.conversation_id, budget.max_artifacts * 3, error);
     int usedTokens = 0;
-    for (const ArtifactRecord &artifact : artifacts)
+    for (const artifact_record_t &artifact : artifacts)
     {
-        if (selected.size() >= budget.maxArtifacts)
+        if (selected.size() >= budget.max_artifacts)
         {
             break;
         }
-        if (((usedTokens + artifact.tokenEstimate) > budget.artifactTokens) == true)
+        if (((usedTokens + artifact.token_estimate) > budget.artifact_tokens) == true)
         {
             continue;
         }
         selected.append(artifact);
-        usedTokens += artifact.tokenEstimate;
+        usedTokens += artifact.token_estimate;
     }
     return selected;
 }
 
-QList<ContextMessage> ChatContextManager::selectRecentMessages(const ContextBudget &budget,
-                                                               QString *error) const
+QList<context_message_t>
+chat_context_manager_t::select_recent_messages(const context_budget_t &budget,
+                                               QString *error) const
 {
-    QList<ContextMessage> selected;
-    const QList<ContextMessage> messages = m_store->recentMessages(
-        m_conversation.conversationId, budget.maxRecentMessages * 2, error);
+    QList<context_message_t> selected;
+    const QList<context_message_t> messages = this->store->recent_messages(
+        this->conversation.conversation_id, budget.max_recent_messages * 2, error);
     int usedTokens = 0;
     for (qsizetype index = messages.size() - 1; index >= 0; --index)
     {
-        const ContextMessage &message = messages.at(static_cast<int>(index));
-        if (((usedTokens + message.tokenEstimate) > budget.recentMessageTokens) == true &&
+        const context_message_t &message = messages.at(static_cast<int>(index));
+        if (((usedTokens + message.token_estimate) > budget.recent_message_tokens) == true &&
             (selected.isEmpty() == false))
         {
             continue;
         }
         selected.prepend(message);
-        usedTokens += message.tokenEstimate;
-        if (selected.size() >= budget.maxRecentMessages)
+        usedTokens += message.token_estimate;
+        if (selected.size() >= budget.max_recent_messages)
         {
             break;
         }
@@ -810,61 +825,60 @@ QList<ContextMessage> ChatContextManager::selectRecentMessages(const ContextBudg
     return selected;
 }
 
-ContextSummary ChatContextManager::composeNextSummary(const ContextSummary &previous,
-                                                      const QList<ContextMessage> &chunk,
-                                                      const QList<ArtifactRecord> &artifacts,
-                                                      QString * /*error*/) const
+context_summary_t chat_context_manager_t::compose_next_summary(
+    const context_summary_t &previous, const QList<context_message_t> &chunk,
+    const QList<artifact_record_t> &artifacts, QString * /*error*/) const
 {
-    ContextSummary summary;
+    context_summary_t summary;
     if (chunk.isEmpty() == true)
     {
         return summary;
     }
 
     QStringList lines;
-    lines.append(QStringLiteral("Rolling summary for workspace %1").arg(m_workspaceId));
-    if (previous.isValid() == true)
+    lines.append(QStringLiteral("Rolling summary for workspace %1").arg(this->workspace_id));
+    if (previous.is_valid() == true)
     {
         lines.append(QStringLiteral("Carry-forward summary:"));
-        lines.append(truncateForContext(previous.content, kSummaryCarryForwardChars));
+        lines.append(truncate_for_context(previous.content, kSummaryCarryForwardChars));
     }
     lines.append(QStringLiteral("Newly summarized conversation:"));
-    for (const ContextMessage &message : chunk)
+    for (const context_message_t &message : chunk)
     {
-        lines.append(renderMessageBullet(message, 260));
+        lines.append(this->render_message_bullet(message, 260));
     }
     if (artifacts.isEmpty() == false)
     {
         lines.append(QStringLiteral("Referenced artifacts:"));
-        for (const ArtifactRecord &artifact : artifacts)
+        for (const artifact_record_t &artifact : artifacts)
         {
-            lines.append(renderArtifactBullet(artifact, 200));
+            lines.append(this->render_artifact_bullet(artifact, 200));
         }
     }
 
-    summary.workspaceId = m_workspaceId;
-    summary.conversationId = m_conversation.conversationId;
-    summary.summaryId = newContextId();
+    summary.workspace_id = this->workspace_id;
+    summary.conversation_id = this->conversation.conversation_id;
+    summary.summary_id = new_context_id();
     summary.version = previous.version + 1;
-    summary.startSequence =
-        previous.isValid() == true ? previous.startSequence : chunk.constFirst().sequence;
-    summary.endSequence = chunk.constLast().sequence;
-    summary.createdAt = nowUtcIsoString();
-    summary.content = truncateForContext(lines.join(QStringLiteral("\n")), kSummaryMaxChars);
-    summary.metadata = QJsonObject{{QStringLiteral("previousSummaryId"), previous.summaryId},
+    summary.start_sequence =
+        previous.is_valid() == true ? previous.start_sequence : chunk.constFirst().sequence;
+    summary.end_sequence = chunk.constLast().sequence;
+    summary.created_at = now_utc_iso_string();
+    summary.content = truncate_for_context(lines.join(QStringLiteral("\n")), kSummaryMaxChars);
+    summary.metadata = QJsonObject{{QStringLiteral("previousSummaryId"), previous.summary_id},
                                    {QStringLiteral("chunkMessageCount"), chunk.size()},
                                    {QStringLiteral("artifactCount"), artifacts.size()}};
     return summary;
 }
 
-QString ChatContextManager::databasePathForWorkspace() const
+QString chat_context_manager_t::database_path_for_workspace() const
 {
-    return sidecarPathForWorkspace(m_workspaceRoot, QStringLiteral("chat-context"));
+    return sidecar_path_for_workspace(this->workspace_root, QStringLiteral("chat-context"));
 }
 
-QString ChatContextManager::artifactPathForWorkspace() const
+QString chat_context_manager_t::artifact_path_for_workspace() const
 {
-    return sidecarPathForWorkspace(m_workspaceRoot, QStringLiteral("artifacts"));
+    return sidecar_path_for_workspace(this->workspace_root, QStringLiteral("artifacts"));
 }
 
 }  // namespace qcai2

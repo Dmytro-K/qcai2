@@ -12,84 +12,84 @@ namespace qcai2
 /**
  * @brief Constructs the logger with logging disabled by default.
  */
-Logger::Logger() = default;
+logger_t::logger_t() = default;
 
-Logger &Logger::instance()
+logger_t &logger_t::instance()
 {
-    static Logger s;
+    static logger_t s;
     return s;
 }
 
-void Logger::setEnabled(bool enabled)
+void logger_t::set_enabled(bool enabled)
 {
-    m_enabled = enabled;
+    this->enabled = enabled;
 }
 
-void Logger::log(Level level, const QString &category, const QString &message)
+void logger_t::log(level_t level, const QString &category, const QString &message)
 {
     // Errors are always logged regardless of enabled flag
-    if (((!m_enabled && level != Error) == true))
+    if (((!this->enabled && level != ERROR) == true))
     {
         return;
     }
 
-    const QString entry = format(level, category, message);
+    const QString entry = this->format(level, category, message);
 
     {
-        QMutexLocker lock(&m_mutex);
-        m_entries.append(entry);
-        if (((m_entries.size() > kMaxEntries) == true))
+        QMutexLocker lock(&this->mutex);
+        this->retained_entries.append(entry);
+        if (((this->retained_entries.size() > k_max_entries) == true))
         {
-            m_entries.removeFirst();
+            this->retained_entries.removeFirst();
         }
     }
 
-    emit entryAdded(entry);
+    emit this->entry_added(entry);
 }
 
-void Logger::debug(const QString &category, const QString &message)
+void logger_t::debug(const QString &category, const QString &message)
 {
-    log(Debug, category, message);
+    this->log(DEBUG, category, message);
 }
 
-void Logger::info(const QString &category, const QString &message)
+void logger_t::info(const QString &category, const QString &message)
 {
-    log(Info, category, message);
+    this->log(INFO, category, message);
 }
 
-void Logger::warn(const QString &category, const QString &message)
+void logger_t::warn(const QString &category, const QString &message)
 {
-    log(Warning, category, message);
+    this->log(WARNING, category, message);
 }
 
-void Logger::error(const QString &category, const QString &message)
+void logger_t::error(const QString &category, const QString &message)
 {
-    log(Error, category, message);
+    this->log(ERROR, category, message);
 }
 
-QStringList Logger::entries() const
+QStringList logger_t::log_entries() const
 {
-    QMutexLocker lock(&m_mutex);
-    return m_entries;
+    QMutexLocker lock(&this->mutex);
+    return this->retained_entries;
 }
 
-void Logger::clear()
+void logger_t::clear()
 {
-    QMutexLocker lock(&m_mutex);
-    m_entries.clear();
+    QMutexLocker lock(&this->mutex);
+    this->retained_entries.clear();
 }
 
-QString Logger::levelStr(Level level)
+QString logger_t::level_str(level_t level)
 {
     switch (level)
     {
-        case Debug:
+        case DEBUG:
             return QStringLiteral("DBG");
-        case Info:
+        case INFO:
             return QStringLiteral("INF");
-        case Warning:
+        case WARNING:
             return QStringLiteral("WRN");
-        case Error:
+        case ERROR:
             return QStringLiteral("ERR");
     }
     return QStringLiteral("???");
@@ -102,11 +102,11 @@ QString Logger::levelStr(Level level)
  * @param message Message payload to append after the metadata.
  * @return Timestamped, formatted log entry.
  */
-QString Logger::format(Level level, const QString &category, const QString &message) const
+QString logger_t::format(level_t level, const QString &category, const QString &message) const
 {
     return QStringLiteral("[%1] [%2] [%3] %4")
         .arg(QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss.zzz")),
-             levelStr(level), category, message);
+             this->level_str(level), category, message);
 }
 
 }  // namespace qcai2

@@ -12,13 +12,14 @@
 namespace qcai2
 {
 
-class IProviderProgressAdapter
+class i_provider_progress_adapter_t
 {
 public:
-    virtual ~IProviderProgressAdapter() = default;
-    virtual QList<AgentProgressEvent> adapt(const ProviderRawEvent &event) = 0;
+    virtual ~i_provider_progress_adapter_t() = default;
+    virtual QList<agent_progress_event_t> adapt(const provider_raw_event_t &event) = 0;
 };
 
-std::unique_ptr<IProviderProgressAdapter> createProviderProgressAdapter(const QString &providerId);
+std::unique_ptr<i_provider_progress_adapter_t>
+create_provider_progress_adapter(const QString &provider_id);
 
 }  // namespace qcai2

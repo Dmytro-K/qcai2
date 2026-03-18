@@ -12,7 +12,7 @@ namespace qcai2
 namespace
 {
 
-int firstNonNegative(std::initializer_list<int> values)
+int first_non_negative(std::initializer_list<int> values)
 {
     for (const int value : values)
     {
@@ -24,18 +24,18 @@ int firstNonNegative(std::initializer_list<int> values)
     return -1;
 }
 
-QString formatDurationPart(std::int64_t durationMs)
+QString format_duration_part(std::int64_t duration_ms)
 {
-    if (durationMs < 0)
+    if (duration_ms < 0)
     {
         return {};
     }
-    if (durationMs < 1000)
+    if (duration_ms < 1000)
     {
-        return QStringLiteral("time %1 ms").arg(durationMs);
+        return QStringLiteral("time %1 ms").arg(duration_ms);
     }
 
-    const double seconds = static_cast<double>(durationMs) / 1000.0;
+    const double seconds = static_cast<double>(duration_ms) / 1000.0;
     if (seconds < 10.0)
     {
         return QStringLiteral("time %1 s").arg(QString::number(seconds, 'f', 2));
@@ -45,98 +45,98 @@ QString formatDurationPart(std::int64_t durationMs)
         return QStringLiteral("time %1 s").arg(QString::number(seconds, 'f', 1));
     }
 
-    const qint64 totalSeconds = durationMs / 1000;
+    const qint64 totalSeconds = duration_ms / 1000;
     const qint64 minutes = totalSeconds / 60;
-    const qint64 remainingSeconds = totalSeconds % 60;
+    const qint64 remaining_seconds = totalSeconds % 60;
     return QStringLiteral("time %1m %2s")
         .arg(minutes)
-        .arg(remainingSeconds, 2, 10, QLatin1Char('0'));
+        .arg(remaining_seconds, 2, 10, QLatin1Char('0'));
 }
 
 }  // namespace
 
-bool ProviderUsage::hasAny() const
+bool provider_usage_t::has_any() const
 {
-    return inputTokens >= 0 || outputTokens >= 0 || totalTokens >= 0 || reasoningTokens >= 0 ||
-           cachedInputTokens >= 0;
+    return input_tokens >= 0 || output_tokens >= 0 || total_tokens >= 0 || reasoning_tokens >= 0 ||
+           cached_input_tokens >= 0;
 }
 
-int ProviderUsage::resolvedTotalTokens() const
+int provider_usage_t::resolved_total_tokens() const
 {
-    if (((totalTokens >= 0) == true))
+    if (((total_tokens >= 0) == true))
     {
-        return totalTokens;
+        return total_tokens;
     }
-    if (((inputTokens >= 0 && outputTokens >= 0) == true))
+    if (((input_tokens >= 0 && output_tokens >= 0) == true))
     {
-        return inputTokens + outputTokens;
+        return input_tokens + output_tokens;
     }
     return -1;
 }
 
-ProviderUsage providerUsageFromResponseObject(const QJsonObject &responseObject)
+provider_usage_t provider_usage_from_response_object(const QJsonObject &response_object)
 {
-    QJsonObject usageObject = responseObject.value(QStringLiteral("usage")).toObject();
-    if (usageObject.isEmpty() == true)
+    QJsonObject usage_object = response_object.value(QStringLiteral("usage")).toObject();
+    if (usage_object.isEmpty() == true)
     {
-        usageObject = responseObject;
+        usage_object = response_object;
     }
 
-    ProviderUsage usage;
-    usage.inputTokens =
-        firstNonNegative({Json::getInt(usageObject, QStringLiteral("input_tokens"), -1),
-                          Json::getInt(usageObject, QStringLiteral("prompt_tokens"), -1)});
-    usage.outputTokens =
-        firstNonNegative({Json::getInt(usageObject, QStringLiteral("output_tokens"), -1),
-                          Json::getInt(usageObject, QStringLiteral("completion_tokens"), -1)});
-    usage.totalTokens = Json::getInt(usageObject, QStringLiteral("total_tokens"), -1);
-    usage.reasoningTokens = firstNonNegative(
-        {Json::getInt(usageObject, QStringLiteral("reasoning_tokens"), -1),
-         Json::getInt(usageObject, QStringLiteral("output_tokens_details/reasoning_tokens"), -1),
-         Json::getInt(usageObject, QStringLiteral("completion_tokens_details/reasoning_tokens"),
-                      -1)});
-    usage.cachedInputTokens = firstNonNegative(
-        {Json::getInt(usageObject, QStringLiteral("cached_input_tokens"), -1),
-         Json::getInt(usageObject, QStringLiteral("input_tokens_details/cached_tokens"), -1),
-         Json::getInt(usageObject, QStringLiteral("prompt_tokens_details/cached_tokens"), -1)});
+    provider_usage_t usage;
+    usage.input_tokens =
+        first_non_negative({json::get_int(usage_object, QStringLiteral("input_tokens"), -1),
+                            json::get_int(usage_object, QStringLiteral("prompt_tokens"), -1)});
+    usage.output_tokens =
+        first_non_negative({json::get_int(usage_object, QStringLiteral("output_tokens"), -1),
+                            json::get_int(usage_object, QStringLiteral("completion_tokens"), -1)});
+    usage.total_tokens = json::get_int(usage_object, QStringLiteral("total_tokens"), -1);
+    usage.reasoning_tokens = first_non_negative(
+        {json::get_int(usage_object, QStringLiteral("reasoning_tokens"), -1),
+         json::get_int(usage_object, QStringLiteral("output_tokens_details/reasoning_tokens"), -1),
+         json::get_int(usage_object, QStringLiteral("completion_tokens_details/reasoning_tokens"),
+                       -1)});
+    usage.cached_input_tokens = first_non_negative(
+        {json::get_int(usage_object, QStringLiteral("cached_input_tokens"), -1),
+         json::get_int(usage_object, QStringLiteral("input_tokens_details/cached_tokens"), -1),
+         json::get_int(usage_object, QStringLiteral("prompt_tokens_details/cached_tokens"), -1)});
     return usage;
 }
 
-QString formatProviderUsageSummary(const ProviderUsage &usage, std::int64_t durationMs)
+QString format_provider_usage_summary(const provider_usage_t &usage, std::int64_t duration_ms)
 {
-    if ((usage.hasAny() == false) && (durationMs < 0))
+    if ((usage.has_any() == false) && (duration_ms < 0))
     {
         return {};
     }
 
     QStringList parts;
-    if (((usage.inputTokens >= 0) == true))
+    if (((usage.input_tokens >= 0) == true))
     {
-        parts.append(QStringLiteral("input %1").arg(usage.inputTokens));
+        parts.append(QStringLiteral("input %1").arg(usage.input_tokens));
     }
-    if (((usage.outputTokens >= 0) == true))
+    if (((usage.output_tokens >= 0) == true))
     {
-        parts.append(QStringLiteral("output %1").arg(usage.outputTokens));
-    }
-
-    const int totalTokens = usage.resolvedTotalTokens();
-    if (((totalTokens >= 0) == true))
-    {
-        parts.append(QStringLiteral("total %1").arg(totalTokens));
-    }
-    if (((usage.reasoningTokens >= 0) == true))
-    {
-        parts.append(QStringLiteral("reasoning %1").arg(usage.reasoningTokens));
-    }
-    if (((usage.cachedInputTokens >= 0) == true))
-    {
-        parts.append(QStringLiteral("cached input %1").arg(usage.cachedInputTokens));
+        parts.append(QStringLiteral("output %1").arg(usage.output_tokens));
     }
 
-    const QString durationPart = formatDurationPart(durationMs);
-    if (durationPart.isEmpty() == false)
+    const int total_tokens = usage.resolved_total_tokens();
+    if (((total_tokens >= 0) == true))
     {
-        parts.append(durationPart);
+        parts.append(QStringLiteral("total %1").arg(total_tokens));
+    }
+    if (((usage.reasoning_tokens >= 0) == true))
+    {
+        parts.append(QStringLiteral("reasoning %1").arg(usage.reasoning_tokens));
+    }
+    if (((usage.cached_input_tokens >= 0) == true))
+    {
+        parts.append(QStringLiteral("cached input %1").arg(usage.cached_input_tokens));
+    }
+
+    const QString duration_part = format_duration_part(duration_ms);
+    if (duration_part.isEmpty() == false)
+    {
+        parts.append(duration_part);
     }
 
     return parts.join(QStringLiteral(" | "));

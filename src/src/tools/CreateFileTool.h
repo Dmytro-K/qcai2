@@ -8,7 +8,7 @@ namespace qcai2
 /**
  * Tool that creates a new file inside the project tree.
  */
-class CreateFileTool : public ITool
+class create_file_tool_t : public i_tool_t
 {
 public:
     /**
@@ -33,19 +33,19 @@ public:
     /**
      * Returns the JSON schema for create_file arguments.
      */
-    QJsonObject argsSchema() const override;
+    QJsonObject args_schema() const override;
 
     /**
      * Creates a new file with the given content inside the sandbox.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
-    QString execute(const QJsonObject &args, const QString &workDir) override;
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 
     /**
      * File creation requires approval.
      */
-    bool requiresApproval() const override
+    bool requires_approval() const override
     {
         return true;
     }

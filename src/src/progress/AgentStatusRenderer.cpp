@@ -8,28 +8,28 @@
 namespace qcai2
 {
 
-AgentStatusRenderer::AgentStatusRenderer(AgentStatusRenderMode mode) : m_mode(mode)
+agent_status_renderer_t::agent_status_renderer_t(agent_status_render_mode_t mode) : mode(mode)
 {
 }
 
-AgentStatusRenderUpdate AgentStatusRenderer::render(const AgentStatusSnapshot &status)
+agent_status_render_update_t agent_status_renderer_t::render(const agent_status_snapshot_t &status)
 {
-    AgentStatusRenderUpdate update;
-    const QString text = formatAgentStatus(status);
+    agent_status_render_update_t update;
+    const QString text = format_agent_status(status);
 
-    if (text == m_lastRenderedText)
+    if (text == this->last_rendered_text)
     {
         return update;
     }
 
-    m_lastRenderedText = text;
-    update.statusChanged = true;
-    update.statusText = text;
+    this->last_rendered_text = text;
+    update.status_changed = true;
+    update.status_text = text;
 
-    if (m_mode == AgentStatusRenderMode::NonInteractive)
+    if (this->mode == agent_status_render_mode_t::NON_INTERACTIVE)
     {
         QJsonObject root{{QStringLiteral("type"), QStringLiteral("agent_status")},
-                         {QStringLiteral("phase"), agentStatusKindName(status.kind)},
+                         {QStringLiteral("phase"), agent_status_kind_name(status.kind)},
                          {QStringLiteral("text"), text}};
         if (status.subject.isEmpty() == false)
         {
@@ -39,16 +39,16 @@ AgentStatusRenderUpdate AgentStatusRenderer::render(const AgentStatusSnapshot &s
         {
             root.insert(QStringLiteral("message"), status.message);
         }
-        update.stableLogLine =
+        update.stable_log_line =
             QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact));
     }
 
     return update;
 }
 
-QString AgentStatusRenderer::currentText() const
+QString agent_status_renderer_t::current_text() const
 {
-    return m_lastRenderedText;
+    return this->last_rendered_text;
 }
 
 }  // namespace qcai2

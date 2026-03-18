@@ -5,75 +5,76 @@
 namespace qcai2
 {
 
-AgentProgressTracker::AgentProgressTracker(const QString &providerId, AgentStatusRenderMode mode,
-                                           bool verbose)
-    : m_adapter(createProviderProgressAdapter(providerId)), m_renderer(mode), m_verbose(verbose)
+agent_progress_tracker_t::agent_progress_tracker_t(const QString &provider_id,
+                                                   agent_status_render_mode_t mode, bool verbose)
+    : adapter(create_provider_progress_adapter(provider_id)), renderer(mode), verbose(verbose)
 {
 }
 
-AgentProgressRenderResult
-AgentProgressTracker::handleProviderRawEvent(const ProviderRawEvent &event)
+agent_progress_render_result_t
+agent_progress_tracker_t::handle_provider_raw_event(const provider_raw_event_t &event)
 {
-    AgentProgressRenderResult result;
-    const QList<AgentProgressEvent> normalizedEvents = m_adapter->adapt(event);
-    for (const AgentProgressEvent &normalizedEvent : normalizedEvents)
+    agent_progress_render_result_t result;
+    const QList<agent_progress_event_t> normalized_events = this->adapter->adapt(event);
+    for (const agent_progress_event_t &normalized_event : normalized_events)
     {
-        result = merge(result, applyNormalizedEvent(normalizedEvent, &event));
+        result = this->merge(result, this->apply_normalized_event(normalized_event, &event));
     }
     return result;
 }
 
-AgentProgressRenderResult
-AgentProgressTracker::handleNormalizedEvent(const AgentProgressEvent &event)
+agent_progress_render_result_t
+agent_progress_tracker_t::handle_normalized_event(const agent_progress_event_t &event)
 {
-    return applyNormalizedEvent(event, nullptr);
+    return this->apply_normalized_event(event, nullptr);
 }
 
-QString AgentProgressTracker::currentStatusText() const
+QString agent_progress_tracker_t::current_status_text() const
 {
-    return m_renderer.currentText();
+    return this->renderer.current_text();
 }
 
-AgentProgressRenderResult AgentProgressTracker::merge(const AgentProgressRenderResult &lhs,
-                                                      const AgentProgressRenderResult &rhs) const
+agent_progress_render_result_t
+agent_progress_tracker_t::merge(const agent_progress_render_result_t &lhs,
+                                const agent_progress_render_result_t &rhs) const
 {
-    AgentProgressRenderResult merged = lhs;
-    if (rhs.statusChanged == true)
+    agent_progress_render_result_t merged = lhs;
+    if (rhs.status_changed == true)
     {
-        merged.statusChanged = true;
-        merged.statusText = rhs.statusText;
+        merged.status_changed = true;
+        merged.status_text = rhs.status_text;
     }
-    if (rhs.stableLogLine.isEmpty() == false)
+    if (rhs.stable_log_line.isEmpty() == false)
     {
-        merged.stableLogLine = rhs.stableLogLine;
+        merged.stable_log_line = rhs.stable_log_line;
     }
-    merged.debugLines.append(rhs.debugLines);
+    merged.debug_lines.append(rhs.debug_lines);
     return merged;
 }
 
-AgentProgressRenderResult
-AgentProgressTracker::applyNormalizedEvent(const AgentProgressEvent &event,
-                                           const ProviderRawEvent *rawEvent)
+agent_progress_render_result_t
+agent_progress_tracker_t::apply_normalized_event(const agent_progress_event_t &event,
+                                                 const provider_raw_event_t *raw_event)
 {
-    AgentProgressRenderResult result;
-    AgentStatusSnapshot changedStatus;
-    const bool statusChanged = m_classifier.apply(event, &changedStatus);
-    if (statusChanged == true)
+    agent_progress_render_result_t result;
+    agent_status_snapshot_t changed_status;
+    const bool status_changed = this->classifier.apply(event, &changed_status);
+    if (status_changed == true)
     {
-        const AgentStatusRenderUpdate renderUpdate = m_renderer.render(changedStatus);
-        result.statusChanged = renderUpdate.statusChanged;
-        result.statusText = renderUpdate.statusText;
-        result.stableLogLine = renderUpdate.stableLogLine;
+        const agent_status_render_update_t render_update = this->renderer.render(changed_status);
+        result.status_changed = render_update.status_changed;
+        result.status_text = render_update.status_text;
+        result.stable_log_line = render_update.stable_log_line;
     }
 
-    if (m_verbose == true)
+    if (this->verbose == true)
     {
-        const QString rawType = (rawEvent != nullptr) ? rawEvent->rawType : event.rawType;
-        result.debugLines.append(
+        const QString raw_type = (raw_event != nullptr) ? raw_event->raw_type : event.raw_type;
+        result.debug_lines.append(
             QStringLiteral("raw=%1 normalized=%2 status=%3")
-                .arg(rawType.isEmpty() == false ? rawType : QStringLiteral("controller"),
-                     agentProgressEventKindName(event.kind),
-                     formatAgentStatus(m_classifier.currentStatus())));
+                .arg(raw_type.isEmpty() == false ? raw_type : QStringLiteral("controller"),
+                     agent_progress_event_kind_name(event.kind),
+                     format_agent_status(this->classifier.current_status())));
     }
 
     return result;

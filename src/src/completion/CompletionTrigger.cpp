@@ -17,92 +17,92 @@
 namespace Qcai2
 {
 
-CompletionTrigger::CompletionTrigger(AiCompletionProvider *provider, QObject *parent)
-    : QObject(parent), m_provider(provider)
+completion_trigger_t::completion_trigger_t(ai_completion_provider_t *provider, QObject *parent)
+    : QObject(parent), provider(provider)
 {
-    m_startupTimer.start();
+    this->startupTimer.start();
 
-    m_timer.setSingleShot(true);
-    connect(&m_timer, &QTimer::timeout, this, [this]() {
-        if (!m_pendingEditor || !m_provider || !m_provider->isEnabled())
+    this->timer.setSingleShot(true);
+    connect(&this->timer, &QTimer::timeout, this, [this]() {
+        if (!this->pendingEditor || !this->provider || !this->provider->isEnabled())
             return;
 
         // Don't trigger during startup (first 10 seconds)
-        if (m_startupTimer.elapsed() < 10000)
+        if (this->startupTimer.elapsed() < 10000)
         {
-            m_pendingEditor = nullptr;
+            this->pendingEditor = nullptr;
             return;
         }
 
         // Safety: editor must be visible and have focus
-        if (!m_pendingEditor->isVisible() || !m_pendingEditor->hasFocus())
+        if (!this->pendingEditor->isVisible() || !this->pendingEditor->hasFocus())
         {
-            m_pendingEditor = nullptr;
+            this->pendingEditor = nullptr;
             return;
         }
 
         const auto &s = settings();
-        const int wordLen = wordLengthAtCursor(m_pendingEditor);
+        const int wordLen = this->wordLengthAtCursor(this->pendingEditor);
         if (wordLen >= s.completionMinChars)
         {
             QCAI_DEBUG(
                 "Trigger",
                 QStringLiteral("Auto-triggering completion: %1 chars at cursor").arg(wordLen));
             // Pass our provider explicitly to avoid nullptr dereference in CodeAssistant
-            m_pendingEditor->invokeAssist(TextEditor::Completion, m_provider);
+            this->pendingEditor->invokeAssist(TextEditor::Completion, this->provider);
         }
-        m_pendingEditor = nullptr;
+        this->pendingEditor = nullptr;
     });
 }
 
-void CompletionTrigger::attachToEditor(TextEditor::TextEditorWidget *editor)
+void completion_trigger_t::attachToEditor(TextEditor::TextEditorWidget *editor)
 {
-    if (!editor || m_attached.contains(editor))
+    if (!editor || this->attached.contains(editor))
         return;
 
-    m_attached.insert(editor);
+    this->attached.insert(editor);
 
     // Use contentsChanged — safe with FakeVim and other event filter plugins.
     // Use QueuedConnection to avoid triggering during initial document load.
     connect(
         editor->document(), &QTextDocument::contentsChanged, this,
-        [this, editor]() { onTextChanged(editor); }, Qt::QueuedConnection);
+        [this, editor]() { this->onTextChanged(editor); }, Qt::QueuedConnection);
 
     // Clean up when editor is destroyed
     connect(editor, &QObject::destroyed, this, [this, editor]() {
-        m_attached.remove(editor);
-        m_initialized.remove(editor);
-        if (m_pendingEditor == editor)
+        this->attached.remove(editor);
+        this->initialized.remove(editor);
+        if (this->pendingEditor == editor)
         {
-            m_pendingEditor = nullptr;
-            m_timer.stop();
+            this->pendingEditor = nullptr;
+            this->timer.stop();
         }
     });
 
     QCAI_DEBUG("Trigger", QStringLiteral("Attached to editor widget (via contentsChanged)"));
 }
 
-void CompletionTrigger::onTextChanged(TextEditor::TextEditorWidget *editor)
+void completion_trigger_t::onTextChanged(TextEditor::TextEditorWidget *editor)
 {
     // Skip the first contentsChanged per editor (initial document load)
-    if (!m_initialized.contains(editor))
+    if (!this->initialized.contains(editor))
     {
-        m_initialized.insert(editor);
+        this->initialized.insert(editor);
         return;
     }
 
-    if (!m_provider || !m_provider->isEnabled())
+    if (!this->provider || !this->provider->isEnabled())
         return;
 
     const auto &s = settings();
     if (!s.aiCompletionEnabled)
         return;
 
-    m_pendingEditor = editor;
-    m_timer.start(s.completionDelayMs);
+    this->pendingEditor = editor;
+    this->timer.start(s.completionDelayMs);
 }
 
-int CompletionTrigger::wordLengthAtCursor(TextEditor::TextEditorWidget *editor) const
+int completion_trigger_t::wordLengthAtCursor(TextEditor::TextEditorWidget *editor) const
 {
     QTextCursor tc = editor->textCursor();
     const int pos = tc.position();

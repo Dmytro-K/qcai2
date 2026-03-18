@@ -12,7 +12,7 @@ namespace qcai2
  * @param workDir Repository root for the git command.
  * @return Porcelain status output or an error string.
  */
-QString GitStatusTool::execute(const QJsonObject & /*args*/, const QString &workDir)
+QString git_status_tool_t::execute(const QJsonObject & /*args*/, const QString &work_dir)
 {
     const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));
     if (git.isEmpty() == true)
@@ -20,21 +20,22 @@ QString GitStatusTool::execute(const QJsonObject & /*args*/, const QString &work
         return QStringLiteral("Error: git not found on PATH.");
     }
 
-    ProcessRunner runner;
-    auto res = runner.run(git, {QStringLiteral("status"), QStringLiteral("--porcelain")}, workDir);
+    process_runner_t runner;
+    auto res =
+        runner.run(git, {QStringLiteral("status"), QStringLiteral("--porcelain")}, work_dir);
 
     if (((!res.success) == true))
     {
-        return QStringLiteral("Error: git status failed: %1").arg(res.stdErr);
+        return QStringLiteral("Error: git status failed: %1").arg(res.std_err);
     }
 
-    return res.stdOut.isEmpty() ? QStringLiteral("Working tree clean.") : res.stdOut;
+    return res.std_out.isEmpty() ? QStringLiteral("Working tree clean.") : res.std_out;
 }
 
 /**
  * Returns the JSON schema for optional git diff arguments.
  */
-QJsonObject GitDiffTool::argsSchema() const
+QJsonObject git_diff_tool_t::args_schema() const
 {
     return QJsonObject{
         {"path", QJsonObject{{"type", "string"}, {"description", "Optional file path to diff"}}}};
@@ -46,7 +47,7 @@ QJsonObject GitDiffTool::argsSchema() const
  * @param workDir Repository root for the git command.
  * @return Diff text or an error string.
  */
-QString GitDiffTool::execute(const QJsonObject &args, const QString &workDir)
+QString git_diff_tool_t::execute(const QJsonObject &args, const QString &work_dir)
 {
     const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));
     if (git.isEmpty() == true)
@@ -54,22 +55,22 @@ QString GitDiffTool::execute(const QJsonObject &args, const QString &workDir)
         return QStringLiteral("Error: git not found on PATH.");
     }
 
-    QStringList gitArgs = {QStringLiteral("diff")};
+    QStringList git_args = {QStringLiteral("diff")};
     const QString path = args.value("path").toString();
     if (path.isEmpty() == false)
     {
-        gitArgs << QStringLiteral("--") << path;
+        git_args << QStringLiteral("--") << path;
     }
 
-    ProcessRunner runner;
-    auto res = runner.run(git, gitArgs, workDir);
+    process_runner_t runner;
+    auto res = runner.run(git, git_args, work_dir);
 
     if (((!res.success) == true))
     {
-        return QStringLiteral("Error: git diff failed: %1").arg(res.stdErr);
+        return QStringLiteral("Error: git diff failed: %1").arg(res.std_err);
     }
 
-    return res.stdOut.isEmpty() ? QStringLiteral("No differences.") : res.stdOut;
+    return res.std_out.isEmpty() ? QStringLiteral("No differences.") : res.std_out;
 }
 
 }  // namespace qcai2

@@ -9,7 +9,7 @@
 #include <QJsonValue>
 #include <QString>
 
-namespace qcai2::Json
+namespace qcai2::json
 {
 
 /**
@@ -19,7 +19,7 @@ namespace qcai2::Json
  * @param def Fallback returned when the path is missing or not a string.
  * @return Resolved string value or @p def when traversal fails.
  */
-QString getString(const QJsonObject &root, const QString &path, const QString &def = {});
+QString get_string(const QJsonObject &root, const QString &path, const QString &def = {});
 
 /**
  * @brief Reads an integer-like value from a slash-delimited JSON path.
@@ -28,14 +28,14 @@ QString getString(const QJsonObject &root, const QString &path, const QString &d
  * @param def Fallback returned when the path is missing or not numeric.
  * @return Integer conversion of the resolved value or @p def.
  */
-int getInt(const QJsonObject &root, const QString &path, int def = 0);
+int get_int(const QJsonObject &root, const QString &path, int def = 0);
 
 /**
  * @brief Builds a one-field JSON object that carries an error string.
  * @param message Human-readable error description.
  * @return JSON object containing an @c error property.
  */
-QJsonObject errorObject(const QString &message);
+QJsonObject error_object(const QString &message);
 
 /**
  * @brief Invokes a callable for each object element in an array.
@@ -43,7 +43,7 @@ QJsonObject errorObject(const QString &message);
  * @param arr Array to scan.
  * @param fn Callable invoked only for entries whose value is an object.
  */
-template <typename Fn> void forEachObject(const QJsonArray &arr, Fn &&fn)
+template <typename Fn> void for_each_object(const QJsonArray &arr, Fn &&fn)
 {
     for (const auto &v : arr)
     {
@@ -58,4 +58,4 @@ template <typename Fn> void forEachObject(const QJsonArray &arr, Fn &&fn)
     }
 }
 
-}  // namespace qcai2::Json
+}  // namespace qcai2::json

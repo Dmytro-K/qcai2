@@ -8,6 +8,6 @@
 namespace qcai2
 {
 
-QString formatAgentStatus(const AgentStatusSnapshot &status);
+QString format_agent_status(const agent_status_snapshot_t &status);
 
 }  // namespace qcai2

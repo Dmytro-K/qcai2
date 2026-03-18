@@ -8,38 +8,38 @@
 namespace qtmcp
 {
 
-class Transport : public QObject
+class transport_t : public QObject
 {
     Q_OBJECT
 
 public:
-    enum class State
+    enum class state_t
     {
-        Disconnected,
-        Starting,
-        Connected,
-        Stopping,
+        DISCONNECTED,
+        STARTING,
+        CONNECTED,
+        STOPPING,
     };
-    Q_ENUM(State)
+    Q_ENUM(state_t)
 
-    explicit Transport(QObject *parent = nullptr);
-    ~Transport() override;
+    explicit transport_t(QObject *parent = nullptr);
+    ~transport_t() override;
 
-    virtual QString transportName() const = 0;
-    virtual State state() const = 0;
+    virtual QString transport_name() const = 0;
+    virtual state_t state() const = 0;
     virtual void start() = 0;
     virtual void stop() = 0;
-    virtual bool sendMessage(const QJsonObject &message) = 0;
+    virtual bool send_message(const QJsonObject &message) = 0;
 
 signals:
     void started();
     void stopped();
-    void stateChanged(qtmcp::Transport::State state);
-    void messageReceived(const QJsonObject &message);
-    void errorOccurred(const QString &message);
-    void logMessage(const QString &message);
+    void state_changed(qtmcp::transport_t::state_t state);
+    void message_received(const QJsonObject &message);
+    void error_occurred(const QString &message);
+    void log_message(const QString &message);
 };
 
 }  // namespace qtmcp
 
-Q_DECLARE_METATYPE(qtmcp::Transport::State)
+Q_DECLARE_METATYPE(qtmcp::transport_t::state_t)

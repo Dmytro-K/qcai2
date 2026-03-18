@@ -8,7 +8,7 @@ namespace qcai2
 /**
  * Tool that searches for symbols using Qt Creator's locator infrastructure.
  */
-class FindSymbolTool : public ITool
+class find_symbol_tool_t : public i_tool_t
 {
 public:
     /**
@@ -33,14 +33,14 @@ public:
     /**
      * Returns the JSON schema for find_symbol arguments.
      */
-    QJsonObject argsSchema() const override;
+    QJsonObject args_schema() const override;
 
     /**
      * Searches for symbols via Qt Creator's CppLocatorFilter.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
-    QString execute(const QJsonObject &args, const QString &workDir) override;
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 };
 
 }  // namespace qcai2

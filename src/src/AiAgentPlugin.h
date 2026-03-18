@@ -6,26 +6,26 @@
 namespace qcai2
 {
 
-class AgentController;
-class AgentDockWidget;
-class EditorContext;
-class ChatContextManager;
-class McpToolManager;
-class ToolRegistry;
-class SafetyPolicy;
-class IAIProvider;
-class AiCompletionProvider;
-class GhostTextManager;
-class CopilotProvider;
-class IdeOutputCapture;
+class agent_controller_t;
+class agent_dock_widget_t;
+class editor_context_t;
+class chat_context_manager_t;
+class mcp_tool_manager_t;
+class tool_registry_t;
+class safety_policy_t;
+class iai_provider_t;
+class ai_completion_provider_t;
+class ghost_text_manager_t;
+class copilot_provider_t;
+class ide_output_capture_t;
 
 namespace Internal
 {
 
-class AiAgentNavigationWidgetFactory;
+class ai_agent_navigation_widget_factory_t;
 
 /** Qt Creator plugin that assembles providers, tools, controller state, and UI. */
-class AiAgentPlugin final : public ExtensionSystem::IPlugin
+class ai_agent_plugin_t final : public ExtensionSystem::IPlugin
 {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QtCreatorPlugin" FILE "qcai2.json")
@@ -34,12 +34,12 @@ public:
     /**
      * Creates the plugin instance.
      */
-    AiAgentPlugin();
+    ai_agent_plugin_t();
 
     /**
      * Releases provider objects owned through QObject parentage.
      */
-    ~AiAgentPlugin() final;
+    ~ai_agent_plugin_t() final;
 
     /**
      * Initializes settings, tools, providers, and editor integrations.
@@ -60,66 +60,66 @@ private:
     /**
      * Activates the AI Agent sidebar widget once the main window is available.
      */
-    void showNavigationWidget();
+    void show_navigation_widget();
 
     /**
      * Activates the AI Agent sidebar widget and focuses the goal editor.
      */
-    void focusGoalInput();
+    void focus_goal_input();
 
     /**
      * Instantiates all supported providers and selects the active one.
      */
-    void setupProviders();
+    void setup_providers();
 
     /**
      * Refreshes the cached GitHub Copilot model list asynchronously.
      */
-    void refreshCopilotModels();
+    void refresh_copilot_models();
 
     /**
      * Registers the tool set exposed to the agent controller.
      */
-    void registerTools();
+    void register_tools();
 
     /** Agent loop coordinator shared with the dock widget. */
-    AgentController *m_controller = nullptr;
+    agent_controller_t *controller = nullptr;
 
     /** Captures active editor and project context for prompts. */
-    EditorContext *m_editorContext = nullptr;
+    editor_context_t *editor_context = nullptr;
 
     /** Owns persistent SQLite-backed chat context for each workspace. */
-    ChatContextManager *m_chatContextManager = nullptr;
+    chat_context_manager_t *chat_context_manager = nullptr;
 
     /** Loads configured MCP servers and exposes their tools at runtime. */
-    McpToolManager *m_mcpToolManager = nullptr;
+    mcp_tool_manager_t *mcp_tool_manager = nullptr;
 
     /** Registry that owns the tools available to the model. */
-    ToolRegistry *m_toolRegistry = nullptr;
+    tool_registry_t *tool_registry = nullptr;
 
     /** Safety limits applied to iterations, tool calls, and patch size. */
-    SafetyPolicy *m_safetyPolicy = nullptr;
+    safety_policy_t *safety_policy = nullptr;
 
     /** Provider currently selected in settings. */
-    IAIProvider *m_currentProvider = nullptr;
+    iai_provider_t *current_provider = nullptr;
 
     /** Provider instances available for chat and completion requests. */
-    QList<IAIProvider *> m_providers;
+    QList<iai_provider_t *> providers;
 
     /** Dedicated handle used to refresh GitHub Copilot model metadata. */
-    CopilotProvider *m_copilotProvider = nullptr;
+    copilot_provider_t *copilot_provider = nullptr;
 
     /** Completion assist provider attached to text documents. */
-    AiCompletionProvider *m_completionProvider = nullptr;
+    ai_completion_provider_t *completion_provider = nullptr;
 
     /** Ghost-text overlay manager attached to editor widgets. */
-    GhostTextManager *m_ghostTextManager = nullptr;
+    ghost_text_manager_t *ghost_text_manager = nullptr;
 
     /** Captures Qt Creator Compile Output and Application Output for agent tools. */
-    IdeOutputCapture *m_outputCapture = nullptr;
+    ide_output_capture_t *output_capture = nullptr;
 
     /** Sidebar factory that hosts the AI Agent inside Qt Creator navigation panels. */
-    AiAgentNavigationWidgetFactory *m_navigationWidgetFactory = nullptr;
+    ai_agent_navigation_widget_factory_t *navigation_widget_factory = nullptr;
 };
 
 }  // namespace Internal

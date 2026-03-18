@@ -10,7 +10,7 @@ namespace qcai2::Migration
 namespace
 {
 
-void appendUniqueStrings(QJsonArray &target, const QJsonArray &source)
+void append_unique_strings(QJsonArray &target, const QJsonArray &source)
 {
     for (const QJsonValue &value : source)
     {
@@ -39,20 +39,20 @@ void appendUniqueStrings(QJsonArray &target, const QJsonArray &source)
 
 }  // namespace
 
-bool migrateProjectStateTo_0_0_5_002(QJsonObject &root)
+bool migrate_project_state_to_0_0_5_002(QJsonObject &root)
 {
     if (((!root.contains(QStringLiteral("excludedDefaultLinkedFiles"))) == true))
     {
         return false;
     }
 
-    QJsonArray ignoredLinkedFiles;
-    appendUniqueStrings(ignoredLinkedFiles,
-                        root.value(QStringLiteral("ignoredLinkedFiles")).toArray());
-    appendUniqueStrings(ignoredLinkedFiles,
-                        root.value(QStringLiteral("excludedDefaultLinkedFiles")).toArray());
+    QJsonArray ignored_linked_files;
+    append_unique_strings(ignored_linked_files,
+                          root.value(QStringLiteral("ignoredLinkedFiles")).toArray());
+    append_unique_strings(ignored_linked_files,
+                          root.value(QStringLiteral("excludedDefaultLinkedFiles")).toArray());
 
-    root[QStringLiteral("ignoredLinkedFiles")] = ignoredLinkedFiles;
+    root[QStringLiteral("ignoredLinkedFiles")] = ignored_linked_files;
     root.remove(QStringLiteral("excludedDefaultLinkedFiles"));
     return true;
 }

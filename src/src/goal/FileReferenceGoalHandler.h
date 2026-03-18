@@ -11,19 +11,20 @@ namespace qcai2
 /**
  * Special-token handler that powers # file completion and highlighting.
  */
-class FileReferenceGoalHandler final : public GoalSpecialHandler
+class file_reference_goal_handler_t final : public goal_special_handler_t
 {
 public:
-    using CandidateProvider = std::function<QStringList()>;
+    using candidate_provider_t = std::function<QStringList()>;
 
-    explicit FileReferenceGoalHandler(CandidateProvider candidateProvider);
+    explicit file_reference_goal_handler_t(candidate_provider_t candidate_provider);
 
-    GoalCompletionSession completionSession(const GoalCompletionRequest &request) const override;
-    QList<GoalHighlightSpan> highlightSpans(const QString &text,
-                                            const QPalette &palette) const override;
+    goal_completion_session_t
+    completion_session(const goal_completion_request_t &request) const override;
+    QList<goal_highlight_span_t> highlight_spans(const QString &text,
+                                                 const QPalette &palette) const override;
 
 private:
-    CandidateProvider m_candidateProvider;
+    candidate_provider_t candidate_provider;
 };
 
 }  // namespace qcai2

@@ -14,7 +14,7 @@ namespace qcai2
 /**
  * Returns the JSON schema for search_repo arguments.
  */
-QJsonObject SearchRepoTool::argsSchema() const
+QJsonObject search_repo_tool_t::args_schema() const
 {
     return QJsonObject{{"pattern", QJsonObject{{"type", "string"}, {"required", true}}},
                        {"glob", QJsonObject{{"type", "string"}}},
@@ -27,7 +27,7 @@ QJsonObject SearchRepoTool::argsSchema() const
  * @param workDir Project root used as the search scope.
  * @return Matching lines or an error string.
  */
-QString SearchRepoTool::execute(const QJsonObject &args, const QString &workDir)
+QString search_repo_tool_t::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString pattern = args.value("pattern").toString();
     if (pattern.isEmpty() == true)
@@ -46,10 +46,10 @@ QString SearchRepoTool::execute(const QJsonObject &args, const QString &workDir)
     const QString rgPath = QStandardPaths::findExecutable(QStringLiteral("rg"));
     if (rgPath.isEmpty() == false)
     {
-        return searchWithRipgrep(pattern, glob, maxResults, workDir);
+        return this->search_with_ripgrep(pattern, glob, maxResults, workDir);
     }
 
-    return searchFallback(pattern, glob, maxResults, workDir);
+    return this->search_fallback(pattern, glob, maxResults, workDir);
 }
 
 /**
@@ -60,8 +60,8 @@ QString SearchRepoTool::execute(const QJsonObject &args, const QString &workDir)
  * @param workDir Project root used as the search scope.
  * @return Matching lines or an error string.
  */
-QString SearchRepoTool::searchWithRipgrep(const QString &pattern, const QString &glob,
-                                          int maxResults, const QString &workDir)
+QString search_repo_tool_t::search_with_ripgrep(const QString &pattern, const QString &glob,
+                                                int maxResults, const QString &workDir)
 {
     QStringList args;
     args << QStringLiteral("--no-heading") << QStringLiteral("--line-number")
@@ -74,19 +74,19 @@ QString SearchRepoTool::searchWithRipgrep(const QString &pattern, const QString 
 
     args << pattern << QStringLiteral(".");
 
-    ProcessRunner runner;
+    process_runner_t runner;
     auto result = runner.run(QStringLiteral("rg"), args, workDir, 15000);
 
-    if (result.exitCode == 1)
+    if (result.exit_code == 1)
     {
         return QStringLiteral("No matches found.");
     }
-    if (!result.success && result.exitCode != 1)
+    if (!result.success && result.exit_code != 1)
     {
-        return QStringLiteral("Error running rg: %1").arg(result.stdErr);
+        return QStringLiteral("Error running rg: %1").arg(result.std_err);
     }
 
-    return result.stdOut;
+    return result.std_out;
 }
 
 /**
@@ -97,8 +97,8 @@ QString SearchRepoTool::searchWithRipgrep(const QString &pattern, const QString 
  * @param workDir Project root used as the search scope.
  * @return Matching lines or an error string.
  */
-QString SearchRepoTool::searchFallback(const QString &pattern, const QString &glob, int maxResults,
-                                       const QString &workDir)
+QString search_repo_tool_t::search_fallback(const QString &pattern, const QString &glob,
+                                            int maxResults, const QString &workDir)
 {
     QRegularExpression re(pattern);
     if (re.isValid() == false)

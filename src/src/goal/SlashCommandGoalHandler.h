@@ -6,22 +6,23 @@
 namespace qcai2
 {
 
-class SlashCommandRegistry;
+class slash_command_registry_t;
 
 /**
  * Special-token handler that powers slash-command popup completions and styling.
  */
-class SlashCommandGoalHandler final : public GoalSpecialHandler
+class slash_command_goal_handler_t final : public goal_special_handler_t
 {
 public:
-    explicit SlashCommandGoalHandler(const SlashCommandRegistry *registry);
+    explicit slash_command_goal_handler_t(const slash_command_registry_t *registry);
 
-    GoalCompletionSession completionSession(const GoalCompletionRequest &request) const override;
-    QList<GoalHighlightSpan> highlightSpans(const QString &text,
-                                            const QPalette &palette) const override;
+    goal_completion_session_t
+    completion_session(const goal_completion_request_t &request) const override;
+    QList<goal_highlight_span_t> highlight_spans(const QString &text,
+                                                 const QPalette &palette) const override;
 
 private:
-    const SlashCommandRegistry *m_registry = nullptr;
+    const slash_command_registry_t *registry = nullptr;
 };
 
 }  // namespace qcai2

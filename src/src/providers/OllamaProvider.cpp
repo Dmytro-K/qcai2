@@ -7,10 +7,10 @@ namespace qcai2
  * Creates an Ollama provider pointed at the default localhost endpoint.
  * @param parent Parent QObject that owns this instance.
  */
-OllamaProvider::OllamaProvider(QObject *parent) : OpenAICompatibleProvider(parent)
+ollama_provider_t::ollama_provider_t(QObject *parent) : open_ai_compatible_provider_t(parent)
 {
     // Default Ollama endpoint
-    setBaseUrl(QStringLiteral("http://localhost:11434"));
+    set_base_url(QStringLiteral("http://localhost:11434"));
 }
 
 }  // namespace qcai2

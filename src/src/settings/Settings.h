@@ -12,106 +12,106 @@ namespace qcai2
 /**
  * Stores persistent plugin settings loaded from QSettings.
  */
-struct Settings
+struct settings_t
 {
     /** Selected backend identifier. */
     QString provider = QStringLiteral("openai");
 
     /** Base URL for OpenAI-compatible providers. */
-    QString baseUrl = QStringLiteral("https://api.openai.com");
+    QString base_url = QStringLiteral("https://api.openai.com");
 
     /** API key for the active remote provider. */
-    QString apiKey;
+    QString api_key;
 
     /** Default model used for agent requests. */
-    QString modelName = QStringLiteral("gpt-5.2");
+    QString model_name = QStringLiteral("gpt-5.2");
 
     /** Provider reasoning effort: off, low, medium, or high. */
-    QString reasoningEffort = QStringLiteral("medium");
+    QString reasoning_effort = QStringLiteral("medium");
 
     /** Provider thinking level: off, low, medium, or high. */
-    QString thinkingLevel = QStringLiteral("medium");
+    QString thinking_level = QStringLiteral("medium");
 
     /** Sampling temperature for agent requests. */
     double temperature = 0.2;
 
     /** Maximum token budget for agent responses. */
-    int maxTokens = 4096;
+    int max_tokens = 4096;
 
     /** Base URL for the local HTTP provider. */
-    QString localBaseUrl = QStringLiteral("http://localhost:8080");
+    QString local_base_url = QStringLiteral("http://localhost:8080");
 
     /** Endpoint path appended to the local provider base URL. */
-    QString localEndpointPath = QStringLiteral("/v1/chat/completions");
+    QString local_endpoint_path = QStringLiteral("/v1/chat/completions");
 
     /** Sends local requests in simplified prompt mode when true. */
-    bool localSimpleMode = false;
+    bool local_simple_mode = false;
 
     /** Extra HTTP headers for the local provider. */
-    QString localCustomHeaders;
+    QString local_custom_headers;
 
     /** Base URL for the Ollama server. */
-    QString ollamaBaseUrl = QStringLiteral("http://localhost:11434");
+    QString ollama_base_url = QStringLiteral("http://localhost:11434");
 
     /** Default Ollama model name. */
-    QString ollamaModel = QStringLiteral("llama4");
+    QString ollama_model = QStringLiteral("llama4");
 
     /** Optional cached Copilot token. */
-    QString copilotToken;
+    QString copilot_token;
 
     /** Default model exposed by the Copilot sidecar. */
-    QString copilotModel = QStringLiteral("gpt-4o");
+    QString copilot_model = QStringLiteral("gpt-4o");
 
     /** Path to the Node.js executable used to launch the sidecar. */
-    QString copilotNodePath;
+    QString copilot_node_path;
 
     /** Optional explicit path to the Copilot sidecar script. */
-    QString copilotSidecarPath;
+    QString copilot_sidecar_path;
 
     /** Maximum Copilot completion wait time in seconds; 0 disables the timeout. */
-    int copilotCompletionTimeoutSec = 300;
+    int copilot_completion_timeout_sec = 300;
 
     /** Maximum agent loop iterations allowed per request. */
-    int maxIterations = 8;
+    int max_iterations = 8;
 
     /** Maximum number of tool calls allowed per request. */
-    int maxToolCalls = 25;
+    int max_tool_calls = 25;
 
     /** Maximum allowed changed lines before approval is required. */
-    int maxDiffLines = 300;
+    int max_diff_lines = 300;
 
     /** Maximum allowed changed files before approval is required. */
-    int maxChangedFiles = 10;
+    int max_changed_files = 10;
 
     /** Starts the agent in dry-run mode by default when true. */
-    bool dryRunDefault = true;
+    bool dry_run_default = true;
 
     /** Enables AI completion features inside the editor. */
-    bool aiCompletionEnabled = true;
+    bool ai_completion_enabled = true;
 
     /** Enables plugin debug logging. */
-    bool debugLogging = false;
+    bool debug_logging = false;
 
     /** Shows raw agent JSON payloads in chat when true. */
-    bool agentDebug = false;
+    bool agent_debug = false;
 
     /** Minimum identifier length that triggers auto-completion. */
-    int completionMinChars = 3;
+    int completion_min_chars = 3;
 
     /** Debounce delay for automatic completion requests, in milliseconds. */
-    int completionDelayMs = 500;
+    int completion_delay_ms = 500;
 
     /** Optional model override for code completion requests. */
-    QString completionModel;
+    QString completion_model;
 
     /** Completion thinking level: off, low, medium, or high. */
-    QString completionThinkingLevel = QStringLiteral("off");
+    QString completion_thinking_level = QStringLiteral("off");
 
     /** Completion reasoning effort: off, low, medium, or high. */
-    QString completionReasoningEffort = QStringLiteral("off");
+    QString completion_reasoning_effort = QStringLiteral("off");
 
     /** Globally configured MCP servers keyed by logical server name. */
-    qtmcp::ServerDefinitions mcpServers;
+    qtmcp::server_definitions_t mcp_servers;
 
     /**
      * Loads settings from QSettings.
@@ -124,28 +124,28 @@ struct Settings
     void save() const;
 };
 
-struct McpServerConnectionState
+struct mcp_server_connection_state_t
 {
     QString state;
     QString message;
 };
 
-using McpServerConnectionStates = QMap<QString, McpServerConnectionState>;
+using mcp_server_connection_states_t = QMap<QString, mcp_server_connection_state_t>;
 
 /**
  * Returns the process-wide settings singleton.
  * @return Shared settings instance.
  */
-Settings &settings();
+settings_t &settings();
 
-McpServerConnectionStates loadMcpServerConnectionStates(QString *error = nullptr);
-bool saveMcpServerConnectionStates(const McpServerConnectionStates &states,
-                                   QString *error = nullptr);
+mcp_server_connection_states_t load_mcp_server_connection_states(QString *error = nullptr);
+bool save_mcp_server_connection_states(const mcp_server_connection_states_t &states,
+                                       QString *error = nullptr);
 
 /**
  * Tracks user-visible model choices for provider-specific UIs.
  */
-class ModelCatalog : public QObject
+class model_catalog_t : public QObject
 {
     Q_OBJECT
 public:
@@ -153,44 +153,44 @@ public:
      * Creates a model catalog.
      * @param parent Owning QObject.
      */
-    explicit ModelCatalog(QObject *parent = nullptr);
+    explicit model_catalog_t(QObject *parent = nullptr);
 
     /**
      * Returns the current Copilot model list.
      * @return Normalized model names shown in the settings UI.
      */
-    QStringList copilotModels() const;
+    QStringList copilot_models() const;
 
     /**
      * Replaces the Copilot model list.
      * @param models Candidate model names.
      */
-    void setCopilotModels(const QStringList &models);
+    void set_copilot_models(const QStringList &models);
 
     /**
      * Returns the built-in default Copilot models.
      * @return Default model names used when no runtime list is available.
      */
-    static QStringList defaultCopilotModels();
+    static QStringList default_copilot_models();
 
 signals:
     /**
      * Emitted after the Copilot model list changes.
      * @param models Normalized model names exposed to the UI.
      */
-    void copilotModelsChanged(const QStringList &models);
+    void copilot_models_changed(const QStringList &models);
 
 private:
     /**
      * Current normalized Copilot model list.
      */
-    QStringList m_copilotModels;
+    QStringList available_copilot_models;
 };
 
 /**
  * Returns the process-wide model catalog singleton.
  * @return Shared model catalog instance.
  */
-ModelCatalog &modelCatalog();
+model_catalog_t &model_catalog();
 
 }  // namespace qcai2

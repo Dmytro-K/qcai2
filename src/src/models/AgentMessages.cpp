@@ -15,19 +15,19 @@ namespace
  * Extracts top-level JSON objects from mixed text while respecting strings and escapes.
  * @param raw Raw completion text.
  */
-QList<QString> extractTopLevelObjects(const QString &raw)
+QList<QString> extract_top_level_objects(const QString &raw)
 {
     QList<QString> objects;
     int start = -1;
     int depth = 0;
-    bool inString = false;
+    bool in_string = false;
     bool escaped = false;
 
     for (int i = 0; i < raw.size(); ++i)
     {
         const QChar ch = raw.at(i);
 
-        if (inString == true)
+        if (in_string == true)
         {
             if (escaped == true)
             {
@@ -39,14 +39,14 @@ QList<QString> extractTopLevelObjects(const QString &raw)
             }
             else if (ch == QLatin1Char('"'))
             {
-                inString = false;
+                in_string = false;
             }
             continue;
         }
 
         if (ch == QLatin1Char('"'))
         {
-            inString = true;
+            in_string = true;
             continue;
         }
 
@@ -77,35 +77,35 @@ QList<QString> extractTopLevelObjects(const QString &raw)
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// ChatMessage
+// chat_message_t
 // ---------------------------------------------------------------------------
 
-QJsonObject ChatMessage::toJson() const
+QJsonObject chat_message_t::to_json() const
 {
     return QJsonObject{{"role", role}, {"content", content}};
 }
 
-ChatMessage ChatMessage::fromJson(const QJsonObject &obj)
+chat_message_t chat_message_t::from_json(const QJsonObject &obj)
 {
     return {obj.value("role").toString(), obj.value("content").toString()};
 }
 
 // ---------------------------------------------------------------------------
-// AgentResponse
+// agent_response_t
 // ---------------------------------------------------------------------------
 
-AgentResponse AgentResponse::parseJson(const QJsonObject &obj)
+agent_response_t agent_response_t::parse_json(const QJsonObject &obj)
 {
-    AgentResponse r;
+    agent_response_t r;
     const QString type = obj.value("type").toString();
 
     if (type == "plan")
     {
-        r.type = ResponseType::Plan;
+        r.type = response_type_t::PLAN;
         const QJsonArray arr = obj.value("steps").toArray();
         for (int i = 0; i < arr.size(); ++i)
         {
-            PlanStep s;
+            plan_step_t s;
             s.index = i;
             s.description = arr[i].isString() ? arr[i].toString()
                                               : arr[i].toObject().value("description").toString();
@@ -116,15 +116,15 @@ AgentResponse AgentResponse::parseJson(const QJsonObject &obj)
 
     if (type == "tool_call")
     {
-        r.type = ResponseType::ToolCall;
-        r.toolName = obj.value("name").toString();
-        r.toolArgs = obj.value("args").toObject();
+        r.type = response_type_t::TOOL_CALL;
+        r.tool_name = obj.value("name").toString();
+        r.tool_args = obj.value("args").toObject();
         return r;
     }
 
     if (type == "final")
     {
-        r.type = ResponseType::Final;
+        r.type = response_type_t::FINAL;
         r.summary = obj.value("summary").toString();
         r.diff = obj.value("diff").toString();
         return r;
@@ -132,22 +132,22 @@ AgentResponse AgentResponse::parseJson(const QJsonObject &obj)
 
     if (type == "need_approval")
     {
-        r.type = ResponseType::NeedApproval;
-        r.approvalAction = obj.value("action").toString();
-        r.approvalReason = obj.value("reason").toString();
-        r.approvalPreview = obj.value("preview").toString();
+        r.type = response_type_t::NEED_APPROVAL;
+        r.approval_action = obj.value("action").toString();
+        r.approval_reason = obj.value("reason").toString();
+        r.approval_preview = obj.value("preview").toString();
         return r;
     }
 
     // Unknown type – treat as text
-    r.type = ResponseType::Text;
+    r.type = response_type_t::TEXT;
     r.text = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
     return r;
 }
 
-AgentResponse AgentResponse::parse(const QString &raw)
+agent_response_t agent_response_t::parse(const QString &raw)
 {
-    const auto tryParseTypedResponse = [](const QString &candidate, AgentResponse &out) {
+    const auto try_parse_typed_response = [](const QString &candidate, agent_response_t &out) {
         QJsonParseError err;
         const QJsonDocument doc = QJsonDocument::fromJson(candidate.toUtf8(), &err);
         if (err.error != QJsonParseError::NoError || !doc.isObject())
@@ -161,33 +161,33 @@ AgentResponse AgentResponse::parse(const QString &raw)
             return false;
         }
 
-        out = parseJson(obj);
+        out = parse_json(obj);
         return true;
     };
 
-    AgentResponse parsed;
-    if (tryParseTypedResponse(raw, parsed))
+    agent_response_t parsed;
+    if (try_parse_typed_response(raw, parsed))
     {
         return parsed;
     }
 
     // Keep previous behavior: if the whole payload is a single JSON object,
-    // return parseJson() even for unknown/unsupported type.
+    // return parse_json() even for unknown/unsupported type.
     QJsonParseError err;
     const QJsonDocument doc = QJsonDocument::fromJson(raw.toUtf8(), &err);
     if (err.error == QJsonParseError::NoError && doc.isObject())
     {
-        return parseJson(doc.object());
+        return parse_json(doc.object());
     }
 
-    static const QRegularExpression fencedJsonRe(R"(```(?:json)?\s*(\{[\s\S]*?\})\s*```)",
-                                                 QRegularExpression::MultilineOption);
+    static const QRegularExpression fenced_json_re(R"(```(?:json)?\s*(\{[\s\S]*?\})\s*```)",
+                                                   QRegularExpression::MultilineOption);
 
-    QRegularExpressionMatchIterator it = fencedJsonRe.globalMatch(raw);
+    QRegularExpressionMatchIterator it = fenced_json_re.globalMatch(raw);
     while (it.hasNext())
     {
         const QRegularExpressionMatch m = it.next();
-        if (tryParseTypedResponse(m.captured(1), parsed))
+        if (try_parse_typed_response(m.captured(1), parsed))
         {
             return parsed;
         }
@@ -195,18 +195,18 @@ AgentResponse AgentResponse::parse(const QString &raw)
 
     // Handle multiple JSON objects in one message, e.g.
     // {"type":"tool_call",...}{"type":"final",...}
-    const QList<QString> objects = extractTopLevelObjects(raw);
+    const QList<QString> objects = extract_top_level_objects(raw);
     for (const QString &candidate : objects)
     {
-        if (tryParseTypedResponse(candidate, parsed))
+        if (try_parse_typed_response(candidate, parsed))
         {
             return parsed;
         }
     }
 
     // Fallback: return raw text
-    AgentResponse r;
-    r.type = ResponseType::Text;
+    agent_response_t r;
+    r.type = response_type_t::TEXT;
     r.text = raw;
     return r;
 }

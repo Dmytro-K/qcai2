@@ -29,21 +29,21 @@ QString displayNameForRunControl(const ProjectExplorer::RunControl *runControl)
     return displayName.isEmpty() ? QStringLiteral("Application") : displayName;
 }
 
-CapturedDiagnostic diagnosticFromTask(const ProjectExplorer::Task &task)
+captured_diagnostic_t diagnosticFromTask(const ProjectExplorer::Task &task)
 {
-    CapturedDiagnostic diagnostic;
+    captured_diagnostic_t diagnostic;
 
     switch (task.type())
     {
         case ProjectExplorer::Task::Error:
         case ProjectExplorer::Task::DisruptingError:
-            diagnostic.severity = DiagnosticSeverity::Error;
+            diagnostic.severity = diagnostic_severity_t::ERROR;
             break;
         case ProjectExplorer::Task::Warning:
-            diagnostic.severity = DiagnosticSeverity::Warning;
+            diagnostic.severity = diagnostic_severity_t::WARNING;
             break;
         case ProjectExplorer::Task::Unknown:
-            diagnostic.severity = DiagnosticSeverity::Unknown;
+            diagnostic.severity = diagnostic_severity_t::UNKNOWN;
             break;
     }
 
@@ -53,7 +53,7 @@ CapturedDiagnostic diagnosticFromTask(const ProjectExplorer::Task &task)
         diagnostic.summary = task.description().trimmed();
     }
     diagnostic.details = task.details().join(QStringLiteral(" | ")).trimmed();
-    diagnostic.filePath = task.file().toUserOutput();
+    diagnostic.file_path = task.file().toUserOutput();
     diagnostic.line = task.line();
     diagnostic.column = task.column();
     diagnostic.origin = task.origin().trimmed();
@@ -63,221 +63,224 @@ CapturedDiagnostic diagnosticFromTask(const ProjectExplorer::Task &task)
 
 }  // namespace
 
-IdeOutputCapture::IdeOutputCapture(QObject *parent)
-    : QObject(parent), m_compileBuffer(120000), m_applicationBuffer(120000),
-      m_runControlScanTimer(this)
+ide_output_capture_t::ide_output_capture_t(QObject *parent)
+    : QObject(parent), compile_buffer(120000), application_buffer(120000),
+      run_control_scan_timer(this)
 {
-    m_runControlScanTimer.setInterval(1000);
-    connect(&m_runControlScanTimer, &QTimer::timeout, this, &IdeOutputCapture::refreshRunControls);
+    this->run_control_scan_timer.setInterval(1000);
+    connect(&this->run_control_scan_timer, &QTimer::timeout, this,
+            &ide_output_capture_t::refresh_run_controls);
 }
 
-void IdeOutputCapture::initialize()
+void ide_output_capture_t::initialize()
 {
     if (auto *projectManager = ProjectExplorer::ProjectManager::instance();
         ((projectManager != nullptr) == true))
     {
         for (ProjectExplorer::Project *project : ProjectExplorer::ProjectManager::projects())
         {
-            attachProject(project);
+            attach_project(project);
         }
 
         connect(projectManager, &ProjectExplorer::ProjectManager::projectAdded, this,
-                &IdeOutputCapture::attachProject);
+                &ide_output_capture_t::attach_project);
         connect(projectManager, &ProjectExplorer::ProjectManager::buildConfigurationAdded, this,
-                &IdeOutputCapture::attachBuildConfiguration);
+                &ide_output_capture_t::attach_build_configuration);
     }
 
     if (auto *buildManager = ProjectExplorer::BuildManager::instance();
         ((buildManager != nullptr) == true))
     {
-        connect(
-            buildManager, &ProjectExplorer::BuildManager::buildStateChanged, this,
-            [this](ProjectExplorer::Project *project) {
-                if (((ProjectExplorer::BuildManager::isBuilding() && !m_buildInProgress) == true))
-                {
-                    const QString projectName =
-                        project ? project->displayName() : QStringLiteral("Project");
-                    beginCompileCapture(
-                        QStringLiteral("=== Build started: %1 ===").arg(projectName));
-                }
-            });
+        connect(buildManager, &ProjectExplorer::BuildManager::buildStateChanged, this,
+                [this](ProjectExplorer::Project *project) {
+                    if (((ProjectExplorer::BuildManager::isBuilding() &&
+                          !this->build_in_progress) == true))
+                    {
+                        const QString projectName =
+                            project ? project->displayName() : QStringLiteral("Project");
+                        begin_compile_capture(
+                            QStringLiteral("=== Build started: %1 ===").arg(projectName));
+                    }
+                });
         connect(buildManager, &ProjectExplorer::BuildManager::buildQueueFinished, this,
                 [this](bool success) {
-                    m_buildInProgress = false;
-                    appendCompileBanner(
+                    this->build_in_progress = false;
+                    this->append_compile_banner(
                         QStringLiteral("=== Build finished: %1 ===")
                             .arg(success ? QStringLiteral("success") : QStringLiteral("failed")));
                 });
     }
 
-    refreshRunControls();
-    m_runControlScanTimer.start();
+    this->refresh_run_controls();
+    this->run_control_scan_timer.start();
 }
 
-QString IdeOutputCapture::compileOutputSnapshot(int maxLines) const
+QString ide_output_capture_t::compile_output_snapshot(int maxLines) const
 {
-    if (m_compileBuffer.isEmpty() == true)
+    if (this->compile_buffer.is_empty() == true)
     {
         return QStringLiteral("No Compile Output captured yet.");
     }
 
-    return m_compileBuffer.lastLines(maxLines);
+    return this->compile_buffer.last_lines(maxLines);
 }
 
-QString IdeOutputCapture::applicationOutputSnapshot(int maxLines) const
+QString ide_output_capture_t::application_output_snapshot(int maxLines) const
 {
-    if (m_applicationBuffer.isEmpty() == true)
+    if (this->application_buffer.is_empty() == true)
     {
         return QStringLiteral("No Application Output captured yet.");
     }
 
-    return m_applicationBuffer.lastLines(maxLines);
+    return this->application_buffer.last_lines(maxLines);
 }
 
-QString IdeOutputCapture::diagnosticsSnapshot(int maxItems) const
+QString ide_output_capture_t::diagnostics_snapshot(int maxItems) const
 {
-    QList<CapturedDiagnostic> diagnostics = m_compileDiagnostics;
+    QList<captured_diagnostic_t> diagnostics = this->compile_diagnostics;
     if (diagnostics.isEmpty())
     {
-        const QString source =
-            !m_externalBuildOutput.isEmpty() ? m_externalBuildOutput : m_compileBuffer.text();
-        diagnostics = extractDiagnosticsFromText(source);
+        const QString source = !this->external_build_output.isEmpty()
+                                   ? this->external_build_output
+                                   : this->compile_buffer.text();
+        diagnostics = extract_diagnostics_from_text(source);
     }
 
-    return formatCapturedDiagnostics(diagnostics, maxItems);
+    return format_captured_diagnostics(diagnostics, maxItems);
 }
 
-void IdeOutputCapture::ingestExternalBuildOutput(const QString &output)
+void ide_output_capture_t::ingest_external_build_output(const QString &output)
 {
-    beginCompileCapture(QStringLiteral("=== External build tool output ==="));
-    m_compileBuffer.appendChunk(output, !output.endsWith(QLatin1Char('\n')));
-    m_externalBuildOutput = output;
+    this->begin_compile_capture(QStringLiteral("=== External build tool output ==="));
+    this->compile_buffer.append_chunk(output, !output.endsWith(QLatin1Char('\n')));
+    this->external_build_output = output;
 
-    const QList<CapturedDiagnostic> diagnostics = extractDiagnosticsFromText(output);
+    const QList<captured_diagnostic_t> diagnostics = extract_diagnostics_from_text(output);
     if (((!diagnostics.isEmpty()) == true))
     {
-        m_compileDiagnostics = diagnostics;
+        this->compile_diagnostics = diagnostics;
     }
 }
 
-void IdeOutputCapture::attachProject(ProjectExplorer::Project *project)
+void ide_output_capture_t::attach_project(ProjectExplorer::Project *project)
 {
-    if ((((project == nullptr) || m_projects.contains(project)) == true))
+    if ((((project == nullptr) || this->projects.contains(project)) == true))
     {
         return;
     }
 
-    trackObject(project, m_projects);
+    this->track_object(project, this->projects);
     for (ProjectExplorer::Target *target : project->targets())
     {
-        attachTarget(target);
+        this->attach_target(target);
     }
 
     connect(project, &ProjectExplorer::Project::addedTarget, this,
-            &IdeOutputCapture::attachTarget);
+            &ide_output_capture_t::attach_target);
 }
 
-void IdeOutputCapture::attachTarget(ProjectExplorer::Target *target)
+void ide_output_capture_t::attach_target(ProjectExplorer::Target *target)
 {
-    if ((((target == nullptr) || m_targets.contains(target)) == true))
+    if ((((target == nullptr) || this->targets.contains(target)) == true))
     {
         return;
     }
 
-    trackObject(target, m_targets);
+    this->track_object(target, this->targets);
     for (ProjectExplorer::BuildConfiguration *buildConfiguration : target->buildConfigurations())
     {
-        attachBuildConfiguration(buildConfiguration);
+        this->attach_build_configuration(buildConfiguration);
     }
 
     connect(target, &ProjectExplorer::Target::addedBuildConfiguration, this,
-            &IdeOutputCapture::attachBuildConfiguration);
+            &ide_output_capture_t::attach_build_configuration);
 }
 
-void IdeOutputCapture::attachBuildConfiguration(
+void ide_output_capture_t::attach_build_configuration(
     ProjectExplorer::BuildConfiguration *buildConfiguration)
 {
-    if ((((buildConfiguration == nullptr) || m_buildConfigurations.contains(buildConfiguration)) ==
-         true))
+    if ((((buildConfiguration == nullptr) ||
+          this->build_configurations.contains(buildConfiguration)) == true))
     {
         return;
     }
 
-    trackObject(buildConfiguration, m_buildConfigurations);
-    attachBuildStepList(buildConfiguration->buildSteps());
-    attachBuildStepList(buildConfiguration->cleanSteps());
+    this->track_object(buildConfiguration, this->build_configurations);
+    this->attach_build_step_list(buildConfiguration->buildSteps());
+    this->attach_build_step_list(buildConfiguration->cleanSteps());
 }
 
-void IdeOutputCapture::attachBuildStepList(ProjectExplorer::BuildStepList *stepList)
+void ide_output_capture_t::attach_build_step_list(ProjectExplorer::BuildStepList *stepList)
 {
-    if ((((stepList == nullptr) || m_buildStepLists.contains(stepList)) == true))
+    if ((((stepList == nullptr) || this->build_step_lists.contains(stepList)) == true))
     {
         return;
     }
 
-    trackObject(stepList, m_buildStepLists);
+    this->track_object(stepList, this->build_step_lists);
     for (ProjectExplorer::BuildStep *step : stepList->steps())
     {
-        attachBuildStep(step);
+        this->attach_build_step(step);
     }
 
     connect(stepList, &ProjectExplorer::BuildStepList::stepInserted, this,
-            [this, stepList](int position) { attachBuildStep(stepList->at(position)); });
+            [this, stepList](int position) { this->attach_build_step(stepList->at(position)); });
 }
 
-void IdeOutputCapture::attachBuildStep(ProjectExplorer::BuildStep *step)
+void ide_output_capture_t::attach_build_step(ProjectExplorer::BuildStep *step)
 {
-    if ((((step == nullptr) || m_buildSteps.contains(step)) == true))
+    if ((((step == nullptr) || this->build_steps.contains(step)) == true))
     {
         return;
     }
 
-    trackObject(step, m_buildSteps);
+    this->track_object(step, this->build_steps);
     connect(step, &ProjectExplorer::BuildStep::addOutput, this,
             [this](const QString &text, ProjectExplorer::BuildStep::OutputFormat format,
                    ProjectExplorer::BuildStep::OutputNewlineSetting newlineSetting) {
                 Q_UNUSED(format)
-                if (m_buildInProgress == false)
+                if (this->build_in_progress == false)
                 {
-                    beginCompileCapture(QStringLiteral("=== Build output captured ==="));
+                    this->begin_compile_capture(QStringLiteral("=== Build output captured ==="));
                 }
 
-                m_compileBuffer.appendChunk(text, newlineSetting ==
-                                                      ProjectExplorer::BuildStep::DoAppendNewline);
+                this->compile_buffer.append_chunk(
+                    text, newlineSetting == ProjectExplorer::BuildStep::DoAppendNewline);
             });
     connect(step, &ProjectExplorer::BuildStep::addTask, this,
             [this](const ProjectExplorer::Task &task, int linkedOutputLines, int skipLines) {
                 Q_UNUSED(linkedOutputLines)
                 Q_UNUSED(skipLines)
-                recordCompileTask(task);
+                this->record_compile_task(task);
             });
 }
 
-void IdeOutputCapture::attachRunControl(ProjectExplorer::RunControl *runControl)
+void ide_output_capture_t::attach_run_control(ProjectExplorer::RunControl *runControl)
 {
-    if ((((runControl == nullptr) || m_runControls.contains(runControl)) == true))
+    if ((((runControl == nullptr) || this->run_controls.contains(runControl)) == true))
     {
         return;
     }
 
-    trackObject(runControl, m_runControls);
+    this->track_object(runControl, this->run_controls);
     connect(runControl, &ProjectExplorer::RunControl::started, this, [this, runControl]() {
-        m_applicationBuffer.clear();
-        appendApplicationBanner(
+        this->application_buffer.clear();
+        this->append_application_banner(
             QStringLiteral("=== Run started: %1 ===").arg(displayNameForRunControl(runControl)));
     });
     connect(runControl, &ProjectExplorer::RunControl::appendMessage, this,
             [this](const QString &message, Utils::OutputFormat format) {
                 Q_UNUSED(format)
-                m_applicationBuffer.appendChunk(message, !message.endsWith(QLatin1Char('\n')));
+                this->application_buffer.append_chunk(message,
+                                                      !message.endsWith(QLatin1Char('\n')));
             });
     connect(runControl, &ProjectExplorer::RunControl::stopped, this, [this, runControl]() {
-        appendApplicationBanner(
+        this->append_application_banner(
             QStringLiteral("=== Run stopped: %1 ===").arg(displayNameForRunControl(runControl)));
     });
 }
 
-void IdeOutputCapture::trackObject(QObject *object, QSet<const QObject *> &trackedSet)
+void ide_output_capture_t::track_object(QObject *object, QSet<const QObject *> &trackedSet)
 {
     trackedSet.insert(object);
     auto *trackedSetPtr = &trackedSet;
@@ -285,40 +288,40 @@ void IdeOutputCapture::trackObject(QObject *object, QSet<const QObject *> &track
             [object, trackedSetPtr]() { trackedSetPtr->remove(object); });
 }
 
-void IdeOutputCapture::refreshRunControls()
+void ide_output_capture_t::refresh_run_controls()
 {
     if (((!qApp) == true))
     {
         return;
     }
 
-    const auto runControls = qApp->findChildren<ProjectExplorer::RunControl *>();
-    for (ProjectExplorer::RunControl *runControl : runControls)
+    const auto run_controls = qApp->findChildren<ProjectExplorer::RunControl *>();
+    for (ProjectExplorer::RunControl *runControl : run_controls)
     {
-        attachRunControl(runControl);
+        this->attach_run_control(runControl);
     }
 }
 
-void IdeOutputCapture::beginCompileCapture(const QString &banner)
+void ide_output_capture_t::begin_compile_capture(const QString &banner)
 {
-    m_buildInProgress = true;
-    m_compileBuffer.clear();
-    m_compileDiagnostics.clear();
-    m_externalBuildOutput.clear();
-    appendCompileBanner(banner);
+    this->build_in_progress = true;
+    this->compile_buffer.clear();
+    this->compile_diagnostics.clear();
+    this->external_build_output.clear();
+    this->append_compile_banner(banner);
 }
 
-void IdeOutputCapture::appendCompileBanner(const QString &banner)
+void ide_output_capture_t::append_compile_banner(const QString &banner)
 {
-    m_compileBuffer.appendChunk(banner, true);
+    this->compile_buffer.append_chunk(banner, true);
 }
 
-void IdeOutputCapture::appendApplicationBanner(const QString &banner)
+void ide_output_capture_t::append_application_banner(const QString &banner)
 {
-    m_applicationBuffer.appendChunk(banner, true);
+    this->application_buffer.append_chunk(banner, true);
 }
 
-void IdeOutputCapture::recordCompileTask(const ProjectExplorer::Task &task)
+void ide_output_capture_t::record_compile_task(const ProjectExplorer::Task &task)
 {
     if (((!task.isError() && !task.isWarning() &&
           task.type() != ProjectExplorer::Task::DisruptingError) == true))
@@ -326,7 +329,7 @@ void IdeOutputCapture::recordCompileTask(const ProjectExplorer::Task &task)
         return;
     }
 
-    m_compileDiagnostics.append(diagnosticFromTask(task));
+    this->compile_diagnostics.append(diagnosticFromTask(task));
 }
 
 }  // namespace qcai2

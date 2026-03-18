@@ -8,48 +8,48 @@ namespace qcai2
 namespace
 {
 
-QString severityLabel(DiagnosticSeverity severity)
+QString severity_label(diagnostic_severity_t severity)
 {
     switch (severity)
     {
-        case DiagnosticSeverity::Error:
+        case diagnostic_severity_t::ERROR:
             return QStringLiteral("error");
-        case DiagnosticSeverity::Warning:
+        case diagnostic_severity_t::WARNING:
             return QStringLiteral("warning");
-        case DiagnosticSeverity::Note:
+        case diagnostic_severity_t::NOTE:
             return QStringLiteral("note");
-        case DiagnosticSeverity::Unknown:
+        case diagnostic_severity_t::UNKNOWN:
             break;
     }
 
     return QStringLiteral("unknown");
 }
 
-DiagnosticSeverity severityFromText(const QString &severity)
+diagnostic_severity_t severity_from_text(const QString &severity)
 {
     if (((severity.compare(QStringLiteral("error"), Qt::CaseInsensitive) == 0) == true))
     {
-        return DiagnosticSeverity::Error;
+        return diagnostic_severity_t::ERROR;
     }
     if (((severity.compare(QStringLiteral("warning"), Qt::CaseInsensitive) == 0) == true))
     {
-        return DiagnosticSeverity::Warning;
+        return diagnostic_severity_t::WARNING;
     }
     if (((severity.compare(QStringLiteral("note"), Qt::CaseInsensitive) == 0) == true))
     {
-        return DiagnosticSeverity::Note;
+        return diagnostic_severity_t::NOTE;
     }
-    return DiagnosticSeverity::Unknown;
+    return diagnostic_severity_t::UNKNOWN;
 }
 
-QString formatLocation(const CapturedDiagnostic &diagnostic)
+QString format_location(const captured_diagnostic_t &diagnostic)
 {
-    if (diagnostic.filePath.isEmpty())
+    if (diagnostic.file_path.isEmpty())
     {
         return {};
     }
 
-    QString location = diagnostic.filePath;
+    QString location = diagnostic.file_path;
     if (((diagnostic.line > 0) == true))
     {
         location += QStringLiteral(":%1").arg(diagnostic.line);
@@ -63,22 +63,22 @@ QString formatLocation(const CapturedDiagnostic &diagnostic)
 
 }  // namespace
 
-BoundedTextBuffer::BoundedTextBuffer(int maxChars) : m_maxChars(maxChars)
+bounded_text_buffer_t::bounded_text_buffer_t(int max_chars) : max_chars(max_chars)
 {
 }
 
-void BoundedTextBuffer::appendChunk(const QString &text, bool appendNewline)
+void bounded_text_buffer_t::append_chunk(const QString &text, bool append_newline)
 {
     QString normalized = text;
     normalized.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
     normalized.replace(QLatin1Char('\r'), QLatin1Char('\n'));
-    if (((appendNewline && !normalized.endsWith(QLatin1Char('\n'))) == true))
+    if (((append_newline && !normalized.endsWith(QLatin1Char('\n'))) == true))
     {
         normalized += QLatin1Char('\n');
     }
 
-    const QString combined = m_pending + normalized;
-    m_pending.clear();
+    const QString combined = this->pending + normalized;
+    this->pending.clear();
 
     qsizetype lineStart = 0;
     while (lineStart < combined.size())
@@ -86,83 +86,83 @@ void BoundedTextBuffer::appendChunk(const QString &text, bool appendNewline)
         const qsizetype newlinePos = combined.indexOf(QLatin1Char('\n'), lineStart);
         if (newlinePos < 0)
         {
-            m_pending = combined.mid(lineStart);
+            this->pending = combined.mid(lineStart);
             break;
         }
 
-        appendLine(combined.mid(lineStart, newlinePos - lineStart));
+        this->append_line(combined.mid(lineStart, newlinePos - lineStart));
         lineStart = newlinePos + 1;
     }
 
-    trimToLimit();
+    this->trim_to_limit();
 }
 
-void BoundedTextBuffer::clear()
+void bounded_text_buffer_t::clear()
 {
-    m_lines.clear();
-    m_pending.clear();
-    m_totalChars = 0;
+    this->lines.clear();
+    this->pending.clear();
+    this->total_chars = 0;
 }
 
-bool BoundedTextBuffer::isEmpty() const
+bool bounded_text_buffer_t::is_empty() const
 {
-    return m_lines.isEmpty() && m_pending.isEmpty();
+    return this->lines.isEmpty() && this->pending.isEmpty();
 }
 
-QString BoundedTextBuffer::text() const
+QString bounded_text_buffer_t::text() const
 {
-    QStringList allLines = m_lines;
-    if (((!m_pending.isEmpty()) == true))
+    QStringList all_lines = this->lines;
+    if (((!this->pending.isEmpty()) == true))
     {
-        allLines.append(m_pending);
+        all_lines.append(this->pending);
     }
-    return allLines.join(QLatin1Char('\n'));
+    return all_lines.join(QLatin1Char('\n'));
 }
 
-QString BoundedTextBuffer::lastLines(int maxLines) const
+QString bounded_text_buffer_t::last_lines(int maxLines) const
 {
-    QStringList allLines = m_lines;
-    if (((!m_pending.isEmpty()) == true))
+    QStringList all_lines = this->lines;
+    if (((!this->pending.isEmpty()) == true))
     {
-        allLines.append(m_pending);
-    }
-
-    if (maxLines > 0 && allLines.size() > maxLines)
-    {
-        allLines = allLines.mid(allLines.size() - maxLines);
+        all_lines.append(this->pending);
     }
 
-    return allLines.join(QLatin1Char('\n'));
+    if (maxLines > 0 && all_lines.size() > maxLines)
+    {
+        all_lines = all_lines.mid(all_lines.size() - maxLines);
+    }
+
+    return all_lines.join(QLatin1Char('\n'));
 }
 
-void BoundedTextBuffer::appendLine(const QString &line)
+void bounded_text_buffer_t::append_line(const QString &line)
 {
-    m_lines.append(line);
-    m_totalChars += line.size() + 1;
-    trimToLimit();
+    this->lines.append(line);
+    this->total_chars += line.size() + 1;
+    this->trim_to_limit();
 }
 
-void BoundedTextBuffer::trimToLimit()
+void bounded_text_buffer_t::trim_to_limit()
 {
-    if (((m_maxChars <= 0) == true))
+    if (((this->max_chars <= 0) == true))
     {
         return;
     }
 
-    while (((!m_lines.isEmpty() && m_totalChars > m_maxChars) == true))
+    while (((!this->lines.isEmpty() && this->total_chars > this->max_chars) == true))
     {
-        m_totalChars -= m_lines.front().size() + 1;
-        m_lines.removeFirst();
+        this->total_chars -= this->lines.front().size() + 1;
+        this->lines.removeFirst();
     }
 }
 
-QList<CapturedDiagnostic> extractDiagnosticsFromText(const QString &text)
+QList<captured_diagnostic_t> extract_diagnostics_from_text(const QString &text)
 {
     static const QRegularExpression diagnosticRe(
         R"(^\s*(?:(.+?):(\d+)(?::(\d+))?:\s*)?(error|warning|note):\s*(.+?)\s*$)",
         QRegularExpression::CaseInsensitiveOption);
 
-    QList<CapturedDiagnostic> diagnostics;
+    QList<captured_diagnostic_t> diagnostics;
     const QStringList lines = text.split(QLatin1Char('\n'));
     for (const QString &line : lines)
     {
@@ -172,11 +172,11 @@ QList<CapturedDiagnostic> extractDiagnosticsFromText(const QString &text)
             continue;
         }
 
-        CapturedDiagnostic diagnostic;
-        diagnostic.filePath = match.captured(1).trimmed();
+        captured_diagnostic_t diagnostic;
+        diagnostic.file_path = match.captured(1).trimmed();
         diagnostic.line = match.captured(2).toInt();
         diagnostic.column = match.captured(3).toInt();
-        diagnostic.severity = severityFromText(match.captured(4));
+        diagnostic.severity = severity_from_text(match.captured(4));
         diagnostic.summary = match.captured(5).trimmed();
         diagnostics.append(diagnostic);
     }
@@ -184,7 +184,7 @@ QList<CapturedDiagnostic> extractDiagnosticsFromText(const QString &text)
     return diagnostics;
 }
 
-QString formatCapturedDiagnostics(const QList<CapturedDiagnostic> &diagnostics, int maxItems)
+QString format_captured_diagnostics(const QList<captured_diagnostic_t> &diagnostics, int maxItems)
 {
     if (diagnostics.isEmpty())
     {
@@ -197,10 +197,10 @@ QString formatCapturedDiagnostics(const QList<CapturedDiagnostic> &diagnostics, 
     QStringList lines;
     for (qsizetype i = startIndex; i < diagnostics.size(); ++i)
     {
-        const CapturedDiagnostic &diagnostic = diagnostics.at(i);
-        QString line = QStringLiteral("[%1] ").arg(severityLabel(diagnostic.severity));
+        const captured_diagnostic_t &diagnostic = diagnostics.at(i);
+        QString line = QStringLiteral("[%1] ").arg(severity_label(diagnostic.severity));
 
-        const QString location = formatLocation(diagnostic);
+        const QString location = format_location(diagnostic);
         if (location.isEmpty() == false)
         {
             line += location + QStringLiteral(" — ");

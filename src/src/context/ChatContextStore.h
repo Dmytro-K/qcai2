@@ -5,62 +5,67 @@
 namespace qcai2
 {
 
-class ChatContextStore
+class chat_context_store_t
 {
 public:
-    ChatContextStore();
-    ~ChatContextStore();
+    chat_context_store_t();
+    ~chat_context_store_t();
 
-    bool open(const QString &databasePath, const QString &artifactDirPath,
+    bool open(const QString &database_path, const QString &artifact_dir_path,
               QString *error = nullptr);
     void close();
 
-    bool isOpen() const;
-    QString databasePath() const;
-    QString artifactDirPath() const;
+    bool is_open() const;
+    QString database_path() const;
+    QString artifact_dir_path() const;
 
-    bool ensureConversation(ConversationRecord *conversation, QString *error = nullptr);
-    ConversationRecord conversation(const QString &conversationId, QString *error = nullptr) const;
+    bool ensure_conversation(conversation_record_t *conversation, QString *error = nullptr);
+    conversation_record_t conversation(const QString &conversation_id,
+                                       QString *error = nullptr) const;
 
-    bool saveRun(const RunRecord &run, QString *error = nullptr);
-    bool updateRun(const RunRecord &run, QString *error = nullptr);
+    bool save_run(const run_record_t &run, QString *error = nullptr);
+    bool update_run(const run_record_t &run, QString *error = nullptr);
 
-    bool appendMessage(ContextMessage *message, QString *error = nullptr);
-    bool upsertMemoryItem(MemoryItem *item, QString *error = nullptr);
-    bool addSummary(ContextSummary *summary, QString *error = nullptr);
-    bool addArtifact(ArtifactRecord *artifact, const QString &content, QString *error = nullptr);
+    bool append_message(context_message_t *message, QString *error = nullptr);
+    bool upsert_memory_item(memory_item_t *item, QString *error = nullptr);
+    bool add_summary(context_summary_t *summary, QString *error = nullptr);
+    bool add_artifact(artifact_record_t *artifact, const QString &content,
+                      QString *error = nullptr);
 
-    QList<ContextMessage> recentMessages(const QString &conversationId, int limit,
-                                         QString *error = nullptr) const;
-    QList<ContextMessage> messagesRange(const QString &conversationId, int startSequenceExclusive,
-                                        int endSequenceInclusive, QString *error = nullptr) const;
-    QList<MemoryItem> memoryItems(const QString &workspaceId, int limit,
-                                  QString *error = nullptr) const;
-    QList<ArtifactRecord> recentArtifacts(const QString &conversationId, int limit,
-                                          QString *error = nullptr) const;
+    QList<context_message_t> recent_messages(const QString &conversation_id, int limit,
+                                             QString *error = nullptr) const;
+    QList<context_message_t> messages_range(const QString &conversation_id,
+                                            int start_sequence_exclusive,
+                                            int end_sequence_inclusive,
+                                            QString *error = nullptr) const;
+    QList<memory_item_t> memory_items(const QString &workspace_id, int limit,
+                                      QString *error = nullptr) const;
+    QList<artifact_record_t> recent_artifacts(const QString &conversation_id, int limit,
+                                              QString *error = nullptr) const;
 
-    ContextSummary latestSummary(const QString &conversationId, QString *error = nullptr) const;
-    int latestSummaryVersion(const QString &conversationId, QString *error = nullptr) const;
-    int latestMessageSequence(const QString &conversationId, QString *error = nullptr) const;
+    context_summary_t latest_summary(const QString &conversation_id,
+                                     QString *error = nullptr) const;
+    int latest_summary_version(const QString &conversation_id, QString *error = nullptr) const;
+    int latest_message_sequence(const QString &conversation_id, QString *error = nullptr) const;
 
 private:
-    bool initializeLayout(QString *error);
-    bool ensureOpen(QString *error) const;
-    QString conversationsDirectoryPath() const;
-    QString conversationDirectoryPath(const QString &conversationId) const;
-    QString conversationStatePath(const QString &conversationId) const;
-    QString conversationMessagesPath(const QString &conversationId) const;
-    QString conversationSummariesPath(const QString &conversationId) const;
-    QString conversationLatestSummaryPath(const QString &conversationId) const;
-    QString conversationArtifactsPath(const QString &conversationId) const;
-    QString runsDirectoryPath() const;
-    QString runPath(const QString &runId) const;
-    QString memoryPath() const;
-    QString formatPath() const;
+    bool initialize_layout(QString *error);
+    bool ensure_open(QString *error) const;
+    QString conversations_directory_path() const;
+    QString conversation_directory_path(const QString &conversation_id) const;
+    QString conversation_state_path(const QString &conversation_id) const;
+    QString conversation_messages_path(const QString &conversation_id) const;
+    QString conversation_summaries_path(const QString &conversation_id) const;
+    QString conversation_latest_summary_path(const QString &conversation_id) const;
+    QString conversation_artifacts_path(const QString &conversation_id) const;
+    QString runs_directory_path() const;
+    QString run_path(const QString &run_id) const;
+    QString memory_path() const;
+    QString format_path() const;
 
-    QString m_databasePath;
-    QString m_artifactDirPath;
-    bool m_isOpen = false;
+    QString database_file_path;
+    QString artifacts_directory_path;
+    bool open_state = false;
 };
 
 }  // namespace qcai2

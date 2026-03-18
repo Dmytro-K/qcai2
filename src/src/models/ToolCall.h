@@ -10,7 +10,7 @@ namespace qcai2
 /**
  * Represents one tool invocation request and its execution result.
  */
-struct ToolCall
+struct tool_call_t
 {
     /**
      * Optional provider call id used to correlate responses.
@@ -45,19 +45,18 @@ struct ToolCall
     /**
      * Error message for failed executions.
      */
-    QString errorMsg;
+    QString error_msg;
 
     /**
      * Serializes the request and optional execution result to JSON.
      */
-    QJsonObject toJson() const;
+    QJsonObject to_json() const;
 
     /**
      * Deserializes the tool request fields from JSON.
      * @param obj JSON object to convert.
      */
-    static ToolCall fromJson(const QJsonObject &obj);
-
+    static tool_call_t from_json(const QJsonObject &obj);
 };
 
 }  // namespace qcai2

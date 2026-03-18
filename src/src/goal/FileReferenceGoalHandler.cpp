@@ -10,23 +10,23 @@ namespace qcai2
 namespace
 {
 
-struct HashTokenState
+struct hash_token_state_t
 {
     bool active = false;
     int start = 0;
     int end = 0;
 };
 
-bool isTokenBoundary(const QString &text, int index)
+bool is_token_boundary(const QString &text, int index)
 {
     return index <= 0 || text.at(index - 1).isSpace();
 }
 
-HashTokenState hashTokenAtCursor(const QString &text, int cursorPosition)
+hash_token_state_t hash_token_at_cursor(const QString &text, int cursor_position)
 {
     for (int i = 0; i < text.size(); ++i)
     {
-        if (text.at(i) != QLatin1Char('#') || !isTokenBoundary(text, i))
+        if (text.at(i) != QLatin1Char('#') || !is_token_boundary(text, i))
         {
             continue;
         }
@@ -37,7 +37,7 @@ HashTokenState hashTokenAtCursor(const QString &text, int cursorPosition)
             ++end;
         }
 
-        if (((cursorPosition < i + 1 || cursorPosition > end) == true))
+        if (((cursor_position < i + 1 || cursor_position > end) == true))
         {
             continue;
         }
@@ -48,12 +48,12 @@ HashTokenState hashTokenAtCursor(const QString &text, int cursorPosition)
     return {};
 }
 
-QList<HashTokenState> allHashTokens(const QString &text)
+QList<hash_token_state_t> all_hash_tokens(const QString &text)
 {
-    QList<HashTokenState> tokens;
+    QList<hash_token_state_t> tokens;
     for (int i = 0; i < text.size(); ++i)
     {
-        if (text.at(i) != QLatin1Char('#') || !isTokenBoundary(text, i))
+        if (text.at(i) != QLatin1Char('#') || !is_token_boundary(text, i))
         {
             continue;
         }
@@ -69,7 +69,7 @@ QList<HashTokenState> allHashTokens(const QString &text)
     return tokens;
 }
 
-QColor fileReferenceColor(const QPalette &palette)
+QColor file_reference_color(const QPalette &palette)
 {
     const QColor base = palette.color(QPalette::Highlight);
     return palette.color(QPalette::Base).lightness() < 128 ? base.lighter(130) : base.darker(120);
@@ -77,68 +77,69 @@ QColor fileReferenceColor(const QPalette &palette)
 
 }  // namespace
 
-FileReferenceGoalHandler::FileReferenceGoalHandler(CandidateProvider candidateProvider)
-    : m_candidateProvider(std::move(candidateProvider))
+file_reference_goal_handler_t::file_reference_goal_handler_t(
+    candidate_provider_t candidate_provider)
+    : candidate_provider(std::move(candidate_provider))
 {
 }
 
-GoalCompletionSession
-FileReferenceGoalHandler::completionSession(const GoalCompletionRequest &request) const
+goal_completion_session_t
+file_reference_goal_handler_t::completion_session(const goal_completion_request_t &request) const
 {
-    if (((!m_candidateProvider) == true))
+    if (((!this->candidate_provider) == true))
     {
         return {};
     }
 
-    const HashTokenState token = hashTokenAtCursor(request.text, request.cursorPosition);
+    const hash_token_state_t token = hash_token_at_cursor(request.text, request.cursor_position);
     if (token.active == false)
     {
         return {};
     }
 
-    GoalCompletionSession session;
+    goal_completion_session_t session;
     session.active = true;
-    session.replaceStart = token.start;
-    session.replaceEnd = token.end;
-    session.prefix = request.text.mid(token.start, request.cursorPosition - token.start);
+    session.replace_start = token.start;
+    session.replace_end = token.end;
+    session.prefix = request.text.mid(token.start, request.cursor_position - token.start);
 
-    const QString filePrefix = session.prefix.mid(1);
-    const QStringList candidates = m_candidateProvider();
-    QList<GoalCompletionItem> caseSensitiveItems;
-    QList<GoalCompletionItem> caseInsensitiveItems;
+    const QString file_prefix = session.prefix.mid(1);
+    const QStringList candidates = this->candidate_provider();
+    QList<goal_completion_item_t> case_sensitive_items;
+    QList<goal_completion_item_t> case_insensitive_items;
     for (const QString &candidate : candidates)
     {
-        if (!candidate.contains(filePrefix, Qt::CaseInsensitive))
+        if (!candidate.contains(file_prefix, Qt::CaseInsensitive))
         {
             continue;
         }
 
-        GoalCompletionItem item{QStringLiteral("#%1").arg(candidate),
-                                QStringLiteral("#%1").arg(candidate), candidate};
-        if (candidate.contains(filePrefix, Qt::CaseSensitive))
+        goal_completion_item_t item{QStringLiteral("#%1").arg(candidate),
+                                    QStringLiteral("#%1").arg(candidate), candidate};
+        if (candidate.contains(file_prefix, Qt::CaseSensitive))
         {
-            caseSensitiveItems.append(item);
+            case_sensitive_items.append(item);
         }
         else
         {
-            caseInsensitiveItems.append(item);
+            case_insensitive_items.append(item);
         }
     }
 
-    session.items = caseSensitiveItems;
-    session.items.append(caseInsensitiveItems);
+    session.items = case_sensitive_items;
+    session.items.append(case_insensitive_items);
 
     return session;
 }
 
-QList<GoalHighlightSpan> FileReferenceGoalHandler::highlightSpans(const QString &text,
-                                                                  const QPalette &palette) const
+QList<goal_highlight_span_t>
+file_reference_goal_handler_t::highlight_spans(const QString &text, const QPalette &palette) const
 {
-    QList<GoalHighlightSpan> spans;
+    QList<goal_highlight_span_t> spans;
     QTextCharFormat format;
-    format.setForeground(fileReferenceColor(palette));
+    format.setForeground(file_reference_color(palette));
 
-    for (const HashTokenState &token : allHashTokens(text))
+    for (const hash_token_state_t &token : all_hash_tokens(text))
     {
         spans.append({token.start, token.end - token.start, format});
     }

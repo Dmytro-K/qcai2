@@ -65,10 +65,10 @@ void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
 
 void populateEffortCombo(QComboBox *combo)
 {
-    combo->addItem(Tr::tr("Off"), QStringLiteral("off"));
-    combo->addItem(Tr::tr("Low"), QStringLiteral("low"));
-    combo->addItem(Tr::tr("Medium"), QStringLiteral("medium"));
-    combo->addItem(Tr::tr("High"), QStringLiteral("high"));
+    combo->addItem(tr_t::tr("Off"), QStringLiteral("off"));
+    combo->addItem(tr_t::tr("Low"), QStringLiteral("low"));
+    combo->addItem(tr_t::tr("Medium"), QStringLiteral("medium"));
+    combo->addItem(tr_t::tr("High"), QStringLiteral("high"));
 }
 
 void selectEffortValue(QComboBox *combo, const QString &value, int fallbackIndex)
@@ -79,104 +79,104 @@ void selectEffortValue(QComboBox *combo, const QString &value, int fallbackIndex
 
 }  // namespace
 
-class SettingsWidget : public Core::IOptionsPageWidget
+class settings_widget_t : public Core::IOptionsPageWidget
 {
-    struct Snapshot
+    struct snapshot_t
     {
         QString provider;
-        QString baseUrl;
-        QString apiKey;
-        QString modelName;
-        QString reasoningEffort;
-        QString thinkingLevel;
+        QString base_url;
+        QString api_key;
+        QString model_name;
+        QString reasoning_effort;
+        QString thinking_level;
         double temperature = 0;
-        int maxTokens = 0;
-        QString copilotModel;
-        QString copilotNodePath;
-        QString copilotSidecarPath;
-        int copilotCompletionTimeoutSec = 0;
-        QString localBaseUrl;
-        QString localEndpointPath;
-        bool localSimpleMode = false;
-        QString localCustomHeaders;
-        QString ollamaBaseUrl;
-        QString ollamaModel;
-        int maxIterations = 0;
-        int maxToolCalls = 0;
-        int maxDiffLines = 0;
-        int maxChangedFiles = 0;
-        bool dryRunDefault = false;
-        bool aiCompletionEnabled = false;
-        int completionMinChars = 0;
-        int completionDelayMs = 0;
-        QString completionModel;
-        QString completionThinkingLevel;
-        QString completionReasoningEffort;
-        bool debugLogging = false;
-        bool agentDebug = false;
-        qtmcp::ServerDefinitions mcpServers;
+        int max_tokens = 0;
+        QString copilot_model;
+        QString copilot_node_path;
+        QString copilot_sidecar_path;
+        int copilot_completion_timeout_sec = 0;
+        QString local_base_url;
+        QString local_endpoint_path;
+        bool local_simple_mode = false;
+        QString local_custom_headers;
+        QString ollama_base_url;
+        QString ollama_model;
+        int max_iterations = 0;
+        int max_tool_calls = 0;
+        int max_diff_lines = 0;
+        int max_changed_files = 0;
+        bool dry_run_default = false;
+        bool ai_completion_enabled = false;
+        int completion_min_chars = 0;
+        int completion_delay_ms = 0;
+        QString completion_model;
+        QString completion_thinking_level;
+        QString completion_reasoning_effort;
+        bool debug_logging = false;
+        bool agent_debug = false;
+        qtmcp::server_definitions_t mcp_servers;
 
-        friend bool operator==(const Snapshot &, const Snapshot &) = default;
+        friend bool operator==(const snapshot_t &, const snapshot_t &) = default;
     };
 
 public:
-    SettingsWidget()
+    settings_widget_t()
     {
-        m_ui = std::make_unique<Ui::SettingsWidget>();
-        m_ui->setupUi(this);
+        this->ui = std::make_unique<Ui::settings_widget_t>();
+        this->ui->setupUi(this);
 
         auto &s = settings();
 
-        m_providerCombo = m_ui->providerCombo;
-        m_baseUrlCombo = m_ui->baseUrlCombo;
-        m_apiKeyEdit = m_ui->apiKeyEdit;
-        m_modelCombo = m_ui->modelCombo;
-        m_reasoningCombo = m_ui->reasoningCombo;
-        m_thinkingCombo = m_ui->thinkingCombo;
-        m_tempSpin = m_ui->tempSpin;
-        m_maxTokensSpin = m_ui->maxTokensSpin;
-        m_copilotModelCombo = m_ui->copilotModelCombo;
-        m_copilotNodeEdit = m_ui->copilotNodeEdit;
-        m_copilotSidecarEdit = m_ui->copilotSidecarEdit;
-        m_copilotCompletionTimeoutSpin = m_ui->copilotCompletionTimeoutSpin;
-        m_localUrlEdit = m_ui->localUrlEdit;
-        m_localEndpointEdit = m_ui->localEndpointEdit;
-        m_localSimpleCheck = m_ui->localSimpleCheck;
-        m_localHeadersEdit = m_ui->localHeadersEdit;
-        m_ollamaUrlEdit = m_ui->ollamaUrlEdit;
-        m_ollamaModelCombo = m_ui->ollamaModelCombo;
-        m_maxIterSpin = m_ui->maxIterSpin;
-        m_maxToolsSpin = m_ui->maxToolsSpin;
-        m_maxDiffSpin = m_ui->maxDiffSpin;
-        m_maxFilesSpin = m_ui->maxFilesSpin;
-        m_dryRunCheck = m_ui->dryRunCheck;
-        m_aiCompletionCheck = m_ui->aiCompletionCheck;
-        m_completionMinCharsSpin = m_ui->completionMinCharsSpin;
-        m_completionDelayMsSpin = m_ui->completionDelayMsSpin;
-        m_completionModelCombo = m_ui->completionModelCombo;
-        m_completionThinkingCombo = m_ui->completionThinkingCombo;
-        m_completionReasoningCombo = m_ui->completionReasoningCombo;
-        m_debugLoggingCheck = m_ui->debugLoggingCheck;
-        m_agentDebugCheck = m_ui->agentDebugCheck;
-        m_mcpServersWidget = new McpServersWidget(this);
-        m_mcpServersWidget->setServers(s.mcpServers);
-        m_ui->settingsTabs->insertTab(1, m_mcpServersWidget, Tr::tr("MCP Servers"));
+        this->providerCombo = this->ui->providerCombo;
+        this->baseUrlCombo = this->ui->baseUrlCombo;
+        this->apiKeyEdit = this->ui->apiKeyEdit;
+        this->modelCombo = this->ui->modelCombo;
+        this->reasoningCombo = this->ui->reasoningCombo;
+        this->thinkingCombo = this->ui->thinkingCombo;
+        this->tempSpin = this->ui->tempSpin;
+        this->maxTokensSpin = this->ui->maxTokensSpin;
+        this->copilotModelCombo = this->ui->copilotModelCombo;
+        this->copilotNodeEdit = this->ui->copilotNodeEdit;
+        this->copilotSidecarEdit = this->ui->copilotSidecarEdit;
+        this->copilotCompletionTimeoutSpin = this->ui->copilotCompletionTimeoutSpin;
+        this->localUrlEdit = this->ui->localUrlEdit;
+        this->localEndpointEdit = this->ui->localEndpointEdit;
+        this->localSimpleCheck = this->ui->localSimpleCheck;
+        this->localHeadersEdit = this->ui->localHeadersEdit;
+        this->ollamaUrlEdit = this->ui->ollamaUrlEdit;
+        this->ollamaModelCombo = this->ui->ollamaModelCombo;
+        this->maxIterSpin = this->ui->maxIterSpin;
+        this->maxToolsSpin = this->ui->maxToolsSpin;
+        this->maxDiffSpin = this->ui->maxDiffSpin;
+        this->maxFilesSpin = this->ui->maxFilesSpin;
+        this->dryRunCheck = this->ui->dryRunCheck;
+        this->aiCompletionCheck = this->ui->aiCompletionCheck;
+        this->completionMinCharsSpin = this->ui->completionMinCharsSpin;
+        this->completionDelayMsSpin = this->ui->completionDelayMsSpin;
+        this->completionModelCombo = this->ui->completionModelCombo;
+        this->completionThinkingCombo = this->ui->completionThinkingCombo;
+        this->completionReasoningCombo = this->ui->completionReasoningCombo;
+        this->debugLoggingCheck = this->ui->debugLoggingCheck;
+        this->agentDebugCheck = this->ui->agentDebugCheck;
+        this->mcpServersWidget = new mcp_servers_widget_t(this);
+        this->mcpServersWidget->set_servers(s.mcp_servers);
+        this->ui->settingsTabs->insertTab(1, this->mcpServersWidget, tr_t::tr("MCP Servers"));
 
         // Provider selection
-        m_providerCombo->addItem(Tr::tr("OpenAI-Compatible"), QStringLiteral("openai"));
-        m_providerCombo->addItem(Tr::tr("Anthropic API"), QStringLiteral("anthropic"));
-        m_providerCombo->addItem(Tr::tr("GitHub Copilot"), QStringLiteral("copilot"));
-        m_providerCombo->addItem(Tr::tr("Local HTTP"), QStringLiteral("local"));
-        m_providerCombo->addItem(Tr::tr("Ollama (Local)"), QStringLiteral("ollama"));
-        int idx = m_providerCombo->findData(s.provider);
+        this->providerCombo->addItem(tr_t::tr("OpenAI-Compatible"), QStringLiteral("openai"));
+        this->providerCombo->addItem(tr_t::tr("Anthropic API"), QStringLiteral("anthropic"));
+        this->providerCombo->addItem(tr_t::tr("GitHub Copilot"), QStringLiteral("copilot"));
+        this->providerCombo->addItem(tr_t::tr("Local HTTP"), QStringLiteral("local"));
+        this->providerCombo->addItem(tr_t::tr("Ollama (Local)"), QStringLiteral("ollama"));
+        int idx = this->providerCombo->findData(s.provider);
         if (((idx >= 0) == true))
         {
-            m_providerCombo->setCurrentIndex(idx);
+            this->providerCombo->setCurrentIndex(idx);
         }
 
         // OpenAI settings
         // Base URL combo: editable, with popular providers
-        m_baseUrlCombo->addItems({
+        this->baseUrlCombo->addItems({
             QStringLiteral("https://api.openai.com"),
             QStringLiteral("https://api.anthropic.com"),
             QStringLiteral("https://generativelanguage.googleapis.com"),
@@ -190,11 +190,11 @@ public:
             QStringLiteral("http://localhost:1234"),
             QStringLiteral("http://localhost:8080"),
         });
-        m_baseUrlCombo->setCurrentText(s.baseUrl);
-        m_apiKeyEdit->setText(s.apiKey);
+        this->baseUrlCombo->setCurrentText(s.base_url);
+        this->apiKeyEdit->setText(s.api_key);
 
         // Model combo: editable, with presets
-        m_modelCombo->addItems({
+        this->modelCombo->addItems({
             // OpenAI — GPT-5 family
             QStringLiteral("gpt-5.2"),
             QStringLiteral("gpt-5.2-codex"),
@@ -242,40 +242,40 @@ public:
             QStringLiteral("grok-3-mini"),
             QStringLiteral("grok-3-fast"),
         });
-        m_modelCombo->setCurrentText(s.modelName);
+        this->modelCombo->setCurrentText(s.model_name);
 
-        populateEffortCombo(m_reasoningCombo);
-        selectEffortValue(m_reasoningCombo, s.reasoningEffort, 2);
+        populateEffortCombo(this->reasoningCombo);
+        selectEffortValue(this->reasoningCombo, s.reasoning_effort, 2);
 
-        populateEffortCombo(m_thinkingCombo);
-        selectEffortValue(m_thinkingCombo, s.thinkingLevel, 2);
+        populateEffortCombo(this->thinkingCombo);
+        selectEffortValue(this->thinkingCombo, s.thinking_level, 2);
 
-        m_tempSpin->setValue(s.temperature);
+        this->tempSpin->setValue(s.temperature);
 
-        m_maxTokensSpin->setValue(s.maxTokens);
+        this->maxTokensSpin->setValue(s.max_tokens);
 
         // GitHub Copilot (sidecar)
-        repopulateEditableCombo(m_copilotModelCombo, modelCatalog().copilotModels(),
-                                s.copilotModel);
-        connect(&modelCatalog(), &ModelCatalog::copilotModelsChanged, this,
+        repopulateEditableCombo(this->copilotModelCombo, model_catalog().copilot_models(),
+                                s.copilot_model);
+        connect(&model_catalog(), &model_catalog_t::copilot_models_changed, this,
                 [this](const QStringList &models) {
-                    repopulateEditableCombo(m_copilotModelCombo, models,
-                                            m_copilotModelCombo->currentText());
+                    repopulateEditableCombo(this->copilotModelCombo, models,
+                                            this->copilotModelCombo->currentText());
                 });
 
-        m_copilotNodeEdit->setText(s.copilotNodePath);
-        m_copilotSidecarEdit->setText(s.copilotSidecarPath);
-        m_copilotCompletionTimeoutSpin->setValue(s.copilotCompletionTimeoutSec);
+        this->copilotNodeEdit->setText(s.copilot_node_path);
+        this->copilotSidecarEdit->setText(s.copilot_sidecar_path);
+        this->copilotCompletionTimeoutSpin->setValue(s.copilot_completion_timeout_sec);
 
         // Local provider settings
-        m_localUrlEdit->setText(s.localBaseUrl);
-        m_localEndpointEdit->setText(s.localEndpointPath);
-        m_localSimpleCheck->setChecked(s.localSimpleMode);
-        m_localHeadersEdit->setText(s.localCustomHeaders);
+        this->localUrlEdit->setText(s.local_base_url);
+        this->localEndpointEdit->setText(s.local_endpoint_path);
+        this->localSimpleCheck->setChecked(s.local_simple_mode);
+        this->localHeadersEdit->setText(s.local_custom_headers);
 
         // Ollama
-        m_ollamaUrlEdit->setText(s.ollamaBaseUrl);
-        m_ollamaModelCombo->addItems({
+        this->ollamaUrlEdit->setText(s.ollama_base_url);
+        this->ollamaModelCombo->addItems({
             QStringLiteral("llama4"),
             QStringLiteral("llama3.3"),
             QStringLiteral("llama3.1"),
@@ -288,24 +288,24 @@ public:
             QStringLiteral("phi4"),
             QStringLiteral("codellama"),
         });
-        m_ollamaModelCombo->setCurrentText(s.ollamaModel);
+        this->ollamaModelCombo->setCurrentText(s.ollama_model);
 
         // Safety
-        m_maxIterSpin->setValue(s.maxIterations);
-        m_maxToolsSpin->setValue(s.maxToolCalls);
-        m_maxDiffSpin->setValue(s.maxDiffLines);
-        m_maxFilesSpin->setValue(s.maxChangedFiles);
+        this->maxIterSpin->setValue(s.max_iterations);
+        this->maxToolsSpin->setValue(s.max_tool_calls);
+        this->maxDiffSpin->setValue(s.max_diff_lines);
+        this->maxFilesSpin->setValue(s.max_changed_files);
 
-        m_dryRunCheck->setChecked(s.dryRunDefault);
+        this->dryRunCheck->setChecked(s.dry_run_default);
 
-        m_aiCompletionCheck->setChecked(s.aiCompletionEnabled);
+        this->aiCompletionCheck->setChecked(s.ai_completion_enabled);
 
-        m_completionMinCharsSpin->setValue(s.completionMinChars);
+        this->completionMinCharsSpin->setValue(s.completion_min_chars);
 
-        m_completionDelayMsSpin->setValue(s.completionDelayMs);
+        this->completionDelayMsSpin->setValue(s.completion_delay_ms);
 
-        m_completionModelCombo->addItem(Tr::tr("(Same as agent model)"), QStringLiteral(""));
-        m_completionModelCombo->addItems({
+        this->completionModelCombo->addItem(tr_t::tr("(Same as agent model)"), QStringLiteral(""));
+        this->completionModelCombo->addItems({
             // Fast/small models suitable for completion
             QStringLiteral("gpt-4.1-nano"),
             QStringLiteral("gpt-4.1-mini"),
@@ -322,252 +322,252 @@ public:
             QStringLiteral("qwen2.5-coder-32b"),
             QStringLiteral("codellama"),
         });
-        if (s.completionModel.isEmpty())
+        if (s.completion_model.isEmpty())
         {
-            m_completionModelCombo->setCurrentIndex(0);
+            this->completionModelCombo->setCurrentIndex(0);
         }
         else
         {
-            m_completionModelCombo->setCurrentText(s.completionModel);
+            this->completionModelCombo->setCurrentText(s.completion_model);
         }
 
-        populateEffortCombo(m_completionThinkingCombo);
-        selectEffortValue(m_completionThinkingCombo, s.completionThinkingLevel, 0);
+        populateEffortCombo(this->completionThinkingCombo);
+        selectEffortValue(this->completionThinkingCombo, s.completion_thinking_level, 0);
 
-        populateEffortCombo(m_completionReasoningCombo);
-        selectEffortValue(m_completionReasoningCombo, s.completionReasoningEffort, 0);
+        populateEffortCombo(this->completionReasoningCombo);
+        selectEffortValue(this->completionReasoningCombo, s.completion_reasoning_effort, 0);
 
-        m_debugLoggingCheck->setChecked(s.debugLogging);
+        this->debugLoggingCheck->setChecked(s.debug_logging);
 
-        m_agentDebugCheck->setChecked(s.agentDebug);
+        this->agentDebugCheck->setChecked(s.agent_debug);
 
-        m_snapshot = captureSnapshot();
+        this->snapshot = this->captureSnapshot();
 
         // Notify the framework when any widget value changes so it can poll isDirty().
         using Utils::installCheckSettingsDirtyTrigger;
-        installCheckSettingsDirtyTrigger(m_providerCombo);
-        installCheckSettingsDirtyTrigger(m_baseUrlCombo);
-        installCheckSettingsDirtyTrigger(m_apiKeyEdit);
-        installCheckSettingsDirtyTrigger(m_modelCombo);
-        installCheckSettingsDirtyTrigger(m_reasoningCombo);
-        installCheckSettingsDirtyTrigger(m_thinkingCombo);
-        installCheckSettingsDirtyTrigger(m_maxTokensSpin);
-        installCheckSettingsDirtyTrigger(m_copilotModelCombo);
-        installCheckSettingsDirtyTrigger(m_copilotNodeEdit);
-        installCheckSettingsDirtyTrigger(m_copilotSidecarEdit);
-        installCheckSettingsDirtyTrigger(m_copilotCompletionTimeoutSpin);
-        installCheckSettingsDirtyTrigger(m_localUrlEdit);
-        installCheckSettingsDirtyTrigger(m_localEndpointEdit);
-        installCheckSettingsDirtyTrigger(m_localSimpleCheck);
-        installCheckSettingsDirtyTrigger(m_localHeadersEdit);
-        installCheckSettingsDirtyTrigger(m_ollamaUrlEdit);
-        installCheckSettingsDirtyTrigger(m_ollamaModelCombo);
-        installCheckSettingsDirtyTrigger(m_maxIterSpin);
-        installCheckSettingsDirtyTrigger(m_maxToolsSpin);
-        installCheckSettingsDirtyTrigger(m_maxDiffSpin);
-        installCheckSettingsDirtyTrigger(m_maxFilesSpin);
-        installCheckSettingsDirtyTrigger(m_dryRunCheck);
-        installCheckSettingsDirtyTrigger(m_aiCompletionCheck);
-        installCheckSettingsDirtyTrigger(m_completionMinCharsSpin);
-        installCheckSettingsDirtyTrigger(m_completionDelayMsSpin);
-        installCheckSettingsDirtyTrigger(m_completionModelCombo);
-        installCheckSettingsDirtyTrigger(m_completionThinkingCombo);
-        installCheckSettingsDirtyTrigger(m_completionReasoningCombo);
-        installCheckSettingsDirtyTrigger(m_debugLoggingCheck);
-        installCheckSettingsDirtyTrigger(m_agentDebugCheck);
+        installCheckSettingsDirtyTrigger(this->providerCombo);
+        installCheckSettingsDirtyTrigger(this->baseUrlCombo);
+        installCheckSettingsDirtyTrigger(this->apiKeyEdit);
+        installCheckSettingsDirtyTrigger(this->modelCombo);
+        installCheckSettingsDirtyTrigger(this->reasoningCombo);
+        installCheckSettingsDirtyTrigger(this->thinkingCombo);
+        installCheckSettingsDirtyTrigger(this->maxTokensSpin);
+        installCheckSettingsDirtyTrigger(this->copilotModelCombo);
+        installCheckSettingsDirtyTrigger(this->copilotNodeEdit);
+        installCheckSettingsDirtyTrigger(this->copilotSidecarEdit);
+        installCheckSettingsDirtyTrigger(this->copilotCompletionTimeoutSpin);
+        installCheckSettingsDirtyTrigger(this->localUrlEdit);
+        installCheckSettingsDirtyTrigger(this->localEndpointEdit);
+        installCheckSettingsDirtyTrigger(this->localSimpleCheck);
+        installCheckSettingsDirtyTrigger(this->localHeadersEdit);
+        installCheckSettingsDirtyTrigger(this->ollamaUrlEdit);
+        installCheckSettingsDirtyTrigger(this->ollamaModelCombo);
+        installCheckSettingsDirtyTrigger(this->maxIterSpin);
+        installCheckSettingsDirtyTrigger(this->maxToolsSpin);
+        installCheckSettingsDirtyTrigger(this->maxDiffSpin);
+        installCheckSettingsDirtyTrigger(this->maxFilesSpin);
+        installCheckSettingsDirtyTrigger(this->dryRunCheck);
+        installCheckSettingsDirtyTrigger(this->aiCompletionCheck);
+        installCheckSettingsDirtyTrigger(this->completionMinCharsSpin);
+        installCheckSettingsDirtyTrigger(this->completionDelayMsSpin);
+        installCheckSettingsDirtyTrigger(this->completionModelCombo);
+        installCheckSettingsDirtyTrigger(this->completionThinkingCombo);
+        installCheckSettingsDirtyTrigger(this->completionReasoningCombo);
+        installCheckSettingsDirtyTrigger(this->debugLoggingCheck);
+        installCheckSettingsDirtyTrigger(this->agentDebugCheck);
         // QDoubleSpinBox not supported by installCheckSettingsDirtyTrigger
-        connect(m_tempSpin, &QDoubleSpinBox::valueChanged, Utils::checkSettingsDirty);
-        connect(m_mcpServersWidget, &McpServersWidget::changed, Utils::checkSettingsDirty);
+        connect(this->tempSpin, &QDoubleSpinBox::valueChanged, Utils::checkSettingsDirty);
+        connect(this->mcpServersWidget, &mcp_servers_widget_t::changed, Utils::checkSettingsDirty);
     }
 
     bool isDirty() const override
     {
-        return captureSnapshot() != m_snapshot;
+        return this->captureSnapshot() != this->snapshot;
     }
 
     void apply() override
     {
         auto &s = settings();
-        s.provider = m_providerCombo->currentData().toString();
-        s.baseUrl = m_baseUrlCombo->currentText();
-        s.apiKey = m_apiKeyEdit->text();
-        s.modelName = m_modelCombo->currentText();
-        s.reasoningEffort = m_reasoningCombo->currentData().toString();
-        s.thinkingLevel = m_thinkingCombo->currentData().toString();
-        s.temperature = m_tempSpin->value();
-        s.maxTokens = m_maxTokensSpin->value();
+        s.provider = this->providerCombo->currentData().toString();
+        s.base_url = this->baseUrlCombo->currentText();
+        s.api_key = this->apiKeyEdit->text();
+        s.model_name = this->modelCombo->currentText();
+        s.reasoning_effort = this->reasoningCombo->currentData().toString();
+        s.thinking_level = this->thinkingCombo->currentData().toString();
+        s.temperature = this->tempSpin->value();
+        s.max_tokens = this->maxTokensSpin->value();
 
-        s.copilotModel = m_copilotModelCombo->currentText();
-        s.copilotNodePath = m_copilotNodeEdit->text();
-        s.copilotSidecarPath = m_copilotSidecarEdit->text();
-        s.copilotCompletionTimeoutSec = m_copilotCompletionTimeoutSpin->value();
+        s.copilot_model = this->copilotModelCombo->currentText();
+        s.copilot_node_path = this->copilotNodeEdit->text();
+        s.copilot_sidecar_path = this->copilotSidecarEdit->text();
+        s.copilot_completion_timeout_sec = this->copilotCompletionTimeoutSpin->value();
 
-        s.localBaseUrl = m_localUrlEdit->text();
-        s.localEndpointPath = m_localEndpointEdit->text();
-        s.localSimpleMode = m_localSimpleCheck->isChecked();
-        s.localCustomHeaders = m_localHeadersEdit->text();
+        s.local_base_url = this->localUrlEdit->text();
+        s.local_endpoint_path = this->localEndpointEdit->text();
+        s.local_simple_mode = this->localSimpleCheck->isChecked();
+        s.local_custom_headers = this->localHeadersEdit->text();
 
-        s.ollamaBaseUrl = m_ollamaUrlEdit->text();
-        s.ollamaModel = m_ollamaModelCombo->currentText();
+        s.ollama_base_url = this->ollamaUrlEdit->text();
+        s.ollama_model = this->ollamaModelCombo->currentText();
 
-        s.maxIterations = m_maxIterSpin->value();
-        s.maxToolCalls = m_maxToolsSpin->value();
-        s.maxDiffLines = m_maxDiffSpin->value();
-        s.maxChangedFiles = m_maxFilesSpin->value();
+        s.max_iterations = this->maxIterSpin->value();
+        s.max_tool_calls = this->maxToolsSpin->value();
+        s.max_diff_lines = this->maxDiffSpin->value();
+        s.max_changed_files = this->maxFilesSpin->value();
 
-        s.dryRunDefault = m_dryRunCheck->isChecked();
-        s.aiCompletionEnabled = m_aiCompletionCheck->isChecked();
-        s.completionMinChars = m_completionMinCharsSpin->value();
-        s.completionDelayMs = m_completionDelayMsSpin->value();
-        const int cIdx = m_completionModelCombo->currentIndex();
-        s.completionModel = (cIdx == 0) ? QString() : m_completionModelCombo->currentText();
-        s.completionThinkingLevel = m_completionThinkingCombo->currentData().toString();
-        s.completionReasoningEffort = m_completionReasoningCombo->currentData().toString();
-        s.debugLogging = m_debugLoggingCheck->isChecked();
-        s.agentDebug = m_agentDebugCheck->isChecked();
-        s.mcpServers = m_mcpServersWidget->servers();
+        s.dry_run_default = this->dryRunCheck->isChecked();
+        s.ai_completion_enabled = this->aiCompletionCheck->isChecked();
+        s.completion_min_chars = this->completionMinCharsSpin->value();
+        s.completion_delay_ms = this->completionDelayMsSpin->value();
+        const int cIdx = this->completionModelCombo->currentIndex();
+        s.completion_model = (cIdx == 0) ? QString() : this->completionModelCombo->currentText();
+        s.completion_thinking_level = this->completionThinkingCombo->currentData().toString();
+        s.completion_reasoning_effort = this->completionReasoningCombo->currentData().toString();
+        s.debug_logging = this->debugLoggingCheck->isChecked();
+        s.agent_debug = this->agentDebugCheck->isChecked();
+        s.mcp_servers = this->mcpServersWidget->servers();
         s.save();
 
-        Logger::instance().setEnabled(s.debugLogging);
+        logger_t::instance().set_enabled(s.debug_logging);
 
-        m_snapshot = captureSnapshot();
+        this->snapshot = this->captureSnapshot();
     }
 
     void cancel() override
     {
-        restoreSnapshot(m_snapshot);
+        this->restoreSnapshot(this->snapshot);
     }
 
 private:
-    Snapshot captureSnapshot() const
+    snapshot_t captureSnapshot() const
     {
-        const int cIdx = m_completionModelCombo->currentIndex();
+        const int cIdx = this->completionModelCombo->currentIndex();
         return {
-            m_providerCombo->currentData().toString(),
-            m_baseUrlCombo->currentText(),
-            m_apiKeyEdit->text(),
-            m_modelCombo->currentText(),
-            m_reasoningCombo->currentData().toString(),
-            m_thinkingCombo->currentData().toString(),
-            m_tempSpin->value(),
-            m_maxTokensSpin->value(),
-            m_copilotModelCombo->currentText(),
-            m_copilotNodeEdit->text(),
-            m_copilotSidecarEdit->text(),
-            m_copilotCompletionTimeoutSpin->value(),
-            m_localUrlEdit->text(),
-            m_localEndpointEdit->text(),
-            m_localSimpleCheck->isChecked(),
-            m_localHeadersEdit->text(),
-            m_ollamaUrlEdit->text(),
-            m_ollamaModelCombo->currentText(),
-            m_maxIterSpin->value(),
-            m_maxToolsSpin->value(),
-            m_maxDiffSpin->value(),
-            m_maxFilesSpin->value(),
-            m_dryRunCheck->isChecked(),
-            m_aiCompletionCheck->isChecked(),
-            m_completionMinCharsSpin->value(),
-            m_completionDelayMsSpin->value(),
-            (cIdx == 0) ? QString() : m_completionModelCombo->currentText(),
-            m_completionThinkingCombo->currentData().toString(),
-            m_completionReasoningCombo->currentData().toString(),
-            m_debugLoggingCheck->isChecked(),
-            m_agentDebugCheck->isChecked(),
-            m_mcpServersWidget->servers(),
+            this->providerCombo->currentData().toString(),
+            this->baseUrlCombo->currentText(),
+            this->apiKeyEdit->text(),
+            this->modelCombo->currentText(),
+            this->reasoningCombo->currentData().toString(),
+            this->thinkingCombo->currentData().toString(),
+            this->tempSpin->value(),
+            this->maxTokensSpin->value(),
+            this->copilotModelCombo->currentText(),
+            this->copilotNodeEdit->text(),
+            this->copilotSidecarEdit->text(),
+            this->copilotCompletionTimeoutSpin->value(),
+            this->localUrlEdit->text(),
+            this->localEndpointEdit->text(),
+            this->localSimpleCheck->isChecked(),
+            this->localHeadersEdit->text(),
+            this->ollamaUrlEdit->text(),
+            this->ollamaModelCombo->currentText(),
+            this->maxIterSpin->value(),
+            this->maxToolsSpin->value(),
+            this->maxDiffSpin->value(),
+            this->maxFilesSpin->value(),
+            this->dryRunCheck->isChecked(),
+            this->aiCompletionCheck->isChecked(),
+            this->completionMinCharsSpin->value(),
+            this->completionDelayMsSpin->value(),
+            (cIdx == 0) ? QString() : this->completionModelCombo->currentText(),
+            this->completionThinkingCombo->currentData().toString(),
+            this->completionReasoningCombo->currentData().toString(),
+            this->debugLoggingCheck->isChecked(),
+            this->agentDebugCheck->isChecked(),
+            this->mcpServersWidget->servers(),
         };
     }
 
-    void restoreSnapshot(const Snapshot &snap)
+    void restoreSnapshot(const snapshot_t &snap)
     {
-        const int provIdx = m_providerCombo->findData(snap.provider);
+        const int provIdx = this->providerCombo->findData(snap.provider);
         if (provIdx >= 0)
-            m_providerCombo->setCurrentIndex(provIdx);
+            this->providerCombo->setCurrentIndex(provIdx);
 
-        m_baseUrlCombo->setCurrentText(snap.baseUrl);
-        m_apiKeyEdit->setText(snap.apiKey);
-        m_modelCombo->setCurrentText(snap.modelName);
-        selectEffortValue(m_reasoningCombo, snap.reasoningEffort, 2);
-        selectEffortValue(m_thinkingCombo, snap.thinkingLevel, 2);
-        m_tempSpin->setValue(snap.temperature);
-        m_maxTokensSpin->setValue(snap.maxTokens);
+        this->baseUrlCombo->setCurrentText(snap.base_url);
+        this->apiKeyEdit->setText(snap.api_key);
+        this->modelCombo->setCurrentText(snap.model_name);
+        selectEffortValue(this->reasoningCombo, snap.reasoning_effort, 2);
+        selectEffortValue(this->thinkingCombo, snap.thinking_level, 2);
+        this->tempSpin->setValue(snap.temperature);
+        this->maxTokensSpin->setValue(snap.max_tokens);
 
-        m_copilotModelCombo->setCurrentText(snap.copilotModel);
-        m_copilotNodeEdit->setText(snap.copilotNodePath);
-        m_copilotSidecarEdit->setText(snap.copilotSidecarPath);
-        m_copilotCompletionTimeoutSpin->setValue(snap.copilotCompletionTimeoutSec);
+        this->copilotModelCombo->setCurrentText(snap.copilot_model);
+        this->copilotNodeEdit->setText(snap.copilot_node_path);
+        this->copilotSidecarEdit->setText(snap.copilot_sidecar_path);
+        this->copilotCompletionTimeoutSpin->setValue(snap.copilot_completion_timeout_sec);
 
-        m_localUrlEdit->setText(snap.localBaseUrl);
-        m_localEndpointEdit->setText(snap.localEndpointPath);
-        m_localSimpleCheck->setChecked(snap.localSimpleMode);
-        m_localHeadersEdit->setText(snap.localCustomHeaders);
+        this->localUrlEdit->setText(snap.local_base_url);
+        this->localEndpointEdit->setText(snap.local_endpoint_path);
+        this->localSimpleCheck->setChecked(snap.local_simple_mode);
+        this->localHeadersEdit->setText(snap.local_custom_headers);
 
-        m_ollamaUrlEdit->setText(snap.ollamaBaseUrl);
-        m_ollamaModelCombo->setCurrentText(snap.ollamaModel);
+        this->ollamaUrlEdit->setText(snap.ollama_base_url);
+        this->ollamaModelCombo->setCurrentText(snap.ollama_model);
 
-        m_maxIterSpin->setValue(snap.maxIterations);
-        m_maxToolsSpin->setValue(snap.maxToolCalls);
-        m_maxDiffSpin->setValue(snap.maxDiffLines);
-        m_maxFilesSpin->setValue(snap.maxChangedFiles);
+        this->maxIterSpin->setValue(snap.max_iterations);
+        this->maxToolsSpin->setValue(snap.max_tool_calls);
+        this->maxDiffSpin->setValue(snap.max_diff_lines);
+        this->maxFilesSpin->setValue(snap.max_changed_files);
 
-        m_dryRunCheck->setChecked(snap.dryRunDefault);
-        m_aiCompletionCheck->setChecked(snap.aiCompletionEnabled);
-        m_completionMinCharsSpin->setValue(snap.completionMinChars);
-        m_completionDelayMsSpin->setValue(snap.completionDelayMs);
+        this->dryRunCheck->setChecked(snap.dry_run_default);
+        this->aiCompletionCheck->setChecked(snap.ai_completion_enabled);
+        this->completionMinCharsSpin->setValue(snap.completion_min_chars);
+        this->completionDelayMsSpin->setValue(snap.completion_delay_ms);
 
-        if (snap.completionModel.isEmpty())
-            m_completionModelCombo->setCurrentIndex(0);
+        if (snap.completion_model.isEmpty())
+            this->completionModelCombo->setCurrentIndex(0);
         else
-            m_completionModelCombo->setCurrentText(snap.completionModel);
+            this->completionModelCombo->setCurrentText(snap.completion_model);
 
-        selectEffortValue(m_completionThinkingCombo, snap.completionThinkingLevel, 0);
-        selectEffortValue(m_completionReasoningCombo, snap.completionReasoningEffort, 0);
+        selectEffortValue(this->completionThinkingCombo, snap.completion_thinking_level, 0);
+        selectEffortValue(this->completionReasoningCombo, snap.completion_reasoning_effort, 0);
 
-        m_debugLoggingCheck->setChecked(snap.debugLogging);
-        m_agentDebugCheck->setChecked(snap.agentDebug);
-        m_mcpServersWidget->setServers(snap.mcpServers);
+        this->debugLoggingCheck->setChecked(snap.debug_logging);
+        this->agentDebugCheck->setChecked(snap.agent_debug);
+        this->mcpServersWidget->set_servers(snap.mcp_servers);
     }
 
-    Snapshot m_snapshot;
-    std::unique_ptr<Ui::SettingsWidget> m_ui;
-    QComboBox *m_providerCombo;
-    QComboBox *m_baseUrlCombo;
-    QLineEdit *m_apiKeyEdit;
-    QComboBox *m_modelCombo;
-    QComboBox *m_reasoningCombo;
-    QComboBox *m_thinkingCombo;
-    QDoubleSpinBox *m_tempSpin;
-    QSpinBox *m_maxTokensSpin;
-    QLineEdit *m_copilotNodeEdit, *m_copilotSidecarEdit;
-    QComboBox *m_copilotModelCombo;
-    QSpinBox *m_copilotCompletionTimeoutSpin;
-    QLineEdit *m_localUrlEdit, *m_localEndpointEdit, *m_localHeadersEdit;
-    QCheckBox *m_localSimpleCheck;
-    QLineEdit *m_ollamaUrlEdit;
-    QComboBox *m_ollamaModelCombo;
-    QSpinBox *m_maxIterSpin, *m_maxToolsSpin, *m_maxDiffSpin, *m_maxFilesSpin;
-    QCheckBox *m_dryRunCheck;
-    QCheckBox *m_aiCompletionCheck;
-    QSpinBox *m_completionMinCharsSpin;
-    QSpinBox *m_completionDelayMsSpin;
-    QComboBox *m_completionModelCombo;
-    QComboBox *m_completionThinkingCombo;
-    QComboBox *m_completionReasoningCombo;
-    QCheckBox *m_debugLoggingCheck;
-    QCheckBox *m_agentDebugCheck;
-    McpServersWidget *m_mcpServersWidget = nullptr;
+    snapshot_t snapshot;
+    std::unique_ptr<Ui::settings_widget_t> ui;
+    QComboBox *providerCombo;
+    QComboBox *baseUrlCombo;
+    QLineEdit *apiKeyEdit;
+    QComboBox *modelCombo;
+    QComboBox *reasoningCombo;
+    QComboBox *thinkingCombo;
+    QDoubleSpinBox *tempSpin;
+    QSpinBox *maxTokensSpin;
+    QLineEdit *copilotNodeEdit, *copilotSidecarEdit;
+    QComboBox *copilotModelCombo;
+    QSpinBox *copilotCompletionTimeoutSpin;
+    QLineEdit *localUrlEdit, *localEndpointEdit, *localHeadersEdit;
+    QCheckBox *localSimpleCheck;
+    QLineEdit *ollamaUrlEdit;
+    QComboBox *ollamaModelCombo;
+    QSpinBox *maxIterSpin, *maxToolsSpin, *maxDiffSpin, *maxFilesSpin;
+    QCheckBox *dryRunCheck;
+    QCheckBox *aiCompletionCheck;
+    QSpinBox *completionMinCharsSpin;
+    QSpinBox *completionDelayMsSpin;
+    QComboBox *completionModelCombo;
+    QComboBox *completionThinkingCombo;
+    QComboBox *completionReasoningCombo;
+    QCheckBox *debugLoggingCheck;
+    QCheckBox *agentDebugCheck;
+    mcp_servers_widget_t *mcpServersWidget = nullptr;
 };
 
-SettingsPage::SettingsPage()
+settings_page_t::settings_page_t()
 {
-    setId("qcai2.Settings");
-    setDisplayName(Tr::tr("Qcai2"));
+    setId("qcai2.settings_t");
+    setDisplayName(tr_t::tr("Qcai2"));
     setCategory("qcai2");
     IOptionsPage::registerCategory(
-        "qcai2", Tr::tr("Qcai2"),
+        "qcai2", tr_t::tr("Qcai2"),
         Utils::FilePath::fromString(QStringLiteral(":/qcai2/ai-agent-icon.svg")));
 
-    setWidgetCreator([]() -> Core::IOptionsPageWidget * { return new SettingsWidget; });
+    setWidgetCreator([]() -> Core::IOptionsPageWidget * { return new settings_widget_t; });
 }
 
 }  // namespace qcai2

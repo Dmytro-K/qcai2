@@ -8,7 +8,7 @@
 namespace qcai2::Migration
 {
 
-struct Revision
+struct revision_t
 {
     int major = 0;
     int minor = 0;
@@ -16,30 +16,30 @@ struct Revision
     int build = 0;
     bool valid = false;
 
-    QString versionString() const;
-    QString buildSuffixString() const;
-    QString revisionString() const;
+    QString version_string() const;
+    QString build_suffix_string() const;
+    QString revision_string() const;
 };
 
-Revision currentRevision();
-QString currentVersionString();
-QString currentBuildSuffix();
-QString currentRevisionString();
+revision_t current_revision();
+QString current_version_string();
+QString current_build_suffix();
+QString current_revision_string();
 
-Revision parseRevision(const QString &version, const QString &buildSuffix = {});
-bool isOlder(const Revision &lhs, const Revision &rhs);
+revision_t parse_revision(const QString &version, const QString &build_suffix = {});
+bool is_older(const revision_t &lhs, const revision_t &rhs);
 
-QString globalBackupDirPath();
-QString globalStructuredSettingsFilePath();
-QString projectBackupDirPath(const QString &storagePath);
+QString global_backup_dir_path();
+QString global_structured_settings_file_path();
+QString project_backup_dir_path(const QString &storage_path);
 
-void stampGlobalSettings(QSettings &settings);
-bool migrateGlobalSettings(QSettings &settings, QString *error = nullptr);
+void stamp_global_settings(QSettings &settings);
+bool migrate_global_settings(QSettings &settings, QString *error = nullptr);
 
-void stampProjectState(QJsonObject &root);
-bool migrateProjectState(const QString &storagePath, QString *error = nullptr);
+void stamp_project_state(QJsonObject &root);
+bool migrate_project_state(const QString &storage_path, QString *error = nullptr);
 
-QString projectGoalFilePath(const QString &storagePath);
-QString projectActionsLogFilePath(const QString &storagePath);
+QString project_goal_file_path(const QString &storage_path);
+QString project_actions_log_file_path(const QString &storage_path);
 
 }  // namespace qcai2::Migration

@@ -69,21 +69,21 @@ QString expandEnvironmentPlaceholders(const QString &value, const QProcessEnviro
     return resolved;
 }
 
-QString extraFieldString(const QJsonObject &extraFields, const QString &name)
+QString extra_field_string(const QJsonObject &extra_fields, const QString &name)
 {
-    return extraFields.value(name).toString().trimmed();
+    return extra_fields.value(name).toString().trimmed();
 }
 
-bool extraFieldBool(const QJsonObject &extraFields, const QString &name, bool fallback)
+bool extra_field_bool(const QJsonObject &extra_fields, const QString &name, bool fallback)
 {
-    const QJsonValue value = extraFields.value(name);
+    const QJsonValue value = extra_fields.value(name);
     return value.isBool() ? value.toBool() : fallback;
 }
 
-QStringList extraFieldStringList(const QJsonObject &extraFields, const QString &name)
+QStringList extra_field_string_list(const QJsonObject &extra_fields, const QString &name)
 {
     QStringList values;
-    const QJsonValue value = extraFields.value(name);
+    const QJsonValue value = extra_fields.value(name);
     if (value.isString() == true)
     {
         return value.toString().split(QRegularExpression(QStringLiteral("\\s+")),
@@ -206,10 +206,10 @@ QJsonObject initializeParamsObject()
         {QStringLiteral("capabilities"), QJsonObject{}},
         {QStringLiteral("clientInfo"),
          QJsonObject{{QStringLiteral("name"), QStringLiteral("qcai2")},
-                     {QStringLiteral("version"), Migration::currentRevisionString()}}}};
+                     {QStringLiteral("version"), Migration::current_revision_string()}}}};
 }
 
-int probeTimeoutMs(int configuredTimeoutMs)
+int probe_timeout_ms(int configuredTimeoutMs)
 {
     if (((configuredTimeoutMs <= 0) == true))
     {
@@ -218,30 +218,30 @@ int probeTimeoutMs(int configuredTimeoutMs)
     return std::min(configuredTimeoutMs, kStatusProbeTimeoutMs);
 }
 
-qtmcp::HttpTransportConfig buildHttpTransportConfig(const QString &serverName,
-                                                    const qtmcp::ServerDefinition &definition)
+qtmcp::http_transport_config_t
+buildHttpTransportConfig(const QString &serverName, const qtmcp::server_definition_t &definition)
 {
     const QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
 
-    qtmcp::HttpTransportConfig config;
+    qtmcp::http_transport_config_t config;
     config.endpoint = QUrl(expandEnvironmentPlaceholders(definition.url, environment));
-    config.protocolVersion = QString::fromLatin1(kMcpProtocolVersionHttp);
-    config.requestTimeoutMs = definition.requestTimeoutMs;
-    config.oauthEnabled = extraFieldBool(definition.extraFields, QStringLiteral("oauthEnabled"),
-                                         definition.headers.isEmpty());
-    config.oauthClientId =
-        extraFieldString(definition.extraFields, QStringLiteral("oauthClientId"));
-    config.oauthClientSecret = expandEnvironmentPlaceholders(
-        extraFieldString(definition.extraFields, QStringLiteral("oauthClientSecret")),
+    config.protocol_version = QString::fromLatin1(kMcpProtocolVersionHttp);
+    config.request_timeout_ms = definition.request_timeout_ms;
+    config.oauth_enabled = extra_field_bool(
+        definition.extra_fields, QStringLiteral("oauthEnabled"), definition.headers.isEmpty());
+    config.oauth_client_id =
+        extra_field_string(definition.extra_fields, QStringLiteral("oauthClientId"));
+    config.oauth_client_secret = expandEnvironmentPlaceholders(
+        extra_field_string(definition.extra_fields, QStringLiteral("oauthClientSecret")),
         environment);
-    config.oauthClientName =
-        extraFieldString(definition.extraFields, QStringLiteral("oauthClientName"));
-    if (config.oauthClientName.isEmpty())
+    config.oauth_client_name =
+        extra_field_string(definition.extra_fields, QStringLiteral("oauthClientName"));
+    if (config.oauth_client_name.isEmpty())
     {
-        config.oauthClientName = QStringLiteral("qcai2");
+        config.oauth_client_name = QStringLiteral("qcai2");
     }
-    config.oauthScopes =
-        extraFieldStringList(definition.extraFields, QStringLiteral("oauthScopes"));
+    config.oauth_scopes =
+        extra_field_string_list(definition.extra_fields, QStringLiteral("oauthScopes"));
     for (auto it = definition.headers.begin(); it != definition.headers.end(); ++it)
     {
         config.headers.insert(it.key(), expandEnvironmentPlaceholders(it.value(), environment));
@@ -251,14 +251,14 @@ qtmcp::HttpTransportConfig buildHttpTransportConfig(const QString &serverName,
     return config;
 }
 
-QColor statusColor(McpServersWidget::HttpStatusKind kind, const QWidget *widget)
+QColor statusColor(mcp_servers_widget_t::http_status_kind_t kind, const QWidget *widget)
 {
     switch (kind)
     {
-        case McpServersWidget::HttpStatusKind::Reachable:
+        case mcp_servers_widget_t::http_status_kind_t::REACHABLE:
             return QColor(0, 128, 0);
-        case McpServersWidget::HttpStatusKind::AuthorizationRequired:
-        case McpServersWidget::HttpStatusKind::Error:
+        case mcp_servers_widget_t::http_status_kind_t::AUTHORIZATION_REQUIRED:
+        case mcp_servers_widget_t::http_status_kind_t::ERROR:
             return QColor(180, 0, 0);
         default:
             return widget->palette().color(QPalette::Text);
@@ -267,55 +267,55 @@ QColor statusColor(McpServersWidget::HttpStatusKind kind, const QWidget *widget)
 
 QString notTestedText()
 {
-    return McpServersWidget::tr("Not tested");
+    return mcp_servers_widget_t::tr("Not tested");
 }
 
 QString checkingText()
 {
-    return McpServersWidget::tr("Checking...");
+    return mcp_servers_widget_t::tr("Checking...");
 }
 
 QString authorizedText()
 {
-    return McpServersWidget::tr("Authorized");
+    return mcp_servers_widget_t::tr("Authorized");
 }
 
 QString connectedText()
 {
-    return McpServersWidget::tr("Connected");
+    return mcp_servers_widget_t::tr("Connected");
 }
 
 QString authorizationRequiredText()
 {
-    return McpServersWidget::tr("Authorization required");
+    return mcp_servers_widget_t::tr("Authorization required");
 }
 
 QString authorizingText()
 {
-    return McpServersWidget::tr("Authorizing...");
+    return mcp_servers_widget_t::tr("Authorizing...");
 }
 
 QString errorPrefixText()
 {
-    return McpServersWidget::tr("Error");
+    return mcp_servers_widget_t::tr("Error");
 }
 
 }  // namespace
 
-McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
+mcp_servers_widget_t::mcp_servers_widget_t(QWidget *parent) : QWidget(parent)
 {
     auto *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
 
     auto *listColumn = new QVBoxLayout;
-    m_serverList = new QListWidget(this);
-    listColumn->addWidget(m_serverList, 1);
+    this->server_list = new QListWidget(this);
+    listColumn->addWidget(this->server_list, 1);
 
     auto *buttonRow = new QHBoxLayout;
-    m_addButton = new QPushButton(tr("Add"), this);
-    m_removeButton = new QPushButton(tr("Remove"), this);
-    buttonRow->addWidget(m_addButton);
-    buttonRow->addWidget(m_removeButton);
+    this->add_button = new QPushButton(tr("Add"), this);
+    this->remove_button = new QPushButton(tr("Remove"), this);
+    buttonRow->addWidget(this->add_button);
+    buttonRow->addWidget(this->remove_button);
     buttonRow->addStretch(1);
     listColumn->addLayout(buttonRow);
 
@@ -323,213 +323,217 @@ McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
     auto *editorLayout = new QVBoxLayout(editorGroup);
     auto *formLayout = new QFormLayout;
 
-    m_nameEdit = new QLineEdit(editorGroup);
-    m_enabledCheck = new QCheckBox(tr("Enabled"), editorGroup);
-    m_transportCombo = new QComboBox(editorGroup);
-    m_transportCombo->setEditable(true);
-    m_transportCombo->addItems(
+    this->name_edit = new QLineEdit(editorGroup);
+    this->enabled_check = new QCheckBox(tr("Enabled"), editorGroup);
+    this->transport_combo = new QComboBox(editorGroup);
+    this->transport_combo->setEditable(true);
+    this->transport_combo->addItems(
         {QStringLiteral("stdio"), QStringLiteral("http"), QStringLiteral("sse")});
-    m_startupTimeoutSpin = new QSpinBox(editorGroup);
-    m_startupTimeoutSpin->setRange(0, 600000);
-    m_startupTimeoutSpin->setSuffix(tr(" ms"));
-    m_requestTimeoutSpin = new QSpinBox(editorGroup);
-    m_requestTimeoutSpin->setRange(0, 600000);
-    m_requestTimeoutSpin->setSuffix(tr(" ms"));
+    this->startup_timeout_spin = new QSpinBox(editorGroup);
+    this->startup_timeout_spin->setRange(0, 600000);
+    this->startup_timeout_spin->setSuffix(tr(" ms"));
+    this->request_timeout_spin = new QSpinBox(editorGroup);
+    this->request_timeout_spin->setRange(0, 600000);
+    this->request_timeout_spin->setSuffix(tr(" ms"));
 
-    formLayout->addRow(tr("Name:"), m_nameEdit);
-    formLayout->addRow(QString(), m_enabledCheck);
-    formLayout->addRow(tr("Transport:"), m_transportCombo);
-    formLayout->addRow(tr("Startup timeout:"), m_startupTimeoutSpin);
-    formLayout->addRow(tr("Request timeout:"), m_requestTimeoutSpin);
+    formLayout->addRow(tr("Name:"), this->name_edit);
+    formLayout->addRow(QString(), this->enabled_check);
+    formLayout->addRow(tr("transport_t:"), this->transport_combo);
+    formLayout->addRow(tr("Startup timeout:"), this->startup_timeout_spin);
+    formLayout->addRow(tr("Request timeout:"), this->request_timeout_spin);
     editorLayout->addLayout(formLayout);
 
-    m_transportPages = new QStackedWidget(editorGroup);
+    this->transport_pages = new QStackedWidget(editorGroup);
 
-    auto *stdioPage = new QWidget(m_transportPages);
+    auto *stdioPage = new QWidget(this->transport_pages);
     auto *stdioLayout = new QFormLayout(stdioPage);
-    m_commandEdit = new QLineEdit(stdioPage);
-    m_argsEdit = new QPlainTextEdit(stdioPage);
-    m_argsEdit->setPlaceholderText(tr("One argument per line"));
-    m_envEdit = new QPlainTextEdit(stdioPage);
-    m_envEdit->setPlaceholderText(tr("One KEY=VALUE pair per line"));
-    stdioLayout->addRow(tr("Command:"), m_commandEdit);
-    stdioLayout->addRow(tr("Arguments:"), m_argsEdit);
-    stdioLayout->addRow(tr("Environment:"), m_envEdit);
-    m_transportPages->addWidget(stdioPage);
+    this->command_edit = new QLineEdit(stdioPage);
+    this->args_edit = new QPlainTextEdit(stdioPage);
+    this->args_edit->setPlaceholderText(tr("One argument per line"));
+    this->env_edit = new QPlainTextEdit(stdioPage);
+    this->env_edit->setPlaceholderText(tr("One KEY=VALUE pair per line"));
+    stdioLayout->addRow(tr("Command:"), this->command_edit);
+    stdioLayout->addRow(tr("Arguments:"), this->args_edit);
+    stdioLayout->addRow(tr("Environment:"), this->env_edit);
+    this->transport_pages->addWidget(stdioPage);
 
-    auto *httpPage = new QWidget(m_transportPages);
+    auto *httpPage = new QWidget(this->transport_pages);
     auto *httpLayout = new QFormLayout(httpPage);
-    m_urlEdit = new QLineEdit(httpPage);
-    m_tokenEdit = new QLineEdit(httpPage);
-    m_tokenEdit->setPlaceholderText(tr("Bearer token or ${ENV_VAR}"));
-    m_headersEdit = new QPlainTextEdit(httpPage);
-    m_headersEdit->setPlaceholderText(tr("One Header: Value pair per line"));
+    this->url_edit = new QLineEdit(httpPage);
+    this->token_edit = new QLineEdit(httpPage);
+    this->token_edit->setPlaceholderText(tr("Bearer token or ${ENV_VAR}"));
+    this->headers_edit = new QPlainTextEdit(httpPage);
+    this->headers_edit->setPlaceholderText(tr("One Header: Value pair per line"));
     auto *httpStatusRow = new QWidget(httpPage);
     auto *httpStatusLayout = new QHBoxLayout(httpStatusRow);
     httpStatusLayout->setContentsMargins(0, 0, 0, 0);
-    m_httpStatusLabel = new QLabel(notTestedText(), httpStatusRow);
-    m_httpStatusLabel->setWordWrap(true);
-    m_testConnectionButton = new QPushButton(tr("Test connection"), httpStatusRow);
-    m_authorizeButton = new QPushButton(tr("Authorize"), httpStatusRow);
-    m_testConnectionButton->setEnabled(false);
-    m_authorizeButton->setEnabled(false);
-    httpStatusLayout->addWidget(m_httpStatusLabel, 1);
-    httpStatusLayout->addWidget(m_testConnectionButton, 0);
-    httpStatusLayout->addWidget(m_authorizeButton, 0);
-    httpLayout->addRow(tr("URL:"), m_urlEdit);
-    httpLayout->addRow(tr("Token:"), m_tokenEdit);
-    httpLayout->addRow(tr("Headers:"), m_headersEdit);
+    this->http_status_label = new QLabel(notTestedText(), httpStatusRow);
+    this->http_status_label->setWordWrap(true);
+    this->test_connection_button = new QPushButton(tr("Test connection"), httpStatusRow);
+    this->authorize_button = new QPushButton(tr("Authorize"), httpStatusRow);
+    this->test_connection_button->setEnabled(false);
+    this->authorize_button->setEnabled(false);
+    httpStatusLayout->addWidget(this->http_status_label, 1);
+    httpStatusLayout->addWidget(this->test_connection_button, 0);
+    httpStatusLayout->addWidget(this->authorize_button, 0);
+    httpLayout->addRow(tr("URL:"), this->url_edit);
+    httpLayout->addRow(tr("Token:"), this->token_edit);
+    httpLayout->addRow(tr("Headers:"), this->headers_edit);
     httpLayout->addRow(tr("Status:"), httpStatusRow);
-    m_transportPages->addWidget(httpPage);
+    this->transport_pages->addWidget(httpPage);
 
-    auto *unknownPage = new QWidget(m_transportPages);
+    auto *unknownPage = new QWidget(this->transport_pages);
     auto *unknownLayout = new QVBoxLayout(unknownPage);
-    m_unknownTransportLabel = new QLabel(unknownPage);
-    m_unknownTransportLabel->setWordWrap(true);
-    unknownLayout->addWidget(m_unknownTransportLabel);
+    this->unknown_transport_label = new QLabel(unknownPage);
+    this->unknown_transport_label->setWordWrap(true);
+    unknownLayout->addWidget(this->unknown_transport_label);
     unknownLayout->addStretch(1);
-    m_transportPages->addWidget(unknownPage);
+    this->transport_pages->addWidget(unknownPage);
 
-    editorLayout->addWidget(m_transportPages, 1);
+    editorLayout->addWidget(this->transport_pages, 1);
 
     mainLayout->addLayout(listColumn, 1);
     mainLayout->addWidget(editorGroup, 2);
 
-    connect(m_addButton, &QPushButton::clicked, this, [this]() {
-        const QString name = makeUniqueServerName(QStringLiteral("server"));
-        m_servers.insert(name, qtmcp::ServerDefinition{});
-        repopulateServerList(name);
-        emit changed();
+    connect(this->add_button, &QPushButton::clicked, this, [this]() {
+        const QString name = this->make_unique_server_name(QStringLiteral("server"));
+        this->server_definitions.insert(name, qtmcp::server_definition_t{});
+        this->repopulate_server_list(name);
+        emit this->changed();
     });
-    connect(m_removeButton, &QPushButton::clicked, this, [this]() {
-        const QString name = currentServerName();
+    connect(this->remove_button, &QPushButton::clicked, this, [this]() {
+        const QString name = this->current_server_name();
         if (name.isEmpty() == true)
         {
             return;
         }
-        if (((m_testingConnection && m_connectionTestServerName == name) == true))
+        if (((this->testing_connection && this->connection_test_server_name == name) == true))
         {
-            cleanupConnectionTest();
+            this->cleanup_connection_test();
         }
-        m_servers.remove(name);
-        m_httpStatuses.remove(name);
-        m_authorizedServers.remove(name);
-        persistConnectionStates();
-        repopulateServerList();
-        emit changed();
+        this->server_definitions.remove(name);
+        this->http_statuses.remove(name);
+        this->authorized_servers.remove(name);
+        this->persist_connection_states();
+        this->repopulate_server_list();
+        emit this->changed();
     });
-    connect(m_serverList, &QListWidget::currentItemChanged, this,
-            [this](QListWidgetItem *, QListWidgetItem *) { loadCurrentServer(); });
-    connect(m_nameEdit, &QLineEdit::editingFinished, this, [this]() { renameCurrentServer(); });
-    connect(m_enabledCheck, &QCheckBox::checkStateChanged, this, [this](Qt::CheckState state) {
-        if (m_updating == true)
+    connect(this->server_list, &QListWidget::currentItemChanged, this,
+            [this](QListWidgetItem *, QListWidgetItem *) { this->load_current_server(); });
+    connect(this->name_edit, &QLineEdit::editingFinished, this,
+            [this]() { this->rename_current_server(); });
+    connect(this->enabled_check, &QCheckBox::checkStateChanged, this,
+            [this](Qt::CheckState state) {
+                if (this->updating == true)
+                {
+                    return;
+                }
+                if (auto *server = this->current_server(); ((server != nullptr) == true))
+                {
+                    server->enabled = state == Qt::Checked;
+                }
+                this->invalidate_current_server_status();
+            });
+    connect(this->transport_combo, &QComboBox::currentTextChanged, this,
+            [this](const QString &text) {
+                this->update_transport_page(text);
+                if (this->updating == true)
+                {
+                    return;
+                }
+                if (auto *server = this->current_server(); ((server != nullptr) == true))
+                {
+                    server->transport = text.trimmed();
+                }
+                this->invalidate_current_server_status();
+            });
+    connect(this->startup_timeout_spin, &QSpinBox::valueChanged, this, [this](int value) {
+        if (this->updating == true)
         {
             return;
         }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
+        if (auto *server = this->current_server(); ((server != nullptr) == true))
         {
-            server->enabled = state == Qt::Checked;
+            server->startup_timeout_ms = value;
         }
-        invalidateCurrentServerStatus();
+        this->invalidate_current_server_status();
     });
-    connect(m_transportCombo, &QComboBox::currentTextChanged, this, [this](const QString &text) {
-        updateTransportPage(text);
-        if (m_updating == true)
+    connect(this->request_timeout_spin, &QSpinBox::valueChanged, this, [this](int value) {
+        if (this->updating == true)
         {
             return;
         }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
+        if (auto *server = this->current_server(); ((server != nullptr) == true))
         {
-            server->transport = text.trimmed();
+            server->request_timeout_ms = value;
         }
-        invalidateCurrentServerStatus();
+        this->invalidate_current_server_status();
     });
-    connect(m_startupTimeoutSpin, &QSpinBox::valueChanged, this, [this](int value) {
-        if (m_updating == true)
+    connect(this->command_edit, &QLineEdit::textChanged, this, [this](const QString &text) {
+        if (this->updating == true)
         {
             return;
         }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
-        {
-            server->startupTimeoutMs = value;
-        }
-        invalidateCurrentServerStatus();
-    });
-    connect(m_requestTimeoutSpin, &QSpinBox::valueChanged, this, [this](int value) {
-        if (m_updating == true)
-        {
-            return;
-        }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
-        {
-            server->requestTimeoutMs = value;
-        }
-        invalidateCurrentServerStatus();
-    });
-    connect(m_commandEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
-        if (m_updating == true)
-        {
-            return;
-        }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
+        if (auto *server = this->current_server(); ((server != nullptr) == true))
         {
             server->command = text;
         }
-        invalidateCurrentServerStatus();
+        this->invalidate_current_server_status();
     });
-    connect(m_urlEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
-        if (m_updating == true)
+    connect(this->url_edit, &QLineEdit::textChanged, this, [this](const QString &text) {
+        if (this->updating == true)
         {
             return;
         }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
+        if (auto *server = this->current_server(); ((server != nullptr) == true))
         {
             server->url = text;
         }
-        invalidateCurrentServerStatus();
+        this->invalidate_current_server_status();
     });
-    connect(m_argsEdit, &QPlainTextEdit::textChanged, this, [this]() {
-        if (m_updating == true)
+    connect(this->args_edit, &QPlainTextEdit::textChanged, this, [this]() {
+        if (this->updating == true)
         {
             return;
         }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
+        if (auto *server = this->current_server(); ((server != nullptr) == true))
         {
-            server->args = textLines(m_argsEdit->toPlainText());
+            server->args = this->text_lines(this->args_edit->toPlainText());
         }
-        invalidateCurrentServerStatus();
+        this->invalidate_current_server_status();
     });
-    connect(m_envEdit, &QPlainTextEdit::textChanged, this, [this]() {
-        if (m_updating == true)
+    connect(this->env_edit, &QPlainTextEdit::textChanged, this, [this]() {
+        if (this->updating == true)
         {
             return;
         }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
+        if (auto *server = this->current_server(); ((server != nullptr) == true))
         {
-            server->env = parseMapLines(m_envEdit->toPlainText(), QLatin1Char('='));
+            server->env = this->parse_map_lines(this->env_edit->toPlainText(), QLatin1Char('='));
         }
-        invalidateCurrentServerStatus();
+        this->invalidate_current_server_status();
     });
-    connect(m_headersEdit, &QPlainTextEdit::textChanged, this, [this]() {
-        if (m_updating == true)
+    connect(this->headers_edit, &QPlainTextEdit::textChanged, this, [this]() {
+        if (this->updating == true)
         {
             return;
         }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
+        if (auto *server = this->current_server(); ((server != nullptr) == true))
         {
             QMap<QString, QString> headers =
-                parseMapLines(m_headersEdit->toPlainText(), QLatin1Char(':'));
-            QString token = m_tokenEdit->text().trimmed();
+                this->parse_map_lines(this->headers_edit->toPlainText(), QLatin1Char(':'));
+            QString token = this->token_edit->text().trimmed();
             if (token.isEmpty() == true)
             {
                 QString extractedToken = extractBearerToken(&headers);
                 if (extractedToken.isEmpty() == false)
                 {
-                    m_updating = true;
-                    m_tokenEdit->setText(extractedToken);
-                    m_headersEdit->setPlainText(
-                        joinMapLines(headers, QLatin1Char(':'), true).join(QLatin1Char('\n')));
-                    m_updating = false;
+                    this->updating = true;
+                    this->token_edit->setText(extractedToken);
+                    this->headers_edit->setPlainText(
+                        this->join_map_lines(headers, QLatin1Char(':'), true)
+                            .join(QLatin1Char('\n')));
+                    this->updating = false;
                     token = extractedToken;
                 }
             }
@@ -541,255 +545,257 @@ McpServersWidget::McpServersWidget(QWidget *parent) : QWidget(parent)
             }
             server->headers = headers;
         }
-        invalidateCurrentServerStatus();
+        this->invalidate_current_server_status();
     });
-    connect(m_tokenEdit, &QLineEdit::textChanged, this, [this](const QString &) {
-        if (m_updating == true)
+    connect(this->token_edit, &QLineEdit::textChanged, this, [this](const QString &) {
+        if (this->updating == true)
         {
             return;
         }
-        if (auto *server = currentServer(); ((server != nullptr) == true))
+        if (auto *server = this->current_server(); ((server != nullptr) == true))
         {
-            server->headers =
-                normalizedHeadersWithToken(m_headersEdit->toPlainText(), m_tokenEdit->text());
+            server->headers = normalizedHeadersWithToken(this->headers_edit->toPlainText(),
+                                                         this->token_edit->text());
         }
-        invalidateCurrentServerStatus();
+        this->invalidate_current_server_status();
     });
-    connect(m_testConnectionButton, &QPushButton::clicked, this,
-            [this]() { testCurrentServerConnection(); });
-    connect(m_authorizeButton, &QPushButton::clicked, this,
-            [this]() { authorizeCurrentServer(); });
+    connect(this->test_connection_button, &QPushButton::clicked, this,
+            [this]() { this->test_current_server_connection(); });
+    connect(this->authorize_button, &QPushButton::clicked, this,
+            [this]() { this->authorize_current_server(); });
 
-    setEditorsEnabled(false);
-    m_connectionTestTimer = new QTimer(this);
-    m_connectionTestTimer->setSingleShot(true);
-    connect(m_connectionTestTimer, &QTimer::timeout, this, [this]() {
-        if (((!m_testingConnection || m_connectionTestServerName.isEmpty()) == true))
+    this->set_editors_enabled(false);
+    this->connection_test_timer = new QTimer(this);
+    this->connection_test_timer->setSingleShot(true);
+    connect(this->connection_test_timer, &QTimer::timeout, this, [this]() {
+        if (((!this->testing_connection || this->connection_test_server_name.isEmpty()) == true))
         {
             return;
         }
-        finishConnectionTest(m_connectionTestServerName, HttpStatusKind::Error,
-                             tr("Error: connection test timed out"));
+        this->finish_connection_test(this->connection_test_server_name, http_status_kind_t::ERROR,
+                                     tr("Error: connection test timed out"));
     });
 }
 
-void McpServersWidget::setServers(const qtmcp::ServerDefinitions &servers)
+void mcp_servers_widget_t::set_servers(const qtmcp::server_definitions_t &servers)
 {
-    cleanupConnectionTest();
-    m_servers = servers;
-    m_httpStatuses.clear();
-    m_authorizedServers.clear();
-    loadPersistedConnectionStates();
-    repopulateServerList();
+    this->cleanup_connection_test();
+    this->server_definitions = servers;
+    this->http_statuses.clear();
+    this->authorized_servers.clear();
+    this->load_persisted_connection_states();
+    this->repopulate_server_list();
 }
 
-qtmcp::ServerDefinitions McpServersWidget::servers() const
+qtmcp::server_definitions_t mcp_servers_widget_t::servers() const
 {
-    return m_servers;
+    return this->server_definitions;
 }
 
-QString McpServersWidget::currentServerName() const
+QString mcp_servers_widget_t::current_server_name() const
 {
-    const auto *item = m_serverList->currentItem();
+    const auto *item = this->server_list->currentItem();
     return item == nullptr ? QString() : item->data(Qt::UserRole).toString();
 }
 
-qtmcp::ServerDefinition *McpServersWidget::currentServer()
+qtmcp::server_definition_t *mcp_servers_widget_t::current_server()
 {
-    const QString name = currentServerName();
-    auto it = m_servers.find(name);
-    return it == m_servers.end() ? nullptr : &it.value();
+    const QString name = this->current_server_name();
+    auto it = this->server_definitions.find(name);
+    return it == this->server_definitions.end() ? nullptr : &it.value();
 }
 
-const qtmcp::ServerDefinition *McpServersWidget::currentServer() const
+const qtmcp::server_definition_t *mcp_servers_widget_t::current_server() const
 {
-    const QString name = currentServerName();
-    auto it = m_servers.constFind(name);
-    return it == m_servers.cend() ? nullptr : &it.value();
+    const QString name = this->current_server_name();
+    auto it = this->server_definitions.constFind(name);
+    return it == this->server_definitions.cend() ? nullptr : &it.value();
 }
 
-void McpServersWidget::repopulateServerList(const QString &selectedServer)
+void mcp_servers_widget_t::repopulate_server_list(const QString &selectedServer)
 {
     const QString targetSelection =
-        selectedServer.isEmpty() ? currentServerName() : selectedServer;
+        selectedServer.isEmpty() ? this->current_server_name() : selectedServer;
 
-    m_updating = true;
-    m_serverList->clear();
-    for (auto it = m_servers.cbegin(); ((it != m_servers.cend()) == true); ++it)
+    this->updating = true;
+    this->server_list->clear();
+    for (auto it = this->server_definitions.cbegin();
+         ((it != this->server_definitions.cend()) == true); ++it)
     {
-        auto *item = new QListWidgetItem(it.key(), m_serverList);
+        auto *item = new QListWidgetItem(it.key(), this->server_list);
         item->setData(Qt::UserRole, it.key());
-        m_serverList->addItem(item);
-        updateServerListItem(it.key());
+        this->server_list->addItem(item);
+        this->update_server_list_item(it.key());
     }
 
     QListWidgetItem *selectedItem = nullptr;
-    for (int i = 0; ((i < m_serverList->count()) == true); ++i)
+    for (int i = 0; ((i < this->server_list->count()) == true); ++i)
     {
-        auto *item = m_serverList->item(i);
+        auto *item = this->server_list->item(i);
         if (((item->data(Qt::UserRole).toString() == targetSelection) == true))
         {
             selectedItem = item;
             break;
         }
     }
-    if (((selectedItem == nullptr && m_serverList->count() > 0) == true))
+    if (((selectedItem == nullptr && this->server_list->count() > 0) == true))
     {
-        selectedItem = m_serverList->item(0);
+        selectedItem = this->server_list->item(0);
     }
 
-    m_serverList->setCurrentItem(selectedItem);
-    m_updating = false;
-    loadCurrentServer();
+    this->server_list->setCurrentItem(selectedItem);
+    this->updating = false;
+    this->load_current_server();
 }
 
-void McpServersWidget::loadCurrentServer()
+void mcp_servers_widget_t::load_current_server()
 {
-    const qtmcp::ServerDefinition *server = currentServer();
+    const qtmcp::server_definition_t *server = this->current_server();
     if (((server == nullptr) == true))
     {
-        clearEditors();
-        setEditorsEnabled(false);
-        m_removeButton->setEnabled(false);
+        this->clear_editors();
+        this->set_editors_enabled(false);
+        this->remove_button->setEnabled(false);
         return;
     }
 
-    setEditorsEnabled(true);
-    m_removeButton->setEnabled(true);
-    m_updating = true;
-    m_nameEdit->setText(currentServerName());
-    m_enabledCheck->setChecked(server->enabled);
-    if (m_transportCombo->findText(server->transport) < 0)
+    this->set_editors_enabled(true);
+    this->remove_button->setEnabled(true);
+    this->updating = true;
+    this->name_edit->setText(this->current_server_name());
+    this->enabled_check->setChecked(server->enabled);
+    if (this->transport_combo->findText(server->transport) < 0)
     {
-        m_transportCombo->addItem(server->transport);
+        this->transport_combo->addItem(server->transport);
     }
-    m_transportCombo->setCurrentText(server->transport);
-    m_startupTimeoutSpin->setValue(server->startupTimeoutMs);
-    m_requestTimeoutSpin->setValue(server->requestTimeoutMs);
-    m_commandEdit->setText(server->command);
-    m_argsEdit->setPlainText(server->args.join(QLatin1Char('\n')));
-    m_envEdit->setPlainText(
-        joinMapLines(server->env, QLatin1Char('='), false).join(QLatin1Char('\n')));
-    m_urlEdit->setText(server->url);
+    this->transport_combo->setCurrentText(server->transport);
+    this->startup_timeout_spin->setValue(server->startup_timeout_ms);
+    this->request_timeout_spin->setValue(server->request_timeout_ms);
+    this->command_edit->setText(server->command);
+    this->args_edit->setPlainText(server->args.join(QLatin1Char('\n')));
+    this->env_edit->setPlainText(
+        this->join_map_lines(server->env, QLatin1Char('='), false).join(QLatin1Char('\n')));
+    this->url_edit->setText(server->url);
     QMap<QString, QString> visibleHeaders = server->headers;
     const QString token = extractBearerToken(&visibleHeaders);
-    m_tokenEdit->setText(token);
-    m_headersEdit->setPlainText(
-        joinMapLines(visibleHeaders, QLatin1Char(':'), true).join(QLatin1Char('\n')));
-    updateTransportPage(server->transport);
-    m_updating = false;
-    updateCurrentHttpStatusUi();
+    this->token_edit->setText(token);
+    this->headers_edit->setPlainText(
+        this->join_map_lines(visibleHeaders, QLatin1Char(':'), true).join(QLatin1Char('\n')));
+    this->update_transport_page(server->transport);
+    this->updating = false;
+    this->update_current_http_status_ui();
 }
 
-void McpServersWidget::clearEditors()
+void mcp_servers_widget_t::clear_editors()
 {
-    m_updating = true;
-    m_nameEdit->clear();
-    m_enabledCheck->setChecked(false);
-    m_transportCombo->setCurrentText(QStringLiteral("stdio"));
-    m_startupTimeoutSpin->setValue(10000);
-    m_requestTimeoutSpin->setValue(30000);
-    m_commandEdit->clear();
-    m_argsEdit->clear();
-    m_envEdit->clear();
-    m_urlEdit->clear();
-    m_tokenEdit->clear();
-    m_headersEdit->clear();
-    updateTransportPage(QStringLiteral("stdio"));
-    m_updating = false;
-    updateCurrentHttpStatusUi();
+    this->updating = true;
+    this->name_edit->clear();
+    this->enabled_check->setChecked(false);
+    this->transport_combo->setCurrentText(QStringLiteral("stdio"));
+    this->startup_timeout_spin->setValue(10000);
+    this->request_timeout_spin->setValue(30000);
+    this->command_edit->clear();
+    this->args_edit->clear();
+    this->env_edit->clear();
+    this->url_edit->clear();
+    this->token_edit->clear();
+    this->headers_edit->clear();
+    this->update_transport_page(QStringLiteral("stdio"));
+    this->updating = false;
+    this->update_current_http_status_ui();
 }
 
-void McpServersWidget::setEditorsEnabled(bool enabled)
+void mcp_servers_widget_t::set_editors_enabled(bool enabled)
 {
-    m_nameEdit->setEnabled(enabled);
-    m_enabledCheck->setEnabled(enabled);
-    m_transportCombo->setEnabled(enabled);
-    m_startupTimeoutSpin->setEnabled(enabled);
-    m_requestTimeoutSpin->setEnabled(enabled);
-    m_commandEdit->setEnabled(enabled);
-    m_argsEdit->setEnabled(enabled);
-    m_envEdit->setEnabled(enabled);
-    m_urlEdit->setEnabled(enabled);
-    m_tokenEdit->setEnabled(enabled);
-    m_headersEdit->setEnabled(enabled);
-    m_transportPages->setEnabled(enabled);
+    this->name_edit->setEnabled(enabled);
+    this->enabled_check->setEnabled(enabled);
+    this->transport_combo->setEnabled(enabled);
+    this->startup_timeout_spin->setEnabled(enabled);
+    this->request_timeout_spin->setEnabled(enabled);
+    this->command_edit->setEnabled(enabled);
+    this->args_edit->setEnabled(enabled);
+    this->env_edit->setEnabled(enabled);
+    this->url_edit->setEnabled(enabled);
+    this->token_edit->setEnabled(enabled);
+    this->headers_edit->setEnabled(enabled);
+    this->transport_pages->setEnabled(enabled);
     if (enabled == false)
     {
-        m_httpStatusLabel->setText(notTestedText());
-        m_httpStatusLabel->setStyleSheet(QString());
-        m_testConnectionButton->setEnabled(false);
-        m_authorizeButton->setEnabled(false);
+        this->http_status_label->setText(notTestedText());
+        this->http_status_label->setStyleSheet(QString());
+        this->test_connection_button->setEnabled(false);
+        this->authorize_button->setEnabled(false);
     }
 }
 
-void McpServersWidget::updateTransportPage(const QString &transport)
+void mcp_servers_widget_t::update_transport_page(const QString &transport)
 {
     const QString normalized = transport.trimmed();
     if (((normalized == QStringLiteral("stdio")) == true))
     {
-        m_transportPages->setCurrentIndex(0);
+        this->transport_pages->setCurrentIndex(0);
     }
     else if (normalized == QStringLiteral("http") || normalized == QStringLiteral("sse"))
     {
-        m_transportPages->setCurrentIndex(1);
+        this->transport_pages->setCurrentIndex(1);
     }
     else
     {
-        m_unknownTransportLabel->setText(
-            tr("Transport '%1' is preserved from JSON, but this UI does not yet provide a "
+        this->unknown_transport_label->setText(
+            tr("transport_t '%1' is preserved from JSON, but this UI does not yet provide a "
                "dedicated editor for it.")
                 .arg(normalized.isEmpty() ? tr("(empty)") : normalized));
-        m_transportPages->setCurrentIndex(2);
+        this->transport_pages->setCurrentIndex(2);
     }
 
-    updateCurrentHttpStatusUi();
+    this->update_current_http_status_ui();
 }
 
-void McpServersWidget::updateCurrentHttpStatusUi()
+void mcp_servers_widget_t::update_current_http_status_ui()
 {
-    const qtmcp::ServerDefinition *server = currentServer();
+    const qtmcp::server_definition_t *server = this->current_server();
     const bool isHttpServer =
         server != nullptr && server->transport.trimmed() == QStringLiteral("http");
 
     if (isHttpServer == false)
     {
-        m_httpStatusLabel->setText(notTestedText());
-        m_httpStatusLabel->setStyleSheet(QString());
-        m_testConnectionButton->setEnabled(false);
-        m_authorizeButton->setEnabled(false);
+        this->http_status_label->setText(notTestedText());
+        this->http_status_label->setStyleSheet(QString());
+        this->test_connection_button->setEnabled(false);
+        this->authorize_button->setEnabled(false);
         return;
     }
 
-    const HttpStatus status = m_httpStatuses.value(currentServerName());
+    const http_status_t status = this->http_statuses.value(this->current_server_name());
     QString text = status.message;
     if (text.isEmpty() == true)
     {
         text = notTestedText();
     }
 
-    m_httpStatusLabel->setText(text);
+    this->http_status_label->setText(text);
     const QColor color = statusColor(status.kind, this);
-    m_httpStatusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(color.name(QColor::HexRgb)));
+    this->http_status_label->setStyleSheet(
+        QStringLiteral("color: %1;").arg(color.name(QColor::HexRgb)));
 
-    const bool canTest = !m_authorizing && !m_testingConnection && server->enabled;
-    const bool canAuthorize = status.kind == HttpStatusKind::AuthorizationRequired &&
-                              !m_authorizing && !m_testingConnection;
-    m_testConnectionButton->setEnabled(canTest);
-    m_authorizeButton->setEnabled(canAuthorize);
+    const bool canTest = !this->authorizing && !this->testing_connection && server->enabled;
+    const bool canAuthorize = status.kind == http_status_kind_t::AUTHORIZATION_REQUIRED &&
+                              !this->authorizing && !this->testing_connection;
+    this->test_connection_button->setEnabled(canTest);
+    this->authorize_button->setEnabled(canAuthorize);
 }
 
-void McpServersWidget::updateServerListItem(const QString &serverName)
+void mcp_servers_widget_t::update_server_list_item(const QString &serverName)
 {
-    for (int i = 0; ((i < m_serverList->count()) == true); ++i)
+    for (int i = 0; ((i < this->server_list->count()) == true); ++i)
     {
-        QListWidgetItem *item = m_serverList->item(i);
+        QListWidgetItem *item = this->server_list->item(i);
         if (((item == nullptr || item->data(Qt::UserRole).toString() != serverName) == true))
         {
             continue;
         }
 
-        const HttpStatus status = m_httpStatuses.value(serverName);
+        const http_status_t status = this->http_statuses.value(serverName);
         QString text = serverName;
         if (((!status.message.isEmpty()) == true))
         {
@@ -802,60 +808,60 @@ void McpServersWidget::updateServerListItem(const QString &serverName)
     }
 }
 
-void McpServersWidget::setHttpStatus(const QString &serverName, HttpStatusKind kind,
-                                     const QString &message)
+void mcp_servers_widget_t::set_http_status(const QString &serverName, http_status_kind_t kind,
+                                           const QString &message)
 {
-    HttpStatus status;
+    http_status_t status;
     status.kind = kind;
     status.message = message;
-    m_httpStatuses.insert(serverName, status);
-    persistConnectionStates();
-    updateServerListItem(serverName);
-    if (((serverName == currentServerName()) == true))
+    this->http_statuses.insert(serverName, status);
+    this->persist_connection_states();
+    this->update_server_list_item(serverName);
+    if (((serverName == this->current_server_name()) == true))
     {
-        updateCurrentHttpStatusUi();
+        this->update_current_http_status_ui();
     }
 }
 
-void McpServersWidget::clearHttpStatus(const QString &serverName)
+void mcp_servers_widget_t::clear_http_status(const QString &serverName)
 {
     if (serverName.isEmpty() == true)
     {
         return;
     }
 
-    m_httpStatuses.remove(serverName);
-    m_authorizedServers.remove(serverName);
-    persistConnectionStates();
-    updateServerListItem(serverName);
-    if (((serverName == currentServerName()) == true))
+    this->http_statuses.remove(serverName);
+    this->authorized_servers.remove(serverName);
+    this->persist_connection_states();
+    this->update_server_list_item(serverName);
+    if (((serverName == this->current_server_name()) == true))
     {
-        updateCurrentHttpStatusUi();
+        this->update_current_http_status_ui();
     }
 }
 
-void McpServersWidget::loadPersistedConnectionStates()
+void mcp_servers_widget_t::load_persisted_connection_states()
 {
     QString error;
-    const McpServerConnectionStates storedStates = loadMcpServerConnectionStates(&error);
+    const mcp_server_connection_states_t storedStates = load_mcp_server_connection_states(&error);
     if (error.isEmpty() == false)
     {
-        QCAI_WARN("Settings", error);
+        QCAI_WARN("settings_t", error);
     }
 
     for (auto it = storedStates.cbegin(); it != storedStates.cend(); ++it)
     {
-        if (((!m_servers.contains(it.key())) == true))
+        if (((!this->server_definitions.contains(it.key())) == true))
         {
             continue;
         }
 
-        HttpStatus status;
+        http_status_t status;
         const QString state = it.value().state.trimmed();
         if (((state == QStringLiteral("authorized")) == true))
         {
-            status.kind = HttpStatusKind::Reachable;
-            m_authorizedServers.insert(it.key());
+            status.kind = http_status_kind_t::REACHABLE;
+            this->authorized_servers.insert(it.key());
             if (it.value().message.trimmed().isEmpty())
             {
                 status.message = authorizedText();
@@ -863,15 +869,15 @@ void McpServersWidget::loadPersistedConnectionStates()
         }
         else if (((state == QStringLiteral("reachable")) == true))
         {
-            status.kind = HttpStatusKind::Reachable;
+            status.kind = http_status_kind_t::REACHABLE;
         }
         else if (((state == QStringLiteral("authorization_required")) == true))
         {
-            status.kind = HttpStatusKind::AuthorizationRequired;
+            status.kind = http_status_kind_t::AUTHORIZATION_REQUIRED;
         }
         else if (((state == QStringLiteral("error")) == true))
         {
-            status.kind = HttpStatusKind::Error;
+            status.kind = http_status_kind_t::ERROR;
         }
         else
         {
@@ -881,44 +887,45 @@ void McpServersWidget::loadPersistedConnectionStates()
         {
             status.message = it.value().message.trimmed();
         }
-        m_httpStatuses.insert(it.key(), status);
-        if (status.kind == HttpStatusKind::Reachable &&
+        this->http_statuses.insert(it.key(), status);
+        if (status.kind == http_status_kind_t::REACHABLE &&
             (status.message == authorizedText() ||
              status.message == QStringLiteral("Авторизовано")))
         {
-            m_authorizedServers.insert(it.key());
+            this->authorized_servers.insert(it.key());
         }
     }
 
-    persistConnectionStates();
+    this->persist_connection_states();
 }
 
-void McpServersWidget::persistConnectionStates() const
+void mcp_servers_widget_t::persist_connection_states() const
 {
-    McpServerConnectionStates states;
-    for (auto it = m_httpStatuses.cbegin(); it != m_httpStatuses.cend(); ++it)
+    mcp_server_connection_states_t states;
+    for (auto it = this->http_statuses.cbegin(); it != this->http_statuses.cend(); ++it)
     {
-        if (!m_servers.contains(it.key()))
+        if (!this->server_definitions.contains(it.key()))
         {
             continue;
         }
 
-        McpServerConnectionState state;
+        mcp_server_connection_state_t state;
         switch (it.value().kind)
         {
-            case HttpStatusKind::Checking:
+            case http_status_kind_t::CHECKING:
                 continue;
-            case HttpStatusKind::Reachable:
-                state.state = m_authorizedServers.contains(it.key()) ? QStringLiteral("authorized")
-                                                                     : QStringLiteral("reachable");
+            case http_status_kind_t::REACHABLE:
+                state.state = this->authorized_servers.contains(it.key())
+                                  ? QStringLiteral("authorized")
+                                  : QStringLiteral("reachable");
                 break;
-            case HttpStatusKind::AuthorizationRequired:
+            case http_status_kind_t::AUTHORIZATION_REQUIRED:
                 state.state = QStringLiteral("authorization_required");
                 break;
-            case HttpStatusKind::Error:
+            case http_status_kind_t::ERROR:
                 state.state = QStringLiteral("error");
                 break;
-            case HttpStatusKind::Unknown:
+            case http_status_kind_t::UNKNOWN:
                 continue;
         }
         state.message = it.value().message;
@@ -926,40 +933,41 @@ void McpServersWidget::persistConnectionStates() const
     }
 
     QString error;
-    if (!saveMcpServerConnectionStates(states, &error) && !error.isEmpty())
+    if (!save_mcp_server_connection_states(states, &error) && !error.isEmpty())
     {
-        QCAI_WARN("Settings", error);
+        QCAI_WARN("settings_t", error);
     }
 }
 
-void McpServersWidget::finishConnectionTest(const QString &serverName, HttpStatusKind kind,
-                                            const QString &message, bool authorized)
+void mcp_servers_widget_t::finish_connection_test(const QString &serverName,
+                                                  http_status_kind_t kind, const QString &message,
+                                                  bool authorized)
 {
     if (authorized)
     {
-        m_authorizedServers.insert(serverName);
+        this->authorized_servers.insert(serverName);
     }
-    else if (kind != HttpStatusKind::Reachable || message != authorizedText())
+    else if (kind != http_status_kind_t::REACHABLE || message != authorizedText())
     {
-        m_authorizedServers.remove(serverName);
+        this->authorized_servers.remove(serverName);
     }
 
-    setHttpStatus(serverName, kind, message);
-    cleanupConnectionTest();
+    this->set_http_status(serverName, kind, message);
+    this->cleanup_connection_test();
 }
 
-void McpServersWidget::cleanupConnectionTest()
+void mcp_servers_widget_t::cleanup_connection_test()
 {
-    if (m_connectionTestTimer != nullptr)
+    if (this->connection_test_timer != nullptr)
     {
-        m_connectionTestTimer->stop();
+        this->connection_test_timer->stop();
     }
 
-    qtmcp::Client *client = m_connectionTestClient;
-    m_connectionTestClient = nullptr;
-    m_connectionTestServerName.clear();
-    m_connectionTestRequestId = 0;
-    m_testingConnection = false;
+    qtmcp::client_t *client = this->connection_test_client;
+    this->connection_test_client = nullptr;
+    this->connection_test_server_name.clear();
+    this->connection_test_request_id = 0;
+    this->testing_connection = false;
 
     if (client != nullptr)
     {
@@ -968,34 +976,34 @@ void McpServersWidget::cleanupConnectionTest()
         client->deleteLater();
     }
 
-    updateCurrentHttpStatusUi();
+    this->update_current_http_status_ui();
 }
 
-void McpServersWidget::invalidateCurrentServerStatus()
+void mcp_servers_widget_t::invalidate_current_server_status()
 {
-    const QString serverName = currentServerName();
+    const QString serverName = this->current_server_name();
     if (serverName.isEmpty())
     {
         return;
     }
 
-    if (m_testingConnection && m_connectionTestServerName == serverName)
+    if (this->testing_connection && this->connection_test_server_name == serverName)
     {
-        cleanupConnectionTest();
+        this->cleanup_connection_test();
     }
-    clearHttpStatus(serverName);
-    emit changed();
+    this->clear_http_status(serverName);
+    emit this->changed();
 }
 
-void McpServersWidget::testCurrentServerConnection()
+void mcp_servers_widget_t::test_current_server_connection()
 {
-    if (m_testingConnection || m_authorizing)
+    if (this->testing_connection || this->authorizing)
     {
         return;
     }
 
-    const QString serverName = currentServerName();
-    const qtmcp::ServerDefinition *definition = currentServer();
+    const QString serverName = this->current_server_name();
+    const qtmcp::server_definition_t *definition = this->current_server();
     if (serverName.isEmpty() || definition == nullptr ||
         definition->transport.trimmed() != QStringLiteral("http"))
     {
@@ -1004,189 +1012,196 @@ void McpServersWidget::testCurrentServerConnection()
 
     if (!definition->enabled)
     {
-        setHttpStatus(serverName, HttpStatusKind::Error, tr("Error: server is disabled"));
+        this->set_http_status(serverName, http_status_kind_t::ERROR,
+                              tr("Error: server is disabled"));
         return;
     }
 
     if (definition->url.trimmed().isEmpty())
     {
-        setHttpStatus(serverName, HttpStatusKind::Error, tr("Error: URL is not set"));
+        this->set_http_status(serverName, http_status_kind_t::ERROR, tr("Error: URL is not set"));
         return;
     }
 
-    m_testingConnection = true;
-    m_connectionTestServerName = serverName;
-    m_connectionTestRequestId = 0;
-    setHttpStatus(serverName, HttpStatusKind::Checking, checkingText());
-    const int startupTimeoutMs = probeTimeoutMs(definition->startupTimeoutMs);
-    const int requestTimeoutMs = probeTimeoutMs(definition->requestTimeoutMs);
+    this->testing_connection = true;
+    this->connection_test_server_name = serverName;
+    this->connection_test_request_id = 0;
+    this->set_http_status(serverName, http_status_kind_t::CHECKING, checkingText());
+    const int startup_timeout_ms = probe_timeout_ms(definition->startup_timeout_ms);
+    const int request_timeout_ms = probe_timeout_ms(definition->request_timeout_ms);
 
-    qtmcp::HttpTransportConfig transportConfig = buildHttpTransportConfig(serverName, *definition);
-    transportConfig.interactiveOAuthEnabled = false;
+    qtmcp::http_transport_config_t transportConfig =
+        buildHttpTransportConfig(serverName, *definition);
+    transportConfig.interactive_o_auth_enabled = false;
 
-    auto *client = new qtmcp::Client(this);
-    client->setTransport(std::make_unique<qtmcp::HttpTransport>(transportConfig));
-    m_connectionTestClient = client;
+    auto *client = new qtmcp::client_t(this);
+    client->set_transport(std::make_unique<qtmcp::http_transport_t>(transportConfig));
+    this->connection_test_client = client;
 
-    auto *transport = qobject_cast<qtmcp::HttpTransport *>(client->transport());
+    auto *transport = qobject_cast<qtmcp::http_transport_t *>(client->transport());
     Q_ASSERT(transport != nullptr);
 
-    connect(client, &qtmcp::Client::transportLogMessage, this,
+    connect(client, &qtmcp::client_t::transport_log_message, this,
             [serverName](const QString &message) { logMcpSettingsDebug(serverName, message); });
-    connect(client, &qtmcp::Client::transportErrorOccurred, this,
+    connect(client, &qtmcp::client_t::transport_error_occurred, this,
             [this, client, transport, serverName](const QString &message) {
-                if (client != m_connectionTestClient)
+                if (client != this->connection_test_client)
                 {
                     return;
                 }
                 QCAI_ERROR("MCP",
                            QStringLiteral("[settings:%1] %2").arg(serverName, message.trimmed()));
 
-                const QString transportOAuthError = transport->lastOAuthError().trimmed();
-                if (transport->lastAuthorizationRequired() ||
+                const QString transportOAuthError = transport->last_o_auth_error().trimmed();
+                if (transport->last_authorization_required() ||
                     transportOAuthError == QStringLiteral("OAuth authorization required.") ||
                     message.trimmed() == QStringLiteral("OAuth authorization required."))
                 {
-                    finishConnectionTest(serverName, HttpStatusKind::AuthorizationRequired,
-                                         authorizationRequiredText());
+                    this->finish_connection_test(serverName,
+                                                 http_status_kind_t::AUTHORIZATION_REQUIRED,
+                                                 authorizationRequiredText());
                     return;
                 }
 
                 const QString details =
                     !transportOAuthError.isEmpty() ? transportOAuthError : message.trimmed();
-                finishConnectionTest(serverName, HttpStatusKind::Error,
-                                     details.isEmpty() ? errorPrefixText()
-                                                       : tr("Error: %1").arg(details));
+                this->finish_connection_test(serverName, http_status_kind_t::ERROR,
+                                             details.isEmpty() ? errorPrefixText()
+                                                               : tr("Error: %1").arg(details));
             });
 
     connect(
-        client, &qtmcp::Client::connected, this,
-        [this, client, transport, serverName, requestTimeoutMs]() {
-            if (client != m_connectionTestClient)
+        client, &qtmcp::client_t::connected, this,
+        [this, client, transport, serverName, request_timeout_ms]() {
+            if (client != this->connection_test_client)
             {
                 return;
             }
 
-            if (m_connectionTestTimer != nullptr)
+            if (this->connection_test_timer != nullptr)
             {
-                m_connectionTestTimer->start(requestTimeoutMs);
+                this->connection_test_timer->start(request_timeout_ms);
             }
 
-            if (transport->config().oauthEnabled && m_authorizedServers.contains(serverName) &&
-                transport->hasCachedOAuthCredentials())
+            if (transport->config().oauth_enabled &&
+                this->authorized_servers.contains(serverName) &&
+                transport->has_cached_o_auth_credentials())
             {
                 logMcpSettingsDebug(
                     serverName,
                     QStringLiteral(
                         "Skipping redundant HTTP initialize probe because this server is already "
                         "authorized and cached OAuth credentials are available."));
-                finishConnectionTest(serverName, HttpStatusKind::Reachable, authorizedText(),
-                                     true);
+                this->finish_connection_test(serverName, http_status_kind_t::REACHABLE,
+                                             authorizedText(), true);
                 return;
             }
 
-            if (transport->config().oauthEnabled && !transport->hasCachedOAuthCredentials())
+            if (transport->config().oauth_enabled && !transport->has_cached_o_auth_credentials())
             {
                 logMcpSettingsDebug(
                     serverName,
                     QStringLiteral("Skipping HTTP initialize probe because no cached OAuth "
                                    "credentials are available; authorization is required first."));
-                finishConnectionTest(serverName, HttpStatusKind::AuthorizationRequired,
-                                     authorizationRequiredText());
+                this->finish_connection_test(serverName,
+                                             http_status_kind_t::AUTHORIZATION_REQUIRED,
+                                             authorizationRequiredText());
                 return;
             }
 
             const qint64 requestId =
-                client->sendRequest(QStringLiteral("initialize"), initializeParamsObject());
+                client->send_request(QStringLiteral("initialize"), initializeParamsObject());
             if (requestId <= 0)
             {
-                finishConnectionTest(serverName, HttpStatusKind::Error,
-                                     tr("Error: failed to send initialize request"));
+                this->finish_connection_test(serverName, http_status_kind_t::ERROR,
+                                             tr("Error: failed to send initialize request"));
                 return;
             }
-            m_connectionTestRequestId = requestId;
+            this->connection_test_request_id = requestId;
         });
 
-    connect(client, &qtmcp::Client::responseReceived, this,
+    connect(client, &qtmcp::client_t::response_received, this,
             [this, client, transport, serverName](const QJsonValue &id, const QJsonValue &) {
-                if (client != m_connectionTestClient ||
-                    id.toInteger() != m_connectionTestRequestId)
+                if (client != this->connection_test_client ||
+                    id.toInteger() != this->connection_test_request_id)
                 {
                     return;
                 }
-                finishConnectionTest(serverName, HttpStatusKind::Reachable,
-                                     transport->config().oauthEnabled ? authorizedText()
-                                                                      : connectedText(),
-                                     transport->config().oauthEnabled);
+                this->finish_connection_test(serverName, http_status_kind_t::REACHABLE,
+                                             transport->config().oauth_enabled ? authorizedText()
+                                                                               : connectedText(),
+                                             transport->config().oauth_enabled);
             });
 
-    connect(client, &qtmcp::Client::errorResponseReceived, this,
+    connect(client, &qtmcp::client_t::error_response_received, this,
             [this, client, transport, serverName](const QJsonValue &id, int,
                                                   const QString &message, const QJsonValue &) {
-                if (client != m_connectionTestClient ||
-                    id.toInteger() != m_connectionTestRequestId)
+                if (client != this->connection_test_client ||
+                    id.toInteger() != this->connection_test_request_id)
                 {
                     return;
                 }
 
-                const QString transportOAuthError = transport->lastOAuthError().trimmed();
-                if (transport->lastAuthorizationRequired() ||
+                const QString transportOAuthError = transport->last_o_auth_error().trimmed();
+                if (transport->last_authorization_required() ||
                     transportOAuthError == QStringLiteral("OAuth authorization required."))
                 {
-                    finishConnectionTest(serverName, HttpStatusKind::AuthorizationRequired,
-                                         authorizationRequiredText());
+                    this->finish_connection_test(serverName,
+                                                 http_status_kind_t::AUTHORIZATION_REQUIRED,
+                                                 authorizationRequiredText());
                     return;
                 }
 
                 const QString details =
                     !transportOAuthError.isEmpty() ? transportOAuthError : message.trimmed();
-                finishConnectionTest(serverName, HttpStatusKind::Error,
-                                     details.isEmpty() ? errorPrefixText()
-                                                       : tr("Error: %1").arg(details));
+                this->finish_connection_test(serverName, http_status_kind_t::ERROR,
+                                             details.isEmpty() ? errorPrefixText()
+                                                               : tr("Error: %1").arg(details));
             });
 
-    connect(client, &qtmcp::Client::disconnected, this, [this, client, serverName]() {
-        if (client != m_connectionTestClient)
+    connect(client, &qtmcp::client_t::disconnected, this, [this, client, serverName]() {
+        if (client != this->connection_test_client)
         {
             return;
         }
-        finishConnectionTest(serverName, HttpStatusKind::Error,
-                             tr("Error: MCP server disconnected"));
+        this->finish_connection_test(serverName, http_status_kind_t::ERROR,
+                                     tr("Error: MCP server disconnected"));
     });
 
-    if (m_connectionTestTimer != nullptr)
+    if (this->connection_test_timer != nullptr)
     {
-        m_connectionTestTimer->start(startupTimeoutMs);
+        this->connection_test_timer->start(startup_timeout_ms);
     }
     client->start();
 }
 
-void McpServersWidget::authorizeCurrentServer()
+void mcp_servers_widget_t::authorize_current_server()
 {
-    if (m_authorizing || m_testingConnection)
+    if (this->authorizing || this->testing_connection)
     {
         return;
     }
 
-    const QString serverName = currentServerName();
-    const qtmcp::ServerDefinition *definition = currentServer();
+    const QString serverName = this->current_server_name();
+    const qtmcp::server_definition_t *definition = this->current_server();
     if (serverName.isEmpty() || definition == nullptr ||
         definition->transport.trimmed() != QStringLiteral("http"))
     {
         return;
     }
 
-    m_authorizing = true;
-    setHttpStatus(serverName, HttpStatusKind::Checking, authorizingText());
-    updateCurrentHttpStatusUi();
+    this->authorizing = true;
+    this->set_http_status(serverName, http_status_kind_t::CHECKING, authorizingText());
+    this->update_current_http_status_ui();
 
-    qtmcp::HttpTransportConfig transportConfig = buildHttpTransportConfig(serverName, *definition);
-    transportConfig.oauthEnabled = true;
+    qtmcp::http_transport_config_t transportConfig =
+        buildHttpTransportConfig(serverName, *definition);
+    transportConfig.oauth_enabled = true;
 
-    qtmcp::HttpTransport transport(std::move(transportConfig));
-    connect(&transport, &qtmcp::Transport::logMessage, this,
+    qtmcp::http_transport_t transport(std::move(transportConfig));
+    connect(&transport, &qtmcp::transport_t::log_message, this,
             [serverName](const QString &message) { logMcpSettingsDebug(serverName, message); });
-    connect(&transport, &qtmcp::Transport::errorOccurred, this,
+    connect(&transport, &qtmcp::transport_t::error_occurred, this,
             [serverName](const QString &message) {
                 QCAI_ERROR("MCP",
                            QStringLiteral("[settings:%1] %2").arg(serverName, message.trimmed()));
@@ -1201,72 +1216,72 @@ void McpServersWidget::authorizeCurrentServer()
                         .arg(authorized ? QStringLiteral("yes") : QStringLiteral("no"),
                              errorMessage.isEmpty() ? QStringLiteral("(none)") : errorMessage));
 
-    m_authorizing = false;
+    this->authorizing = false;
     if (!authorized)
     {
-        m_authorizedServers.remove(serverName);
-        setHttpStatus(serverName, HttpStatusKind::AuthorizationRequired,
-                      authorizationRequiredText());
+        this->authorized_servers.remove(serverName);
+        this->set_http_status(serverName, http_status_kind_t::AUTHORIZATION_REQUIRED,
+                              authorizationRequiredText());
         if (!errorMessage.trimmed().isEmpty())
         {
             QMessageBox::warning(this, tr("OAuth Authorization Failed"), errorMessage.trimmed());
         }
-        updateCurrentHttpStatusUi();
+        this->update_current_http_status_ui();
         return;
     }
 
-    m_authorizedServers.insert(serverName);
-    setHttpStatus(serverName, HttpStatusKind::Reachable, authorizedText());
-    updateCurrentHttpStatusUi();
+    this->authorized_servers.insert(serverName);
+    this->set_http_status(serverName, http_status_kind_t::REACHABLE, authorizedText());
+    this->update_current_http_status_ui();
 }
 
-QString McpServersWidget::makeUniqueServerName(const QString &baseName) const
+QString mcp_servers_widget_t::make_unique_server_name(const QString &baseName) const
 {
     QString candidate = baseName;
     int suffix = 2;
-    while (m_servers.contains(candidate))
+    while (this->server_definitions.contains(candidate))
     {
         candidate = QStringLiteral("%1-%2").arg(baseName).arg(suffix++);
     }
     return candidate;
 }
 
-void McpServersWidget::renameCurrentServer()
+void mcp_servers_widget_t::rename_current_server()
 {
-    if (m_updating)
+    if (this->updating)
     {
         return;
     }
 
-    const QString oldName = currentServerName();
+    const QString oldName = this->current_server_name();
     if (oldName.isEmpty())
     {
         return;
     }
 
-    if (m_testingConnection && m_connectionTestServerName == oldName)
+    if (this->testing_connection && this->connection_test_server_name == oldName)
     {
-        cleanupConnectionTest();
+        this->cleanup_connection_test();
     }
 
-    const QString newName = m_nameEdit->text().trimmed();
+    const QString newName = this->name_edit->text().trimmed();
     if (newName.isEmpty())
     {
         QMessageBox::warning(this, tr("Invalid MCP Server Name"),
                              tr("The MCP server name must not be empty."));
-        m_updating = true;
-        m_nameEdit->setText(oldName);
-        m_updating = false;
+        this->updating = true;
+        this->name_edit->setText(oldName);
+        this->updating = false;
         return;
     }
 
-    if (newName != oldName && m_servers.contains(newName))
+    if (newName != oldName && this->server_definitions.contains(newName))
     {
         QMessageBox::warning(this, tr("Duplicate MCP Server Name"),
                              tr("An MCP server named '%1' already exists.").arg(newName));
-        m_updating = true;
-        m_nameEdit->setText(oldName);
-        m_updating = false;
+        this->updating = true;
+        this->name_edit->setText(oldName);
+        this->updating = false;
         return;
     }
 
@@ -1275,24 +1290,24 @@ void McpServersWidget::renameCurrentServer()
         return;
     }
 
-    const HttpStatus preservedStatus = m_httpStatuses.take(oldName);
-    const bool wasAuthorized = m_authorizedServers.remove(oldName);
-    const qtmcp::ServerDefinition definition = m_servers.take(oldName);
-    m_servers.insert(newName, definition);
-    if (preservedStatus.kind != HttpStatusKind::Unknown || !preservedStatus.message.isEmpty())
+    const http_status_t preservedStatus = this->http_statuses.take(oldName);
+    const bool wasAuthorized = this->authorized_servers.remove(oldName);
+    const qtmcp::server_definition_t definition = this->server_definitions.take(oldName);
+    this->server_definitions.insert(newName, definition);
+    if (preservedStatus.kind != http_status_kind_t::UNKNOWN || !preservedStatus.message.isEmpty())
     {
-        m_httpStatuses.insert(newName, preservedStatus);
+        this->http_statuses.insert(newName, preservedStatus);
     }
     if (wasAuthorized)
     {
-        m_authorizedServers.insert(newName);
+        this->authorized_servers.insert(newName);
     }
-    persistConnectionStates();
-    repopulateServerList(newName);
-    emit changed();
+    this->persist_connection_states();
+    this->repopulate_server_list(newName);
+    emit this->changed();
 }
 
-QStringList McpServersWidget::textLines(const QString &text)
+QStringList mcp_servers_widget_t::text_lines(const QString &text)
 {
     QStringList lines;
     for (const QString &line : text.split(QLatin1Char('\n')))
@@ -1306,8 +1321,8 @@ QStringList McpServersWidget::textLines(const QString &text)
     return lines;
 }
 
-QStringList McpServersWidget::joinMapLines(const QMap<QString, QString> &values, QChar separator,
-                                           bool insertSpaceAfterSeparator)
+QStringList mcp_servers_widget_t::join_map_lines(const QMap<QString, QString> &values,
+                                                 QChar separator, bool insertSpaceAfterSeparator)
 {
     QStringList lines;
     for (auto it = values.cbegin(); it != values.cend(); ++it)
@@ -1319,10 +1334,10 @@ QStringList McpServersWidget::joinMapLines(const QMap<QString, QString> &values,
     return lines;
 }
 
-QMap<QString, QString> McpServersWidget::parseMapLines(const QString &text, QChar separator)
+QMap<QString, QString> mcp_servers_widget_t::parse_map_lines(const QString &text, QChar separator)
 {
     QMap<QString, QString> values;
-    for (const QString &line : textLines(text))
+    for (const QString &line : text_lines(text))
     {
         const qsizetype separatorIndex = line.indexOf(separator);
         if (separatorIndex < 0)

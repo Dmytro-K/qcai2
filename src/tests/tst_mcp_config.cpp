@@ -8,124 +8,133 @@
 
 using namespace qtmcp;
 
-class McpConfigTest : public QObject
+class mcp_config_test_t : public QObject
 {
     Q_OBJECT
 
 private slots:
-    void serverDefinitions_roundTripPreservesKnownAndExtraFields();
-    void serverDefinitionFromJson_keepsDefaultsWhenOptionalFieldsAreMissing();
-    void serverDefinitionFromJson_rejectsInvalidFieldTypes();
-    void serverDefinitionsFromJson_reportsServerSpecificErrors();
+    void server_definitions_round_trip_preserves_known_and_extra_fields();
+    void server_definition_from_json_keeps_defaults_when_optional_fields_are_missing();
+    void server_definition_from_json_rejects_invalid_field_types();
+    void server_definitions_from_json_reports_server_specific_errors();
 };
 
-void McpConfigTest::serverDefinitions_roundTripPreservesKnownAndExtraFields()
+void mcp_config_test_t::server_definitions_round_trip_preserves_known_and_extra_fields()
 {
-    ServerDefinitions definitions;
+    server_definitions_t definitions;
 
-    ServerDefinition filesystem;
+    server_definition_t filesystem;
     filesystem.enabled = true;
     filesystem.transport = QStringLiteral("stdio");
     filesystem.command = QStringLiteral("npx");
-    filesystem.args = {QStringLiteral("-y"), QStringLiteral("@modelcontextprotocol/server-filesystem"),
+    filesystem.args = {QStringLiteral("-y"),
+                       QStringLiteral("@modelcontextprotocol/server-filesystem"),
                        QStringLiteral("/tmp/project")};
     filesystem.env.insert(QStringLiteral("NODE_ENV"), QStringLiteral("production"));
-    filesystem.startupTimeoutMs = 12000;
-    filesystem.requestTimeoutMs = 45000;
-    filesystem.extraFields.insert(QStringLiteral("notes"), QStringLiteral("preserve-me"));
+    filesystem.startup_timeout_ms = 12000;
+    filesystem.request_timeout_ms = 45000;
+    filesystem.extra_fields.insert(QStringLiteral("notes"), QStringLiteral("preserve-me"));
     definitions.insert(QStringLiteral("filesystem"), filesystem);
 
-    ServerDefinition github;
+    server_definition_t github;
     github.enabled = true;
     github.transport = QStringLiteral("http");
     github.url = QStringLiteral("https://api.githubcopilot.com/mcp/");
     github.headers.insert(QStringLiteral("Authorization"),
                           QStringLiteral("Bearer ${GITHUB_TOKEN}"));
-    github.requestTimeoutMs = 30000;
-    github.extraFields.insert(QStringLiteral("customTransportFlag"), true);
+    github.request_timeout_ms = 30000;
+    github.extra_fields.insert(QStringLiteral("customTransportFlag"), true);
     definitions.insert(QStringLiteral("github"), github);
 
-    const QJsonObject json = serverDefinitionsToJson(definitions);
+    const QJsonObject json = server_definitions_to_json(definitions);
 
-    ServerDefinitions parsed;
+    server_definitions_t parsed;
     QString error;
-    QVERIFY2(serverDefinitionsFromJson(json, &parsed, &error), qPrintable(error));
+    QVERIFY2(server_definitions_from_json(json, &parsed, &error), qPrintable(error));
 
     QCOMPARE(parsed.keys(), definitions.keys());
     QCOMPARE(parsed.value(QStringLiteral("filesystem")).command, filesystem.command);
     QCOMPARE(parsed.value(QStringLiteral("filesystem")).args, filesystem.args);
     QCOMPARE(parsed.value(QStringLiteral("filesystem")).env, filesystem.env);
-    QCOMPARE(parsed.value(QStringLiteral("filesystem")).startupTimeoutMs, filesystem.startupTimeoutMs);
-    QCOMPARE(parsed.value(QStringLiteral("filesystem")).requestTimeoutMs, filesystem.requestTimeoutMs);
-    QCOMPARE(parsed.value(QStringLiteral("filesystem")).extraFields.value(QStringLiteral("notes")).toString(),
+    QCOMPARE(parsed.value(QStringLiteral("filesystem")).startup_timeout_ms,
+             filesystem.startup_timeout_ms);
+    QCOMPARE(parsed.value(QStringLiteral("filesystem")).request_timeout_ms,
+             filesystem.request_timeout_ms);
+    QCOMPARE(parsed.value(QStringLiteral("filesystem"))
+                 .extra_fields.value(QStringLiteral("notes"))
+                 .toString(),
              QStringLiteral("preserve-me"));
 
     QCOMPARE(parsed.value(QStringLiteral("github")).transport, QStringLiteral("http"));
     QCOMPARE(parsed.value(QStringLiteral("github")).url, github.url);
     QCOMPARE(parsed.value(QStringLiteral("github")).headers, github.headers);
-    QCOMPARE(parsed.value(QStringLiteral("github")).requestTimeoutMs, github.requestTimeoutMs);
-    QCOMPARE(parsed.value(QStringLiteral("github")).extraFields.value(QStringLiteral("customTransportFlag")).toBool(),
+    QCOMPARE(parsed.value(QStringLiteral("github")).request_timeout_ms, github.request_timeout_ms);
+    QCOMPARE(parsed.value(QStringLiteral("github"))
+                 .extra_fields.value(QStringLiteral("customTransportFlag"))
+                 .toBool(),
              true);
 }
 
-void McpConfigTest::serverDefinitionFromJson_keepsDefaultsWhenOptionalFieldsAreMissing()
+void mcp_config_test_t::
+    server_definition_from_json_keeps_defaults_when_optional_fields_are_missing()
 {
     const QJsonObject json{{QStringLiteral("command"), QStringLiteral("npx")}};
 
-    ServerDefinition definition;
+    server_definition_t definition;
     QString error;
-    QVERIFY2(serverDefinitionFromJson(json, &definition, &error), qPrintable(error));
+    QVERIFY2(server_definition_from_json(json, &definition, &error), qPrintable(error));
 
     QVERIFY(definition.enabled);
     QCOMPARE(definition.transport, QStringLiteral("stdio"));
     QCOMPARE(definition.command, QStringLiteral("npx"));
-    QCOMPARE(definition.startupTimeoutMs, 10000);
-    QCOMPARE(definition.requestTimeoutMs, 30000);
+    QCOMPARE(definition.startup_timeout_ms, 10000);
+    QCOMPARE(definition.request_timeout_ms, 30000);
     QVERIFY(definition.args.isEmpty());
     QVERIFY(definition.env.isEmpty());
     QVERIFY(definition.headers.isEmpty());
 }
 
-void McpConfigTest::serverDefinitionFromJson_rejectsInvalidFieldTypes()
+void mcp_config_test_t::server_definition_from_json_rejects_invalid_field_types()
 {
-    ServerDefinition definition;
+    server_definition_t definition;
     QString error;
 
-    QVERIFY(!serverDefinitionFromJson(QJsonObject{{QStringLiteral("enabled"), QStringLiteral("yes")}},
-                                      &definition, &error));
+    QVERIFY(!server_definition_from_json(
+        QJsonObject{{QStringLiteral("enabled"), QStringLiteral("yes")}}, &definition, &error));
     QCOMPARE(error, QStringLiteral("Field 'enabled' must be a boolean."));
 
-    QVERIFY(!serverDefinitionFromJson(
+    QVERIFY(!server_definition_from_json(
         QJsonObject{{QStringLiteral("args"), QJsonArray{QStringLiteral("ok"), 3}}}, &definition,
         &error));
     QCOMPARE(error, QStringLiteral("Field 'args[1]' must be a string."));
 
-    QVERIFY(!serverDefinitionFromJson(
-        QJsonObject{{QStringLiteral("headers"),
-                     QJsonObject{{QStringLiteral("Authorization"), 42}}}},
+    QVERIFY(!server_definition_from_json(
+        QJsonObject{
+            {QStringLiteral("headers"), QJsonObject{{QStringLiteral("Authorization"), 42}}}},
         &definition, &error));
     QCOMPARE(error, QStringLiteral("Field 'headers.Authorization' must be a string."));
 }
 
-void McpConfigTest::serverDefinitionsFromJson_reportsServerSpecificErrors()
+void mcp_config_test_t::server_definitions_from_json_reports_server_specific_errors()
 {
-    ServerDefinitions definitions;
+    server_definitions_t definitions;
     QString error;
 
-    QVERIFY(!serverDefinitionsFromJson(
+    QVERIFY(!server_definitions_from_json(
         QJsonObject{{QStringLiteral("broken"),
                      QJsonObject{{QStringLiteral("headers"),
                                   QJsonObject{{QStringLiteral("Authorization"), false}}}}}},
         &definitions, &error));
     QCOMPARE(error,
-             QStringLiteral("Invalid MCP server 'broken': Field 'headers.Authorization' must be a string."));
+             QStringLiteral(
+                 "Invalid MCP server 'broken': Field 'headers.Authorization' must be a string."));
 
-    QVERIFY(!serverDefinitionsFromJson(
+    QVERIFY(!server_definitions_from_json(
         QJsonObject{{QStringLiteral("filesystem"), QStringLiteral("not-an-object")}}, &definitions,
         &error));
     QCOMPARE(error, QStringLiteral("MCP server 'filesystem' must be an object."));
 }
 
-QTEST_APPLESS_MAIN(McpConfigTest)
+QTEST_APPLESS_MAIN(mcp_config_test_t)
 
 #include "tst_mcp_config.moc"

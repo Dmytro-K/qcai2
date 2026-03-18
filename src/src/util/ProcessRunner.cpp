@@ -16,13 +16,13 @@ namespace qcai2
  * @brief Creates a process runner bound to an optional QObject parent.
  * @param parent Parent QObject that owns this instance.
  */
-ProcessRunner::ProcessRunner(QObject *parent) : QObject(parent)
+process_runner_t::process_runner_t(QObject *parent) : QObject(parent)
 {
 }
 
-ProcessRunner::Result ProcessRunner::run(const QString &program, const QStringList &args,
-                                         const QString &workDir, int timeoutMs,
-                                         const QString &stdinData)
+process_runner_t::result_t process_runner_t::run(const QString &program, const QStringList &args,
+                                                 const QString &workDir, int timeoutMs,
+                                                 const QString &stdinData)
 {
     QProcess proc;
     if (workDir.isEmpty() == false)
@@ -42,32 +42,32 @@ ProcessRunner::Result ProcessRunner::run(const QString &program, const QStringLi
         proc.closeWriteChannel();
     }
 
-    Result res;
+    result_t res;
     bool finished = proc.waitForFinished(timeoutMs);
     if (finished == false)
     {
         proc.kill();
         QCAI_WARN("Process", QStringLiteral("Process timed out: %1").arg(program));
         res.success = false;
-        res.errorString = QStringLiteral("Process timed out after %1 ms").arg(timeoutMs);
-        res.stdErr = QString::fromUtf8(proc.readAllStandardError());
+        res.error_string = QStringLiteral("Process timed out after %1 ms").arg(timeoutMs);
+        res.std_err = QString::fromUtf8(proc.readAllStandardError());
         return res;
     }
 
-    res.exitCode = proc.exitCode();
-    res.success = (proc.exitStatus() == QProcess::NormalExit) && (res.exitCode == 0);
-    res.stdOut = QString::fromUtf8(proc.readAllStandardOutput());
-    res.stdErr = QString::fromUtf8(proc.readAllStandardError());
-    res.errorString = proc.errorString();
+    res.exit_code = proc.exitCode();
+    res.success = (proc.exitStatus() == QProcess::NormalExit) && (res.exit_code == 0);
+    res.std_out = QString::fromUtf8(proc.readAllStandardOutput());
+    res.std_err = QString::fromUtf8(proc.readAllStandardError());
+    res.error_string = proc.errorString();
     QCAI_DEBUG("Process", QStringLiteral("Process finished: %1 exitCode=%2 success=%3")
                               .arg(program)
-                              .arg(res.exitCode)
+                              .arg(res.exit_code)
                               .arg(res.success ? QStringLiteral("yes") : QStringLiteral("no")));
     return res;
 }
 
-void ProcessRunner::runAsync(const QString &program, const QStringList &args,
-                             const QString &workDir, int timeoutMs)
+void process_runner_t::run_async(const QString &program, const QStringList &args,
+                                 const QString &workDir, int timeoutMs)
 {
     auto *proc = new QProcess(this);
     if (workDir.isEmpty() == false)
@@ -77,7 +77,7 @@ void ProcessRunner::runAsync(const QString &program, const QStringList &args,
 
     // Stream stdout lines
     connect(proc, &QProcess::readyReadStandardOutput, this, [this, proc]() {
-        handleReadyRead();
+        this->handle_ready_read();
         Q_UNUSED(proc)
     });
 
@@ -88,18 +88,18 @@ void ProcessRunner::runAsync(const QString &program, const QStringList &args,
     timer->start(timeoutMs);
 
     connect(proc, &QProcess::finished, this,
-            [this, proc, timer](int exitCode, QProcess::ExitStatus status) {
+            [this, proc, timer](int exit_code, QProcess::ExitStatus status) {
                 timer->stop();
                 timer->deleteLater();
 
-                Result res;
-                res.exitCode = exitCode;
-                res.success = (status == QProcess::NormalExit) && (exitCode == 0);
-                res.stdOut = QString::fromUtf8(proc->readAllStandardOutput());
-                res.stdErr = QString::fromUtf8(proc->readAllStandardError());
-                res.errorString = proc->errorString();
+                result_t res;
+                res.exit_code = exit_code;
+                res.success = (status == QProcess::NormalExit) && (exit_code == 0);
+                res.std_out = QString::fromUtf8(proc->readAllStandardOutput());
+                res.std_err = QString::fromUtf8(proc->readAllStandardError());
+                res.error_string = proc->errorString();
                 proc->deleteLater();
-                emit finished(res);
+                emit this->finished(res);
             });
 
     proc->start(program, args);
@@ -108,7 +108,7 @@ void ProcessRunner::runAsync(const QString &program, const QStringList &args,
 /**
  * @brief Placeholder for future line-oriented async stdout handling.
  */
-void ProcessRunner::handleReadyRead()
+void process_runner_t::handle_ready_read()
 {
     // Not wired to a specific process here; streaming is handled in runAsync lambda above
 }

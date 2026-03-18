@@ -12,13 +12,13 @@ namespace qcai2
 /**
  * One popup completion entry contributed by a special-token handler.
  */
-struct GoalCompletionItem
+struct goal_completion_item_t
 {
     /** Main label shown in the popup. */
     QString label;
 
     /** Text inserted into the editor when the item is accepted. */
-    QString insertText;
+    QString insert_text;
 
     /** Optional secondary detail text for future popup renderers. */
     QString detail;
@@ -27,40 +27,40 @@ struct GoalCompletionItem
 /**
  * Completion session returned by a special-token handler for the current caret position.
  */
-struct GoalCompletionSession
+struct goal_completion_session_t
 {
     /** True when the handler is active at the current caret position. */
     bool active = false;
 
     /** Document offset where replacement should begin. */
-    int replaceStart = 0;
+    int replace_start = 0;
 
     /** Document offset where replacement should end. */
-    int replaceEnd = 0;
+    int replace_end = 0;
 
     /** Prefix already typed by the user. */
     QString prefix;
 
     /** Completion items to show in the popup. */
-    QList<GoalCompletionItem> items;
+    QList<goal_completion_item_t> items;
 };
 
 /**
  * Goal-editor context passed to special-token completion handlers.
  */
-struct GoalCompletionRequest
+struct goal_completion_request_t
 {
     /** Entire plain-text editor contents. */
     QString text;
 
     /** Caret position inside the document. */
-    int cursorPosition = 0;
+    int cursor_position = 0;
 };
 
 /**
  * One colored span contributed by a special-token handler.
  */
-struct GoalHighlightSpan
+struct goal_highlight_span_t
 {
     /** Document offset where the colored span begins. */
     int start = 0;
@@ -75,22 +75,22 @@ struct GoalHighlightSpan
 /**
  * Shared extension point for goal-editor popup completions and colored spans.
  */
-class GoalSpecialHandler
+class goal_special_handler_t
 {
 public:
-    virtual ~GoalSpecialHandler() = default;
+    virtual ~goal_special_handler_t() = default;
 
     /**
      * Returns popup completion data for the current caret position.
      */
-    virtual GoalCompletionSession completionSession(
-        const GoalCompletionRequest &request) const = 0;
+    virtual goal_completion_session_t
+    completion_session(const goal_completion_request_t &request) const = 0;
 
     /**
      * Returns colored text spans for the current goal contents.
      */
-    virtual QList<GoalHighlightSpan> highlightSpans(const QString &text,
-                                                    const QPalette &palette) const = 0;
+    virtual QList<goal_highlight_span_t> highlight_spans(const QString &text,
+                                                         const QPalette &palette) const = 0;
 };
 
 }  // namespace qcai2

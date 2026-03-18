@@ -8,39 +8,39 @@
 
 using namespace qcai2;
 
-class AgentMessagesTest : public QObject
+class agent_messages_test_t : public QObject
 {
     Q_OBJECT
 
 private slots:
-    void chatMessage_roundTripsThroughJson();
-    void parse_planBuildsIndexedStepsFromStringsAndObjects();
-    void parse_toolCallReadsNameAndArgs();
-    void parse_needApprovalReadsApprovalFields();
-    void parse_unknownJsonObjectFallsBackToCompactText();
-    void parse_fencedJsonExtractsStructuredResponse();
-    void parse_multipleObjectsHandlesBracesInsideStrings();
-    void parse_plainTextFallsBackToRawText();
+    void chat_message_round_trips_through_json();
+    void parse_plan_builds_indexed_steps_from_strings_and_objects();
+    void parse_tool_call_reads_name_and_args();
+    void parse_need_approval_reads_approval_fields();
+    void parse_unknown_json_object_falls_back_to_compact_text();
+    void parse_fenced_json_extracts_structured_response();
+    void parse_multiple_objects_handles_braces_inside_strings();
+    void parse_plain_text_falls_back_to_raw_text();
 };
 
-void AgentMessagesTest::chatMessage_roundTripsThroughJson()
+void agent_messages_test_t::chat_message_round_trips_through_json()
 {
-    const ChatMessage source{QStringLiteral("assistant"),
-                             QStringLiteral("Line 1\nLine 2 with \"quotes\"")};
+    const chat_message_t source{QStringLiteral("assistant"),
+                                QStringLiteral("Line 1\nLine 2 with \"quotes\"")};
 
-    const QJsonObject json = source.toJson();
-    const ChatMessage parsed = ChatMessage::fromJson(json);
+    const QJsonObject json = source.to_json();
+    const chat_message_t parsed = chat_message_t::from_json(json);
 
     QCOMPARE(parsed.role, source.role);
     QCOMPARE(parsed.content, source.content);
 }
 
-void AgentMessagesTest::parse_planBuildsIndexedStepsFromStringsAndObjects()
+void agent_messages_test_t::parse_plan_builds_indexed_steps_from_strings_and_objects()
 {
-    const AgentResponse response = AgentResponse::parse(
+    const agent_response_t response = agent_response_t::parse(
         QStringLiteral(R"({"type":"plan","steps":["Inspect code",{"description":"Add tests"}]})"));
 
-    QVERIFY(response.type == ResponseType::Plan);
+    QVERIFY(response.type == response_type_t::PLAN);
     QCOMPARE(response.steps.size(), 2);
     QCOMPARE(response.steps.at(0).index, 0);
     QCOMPARE(response.steps.at(0).description, QStringLiteral("Inspect code"));
@@ -48,77 +48,79 @@ void AgentMessagesTest::parse_planBuildsIndexedStepsFromStringsAndObjects()
     QCOMPARE(response.steps.at(1).description, QStringLiteral("Add tests"));
 }
 
-void AgentMessagesTest::parse_toolCallReadsNameAndArgs()
+void agent_messages_test_t::parse_tool_call_reads_name_and_args()
 {
-    const AgentResponse response = AgentResponse::parse(
-        QStringLiteral(R"({"type":"tool_call","name":"search_repo","args":{"pattern":"TODO","path":"src"}})"));
+    const agent_response_t response = agent_response_t::parse(QStringLiteral(
+        R"({"type":"tool_call","name":"search_repo","args":{"pattern":"TODO","path":"src"}})"));
 
-    QVERIFY(response.type == ResponseType::ToolCall);
-    QCOMPARE(response.toolName, QStringLiteral("search_repo"));
-    QCOMPARE(response.toolArgs.value(QStringLiteral("pattern")).toString(), QStringLiteral("TODO"));
-    QCOMPARE(response.toolArgs.value(QStringLiteral("path")).toString(), QStringLiteral("src"));
+    QVERIFY(response.type == response_type_t::TOOL_CALL);
+    QCOMPARE(response.tool_name, QStringLiteral("search_repo"));
+    QCOMPARE(response.tool_args.value(QStringLiteral("pattern")).toString(),
+             QStringLiteral("TODO"));
+    QCOMPARE(response.tool_args.value(QStringLiteral("path")).toString(), QStringLiteral("src"));
 }
 
-void AgentMessagesTest::parse_needApprovalReadsApprovalFields()
+void agent_messages_test_t::parse_need_approval_reads_approval_fields()
 {
-    const AgentResponse response = AgentResponse::parse(
-        QStringLiteral(R"({"type":"need_approval","action":"apply_patch","reason":"Needs consent","preview":"diff"})"));
+    const agent_response_t response = agent_response_t::parse(QStringLiteral(
+        R"({"type":"need_approval","action":"apply_patch","reason":"Needs consent","preview":"diff"})"));
 
-    QVERIFY(response.type == ResponseType::NeedApproval);
-    QCOMPARE(response.approvalAction, QStringLiteral("apply_patch"));
-    QCOMPARE(response.approvalReason, QStringLiteral("Needs consent"));
-    QCOMPARE(response.approvalPreview, QStringLiteral("diff"));
+    QVERIFY(response.type == response_type_t::NEED_APPROVAL);
+    QCOMPARE(response.approval_action, QStringLiteral("apply_patch"));
+    QCOMPARE(response.approval_reason, QStringLiteral("Needs consent"));
+    QCOMPARE(response.approval_preview, QStringLiteral("diff"));
 }
 
-void AgentMessagesTest::parse_unknownJsonObjectFallsBackToCompactText()
+void agent_messages_test_t::parse_unknown_json_object_falls_back_to_compact_text()
 {
-    const AgentResponse response =
-        AgentResponse::parse(QStringLiteral(R"({"type":"mystery","answer":42})"));
+    const agent_response_t response =
+        agent_response_t::parse(QStringLiteral(R"({"type":"mystery","answer":42})"));
 
-    QVERIFY(response.type == ResponseType::Text);
+    QVERIFY(response.type == response_type_t::TEXT);
 
     QJsonParseError error;
     const QJsonDocument document = QJsonDocument::fromJson(response.text.toUtf8(), &error);
     QCOMPARE(error.error, QJsonParseError::NoError);
     QVERIFY(document.isObject());
-    QCOMPARE(document.object().value(QStringLiteral("type")).toString(), QStringLiteral("mystery"));
+    QCOMPARE(document.object().value(QStringLiteral("type")).toString(),
+             QStringLiteral("mystery"));
     QCOMPARE(document.object().value(QStringLiteral("answer")).toInt(), 42);
 }
 
-void AgentMessagesTest::parse_fencedJsonExtractsStructuredResponse()
+void agent_messages_test_t::parse_fenced_json_extracts_structured_response()
 {
-    const QString raw = QStringLiteral(
-        "Before\n```json\n{\"type\":\"final\",\"summary\":\"Done\",\"diff\":\"--- a/file\"}\n```\nAfter");
+    const QString raw = QStringLiteral("Before\n```json\n{\"type\":\"final\",\"summary\":\"Done\","
+                                       "\"diff\":\"--- a/file\"}\n```\nAfter");
 
-    const AgentResponse response = AgentResponse::parse(raw);
+    const agent_response_t response = agent_response_t::parse(raw);
 
-    QVERIFY(response.type == ResponseType::Final);
+    QVERIFY(response.type == response_type_t::FINAL);
     QCOMPARE(response.summary, QStringLiteral("Done"));
     QCOMPARE(response.diff, QStringLiteral("--- a/file"));
 }
 
-void AgentMessagesTest::parse_multipleObjectsHandlesBracesInsideStrings()
+void agent_messages_test_t::parse_multiple_objects_handles_braces_inside_strings()
 {
-    const QString raw = QStringLiteral(
-        "noise {\"type\":\"final\",\"summary\":\"brace { inside }\",\"diff\":\"\"}"
-        "{\"type\":\"tool_call\",\"name\":\"ignored\",\"args\":{}} trailing");
+    const QString raw =
+        QStringLiteral("noise {\"type\":\"final\",\"summary\":\"brace { inside }\",\"diff\":\"\"}"
+                       "{\"type\":\"tool_call\",\"name\":\"ignored\",\"args\":{}} trailing");
 
-    const AgentResponse response = AgentResponse::parse(raw);
+    const agent_response_t response = agent_response_t::parse(raw);
 
-    QVERIFY(response.type == ResponseType::Final);
+    QVERIFY(response.type == response_type_t::FINAL);
     QCOMPARE(response.summary, QStringLiteral("brace { inside }"));
 }
 
-void AgentMessagesTest::parse_plainTextFallsBackToRawText()
+void agent_messages_test_t::parse_plain_text_falls_back_to_raw_text()
 {
     const QString raw = QStringLiteral("Just a normal assistant reply.");
 
-    const AgentResponse response = AgentResponse::parse(raw);
+    const agent_response_t response = agent_response_t::parse(raw);
 
-    QVERIFY(response.type == ResponseType::Text);
+    QVERIFY(response.type == response_type_t::TEXT);
     QCOMPARE(response.text, raw);
 }
 
-QTEST_APPLESS_MAIN(AgentMessagesTest)
+QTEST_APPLESS_MAIN(agent_messages_test_t)
 
 #include "tst_agent_messages.moc"

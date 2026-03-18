@@ -3,124 +3,128 @@
 namespace qcai2
 {
 
-QString agentStatusKindName(AgentStatusKind kind)
+QString agent_status_kind_name(agent_status_kind_t kind)
 {
     switch (kind)
     {
-        case AgentStatusKind::Idle:
+        case agent_status_kind_t::IDLE:
             return QStringLiteral("idle");
-        case AgentStatusKind::Thinking:
+        case agent_status_kind_t::THINKING:
             return QStringLiteral("thinking");
-        case AgentStatusKind::Exploring:
+        case agent_status_kind_t::EXPLORING:
             return QStringLiteral("exploring");
-        case AgentStatusKind::Searching:
+        case agent_status_kind_t::SEARCHING:
             return QStringLiteral("searching");
-        case AgentStatusKind::Reading:
+        case agent_status_kind_t::READING:
             return QStringLiteral("reading");
-        case AgentStatusKind::RunningTool:
+        case agent_status_kind_t::RUNNING_TOOL:
             return QStringLiteral("running");
-        case AgentStatusKind::Validating:
+        case agent_status_kind_t::VALIDATING:
             return QStringLiteral("validating");
-        case AgentStatusKind::Testing:
+        case agent_status_kind_t::TESTING:
             return QStringLiteral("testing");
-        case AgentStatusKind::Building:
+        case agent_status_kind_t::BUILDING:
             return QStringLiteral("building");
-        case AgentStatusKind::ApplyingChanges:
+        case agent_status_kind_t::APPLYING_CHANGES:
             return QStringLiteral("applying_changes");
-        case AgentStatusKind::PreparingFinalAnswer:
+        case agent_status_kind_t::PREPARING_FINAL_ANSWER:
             return QStringLiteral("preparing_final_answer");
-        case AgentStatusKind::Done:
+        case agent_status_kind_t::DONE:
             return QStringLiteral("done");
-        case AgentStatusKind::Error:
+        case agent_status_kind_t::ERROR:
             return QStringLiteral("error");
     }
 
     return QStringLiteral("unknown");
 }
 
-bool AgentStatusClassifier::apply(const AgentProgressEvent &event,
-                                  AgentStatusSnapshot *changedStatus)
+bool agent_status_classifier_t::apply(const agent_progress_event_t &event,
+                                      agent_status_snapshot_t *changed_status)
 {
     switch (event.kind)
     {
-        case AgentProgressEventKind::RequestStarted:
-        case AgentProgressEventKind::ReasoningStarted:
-        case AgentProgressEventKind::ReasoningUpdated:
-        case AgentProgressEventKind::MessageDelta:
-            if (m_current.kind == AgentStatusKind::Validating)
+        case agent_progress_event_kind_t::REQUEST_STARTED:
+        case agent_progress_event_kind_t::REASONING_STARTED:
+        case agent_progress_event_kind_t::REASONING_UPDATED:
+        case agent_progress_event_kind_t::MESSAGE_DELTA:
+            if (this->current.kind == agent_status_kind_t::VALIDATING)
             {
                 return false;
             }
-            return setStatus({AgentStatusKind::Thinking, {}, {}}, changedStatus);
+            return this->set_status({agent_status_kind_t::THINKING, {}, {}}, changed_status);
 
-        case AgentProgressEventKind::ToolStarted:
-            return setStatus(toolStatus(event), changedStatus);
+        case agent_progress_event_kind_t::TOOL_STARTED:
+            return this->set_status(this->tool_status(event), changed_status);
 
-        case AgentProgressEventKind::ToolCompleted:
-        case AgentProgressEventKind::ValidationCompleted:
-        case AgentProgressEventKind::Idle:
+        case agent_progress_event_kind_t::TOOL_COMPLETED:
+        case agent_progress_event_kind_t::VALIDATION_COMPLETED:
+        case agent_progress_event_kind_t::IDLE:
             return false;
 
-        case AgentProgressEventKind::ValidationStarted:
-            return setStatus({AgentStatusKind::Validating, event.label, {}}, changedStatus);
+        case agent_progress_event_kind_t::VALIDATION_STARTED:
+            return this->set_status({agent_status_kind_t::VALIDATING, event.label, {}},
+                                    changed_status);
 
-        case AgentProgressEventKind::FinalAnswerStarted:
-            return setStatus({AgentStatusKind::PreparingFinalAnswer, {}, {}}, changedStatus);
+        case agent_progress_event_kind_t::FINAL_ANSWER_STARTED:
+            return this->set_status({agent_status_kind_t::PREPARING_FINAL_ANSWER, {}, {}},
+                                    changed_status);
 
-        case AgentProgressEventKind::FinalAnswerCompleted:
-            return setStatus({AgentStatusKind::Done, {}, {}}, changedStatus);
+        case agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED:
+            return this->set_status({agent_status_kind_t::DONE, {}, {}}, changed_status);
 
-        case AgentProgressEventKind::Error:
-            return setStatus({AgentStatusKind::Error, {}, event.message}, changedStatus);
+        case agent_progress_event_kind_t::ERROR:
+            return this->set_status({agent_status_kind_t::ERROR, {}, event.message},
+                                    changed_status);
     }
 
     return false;
 }
 
-AgentStatusSnapshot AgentStatusClassifier::currentStatus() const
+agent_status_snapshot_t agent_status_classifier_t::current_status() const
 {
-    return m_current;
+    return this->current;
 }
 
-bool AgentStatusClassifier::setStatus(const AgentStatusSnapshot &status,
-                                      AgentStatusSnapshot *changedStatus)
+bool agent_status_classifier_t::set_status(const agent_status_snapshot_t &status,
+                                           agent_status_snapshot_t *changed_status)
 {
-    if (m_current.kind == status.kind && m_current.subject == status.subject &&
-        m_current.message == status.message)
+    if (this->current.kind == status.kind && this->current.subject == status.subject &&
+        this->current.message == status.message)
     {
         return false;
     }
 
-    m_current = status;
-    if (changedStatus != nullptr)
+    this->current = status;
+    if (changed_status != nullptr)
     {
-        *changedStatus = status;
+        *changed_status = status;
     }
     return true;
 }
 
-AgentStatusSnapshot AgentStatusClassifier::toolStatus(const AgentProgressEvent &event) const
+agent_status_snapshot_t
+agent_status_classifier_t::tool_status(const agent_progress_event_t &event) const
 {
     switch (event.operation)
     {
-        case AgentProgressOperation::Explore:
-            return {AgentStatusKind::Exploring, event.label, {}};
-        case AgentProgressOperation::Search:
-            return {AgentStatusKind::Searching, event.label, {}};
-        case AgentProgressOperation::Read:
-            return {AgentStatusKind::Reading, event.label, {}};
-        case AgentProgressOperation::Test:
-            return {AgentStatusKind::Testing, event.label, {}};
-        case AgentProgressOperation::Build:
-            return {AgentStatusKind::Building, event.label, {}};
-        case AgentProgressOperation::ApplyChanges:
-            return {AgentStatusKind::ApplyingChanges, event.label, {}};
-        case AgentProgressOperation::Generic:
-        case AgentProgressOperation::None:
+        case agent_progress_operation_t::EXPLORE:
+            return {agent_status_kind_t::EXPLORING, event.label, {}};
+        case agent_progress_operation_t::SEARCH:
+            return {agent_status_kind_t::SEARCHING, event.label, {}};
+        case agent_progress_operation_t::READ:
+            return {agent_status_kind_t::READING, event.label, {}};
+        case agent_progress_operation_t::TEST:
+            return {agent_status_kind_t::TESTING, event.label, {}};
+        case agent_progress_operation_t::BUILD:
+            return {agent_status_kind_t::BUILDING, event.label, {}};
+        case agent_progress_operation_t::APPLY_CHANGES:
+            return {agent_status_kind_t::APPLYING_CHANGES, event.label, {}};
+        case agent_progress_operation_t::GENERIC:
+        case agent_progress_operation_t::NONE:
             break;
     }
 
-    return {AgentStatusKind::RunningTool, event.label, {}};
+    return {agent_status_kind_t::RUNNING_TOOL, event.label, {}};
 }
 
 }  // namespace qcai2

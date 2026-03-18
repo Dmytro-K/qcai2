@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>SettingsWidget</class>
- <widget class="QWidget" name="SettingsWidget">
+ <class>settings_widget_t</class>
+ <widget class="QWidget" name="settings_widget_t">
   <property name="windowTitle">
-   <string>Settings</string>
+   <string>settings_t</string>
   </property>
   <layout class="QVBoxLayout" name="mainLayout">
    <property name="leftMargin">

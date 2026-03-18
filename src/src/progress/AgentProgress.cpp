@@ -6,166 +6,168 @@ namespace qcai2
 namespace
 {
 
-QString normalizedToolName(QString toolName)
+QString normalized_tool_name(QString tool_name)
 {
-    toolName = toolName.trimmed().toLower();
-    toolName.replace(QLatin1Char('-'), QLatin1Char('_'));
-    toolName.replace(QLatin1Char(' '), QLatin1Char('_'));
-    return toolName;
+    tool_name = tool_name.trimmed().toLower();
+    tool_name.replace(QLatin1Char('-'), QLatin1Char('_'));
+    tool_name.replace(QLatin1Char(' '), QLatin1Char('_'));
+    return tool_name;
 }
 
 }  // namespace
 
-QString providerRawEventKindName(ProviderRawEventKind kind)
+QString provider_raw_event_kind_name(provider_raw_event_kind_t kind)
 {
     switch (kind)
     {
-        case ProviderRawEventKind::RequestStarted:
+        case provider_raw_event_kind_t::REQUEST_STARTED:
             return QStringLiteral("request_started");
-        case ProviderRawEventKind::ReasoningDelta:
+        case provider_raw_event_kind_t::REASONING_DELTA:
             return QStringLiteral("reasoning_delta");
-        case ProviderRawEventKind::MessageDelta:
+        case provider_raw_event_kind_t::MESSAGE_DELTA:
             return QStringLiteral("message_delta");
-        case ProviderRawEventKind::ToolStarted:
+        case provider_raw_event_kind_t::TOOL_STARTED:
             return QStringLiteral("tool_started");
-        case ProviderRawEventKind::ToolCompleted:
+        case provider_raw_event_kind_t::TOOL_COMPLETED:
             return QStringLiteral("tool_completed");
-        case ProviderRawEventKind::ResponseCompleted:
+        case provider_raw_event_kind_t::RESPONSE_COMPLETED:
             return QStringLiteral("response_completed");
-        case ProviderRawEventKind::Idle:
+        case provider_raw_event_kind_t::IDLE:
             return QStringLiteral("idle");
-        case ProviderRawEventKind::Error:
+        case provider_raw_event_kind_t::ERROR_EVENT:
             return QStringLiteral("error");
     }
 
     return QStringLiteral("unknown");
 }
 
-QString agentProgressEventKindName(AgentProgressEventKind kind)
+QString agent_progress_event_kind_name(agent_progress_event_kind_t kind)
 {
     switch (kind)
     {
-        case AgentProgressEventKind::RequestStarted:
+        case agent_progress_event_kind_t::REQUEST_STARTED:
             return QStringLiteral("request_started");
-        case AgentProgressEventKind::ReasoningStarted:
+        case agent_progress_event_kind_t::REASONING_STARTED:
             return QStringLiteral("reasoning_started");
-        case AgentProgressEventKind::ReasoningUpdated:
+        case agent_progress_event_kind_t::REASONING_UPDATED:
             return QStringLiteral("reasoning_updated");
-        case AgentProgressEventKind::ToolStarted:
+        case agent_progress_event_kind_t::TOOL_STARTED:
             return QStringLiteral("tool_started");
-        case AgentProgressEventKind::ToolCompleted:
+        case agent_progress_event_kind_t::TOOL_COMPLETED:
             return QStringLiteral("tool_completed");
-        case AgentProgressEventKind::ValidationStarted:
+        case agent_progress_event_kind_t::VALIDATION_STARTED:
             return QStringLiteral("validation_started");
-        case AgentProgressEventKind::ValidationCompleted:
+        case agent_progress_event_kind_t::VALIDATION_COMPLETED:
             return QStringLiteral("validation_completed");
-        case AgentProgressEventKind::MessageDelta:
+        case agent_progress_event_kind_t::MESSAGE_DELTA:
             return QStringLiteral("message_delta");
-        case AgentProgressEventKind::FinalAnswerStarted:
+        case agent_progress_event_kind_t::FINAL_ANSWER_STARTED:
             return QStringLiteral("final_answer_started");
-        case AgentProgressEventKind::FinalAnswerCompleted:
+        case agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED:
             return QStringLiteral("final_answer_completed");
-        case AgentProgressEventKind::Idle:
+        case agent_progress_event_kind_t::IDLE:
             return QStringLiteral("idle");
-        case AgentProgressEventKind::Error:
+        case agent_progress_event_kind_t::ERROR:
             return QStringLiteral("error");
     }
 
     return QStringLiteral("unknown");
 }
 
-QString agentProgressOperationName(AgentProgressOperation operation)
+QString agent_progress_operation_name(agent_progress_operation_t operation)
 {
     switch (operation)
     {
-        case AgentProgressOperation::None:
+        case agent_progress_operation_t::NONE:
             return QStringLiteral("none");
-        case AgentProgressOperation::Explore:
+        case agent_progress_operation_t::EXPLORE:
             return QStringLiteral("explore");
-        case AgentProgressOperation::Search:
+        case agent_progress_operation_t::SEARCH:
             return QStringLiteral("search");
-        case AgentProgressOperation::Read:
+        case agent_progress_operation_t::READ:
             return QStringLiteral("read");
-        case AgentProgressOperation::Test:
+        case agent_progress_operation_t::TEST:
             return QStringLiteral("test");
-        case AgentProgressOperation::Build:
+        case agent_progress_operation_t::BUILD:
             return QStringLiteral("build");
-        case AgentProgressOperation::ApplyChanges:
+        case agent_progress_operation_t::APPLY_CHANGES:
             return QStringLiteral("apply_changes");
-        case AgentProgressOperation::Generic:
+        case agent_progress_operation_t::GENERIC:
             return QStringLiteral("generic");
     }
 
     return QStringLiteral("unknown");
 }
 
-QString prettifyToolName(const QString &toolName)
+QString prettify_tool_name(const QString &tool_name)
 {
-    QString pretty = normalizedToolName(toolName);
+    QString pretty = normalized_tool_name(tool_name);
     pretty.replace(QLatin1Char('_'), QLatin1Char(' '));
     return pretty.trimmed();
 }
 
-AgentProgressOperation classifyToolOperation(const QString &toolName)
+agent_progress_operation_t classify_tool_operation(const QString &tool_name)
 {
-    const QString normalized = normalizedToolName(toolName);
+    const QString normalized = normalized_tool_name(tool_name);
 
     if (normalized.contains(QStringLiteral("compact")) == true)
     {
-        return AgentProgressOperation::Explore;
+        return agent_progress_operation_t::EXPLORE;
     }
     if (normalized.contains(QStringLiteral("search")) == true ||
         normalized.contains(QStringLiteral("grep")) == true ||
         normalized.contains(QStringLiteral("find")) == true)
     {
-        return AgentProgressOperation::Search;
+        return agent_progress_operation_t::SEARCH;
     }
     if (normalized.contains(QStringLiteral("read")) == true)
     {
-        return AgentProgressOperation::Read;
+        return agent_progress_operation_t::READ;
     }
     if (normalized.contains(QStringLiteral("test")) == true)
     {
-        return AgentProgressOperation::Test;
+        return agent_progress_operation_t::TEST;
     }
     if (normalized.contains(QStringLiteral("build")) == true)
     {
-        return AgentProgressOperation::Build;
+        return agent_progress_operation_t::BUILD;
     }
     if (normalized.contains(QStringLiteral("apply_patch")) == true ||
         normalized.contains(QStringLiteral("edit")) == true ||
         normalized.contains(QStringLiteral("write_file")) == true ||
         normalized.contains(QStringLiteral("create_file")) == true)
     {
-        return AgentProgressOperation::ApplyChanges;
+        return agent_progress_operation_t::APPLY_CHANGES;
     }
 
-    return AgentProgressOperation::Generic;
+    return agent_progress_operation_t::GENERIC;
 }
 
-QString progressLabelForTool(const QString &toolName, AgentProgressOperation operation)
+QString progress_label_for_tool(const QString &tool_name, agent_progress_operation_t operation)
 {
-    const QString normalized = normalizedToolName(toolName);
+    const QString normalized = normalized_tool_name(tool_name);
 
     if (normalized.contains(QStringLiteral("compact")) == true)
     {
         return QStringLiteral("compact command");
     }
-    if (operation == AgentProgressOperation::Search && normalized == QStringLiteral("search_repo"))
+    if (operation == agent_progress_operation_t::SEARCH &&
+        normalized == QStringLiteral("search_repo"))
     {
         return QStringLiteral("repository");
     }
-    if (operation == AgentProgressOperation::Read && normalized == QStringLiteral("read_file"))
+    if (operation == agent_progress_operation_t::READ && normalized == QStringLiteral("read_file"))
     {
         return QStringLiteral("file");
     }
-    if (operation == AgentProgressOperation::Build || operation == AgentProgressOperation::Test ||
-        operation == AgentProgressOperation::ApplyChanges)
+    if (operation == agent_progress_operation_t::BUILD ||
+        operation == agent_progress_operation_t::TEST ||
+        operation == agent_progress_operation_t::APPLY_CHANGES)
     {
         return {};
     }
 
-    return prettifyToolName(toolName);
+    return prettify_tool_name(tool_name);
 }
 
 }  // namespace qcai2

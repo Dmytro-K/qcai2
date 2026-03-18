@@ -1,9 +1,9 @@
 /*! Implements the legacy SSE transport for the Qt MCP client.
  *
  * The legacy MCP SSE transport (protocol version 2024-11-05) works as follows:
- *  1. Client opens a persistent GET connection to the SSE endpoint.
+ *  1. client_t opens a persistent GET connection to the SSE endpoint.
  *  2. Server sends an `event: endpoint` with the POST URL for client messages.
- *  3. Client sends JSON-RPC messages via HTTP POST to that URL.
+ *  3. client_t sends JSON-RPC messages via HTTP POST to that URL.
  *  4. Server delivers responses and notifications through the SSE stream.
  */
 #include <qtmcp/SseTransport.h>
@@ -18,230 +18,238 @@
 namespace qtmcp
 {
 
-SseTransport::SseTransport(SseTransportConfig config, QObject *parent)
-    : Transport(parent), m_config(std::move(config)),
-      m_networkAccessManager(new QNetworkAccessManager(this))
+sse_transport_t::sse_transport_t(sse_transport_config_t config, QObject *parent)
+    : transport_t(parent), transport_config(std::move(config)),
+      network_access_manager(new QNetworkAccessManager(this))
 {
 }
 
-SseTransport::~SseTransport()
+sse_transport_t::~sse_transport_t()
 {
     stop();
 }
 
-QString SseTransport::transportName() const
+QString sse_transport_t::transport_name() const
 {
     return QStringLiteral("sse");
 }
 
-Transport::State SseTransport::state() const
+transport_t::state_t sse_transport_t::state() const
 {
-    return m_state;
+    return this->transport_state;
 }
 
-const SseTransportConfig &SseTransport::config() const
+const sse_transport_config_t &sse_transport_t::config() const
 {
-    return m_config;
+    return this->transport_config;
 }
 
-void SseTransport::start()
+void sse_transport_t::start()
 {
-    if (m_state != State::Disconnected)
+    if (this->transport_state != state_t::DISCONNECTED)
     {
         return;
     }
 
-    const QString scheme = m_config.endpoint.scheme().toLower();
+    const QString scheme = this->transport_config.endpoint.scheme().toLower();
     if (scheme != QStringLiteral("http") && scheme != QStringLiteral("https"))
     {
-        emit errorOccurred(
+        emit error_occurred(
             QStringLiteral("SSE transport requires http/https URL, got: %1").arg(scheme));
         return;
     }
 
-    setState(State::Starting);
-    m_postEndpoint.clear();
-    openSseStream();
+    this->set_state(state_t::STARTING);
+    this->post_endpoint.clear();
+    this->open_sse_stream();
 }
 
-void SseTransport::stop()
+void sse_transport_t::stop()
 {
-    if (m_state == State::Disconnected)
+    if (this->transport_state == state_t::DISCONNECTED)
     {
         return;
     }
 
-    setState(State::Stopping);
+    this->set_state(state_t::STOPPING);
 
-    if (m_sseReply != nullptr)
+    if (this->sse_reply != nullptr)
     {
-        m_sseReply->abort();
-        m_sseReply->deleteLater();
-        m_sseReply = nullptr;
+        this->sse_reply->abort();
+        this->sse_reply->deleteLater();
+        this->sse_reply = nullptr;
     }
 
-    m_sseBuffer.clear();
-    m_currentEventData.clear();
-    m_currentEventType.clear();
-    m_postEndpoint.clear();
+    this->sse_buffer.clear();
+    this->current_event_data.clear();
+    this->current_event_type.clear();
+    this->post_endpoint.clear();
 
-    setState(State::Disconnected);
+    this->set_state(state_t::DISCONNECTED);
     emit stopped();
 }
 
-bool SseTransport::sendMessage(const QJsonObject &message)
+bool sse_transport_t::send_message(const QJsonObject &message)
 {
-    if (m_state != State::Connected)
+    if (this->transport_state != state_t::CONNECTED)
     {
-        emit errorOccurred(QStringLiteral("Cannot send message: SSE transport not connected."));
+        emit error_occurred(QStringLiteral("Cannot send message: SSE transport not connected."));
         return false;
     }
 
-    if (m_postEndpoint.isEmpty() == true)
+    if (this->post_endpoint.isEmpty() == true)
     {
-        emit errorOccurred(
+        emit error_occurred(
             QStringLiteral("Cannot send message: server has not provided a POST endpoint yet."));
         return false;
     }
 
     const QByteArray payload = QJsonDocument(message).toJson(QJsonDocument::Compact);
-    emit logMessage(QStringLiteral("sse -> %1").arg(QString::fromUtf8(payload)));
-    postMessage(payload);
+    emit log_message(QStringLiteral("sse -> %1").arg(QString::fromUtf8(payload)));
+    this->post_message(payload);
     return true;
 }
 
-void SseTransport::setState(State state)
+void sse_transport_t::set_state(state_t state)
 {
-    if (m_state == state)
+    if (this->transport_state == state)
     {
         return;
     }
 
-    m_state = state;
-    QString stateLabel = QStringLiteral("unknown");
-    switch (m_state)
+    this->transport_state = state;
+    QString state_label = QStringLiteral("unknown");
+    switch (this->transport_state)
     {
-        case State::Disconnected:
-            stateLabel = QStringLiteral("disconnected");
+        case state_t::DISCONNECTED:
+            state_label = QStringLiteral("disconnected");
             break;
-        case State::Starting:
-            stateLabel = QStringLiteral("starting");
+        case state_t::STARTING:
+            state_label = QStringLiteral("starting");
             break;
-        case State::Connected:
-            stateLabel = QStringLiteral("connected");
+        case state_t::CONNECTED:
+            state_label = QStringLiteral("connected");
             break;
-        case State::Stopping:
-            stateLabel = QStringLiteral("stopping");
+        case state_t::STOPPING:
+            state_label = QStringLiteral("stopping");
             break;
     }
-    emit logMessage(QStringLiteral("sse state changed: %1").arg(stateLabel));
-    emit stateChanged(m_state);
+    emit log_message(QStringLiteral("sse state changed: %1").arg(state_label));
+    emit state_changed(this->transport_state);
 }
 
-void SseTransport::openSseStream()
+void sse_transport_t::open_sse_stream()
 {
-    QNetworkRequest request(m_config.endpoint);
+    QNetworkRequest request(this->transport_config.endpoint);
     request.setRawHeader("Accept", "text/event-stream");
     request.setRawHeader("Cache-Control", "no-cache");
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
                          QNetworkRequest::AlwaysNetwork);
     // No transfer timeout — the stream stays open indefinitely
     request.setTransferTimeout(0);
-    applyConfiguredHeaders(request);
+    this->apply_configured_headers(request);
 
-    emit logMessage(QStringLiteral("sse opening stream: %1").arg(m_config.endpoint.toString()));
-    m_sseReply = m_networkAccessManager->get(request);
+    emit log_message(
+        QStringLiteral("sse opening stream: %1").arg(this->transport_config.endpoint.toString()));
+    this->sse_reply = this->network_access_manager->get(request);
 
-    connect(m_sseReply, &QNetworkReply::readyRead, this, &SseTransport::processStreamReadyRead);
-    connect(m_sseReply, &QNetworkReply::finished, this, &SseTransport::processStreamFinished);
-    connect(m_sseReply, &QNetworkReply::errorOccurred, this,
+    connect(this->sse_reply, &QNetworkReply::readyRead, this,
+            &sse_transport_t::process_stream_ready_read);
+    connect(this->sse_reply, &QNetworkReply::finished, this,
+            &sse_transport_t::process_stream_finished);
+    connect(this->sse_reply, &QNetworkReply::errorOccurred, this,
             [this](QNetworkReply::NetworkError code) {
-                emit logMessage(QStringLiteral("SSE stream error: code=%1 text=%2")
-                                    .arg(static_cast<int>(code))
-                                    .arg(m_sseReply != nullptr ? m_sseReply->errorString()
-                                                               : QStringLiteral("(null reply)")));
+                emit log_message(QStringLiteral("SSE stream error: code=%1 text=%2")
+                                     .arg(static_cast<int>(code))
+                                     .arg(this->sse_reply != nullptr
+                                              ? this->sse_reply->errorString()
+                                              : QStringLiteral("(null reply)")));
             });
 }
 
-void SseTransport::processStreamReadyRead()
+void sse_transport_t::process_stream_ready_read()
 {
-    if (m_sseReply == nullptr)
+    if (this->sse_reply == nullptr)
     {
         return;
     }
 
-    const QByteArray chunk = m_sseReply->readAll();
+    const QByteArray chunk = this->sse_reply->readAll();
     if (chunk.isEmpty() == true)
     {
         return;
     }
 
-    m_sseBuffer += chunk;
-    processSseBuffer(false);
+    this->sse_buffer += chunk;
+    this->process_sse_buffer(false);
 }
 
-void SseTransport::processStreamFinished()
+void sse_transport_t::process_stream_finished()
 {
-    if (m_sseReply == nullptr)
+    if (this->sse_reply == nullptr)
     {
         return;
     }
 
     // Flush remaining buffer
-    if (m_sseBuffer.isEmpty() == false)
+    if (this->sse_buffer.isEmpty() == false)
     {
-        processSseBuffer(true);
+        this->process_sse_buffer(true);
     }
 
-    const int statusCode = m_sseReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    const QString errorString = m_sseReply->errorString();
+    const int status_code =
+        this->sse_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QString error_string = this->sse_reply->errorString();
 
-    m_sseReply->deleteLater();
-    m_sseReply = nullptr;
+    this->sse_reply->deleteLater();
+    this->sse_reply = nullptr;
 
-    if (m_state == State::Stopping || m_state == State::Disconnected)
+    if (this->transport_state == state_t::STOPPING ||
+        this->transport_state == state_t::DISCONNECTED)
     {
         return;
     }
 
-    emit logMessage(
-        QStringLiteral("SSE stream closed: status=%1 error=%2").arg(statusCode).arg(errorString));
+    emit log_message(QStringLiteral("SSE stream closed: status=%1 error=%2")
+                         .arg(status_code)
+                         .arg(error_string));
 
     // Reconnect after delay
-    if (m_config.reconnectDelayMs > 0)
+    if (this->transport_config.reconnect_delay_ms > 0)
     {
-        emit logMessage(
-            QStringLiteral("SSE reconnecting in %1 ms...").arg(m_config.reconnectDelayMs));
-        QTimer::singleShot(m_config.reconnectDelayMs, this, [this]() {
-            if (m_state != State::Stopping && m_state != State::Disconnected)
+        emit log_message(QStringLiteral("SSE reconnecting in %1 ms...")
+                             .arg(this->transport_config.reconnect_delay_ms));
+        QTimer::singleShot(this->transport_config.reconnect_delay_ms, this, [this]() {
+            if (this->transport_state != state_t::STOPPING &&
+                this->transport_state != state_t::DISCONNECTED)
             {
-                m_sseBuffer.clear();
-                m_currentEventData.clear();
-                m_currentEventType.clear();
-                openSseStream();
+                this->sse_buffer.clear();
+                this->current_event_data.clear();
+                this->current_event_type.clear();
+                this->open_sse_stream();
             }
         });
     }
     else
     {
-        emit errorOccurred(QStringLiteral("SSE stream closed unexpectedly."));
-        setState(State::Disconnected);
+        emit error_occurred(QStringLiteral("SSE stream closed unexpectedly."));
+        this->set_state(state_t::DISCONNECTED);
         emit stopped();
     }
 }
 
-void SseTransport::processSseBuffer(bool flush)
+void sse_transport_t::process_sse_buffer(bool flush)
 {
     while (true)
     {
-        const qsizetype newlineIndex = m_sseBuffer.indexOf('\n');
-        if (newlineIndex < 0)
+        const qsizetype newline_index = this->sse_buffer.indexOf('\n');
+        if (newline_index < 0)
         {
             break;
         }
 
-        QByteArray line = m_sseBuffer.left(newlineIndex);
-        m_sseBuffer.remove(0, newlineIndex + 1);
+        QByteArray line = this->sse_buffer.left(newline_index);
+        this->sse_buffer.remove(0, newline_index + 1);
         if (line.endsWith('\r') == true)
         {
             line.chop(1);
@@ -250,7 +258,7 @@ void SseTransport::processSseBuffer(bool flush)
         // Empty line = end of event
         if (line.isEmpty() == true)
         {
-            handleSseEvent();
+            this->handle_sse_event();
             continue;
         }
 
@@ -262,7 +270,7 @@ void SseTransport::processSseBuffer(bool flush)
 
         if (line.startsWith("event:") == true)
         {
-            m_currentEventType = QString::fromUtf8(line.mid(6)).trimmed();
+            this->current_event_type = QString::fromUtf8(line.mid(6)).trimmed();
             continue;
         }
 
@@ -273,66 +281,66 @@ void SseTransport::processSseBuffer(bool flush)
             {
                 data.remove(0, 1);
             }
-            if (m_currentEventData.isEmpty() == false)
+            if (this->current_event_data.isEmpty() == false)
             {
-                m_currentEventData.append('\n');
+                this->current_event_data.append('\n');
             }
-            m_currentEventData.append(data);
+            this->current_event_data.append(data);
         }
     }
 
-    if (flush && (!m_currentEventData.isEmpty() || !m_currentEventType.isEmpty()))
+    if (flush && (!this->current_event_data.isEmpty() || !this->current_event_type.isEmpty()))
     {
-        handleSseEvent();
+        this->handle_sse_event();
     }
 }
 
-void SseTransport::handleSseEvent()
+void sse_transport_t::handle_sse_event()
 {
-    const QByteArray data = m_currentEventData;
-    const QString eventType = m_currentEventType;
-    m_currentEventData.clear();
-    m_currentEventType.clear();
+    const QByteArray data = this->current_event_data;
+    const QString event_type = this->current_event_type;
+    this->current_event_data.clear();
+    this->current_event_type.clear();
 
     if (data.trimmed().isEmpty() == true)
     {
         return;
     }
 
-    emit logMessage(QStringLiteral("sse event `%1` <- %2")
-                        .arg(eventType.isEmpty() ? QStringLiteral("message") : eventType,
-                             QString::fromUtf8(data).left(200)));
+    emit log_message(QStringLiteral("sse event `%1` <- %2")
+                         .arg(event_type.isEmpty() ? QStringLiteral("message") : event_type,
+                              QString::fromUtf8(data).left(200)));
 
     // The server sends "endpoint" event with the POST URL
-    if (eventType == QStringLiteral("endpoint"))
+    if (event_type == QStringLiteral("endpoint"))
     {
-        const QString endpointPath = QString::fromUtf8(data).trimmed();
+        const QString endpoint_path = QString::fromUtf8(data).trimmed();
         // Resolve relative URL against the SSE endpoint
-        m_postEndpoint = m_config.endpoint.resolved(QUrl(endpointPath));
-        emit logMessage(
-            QStringLiteral("SSE received POST endpoint: %1").arg(m_postEndpoint.toString()));
+        this->post_endpoint = this->transport_config.endpoint.resolved(QUrl(endpoint_path));
+        emit log_message(
+            QStringLiteral("SSE received POST endpoint: %1").arg(this->post_endpoint.toString()));
 
-        if (m_state == State::Starting)
+        if (this->transport_state == state_t::STARTING)
         {
-            setState(State::Connected);
+            this->set_state(state_t::CONNECTED);
             emit started();
         }
         return;
     }
 
     // Parse JSON-RPC message from the stream
-    QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(data, &parseError);
-    if (parseError.error != QJsonParseError::NoError)
+    QJsonParseError parse_error;
+    const QJsonDocument document = QJsonDocument::fromJson(data, &parse_error);
+    if (parse_error.error != QJsonParseError::NoError)
     {
-        emit errorOccurred(QStringLiteral("Failed to parse MCP SSE event JSON: %1")
-                               .arg(parseError.errorString()));
+        emit error_occurred(QStringLiteral("Failed to parse MCP SSE event JSON: %1")
+                                .arg(parse_error.errorString()));
         return;
     }
 
     if (document.isObject() == true)
     {
-        emit messageReceived(document.object());
+        emit message_received(document.object());
     }
     else if (document.isArray() == true)
     {
@@ -341,44 +349,45 @@ void SseTransport::handleSseEvent()
         {
             if (value.isObject() == true)
             {
-                emit messageReceived(value.toObject());
+                emit message_received(value.toObject());
             }
         }
     }
 }
 
-void SseTransport::postMessage(const QByteArray &payload)
+void sse_transport_t::post_message(const QByteArray &payload)
 {
-    QNetworkRequest request(m_postEndpoint);
+    QNetworkRequest request(this->post_endpoint);
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
-    if (m_config.requestTimeoutMs > 0)
+    if (this->transport_config.request_timeout_ms > 0)
     {
-        request.setTransferTimeout(m_config.requestTimeoutMs);
+        request.setTransferTimeout(this->transport_config.request_timeout_ms);
     }
-    applyConfiguredHeaders(request);
+    this->apply_configured_headers(request);
 
-    QNetworkReply *reply = m_networkAccessManager->post(request, payload);
+    QNetworkReply *reply = this->network_access_manager->post(request, payload);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         if (reply->error() != QNetworkReply::NoError)
         {
-            emit logMessage(QStringLiteral("SSE POST error: %1").arg(reply->errorString()));
+            emit log_message(QStringLiteral("SSE POST error: %1").arg(reply->errorString()));
         }
         else
         {
             const QByteArray body = reply->readAll();
             if (body.isEmpty() == false)
             {
-                emit logMessage(QStringLiteral("SSE POST response: %1")
-                                    .arg(QString::fromUtf8(body).left(200)));
+                emit log_message(QStringLiteral("SSE POST response: %1")
+                                     .arg(QString::fromUtf8(body).left(200)));
             }
         }
         reply->deleteLater();
     });
 }
 
-void SseTransport::applyConfiguredHeaders(QNetworkRequest &request) const
+void sse_transport_t::apply_configured_headers(QNetworkRequest &request) const
 {
-    for (auto it = m_config.headers.begin(); it != m_config.headers.end(); ++it)
+    for (auto it = this->transport_config.headers.begin();
+         it != this->transport_config.headers.end(); ++it)
     {
         request.setRawHeader(it.key().toUtf8(), it.value().toUtf8());
     }

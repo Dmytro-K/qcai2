@@ -61,12 +61,12 @@ namespace qcai2
 namespace
 {
 
-int boundedInt(qsizetype value)
+int bounded_int(qsizetype value)
 {
     return static_cast<int>(std::min(value, qsizetype(std::numeric_limits<int>::max())));
 }
 
-QStringList openAiAgentModels()
+QStringList open_ai_agent_models()
 {
     return {
         QStringLiteral("gpt-5.4"),           QStringLiteral("gpt-5.2"),
@@ -77,7 +77,7 @@ QStringList openAiAgentModels()
     };
 }
 
-void populateEffortCombo(QComboBox *combo)
+void populate_effort_combo(QComboBox *combo)
 {
     combo->addItem(QObject::tr("Off"), QStringLiteral("off"));
     combo->addItem(QObject::tr("Low"), QStringLiteral("low"));
@@ -85,20 +85,20 @@ void populateEffortCombo(QComboBox *combo)
     combo->addItem(QObject::tr("High"), QStringLiteral("high"));
 }
 
-void selectEffortValue(QComboBox *combo, const QString &value, int fallbackIndex)
+void select_effort_value(QComboBox *combo, const QString &value, int fallback_index)
 {
     const int index = combo->findData(value);
-    combo->setCurrentIndex(index >= 0 ? index : fallbackIndex);
+    combo->setCurrentIndex(index >= 0 ? index : fallback_index);
 }
 
-void populateModeCombo(QComboBox *combo)
+void populate_mode_combo(QComboBox *combo)
 {
     combo->addItem(QObject::tr("Ask"), QStringLiteral("ask"));
     combo->addItem(QObject::tr("Agent"), QStringLiteral("agent"));
 }
 
-void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
-                             const QString &selectedText)
+void repopulate_editable_combo(QComboBox *combo, const QStringList &items,
+                               const QString &selectedText)
 {
     QStringList uniqueItems;
     uniqueItems.reserve(items.size() + 1);
@@ -125,7 +125,7 @@ void repopulateEditableCombo(QComboBox *combo, const QStringList &items,
     combo->setCurrentText(selected);
 }
 
-QString wrapMarkdownPayloadBlocks(const QString &markdown)
+QString wrap_markdown_payload_blocks(const QString &markdown)
 {
     auto applyPattern = [](const QString &text, const QRegularExpression &pattern) {
         QString rewritten;
@@ -151,24 +151,24 @@ QString wrapMarkdownPayloadBlocks(const QString &markdown)
     };
 
     QString rewritten = markdown;
-    static const QRegularExpression toolReturnedRe(QStringLiteral(
+    static const QRegularExpression tool_returned_re(QStringLiteral(
         R"((Tool '[^']+' returned:)\n([\s\S]*?)(\n\nContinue with the next step\.))"));
-    static const QRegularExpression approvedResultRe(
-        QStringLiteral(R"((Approved and executed '[^']+'. Result:)\n([\s\S]*?)(\n\nContinue\.))"));
+    static const QRegularExpression approved_result_re(QStringLiteral(
+        R"((Approved and executed '[^']+'. result_t:)\n([\s\S]*?)(\n\nContinue\.))"));
 
-    rewritten = applyPattern(rewritten, toolReturnedRe);
-    rewritten = applyPattern(rewritten, approvedResultRe);
+    rewritten = applyPattern(rewritten, tool_returned_re);
+    rewritten = applyPattern(rewritten, approved_result_re);
     return rewritten;
 }
 
-QString redactReadFilePayloads(const QString &markdown)
+QString redact_read_file_payloads(const QString &markdown)
 {
     QString rewritten;
     qsizetype cursor = 0;
-    static const QRegularExpression readFileReturnedRe(QStringLiteral(
+    static const QRegularExpression read_file_returned_re(QStringLiteral(
         R"(((?:Human:\s*)?Tool 'read_file' returned:)([\s\S]*?)(?=\n\nContinue with the next step\.|\n(?:Human:|Assistant:|\{"type":)|$))"));
 
-    QRegularExpressionMatchIterator it = readFileReturnedRe.globalMatch(markdown);
+    QRegularExpressionMatchIterator it = read_file_returned_re.globalMatch(markdown);
     while (it.hasNext() == true)
     {
         const QRegularExpressionMatch match = it.next();
@@ -182,9 +182,9 @@ QString redactReadFilePayloads(const QString &markdown)
     return rewritten;
 }
 
-QString providerUsageMarkdown(const ProviderUsage &usage, qint64 durationMs)
+QString provider_usage_markdown(const provider_usage_t &usage, qint64 duration_ms)
 {
-    const QString summary = formatProviderUsageSummary(usage, durationMs);
+    const QString summary = format_provider_usage_summary(usage, duration_ms);
     if (summary.isEmpty() == true)
     {
         return {};
@@ -194,31 +194,31 @@ QString providerUsageMarkdown(const ProviderUsage &usage, qint64 durationMs)
         .arg(summary.toHtmlEscaped());
 }
 
-class DiffHighlighter final : public QSyntaxHighlighter
+class diff_highlighter_t final : public QSyntaxHighlighter
 {
 public:
-    explicit DiffHighlighter(QTextDocument *document) : QSyntaxHighlighter(document)
+    explicit diff_highlighter_t(QTextDocument *document) : QSyntaxHighlighter(document)
     {
         const QPalette palette = QGuiApplication::palette();
-        const bool isDark = palette.color(QPalette::Base).lightness() < 128;
-        const QColor textColor = palette.color(QPalette::Text);
+        const bool is_dark = palette.color(QPalette::Base).lightness() < 128;
+        const QColor text_color = palette.color(QPalette::Text);
 
-        m_addedFormat.setForeground(textColor);
-        m_addedFormat.setBackground(isDark ? QColor(QStringLiteral("#1f3a2a"))
-                                           : QColor(QStringLiteral("#e8f5e9")));
-        m_removedFormat.setForeground(textColor);
-        m_removedFormat.setBackground(isDark ? QColor(QStringLiteral("#3b2424"))
-                                             : QColor(QStringLiteral("#fdeaea")));
-        m_hunkFormat.setForeground(isDark ? QColor(QStringLiteral("#9ecbff"))
-                                          : QColor(QStringLiteral("#0b4f9e")));
-        m_hunkFormat.setBackground(isDark ? QColor(QStringLiteral("#1d2f45"))
-                                          : QColor(QStringLiteral("#e7f1ff")));
-        m_hunkFormat.setFontWeight(QFont::Bold);
-        m_fileHeaderFormat.setForeground(textColor);
-        m_fileHeaderFormat.setBackground(isDark ? QColor(QStringLiteral("#2f2f2f"))
-                                                : QColor(QStringLiteral("#ececec")));
-        m_metaFormat.setForeground(isDark ? QColor(QStringLiteral("#b7beca"))
-                                          : QColor(QStringLiteral("#566070")));
+        this->added_format.setForeground(text_color);
+        this->added_format.setBackground(is_dark ? QColor(QStringLiteral("#1f3a2a"))
+                                                 : QColor(QStringLiteral("#e8f5e9")));
+        this->removed_format.setForeground(text_color);
+        this->removed_format.setBackground(is_dark ? QColor(QStringLiteral("#3b2424"))
+                                                   : QColor(QStringLiteral("#fdeaea")));
+        this->hunk_format.setForeground(is_dark ? QColor(QStringLiteral("#9ecbff"))
+                                                : QColor(QStringLiteral("#0b4f9e")));
+        this->hunk_format.setBackground(is_dark ? QColor(QStringLiteral("#1d2f45"))
+                                                : QColor(QStringLiteral("#e7f1ff")));
+        this->hunk_format.setFontWeight(QFont::Bold);
+        this->file_header_format.setForeground(text_color);
+        this->file_header_format.setBackground(is_dark ? QColor(QStringLiteral("#2f2f2f"))
+                                                       : QColor(QStringLiteral("#ececec")));
+        this->meta_format.setForeground(is_dark ? QColor(QStringLiteral("#b7beca"))
+                                                : QColor(QStringLiteral("#566070")));
     }
 
 protected:
@@ -226,44 +226,44 @@ protected:
     {
         if (((text.startsWith(QStringLiteral("@@"))) == true))
         {
-            return setFormat(0, boundedInt(text.size()), m_hunkFormat);
+            return setFormat(0, bounded_int(text.size()), this->hunk_format);
         }
         if (((text.startsWith(QStringLiteral("+++ ")) ||
               text.startsWith(QStringLiteral("--- "))) == true))
         {
-            return setFormat(0, boundedInt(text.size()), m_fileHeaderFormat);
+            return setFormat(0, bounded_int(text.size()), this->file_header_format);
         }
         if (((text.startsWith(QStringLiteral("diff --")) ||
               text.startsWith(QStringLiteral("index ")) ||
               text.startsWith(QStringLiteral("new file")) ||
               text.startsWith(QStringLiteral("deleted file"))) == true))
         {
-            return setFormat(0, boundedInt(text.size()), m_metaFormat);
+            return setFormat(0, bounded_int(text.size()), this->meta_format);
         }
         if (((text.startsWith(QLatin1Char('+'))) == true))
         {
-            return setFormat(0, boundedInt(text.size()), m_addedFormat);
+            return setFormat(0, bounded_int(text.size()), this->added_format);
         }
         if (((text.startsWith(QLatin1Char('-'))) == true))
         {
-            return setFormat(0, boundedInt(text.size()), m_removedFormat);
+            return setFormat(0, bounded_int(text.size()), this->removed_format);
         }
     }
 
 private:
-    QTextCharFormat m_addedFormat;
-    QTextCharFormat m_removedFormat;
-    QTextCharFormat m_hunkFormat;
-    QTextCharFormat m_fileHeaderFormat;
-    QTextCharFormat m_metaFormat;
+    QTextCharFormat added_format;
+    QTextCharFormat removed_format;
+    QTextCharFormat hunk_format;
+    QTextCharFormat file_header_format;
+    QTextCharFormat meta_format;
 };
 
-class DiffPreviewEdit;
+class diff_preview_edit_t;
 
-class DiffLineNumberArea final : public QWidget
+class diff_line_number_area_t final : public QWidget
 {
 public:
-    explicit DiffLineNumberArea(DiffPreviewEdit *editor);
+    explicit diff_line_number_area_t(diff_preview_edit_t *editor);
     QSize sizeHint() const override;
 
 protected:
@@ -271,48 +271,49 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
 
 private:
-    DiffPreviewEdit *m_editor;
+    diff_preview_edit_t *editor;
 };
 
-class DiffPreviewEdit final : public QPlainTextEdit
+class diff_preview_edit_t final : public QPlainTextEdit
 {
 public:
-    explicit DiffPreviewEdit(QWidget *parent = nullptr)
-        : QPlainTextEdit(parent), m_lineNumberArea(new DiffLineNumberArea(this)),
-          m_highlighter(document())
+    explicit diff_preview_edit_t(QWidget *parent = nullptr)
+        : QPlainTextEdit(parent), line_number_area(new diff_line_number_area_t(this)),
+          highlighter(document())
     {
         connect(this, &QPlainTextEdit::blockCountChanged, this,
-                &DiffPreviewEdit::updateLineNumberAreaWidth);
+                &diff_preview_edit_t::update_line_number_area_width);
         connect(this, &QPlainTextEdit::updateRequest, this,
-                &DiffPreviewEdit::updateLineNumberArea);
-        updateLineNumberAreaWidth(0);
+                &diff_preview_edit_t::update_line_number_area);
+        this->update_line_number_area_width(0);
     }
 
-    bool allChangesApproved() const
+    bool all_changes_approved() const
     {
-        return m_approvableLines.isEmpty() || m_approvedLines.size() == m_approvableLines.size();
+        return this->approvable_lines.isEmpty() ||
+               this->approved_lines.size() == this->approvable_lines.size();
     }
 
-    bool hasApprovedChanges() const
+    bool has_approved_changes() const
     {
-        return !m_approvedLines.isEmpty();
+        return !this->approved_lines.isEmpty();
     }
 
-    void setDiffText(const QString &diff)
+    void set_diff_text(const QString &diff)
     {
         setPlainText(diff);
-        recalculateApprovals();
-        notifyApprovalChanged();
-        m_lineNumberArea->update();
+        this->recalculate_approvals();
+        this->notify_approval_changed();
+        this->line_number_area->update();
     }
 
-    void setApprovalChangedCallback(std::function<void(qsizetype, qsizetype)> callback)
+    void set_approval_changed_callback(std::function<void(qsizetype, qsizetype)> callback)
     {
-        m_approvalChangedCallback = std::move(callback);
-        notifyApprovalChanged();
+        this->approval_changed_callback = std::move(callback);
+        this->notify_approval_changed();
     }
 
-    QString approvedDiff() const
+    QString approved_diff() const
     {
         const QStringList lines = toPlainText().split('\n');
         if (lines.isEmpty())
@@ -388,7 +389,7 @@ public:
                 if (((hunkLine.startsWith(QLatin1Char('+')) &&
                       !hunkLine.startsWith(QStringLiteral("+++ "))) == true))
                 {
-                    if (m_approvedLines.contains(lineNumber) == true)
+                    if (this->approved_lines.contains(lineNumber) == true)
                     {
                         candidateHunk.append(hunkLine);
                         hunkHasApprovedChanges = true;
@@ -397,7 +398,7 @@ public:
                 else if (((hunkLine.startsWith(QLatin1Char('-')) &&
                            !hunkLine.startsWith(QStringLiteral("--- "))) == true))
                 {
-                    if (m_approvedLines.contains(lineNumber) == true)
+                    if (this->approved_lines.contains(lineNumber) == true)
                     {
                         candidateHunk.append(hunkLine);
                         hunkHasApprovedChanges = true;
@@ -428,7 +429,7 @@ public:
         return Diff::normalize(outputLines.join('\n'));
     }
 
-    void lineNumberAreaMousePressEvent(QMouseEvent *event)
+    void line_number_area_mouse_press_event(QMouseEvent *event)
     {
         if (event->button() != Qt::LeftButton)
         {
@@ -445,7 +446,7 @@ public:
             if (((block.isVisible() && event->pos().y() >= top && event->pos().y() < bottom) ==
                  true))
             {
-                toggleApproval(blockNumber + 1);
+                this->toggle_approval(blockNumber + 1);
                 break;
             }
             if (((top > event->pos().y()) == true))
@@ -459,7 +460,7 @@ public:
         }
     }
 
-    int lineNumberAreaWidth() const
+    int line_number_area_width() const
     {
         int digits = 1;
         int max = qMax(1, blockCount());
@@ -471,9 +472,9 @@ public:
         return 24 + fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
     }
 
-    void lineNumberAreaPaintEvent(QPaintEvent *event)
+    void line_number_area_paint_event(QPaintEvent *event)
     {
-        QPainter painter(m_lineNumberArea);
+        QPainter painter(this->line_number_area);
         painter.fillRect(event->rect(), palette().alternateBase());
         painter.setPen(palette().color(QPalette::Mid));
 
@@ -487,19 +488,20 @@ public:
             if (((block.isVisible() && bottom >= event->rect().top()) == true))
             {
                 const int lineNumber = blockNumber + 1;
-                if (m_approvableLines.contains(lineNumber) == true)
+                if (this->approvable_lines.contains(lineNumber) == true)
                 {
                     const QRect markerRect(2, top + (fontMetrics().height() - 9) / 2, 9, 9);
                     painter.setPen(palette().color(QPalette::Mid));
-                    painter.setBrush(m_approvedLines.contains(lineNumber)
+                    painter.setBrush(this->approved_lines.contains(lineNumber)
                                          ? QBrush(QColor(QStringLiteral("#4caf50")))
                                          : Qt::NoBrush);
                     painter.drawRect(markerRect);
                 }
 
                 const QString number = QString::number(blockNumber + 1);
-                painter.drawText(14, top, m_lineNumberArea->width() - 18, fontMetrics().height(),
-                                 Qt::AlignRight | Qt::AlignVCenter, number);
+                painter.drawText(14, top, this->line_number_area->width() - 18,
+                                 fontMetrics().height(), Qt::AlignRight | Qt::AlignVCenter,
+                                 number);
             }
             block = block.next();
             top = bottom;
@@ -513,37 +515,38 @@ protected:
     {
         QPlainTextEdit::resizeEvent(event);
         const QRect cr = contentsRect();
-        m_lineNumberArea->setGeometry(
-            QRect(cr.left(), cr.top(), lineNumberAreaWidth(), cr.height()));
+        this->line_number_area->setGeometry(
+            QRect(cr.left(), cr.top(), this->line_number_area_width(), cr.height()));
     }
 
 private:
-    void updateLineNumberAreaWidth(int)
+    void update_line_number_area_width(int)
     {
-        setViewportMargins(lineNumberAreaWidth(), 0, 0, 0);
+        setViewportMargins(this->line_number_area_width(), 0, 0, 0);
     }
-    void updateLineNumberArea(const QRect &rect, int dy)
+    void update_line_number_area(const QRect &rect, int dy)
     {
         if (((dy != 0) == true))
         {
-            m_lineNumberArea->scroll(0, dy);
+            this->line_number_area->scroll(0, dy);
         }
         else
         {
-            m_lineNumberArea->update(0, rect.y(), m_lineNumberArea->width(), rect.height());
+            this->line_number_area->update(0, rect.y(), this->line_number_area->width(),
+                                           rect.height());
         }
         if (rect.contains(viewport()->rect()))
         {
-            updateLineNumberAreaWidth(0);
+            this->update_line_number_area_width(0);
         }
     }
 
-    void recalculateApprovals()
+    void recalculate_approvals()
     {
-        m_approvableLines.clear();
-        m_approvedLines.clear();
+        this->approvable_lines.clear();
+        this->approved_lines.clear();
 
-        for (QTextBlock block = document()->firstBlock(); ((block.isValid()) == true);
+        for (QTextBlock block = this->document()->firstBlock(); ((block.isValid()) == true);
              block = block.next())
         {
             const QString text = block.text();
@@ -552,216 +555,231 @@ private:
                   (text.startsWith(QLatin1Char('-')) &&
                    !text.startsWith(QStringLiteral("--- ")))) == true))
             {
-                m_approvableLines.insert(block.blockNumber() + 1);
+                this->approvable_lines.insert(block.blockNumber() + 1);
             }
         }
     }
 
-    void toggleApproval(int line)
+    void toggle_approval(int line)
     {
-        if (((!m_approvableLines.contains(line)) == true))
+        if (((!this->approvable_lines.contains(line)) == true))
         {
             return;
         }
 
-        if (m_approvedLines.contains(line) == true)
+        if (this->approved_lines.contains(line) == true)
         {
-            m_approvedLines.remove(line);
+            this->approved_lines.remove(line);
         }
         else
         {
-            m_approvedLines.insert(line);
+            this->approved_lines.insert(line);
         }
 
-        notifyApprovalChanged();
-        m_lineNumberArea->update();
+        this->notify_approval_changed();
+        this->line_number_area->update();
     }
 
-    void notifyApprovalChanged()
+    void notify_approval_changed()
     {
-        if (static_cast<bool>(m_approvalChangedCallback) == true)
+        if (static_cast<bool>(this->approval_changed_callback) == true)
         {
-            m_approvalChangedCallback(m_approvedLines.size(), m_approvableLines.size());
+            this->approval_changed_callback(this->approved_lines.size(),
+                                            this->approvable_lines.size());
         }
     }
 
-    DiffLineNumberArea *m_lineNumberArea;
-    DiffHighlighter m_highlighter;
-    QSet<int> m_approvableLines;
-    QSet<int> m_approvedLines;
-    std::function<void(qsizetype, qsizetype)> m_approvalChangedCallback;
+    diff_line_number_area_t *line_number_area;
+    diff_highlighter_t highlighter;
+    QSet<int> approvable_lines;
+    QSet<int> approved_lines;
+    std::function<void(qsizetype, qsizetype)> approval_changed_callback;
 };
 
-DiffLineNumberArea::DiffLineNumberArea(DiffPreviewEdit *editor) : QWidget(editor), m_editor(editor)
+diff_line_number_area_t::diff_line_number_area_t(diff_preview_edit_t *editor)
+    : QWidget(editor), editor(editor)
 {
 }
-QSize DiffLineNumberArea::sizeHint() const
+QSize diff_line_number_area_t::sizeHint() const
 {
-    return QSize(m_editor->lineNumberAreaWidth(), 0);
+    return QSize(this->editor->line_number_area_width(), 0);
 }
-void DiffLineNumberArea::paintEvent(QPaintEvent *event)
+void diff_line_number_area_t::paintEvent(QPaintEvent *event)
 {
-    m_editor->lineNumberAreaPaintEvent(event);
+    this->editor->line_number_area_paint_event(event);
 }
-void DiffLineNumberArea::mousePressEvent(QMouseEvent *event)
+void diff_line_number_area_t::mousePressEvent(QMouseEvent *event)
 {
-    m_editor->lineNumberAreaMousePressEvent(event);
+    this->editor->line_number_area_mouse_press_event(event);
 }
 
 }  // namespace
 
-AgentDockWidget::AgentDockWidget(AgentController *controller,
-                                 ChatContextManager *chatContextManager, QWidget *parent)
-    : QWidget(parent), m_controller(controller),
-      m_linkedFilesController(std::make_unique<AgentDockLinkedFilesController>(*this)),
-      m_sessionController(std::make_unique<AgentDockSessionController>(*this, chatContextManager))
+agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
+                                         chat_context_manager_t *chat_context_manager,
+                                         QWidget *parent)
+    : QWidget(parent), controller(controller),
+      linked_files_controller(std::make_unique<agent_dock_linked_files_controller_t>(*this)),
+      session_controller(
+          std::make_unique<agent_dock_session_controller_t>(*this, chat_context_manager))
 {
-    setupUi();
+    this->setup_ui();
 
-    m_inlineDiffManager = new InlineDiffManager(this);
+    this->inline_diff_manager = new inline_diff_manager_t(this);
 
     // Throttle rendering during streaming to avoid O(n²) setPlainText() calls
-    m_renderThrottle = new QTimer(this);
-    m_renderThrottle->setSingleShot(true);
-    m_renderThrottle->setInterval(50);
-    connect(m_renderThrottle, &QTimer::timeout, this, &AgentDockWidget::renderLog);
+    this->render_throttle = new QTimer(this);
+    this->render_throttle->setSingleShot(true);
+    this->render_throttle->setInterval(50);
+    connect(this->render_throttle, &QTimer::timeout, this, &agent_dock_widget_t::render_log);
 
     // Connect controller signals
-    connect(m_controller, &AgentController::logMessage, this, &AgentDockWidget::onLogMessage);
-    connect(m_controller, &AgentController::providerUsageAvailable, this,
-            &AgentDockWidget::onProviderUsageAvailable);
-    connect(m_controller, &AgentController::statusChanged, this,
-            [this](const QString &status) { m_statusLabel->setText(status); });
-    connect(m_controller, &AgentController::streamingToken, this, [this](const QString &token) {
-        m_streamingMarkdown += token;
-        if (!m_isStreaming)
-        {
-            m_isStreaming = true;
-            m_streamingRenderedLen = 0;
-        }
-        if (!m_renderThrottle->isActive())
-        {
-            m_renderThrottle->start();
-        }
-    });
-    connect(m_controller, &AgentController::planUpdated, this, &AgentDockWidget::onPlanUpdated);
-    connect(m_controller, &AgentController::diffAvailable, this,
-            &AgentDockWidget::onDiffAvailable);
-    connect(m_controller, &AgentController::approvalRequested, this,
-            &AgentDockWidget::onApprovalRequested);
-    connect(m_controller, &AgentController::iterationChanged, this,
-            &AgentDockWidget::onIterationChanged);
-    connect(m_controller, &AgentController::stopped, this, &AgentDockWidget::onStopped);
-    connect(m_inlineDiffManager, &InlineDiffManager::diffChanged, this,
+    connect(this->controller, &agent_controller_t::log_message, this,
+            &agent_dock_widget_t::on_log_message);
+    connect(this->controller, &agent_controller_t::provider_usage_available, this,
+            &agent_dock_widget_t::on_provider_usage_available);
+    connect(this->controller, &agent_controller_t::status_changed, this,
+            [this](const QString &status) { this->status_label->setText(status); });
+    connect(this->controller, &agent_controller_t::streaming_token, this,
+            [this](const QString &token) {
+                this->streaming_markdown += token;
+                if (!this->is_streaming)
+                {
+                    this->is_streaming = true;
+                    this->streaming_rendered_len = 0;
+                }
+                if (!this->render_throttle->isActive())
+                {
+                    this->render_throttle->start();
+                }
+            });
+    connect(this->controller, &agent_controller_t::plan_updated, this,
+            &agent_dock_widget_t::on_plan_updated);
+    connect(this->controller, &agent_controller_t::diff_available, this,
+            &agent_dock_widget_t::on_diff_available);
+    connect(this->controller, &agent_controller_t::approval_requested, this,
+            &agent_dock_widget_t::on_approval_requested);
+    connect(this->controller, &agent_controller_t::iteration_changed, this,
+            &agent_dock_widget_t::on_iteration_changed);
+    connect(this->controller, &agent_controller_t::stopped, this,
+            &agent_dock_widget_t::on_stopped);
+    connect(this->inline_diff_manager, &inline_diff_manager_t::diff_changed, this,
             [this](const QString &diff) {
-                syncDiffUi(diff, false, false);
-                m_sessionController->saveChat();
+                this->sync_diff_ui(diff, false, false);
+                this->session_controller->save_chat();
             });
-    connect(m_inlineDiffManager, &InlineDiffManager::hunkAccepted, this,
-            [this](int, const QString &filePath) {
-                onLogMessage(QStringLiteral("✅ Inline diff accepted: %1").arg(filePath));
+    connect(this->inline_diff_manager, &inline_diff_manager_t::hunk_accepted, this,
+            [this](int, const QString &file_path) {
+                this->on_log_message(QStringLiteral("✅ Inline diff accepted: %1").arg(file_path));
             });
-    connect(m_inlineDiffManager, &InlineDiffManager::hunkRejected, this,
-            [this](int, const QString &filePath) {
-                onLogMessage(QStringLiteral("❌ Inline diff rejected: %1").arg(filePath));
+    connect(this->inline_diff_manager, &inline_diff_manager_t::hunk_rejected, this,
+            [this](int, const QString &file_path) {
+                this->on_log_message(QStringLiteral("❌ Inline diff rejected: %1").arg(file_path));
             });
-    connect(m_inlineDiffManager, &InlineDiffManager::allResolved, this,
-            [this]() { onLogMessage(QStringLiteral("✅ All inline diff hunks resolved.")); });
-    connect(m_controller, &AgentController::errorOccurred, this, [this](const QString &err) {
-        onLogMessage(QStringLiteral("❌ Error: %1").arg(err));
-        updateRunState(false);
+    connect(this->inline_diff_manager, &inline_diff_manager_t::all_resolved, this, [this]() {
+        this->on_log_message(QStringLiteral("✅ All inline diff hunks resolved."));
     });
+    connect(this->controller, &agent_controller_t::error_occurred, this,
+            [this](const QString &err) {
+                this->on_log_message(QStringLiteral("❌ Error: %1").arg(err));
+                this->update_run_state(false);
+            });
 
     // All hotkeys are handled via event filter on goal edit only
-    m_goalEdit->installEventFilter(this);
+    this->goal_edit->installEventFilter(this);
 
     // Connect debug logger to Debug Log tab
-    connect(&Logger::instance(), &Logger::entryAdded, this,
-            [this](const QString &entry) { m_debugLogView->appendPlainText(entry); });
+    connect(&logger_t::instance(), &logger_t::entry_added, this,
+            [this](const QString &entry) { this->debug_log_view->appendPlainText(entry); });
     // Load existing log entries
-    const auto existingEntries = Logger::instance().entries();
-    for (const auto &e : existingEntries)
+    const auto existing_entries = logger_t::instance().log_entries();
+    for (const auto &e : existing_entries)
     {
-        m_debugLogView->appendPlainText(e);
+        this->debug_log_view->appendPlainText(e);
     }
 
-    if (auto *projectManager = ProjectExplorer::ProjectManager::instance())
+    if (auto *project_manager = ProjectExplorer::ProjectManager::instance())
     {
-        connect(
-            projectManager, &ProjectExplorer::ProjectManager::projectAdded, this,
-            [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
-        connect(
-            projectManager, &ProjectExplorer::ProjectManager::projectRemoved, this,
-            [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
-        connect(
-            projectManager, &ProjectExplorer::ProjectManager::projectDisplayNameChanged, this,
-            [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
-        connect(
-            projectManager, &ProjectExplorer::ProjectManager::startupProjectChanged, this,
-            [this](ProjectExplorer::Project *) { m_sessionController->refreshProjectSelector(); });
+        connect(project_manager, &ProjectExplorer::ProjectManager::projectAdded, this,
+                [this](ProjectExplorer::Project *) {
+                    this->session_controller->refresh_project_selector();
+                });
+        connect(project_manager, &ProjectExplorer::ProjectManager::projectRemoved, this,
+                [this](ProjectExplorer::Project *) {
+                    this->session_controller->refresh_project_selector();
+                });
+        connect(project_manager, &ProjectExplorer::ProjectManager::projectDisplayNameChanged, this,
+                [this](ProjectExplorer::Project *) {
+                    this->session_controller->refresh_project_selector();
+                });
+        connect(project_manager, &ProjectExplorer::ProjectManager::startupProjectChanged, this,
+                [this](ProjectExplorer::Project *) {
+                    this->session_controller->refresh_project_selector();
+                });
     }
 
-    if (auto *editorManager = Core::EditorManager::instance())
+    if (auto *editor_manager = Core::EditorManager::instance())
     {
-        connect(editorManager, &Core::EditorManager::currentEditorChanged, this,
-                [this](Core::IEditor *) { m_linkedFilesController->refreshUi(); });
+        connect(editor_manager, &Core::EditorManager::currentEditorChanged, this,
+                [this](Core::IEditor *) { this->linked_files_controller->refresh_ui(); });
     }
 
-    m_sessionController->refreshProjectSelector();
+    this->session_controller->refresh_project_selector();
 }
 
-AgentDockWidget::~AgentDockWidget()
+agent_dock_widget_t::~agent_dock_widget_t()
 {
-    m_sessionController->saveChat();
+    this->session_controller->save_chat();
 }
 
-void AgentDockWidget::focusGoalInput()
+void agent_dock_widget_t::focus_goal_input()
 {
-    if (m_goalEdit == nullptr)
+    if (this->goal_edit == nullptr)
     {
         return;
     }
 
-    m_goalEdit->setFocus(Qt::ShortcutFocusReason);
-    QTextCursor cursor = m_goalEdit->textCursor();
+    this->goal_edit->setFocus(Qt::ShortcutFocusReason);
+    QTextCursor cursor = this->goal_edit->textCursor();
     cursor.movePosition(QTextCursor::End);
-    m_goalEdit->setTextCursor(cursor);
+    this->goal_edit->setTextCursor(cursor);
 }
 
-QString AgentDockWidget::currentLogMarkdown() const
+QString agent_dock_widget_t::current_log_markdown() const
 {
-    QString text = m_logMarkdown;
-    if (!m_streamingMarkdown.isEmpty())
+    QString text = this->log_markdown;
+    if (!this->streaming_markdown.isEmpty())
     {
         if (!text.isEmpty())
         {
             text += QStringLiteral("\n\n");
         }
-        text += m_streamingMarkdown;
+        text += this->streaming_markdown;
     }
-    return redactReadFilePayloads(text);
+    return redact_read_file_payloads(text);
 }
 
-void AgentDockWidget::syncDiffUi(const QString &diff, bool focusDiffTab, bool refreshInlineMarkers)
+void agent_dock_widget_t::sync_diff_ui(const QString &diff, bool focusDiffTab,
+                                       bool refreshInlineMarkers)
 {
-    m_currentDiff = diff;
-    m_appliedDiff.clear();
-    m_revertPatchBtn->setEnabled(false);
+    this->current_diff = diff;
+    this->applied_diff.clear();
+    this->revert_patch_btn->setEnabled(false);
 
-    auto *diffPreview = static_cast<DiffPreviewEdit *>(m_diffView);
-    diffPreview->setDiffText(diff);
-    m_applyPatchBtn->setEnabled(!diff.isEmpty() && diffPreview->hasApprovedChanges());
+    auto *diff_preview = static_cast<diff_preview_edit_t *>(this->diff_view);
+    diff_preview->set_diff_text(diff);
+    this->apply_patch_btn->setEnabled(!diff.isEmpty() && diff_preview->has_approved_changes());
 
     if (focusDiffTab)
     {
-        if (auto *page = m_diffView->parentWidget())
+        if (auto *page = this->diff_view->parentWidget())
         {
-            m_tabs->setCurrentWidget(page);
+            this->tabs->setCurrentWidget(page);
         }
     }
 
-    m_diffFileList->clear();
-    const QString workDir = m_sessionController->currentProjectDir();
+    this->diff_file_list->clear();
+    const QString work_dir = this->session_controller->current_project_dir();
 
     if (!diff.isEmpty())
     {
@@ -781,12 +799,12 @@ void AgentDockWidget::syncDiffUi(const QString &diff, bool focusDiffTab, bool re
         for (const auto &f : files)
         {
             auto *item = new QListWidgetItem(f);
-            item->setData(Qt::UserRole, QDir(workDir).absoluteFilePath(f));
-            m_diffFileList->addItem(item);
+            item->setData(Qt::UserRole, QDir(work_dir).absoluteFilePath(f));
+            this->diff_file_list->addItem(item);
         }
 
-        disconnect(m_diffFileList, &QListWidget::itemClicked, nullptr, nullptr);
-        connect(m_diffFileList, &QListWidget::itemClicked, this, [](QListWidgetItem *item) {
+        disconnect(this->diff_file_list, &QListWidget::itemClicked, nullptr, nullptr);
+        connect(this->diff_file_list, &QListWidget::itemClicked, this, [](QListWidgetItem *item) {
             const QString absPath = item->data(Qt::UserRole).toString();
             Core::EditorManager::openEditorAt(
                 Utils::Link(Utils::FilePath::fromString(absPath), 0, 0));
@@ -795,164 +813,173 @@ void AgentDockWidget::syncDiffUi(const QString &diff, bool focusDiffTab, bool re
 
     if (refreshInlineMarkers)
     {
-        if (!diff.isEmpty() && !workDir.isEmpty())
+        if (!diff.isEmpty() && !work_dir.isEmpty())
         {
-            m_inlineDiffManager->showDiff(diff, workDir);
+            this->inline_diff_manager->show_diff(diff, work_dir);
         }
         else
         {
-            m_inlineDiffManager->clearAll();
+            this->inline_diff_manager->clear_all();
         }
     }
 
-    m_diffFileList->setVisible(m_diffFileList->count() != 0);
+    this->diff_file_list->setVisible(this->diff_file_list->count() != 0);
 }
 
-void AgentDockWidget::clearChatState()
+void agent_dock_widget_t::clear_chat_state()
 {
-    m_goalEdit->clear();
-    m_linkedFilesController->clearState();
-    m_logView->clear();
-    m_rawMarkdownView->clear();
-    m_logMarkdown.clear();
-    m_streamingMarkdown.clear();
-    m_streamingRenderedLen = 0;
-    m_isStreaming = false;
-    m_planList->clear();
-    m_inlineDiffManager->clearAll();
-    static_cast<DiffPreviewEdit *>(m_diffView)->setDiffText(QString());
-    m_diffFileList->clear();
-    m_approvalList->clear();
-    m_approvalItems.clear();
-    m_appliedDiff.clear();
-    m_currentDiff.clear();
-    m_statusLabel->setText(tr("Ready"));
-    m_applyPatchBtn->setEnabled(false);
-    m_revertPatchBtn->setEnabled(false);
-    m_tabs->setCurrentWidget(m_planList);
-    m_linkedFilesController->refreshUi();
+    this->goal_edit->clear();
+    this->linked_files_controller->clear_state();
+    this->log_view->clear();
+    this->raw_markdown_view->clear();
+    this->log_markdown.clear();
+    this->streaming_markdown.clear();
+    this->streaming_rendered_len = 0;
+    this->is_streaming = false;
+    this->plan_list->clear();
+    this->inline_diff_manager->clear_all();
+    static_cast<diff_preview_edit_t *>(this->diff_view)->set_diff_text(QString());
+    this->diff_file_list->clear();
+    this->approval_list->clear();
+    this->approval_items.clear();
+    this->applied_diff.clear();
+    this->current_diff.clear();
+    this->status_label->setText(tr("Ready"));
+    this->apply_patch_btn->setEnabled(false);
+    this->revert_patch_btn->setEnabled(false);
+    this->tabs->setCurrentWidget(this->plan_list);
+    this->linked_files_controller->refresh_ui();
 }
 
-void AgentDockWidget::setupUi()
+void agent_dock_widget_t::setup_ui()
 {
-    m_ui = std::make_unique<Ui::AgentDockWidget>();
-    m_ui->setupUi(this);
+    this->ui = std::make_unique<Ui::agent_dock_widget_t>();
+    this->ui->setupUi(this);
 
-    m_statusLabel = m_ui->statusLabel;
-    m_projectCombo = m_ui->projectCombo;
-    auto *designerGoalEdit = m_ui->goalEdit;
-    m_modeCombo = m_ui->modeCombo;
-    m_modelCombo = m_ui->modelCombo;
-    m_reasoningCombo = m_ui->reasoningCombo;
-    m_thinkingCombo = m_ui->thinkingCombo;
-    m_runBtn = m_ui->runBtn;
-    m_stopBtn = m_ui->stopBtn;
-    m_dryRunCheck = m_ui->dryRunCheck;
-    m_tabs = m_ui->tabs;
-    m_planList = m_ui->planList;
-    m_logView = m_ui->logView;
-    m_rawMarkdownView = m_ui->rawMarkdownView;
-    m_diffFileList = m_ui->diffFileList;
-    m_approvalList = m_ui->approvalList;
-    m_debugLogView = m_ui->debugLogView;
-    m_applyPatchBtn = m_ui->applyPatchBtn;
-    m_revertPatchBtn = m_ui->revertPatchBtn;
-    m_copyPlanBtn = m_ui->copyPlanBtn;
-    auto *newChatBtn = m_ui->newChatButton;
+    this->status_label = this->ui->statusLabel;
+    this->project_combo = this->ui->projectCombo;
+    auto *designer_goal_edit = this->ui->goalEdit;
+    this->mode_combo = this->ui->modeCombo;
+    this->model_combo = this->ui->modelCombo;
+    this->reasoning_combo = this->ui->reasoningCombo;
+    this->thinking_combo = this->ui->thinkingCombo;
+    this->run_btn = this->ui->runBtn;
+    this->stop_btn = this->ui->stopBtn;
+    this->dry_run_check = this->ui->dryRunCheck;
+    this->tabs = this->ui->tabs;
+    this->plan_list = this->ui->planList;
+    this->log_view = this->ui->logView;
+    this->raw_markdown_view = this->ui->rawMarkdownView;
+    this->diff_file_list = this->ui->diffFileList;
+    this->approval_list = this->ui->approvalList;
+    this->debug_log_view = this->ui->debugLogView;
+    this->apply_patch_btn = this->ui->applyPatchBtn;
+    this->revert_patch_btn = this->ui->revertPatchBtn;
+    this->copy_plan_btn = this->ui->copyPlanBtn;
+    auto *new_chat_btn = this->ui->newChatButton;
 
-    m_ui->contentSplitter->setStretchFactor(0, 3);
-    m_ui->contentSplitter->setStretchFactor(1, 1);
-    m_ui->inputRow->setStretch(0, 1);
-    m_ui->modeModelRow->setStretch(2, 1);
+    this->ui->contentSplitter->setStretchFactor(0, 3);
+    this->ui->contentSplitter->setStretchFactor(1, 1);
+    this->ui->inputRow->setStretch(0, 1);
+    this->ui->modeModelRow->setStretch(2, 1);
 
-    m_linkedFilesView = new LinkedFilesListWidget(this);
-    m_linkedFilesView->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    m_linkedFilesView->setVisible(false);
-    m_linkedFilesView->setContextMenuPolicy(Qt::ActionsContextMenu);
-    auto *removeLinkedFileAction = new QAction(tr("Remove Linked File"), m_linkedFilesView);
+    this->linked_files_view = new linked_files_list_widget_t(this);
+    this->linked_files_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    this->linked_files_view->setVisible(false);
+    this->linked_files_view->setContextMenuPolicy(Qt::ActionsContextMenu);
+    auto *removeLinkedFileAction = new QAction(tr("Remove Linked File"), this->linked_files_view);
     connect(removeLinkedFileAction, &QAction::triggered, this,
-            [this]() { m_linkedFilesController->removeSelectedLinkedFiles(); });
-    m_linkedFilesView->addAction(removeLinkedFileAction);
-    m_ui->goalColumn->insertWidget(0, m_linkedFilesView);
+            [this]() { this->linked_files_controller->remove_selected_linked_files(); });
+    this->linked_files_view->addAction(removeLinkedFileAction);
+    this->ui->goalColumn->insertWidget(0, this->linked_files_view);
 
-    auto *goalEdit = new GoalTextEdit(designerGoalEdit->parentWidget());
-    goalEdit->setObjectName(designerGoalEdit->objectName());
-    goalEdit->setSizePolicy(designerGoalEdit->sizePolicy());
-    goalEdit->setMinimumSize(designerGoalEdit->minimumSize());
-    goalEdit->setAcceptRichText(designerGoalEdit->acceptRichText());
-    goalEdit->setPlaceholderText(designerGoalEdit->placeholderText());
-    goalEdit->setFont(designerGoalEdit->font());
-    const int goalEditIndex = m_ui->goalColumn->indexOf(designerGoalEdit);
-    m_ui->goalColumn->removeWidget(designerGoalEdit);
-    m_ui->goalColumn->insertWidget(goalEditIndex, goalEdit);
-    designerGoalEdit->deleteLater();
-    m_goalEdit = goalEdit;
-    m_goalEdit->addSpecialHandler(std::make_unique<SlashCommandGoalHandler>(&m_slashCommands));
-    m_goalEdit->addSpecialHandler(std::make_unique<FileReferenceGoalHandler>(
-        [this]() { return m_linkedFilesController->linkedFileCandidates(); }));
-    connect(m_goalEdit, &QTextEdit::textChanged, this,
-            [this]() { m_linkedFilesController->refreshUi(); });
-    connect(m_goalEdit, &GoalTextEdit::filesDropped, this,
-            [this](const QStringList &paths) { m_linkedFilesController->addLinkedFiles(paths); });
-    connect(m_linkedFilesView, &QListWidget::itemDoubleClicked, this,
+    auto *goal_edit = new goal_text_edit_t(designer_goal_edit->parentWidget());
+    goal_edit->setObjectName(designer_goal_edit->objectName());
+    goal_edit->setSizePolicy(designer_goal_edit->sizePolicy());
+    goal_edit->setMinimumSize(designer_goal_edit->minimumSize());
+    goal_edit->setAcceptRichText(designer_goal_edit->acceptRichText());
+    goal_edit->setPlaceholderText(designer_goal_edit->placeholderText());
+    goal_edit->setFont(designer_goal_edit->font());
+    const int goal_edit_index = this->ui->goalColumn->indexOf(designer_goal_edit);
+    this->ui->goalColumn->removeWidget(designer_goal_edit);
+    this->ui->goalColumn->insertWidget(goal_edit_index, goal_edit);
+    designer_goal_edit->deleteLater();
+    this->goal_edit = goal_edit;
+    this->goal_edit->add_special_handler(
+        std::make_unique<slash_command_goal_handler_t>(&this->slash_commands));
+    this->goal_edit->add_special_handler(std::make_unique<file_reference_goal_handler_t>(
+        [this]() { return this->linked_files_controller->linked_file_candidates(); }));
+    connect(this->goal_edit, &QTextEdit::textChanged, this,
+            [this]() { this->linked_files_controller->refresh_ui(); });
+    connect(this->goal_edit, &goal_text_edit_t::files_dropped, this,
+            [this](const QStringList &paths) {
+                this->linked_files_controller->add_linked_files(paths);
+            });
+    connect(this->linked_files_view, &QListWidget::itemDoubleClicked, this,
             [this](QListWidgetItem *item) {
-                const QString absolutePath = m_linkedFilesController->linkedFileAbsolutePath(
-                    item->data(Qt::UserRole).toString());
+                const QString absolutePath =
+                    this->linked_files_controller->linked_file_absolute_path(
+                        item->data(Qt::UserRole).toString());
                 if (!absolutePath.isEmpty())
                 {
                     Core::EditorManager::openEditorAt(
                         Utils::Link(Utils::FilePath::fromString(absolutePath), 0, 0));
                 }
             });
-    m_linkedFilesView->installEventFilter(this);
-    m_linkedFilesController->refreshUi();
+    this->linked_files_view->installEventFilter(this);
+    this->linked_files_controller->refresh_ui();
 
-    auto *diffPreview = new DiffPreviewEdit(m_ui->diffViewPlaceholder->parentWidget());
-    diffPreview->setObjectName(QStringLiteral("diffView"));
-    diffPreview->setReadOnly(true);
-    diffPreview->setLineWrapMode(QPlainTextEdit::NoWrap);
-    diffPreview->setFont(QFont(QStringLiteral("monospace")));
-    if (auto *layout = m_ui->diffViewPlaceholder->parentWidget()->layout())
+    auto *diff_preview = new diff_preview_edit_t(this->ui->diffViewPlaceholder->parentWidget());
+    diff_preview->setObjectName(QStringLiteral("diffView"));
+    diff_preview->setReadOnly(true);
+    diff_preview->setLineWrapMode(QPlainTextEdit::NoWrap);
+    diff_preview->setFont(QFont(QStringLiteral("monospace")));
+    if (auto *layout = this->ui->diffViewPlaceholder->parentWidget()->layout())
     {
-        layout->replaceWidget(m_ui->diffViewPlaceholder, diffPreview);
+        layout->replaceWidget(this->ui->diffViewPlaceholder, diff_preview);
     }
-    m_ui->diffViewPlaceholder->deleteLater();
-    m_diffView = diffPreview;
+    this->ui->diffViewPlaceholder->deleteLater();
+    this->diff_view = diff_preview;
 
-    m_logView->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-    m_rawMarkdownView->setFont(QFont(QStringLiteral("monospace"), 9));
-    m_debugLogView->setFont(QFont(QStringLiteral("monospace"), 9));
+    this->log_view->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    this->raw_markdown_view->setFont(QFont(QStringLiteral("monospace"), 9));
+    this->debug_log_view->setFont(QFont(QStringLiteral("monospace"), 9));
 
-    populateModeCombo(m_modeCombo);
+    populate_mode_combo(this->mode_combo);
 
-    m_modelCombo->setEditable(true);
-    const bool useCopilotModels = settings().provider == QStringLiteral("copilot");
-    repopulateEditableCombo(
-        m_modelCombo, useCopilotModels ? modelCatalog().copilotModels() : openAiAgentModels(),
-        settings().modelName);
-    connect(&modelCatalog(), &ModelCatalog::copilotModelsChanged, this,
+    this->model_combo->setEditable(true);
+    const bool use_copilot_models = settings().provider == QStringLiteral("copilot");
+    repopulate_editable_combo(this->model_combo,
+                              use_copilot_models ? model_catalog().copilot_models()
+                                                 : open_ai_agent_models(),
+                              settings().model_name);
+    connect(&model_catalog(), &model_catalog_t::copilot_models_changed, this,
             [this](const QStringList &models) {
                 if (settings().provider != QStringLiteral("copilot"))
                 {
                     return;
                 }
-                repopulateEditableCombo(m_modelCombo, models, m_modelCombo->currentText());
+                repopulate_editable_combo(this->model_combo, models,
+                                          this->model_combo->currentText());
             });
 
-    populateEffortCombo(m_reasoningCombo);
-    selectEffortValue(m_reasoningCombo, settings().reasoningEffort, 2);
-    populateEffortCombo(m_thinkingCombo);
-    selectEffortValue(m_thinkingCombo, settings().thinkingLevel, 2);
-    m_dryRunCheck->setChecked(settings().dryRunDefault);
+    populate_effort_combo(this->reasoning_combo);
+    select_effort_value(this->reasoning_combo, settings().reasoning_effort, 2);
+    populate_effort_combo(this->thinking_combo);
+    select_effort_value(this->thinking_combo, settings().thinking_level, 2);
+    this->dry_run_check->setChecked(settings().dry_run_default);
 
-    connect(m_applyPatchBtn, &QPushButton::clicked, this, &AgentDockWidget::onApplyPatchClicked);
-    connect(m_revertPatchBtn, &QPushButton::clicked, this, &AgentDockWidget::onRevertPatchClicked);
-    connect(newChatBtn, &QPushButton::clicked, this, [this]() {
-        const bool hasContent = !m_goalEdit->toPlainText().trimmed().isEmpty() ||
-                                !m_logView->toPlainText().isEmpty() || m_planList->count() > 0 ||
-                                !m_currentDiff.isEmpty() || m_approvalList->count() > 0;
+    connect(this->apply_patch_btn, &QPushButton::clicked, this,
+            &agent_dock_widget_t::on_apply_patch_clicked);
+    connect(this->revert_patch_btn, &QPushButton::clicked, this,
+            &agent_dock_widget_t::on_revert_patch_clicked);
+    connect(new_chat_btn, &QPushButton::clicked, this, [this]() {
+        const bool has_content = !this->goal_edit->toPlainText().trimmed().isEmpty() ||
+                                 !this->log_view->toPlainText().isEmpty() ||
+                                 this->plan_list->count() > 0 || !this->current_diff.isEmpty() ||
+                                 this->approval_list->count() > 0;
 
-        if (hasContent &&
+        if (has_content &&
             QMessageBox::question(
                 this, tr("New Chat"), tr("Start a new chat and clear the current history?"),
                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
@@ -960,174 +987,179 @@ void AgentDockWidget::setupUi()
             return;
         }
 
-        if (m_stopBtn->isEnabled())
+        if (this->stop_btn->isEnabled())
         {
-            onStopClicked();
+            this->on_stop_clicked();
         }
 
-        m_sessionController->startNewConversation();
-        clearChatState();
-        m_sessionController->saveChat();
+        this->session_controller->start_new_conversation();
+        this->clear_chat_state();
+        this->session_controller->save_chat();
     });
-    connect(m_copyPlanBtn, &QPushButton::clicked, this, &AgentDockWidget::onCopyPlanClicked);
+    connect(this->copy_plan_btn, &QPushButton::clicked, this,
+            &agent_dock_widget_t::on_copy_plan_clicked);
 
-    static_cast<DiffPreviewEdit *>(m_diffView)
-        ->setApprovalChangedCallback([this](qsizetype approved, qsizetype total) {
+    static_cast<diff_preview_edit_t *>(this->diff_view)
+        ->set_approval_changed_callback([this](qsizetype approved, qsizetype total) {
             Q_UNUSED(total);
-            m_applyPatchBtn->setEnabled(!m_currentDiff.isEmpty() && approved > 0);
+            this->apply_patch_btn->setEnabled(!this->current_diff.isEmpty() && approved > 0);
         });
 
-    connect(m_runBtn, &QPushButton::clicked, this, &AgentDockWidget::onRunClicked);
-    connect(m_stopBtn, &QPushButton::clicked, this, &AgentDockWidget::onStopClicked);
-    connect(m_projectCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
+    connect(this->run_btn, &QPushButton::clicked, this, &agent_dock_widget_t::on_run_clicked);
+    connect(this->stop_btn, &QPushButton::clicked, this, &agent_dock_widget_t::on_stop_clicked);
+    connect(this->project_combo, &QComboBox::currentIndexChanged, this, [this](int index) {
         if (index < 0)
         {
             return;
         }
-        m_sessionController->switchProjectContext(m_projectCombo->itemData(index).toString());
+        this->session_controller->switch_project_context(
+            this->project_combo->itemData(index).toString());
     });
-    const auto persistProjectUiState = [this]() {
-        if (!m_sessionController->currentProjectFilePath().isEmpty())
+    const auto persist_project_ui_state = [this]() {
+        if (!this->session_controller->current_project_file_path().isEmpty())
         {
-            m_sessionController->saveChat();
+            this->session_controller->save_chat();
         }
     };
-    connect(m_modeCombo, &QComboBox::currentIndexChanged, this,
-            [persistProjectUiState](int) { persistProjectUiState(); });
-    connect(m_modelCombo, &QComboBox::currentTextChanged, this,
-            [persistProjectUiState](const QString &) { persistProjectUiState(); });
-    connect(m_reasoningCombo, &QComboBox::currentIndexChanged, this,
-            [persistProjectUiState](int) { persistProjectUiState(); });
-    connect(m_thinkingCombo, &QComboBox::currentIndexChanged, this,
-            [persistProjectUiState](int) { persistProjectUiState(); });
-    connect(m_dryRunCheck, &QCheckBox::checkStateChanged, this,
-            [persistProjectUiState](Qt::CheckState) { persistProjectUiState(); });
+    connect(this->mode_combo, &QComboBox::currentIndexChanged, this,
+            [persist_project_ui_state](int) { persist_project_ui_state(); });
+    connect(this->model_combo, &QComboBox::currentTextChanged, this,
+            [persist_project_ui_state](const QString &) { persist_project_ui_state(); });
+    connect(this->reasoning_combo, &QComboBox::currentIndexChanged, this,
+            [persist_project_ui_state](int) { persist_project_ui_state(); });
+    connect(this->thinking_combo, &QComboBox::currentIndexChanged, this,
+            [persist_project_ui_state](int) { persist_project_ui_state(); });
+    connect(this->dry_run_check, &QCheckBox::checkStateChanged, this,
+            [persist_project_ui_state](Qt::CheckState) { persist_project_ui_state(); });
 
-    m_sessionController->applyProjectUiDefaults();
+    this->session_controller->apply_project_ui_defaults();
 
     // Add Ctrl+C/A shortcuts directly on text views (event filter not enough — Qt Creator
     // intercepts)
-    auto addCopyShortcut = [](QPlainTextEdit *edit) {
-        auto *copyShortcut = new QShortcut(QKeySequence::Copy, edit);
-        copyShortcut->setContext(Qt::WidgetShortcut);
-        QObject::connect(copyShortcut, &QShortcut::activated, edit, &QPlainTextEdit::copy);
-        auto *selectAllShortcut = new QShortcut(QKeySequence::SelectAll, edit);
-        selectAllShortcut->setContext(Qt::WidgetShortcut);
-        QObject::connect(selectAllShortcut, &QShortcut::activated, edit,
+    auto add_copy_shortcut = [](QPlainTextEdit *edit) {
+        auto *copy_shortcut = new QShortcut(QKeySequence::Copy, edit);
+        copy_shortcut->setContext(Qt::WidgetShortcut);
+        QObject::connect(copy_shortcut, &QShortcut::activated, edit, &QPlainTextEdit::copy);
+        auto *select_all_shortcut = new QShortcut(QKeySequence::SelectAll, edit);
+        select_all_shortcut->setContext(Qt::WidgetShortcut);
+        QObject::connect(select_all_shortcut, &QShortcut::activated, edit,
                          &QPlainTextEdit::selectAll);
     };
-    auto addCopyShortcutRich = [](QTextEdit *edit) {
-        auto *copyShortcut = new QShortcut(QKeySequence::Copy, edit);
-        copyShortcut->setContext(Qt::WidgetShortcut);
-        QObject::connect(copyShortcut, &QShortcut::activated, edit, &QTextEdit::copy);
-        auto *selectAllShortcut = new QShortcut(QKeySequence::SelectAll, edit);
-        selectAllShortcut->setContext(Qt::WidgetShortcut);
-        QObject::connect(selectAllShortcut, &QShortcut::activated, edit, &QTextEdit::selectAll);
+    auto add_copy_shortcut_rich = [](QTextEdit *edit) {
+        auto *copy_shortcut = new QShortcut(QKeySequence::Copy, edit);
+        copy_shortcut->setContext(Qt::WidgetShortcut);
+        QObject::connect(copy_shortcut, &QShortcut::activated, edit, &QTextEdit::copy);
+        auto *select_all_shortcut = new QShortcut(QKeySequence::SelectAll, edit);
+        select_all_shortcut->setContext(Qt::WidgetShortcut);
+        QObject::connect(select_all_shortcut, &QShortcut::activated, edit, &QTextEdit::selectAll);
     };
-    addCopyShortcutRich(m_logView);
-    addCopyShortcut(m_rawMarkdownView);
-    addCopyShortcut(m_diffView);
-    addCopyShortcut(m_debugLogView);
-    auto *goalCopyShortcut = new QShortcut(QKeySequence::Copy, m_goalEdit);
-    goalCopyShortcut->setContext(Qt::WidgetShortcut);
-    QObject::connect(goalCopyShortcut, &QShortcut::activated, m_goalEdit, &QTextEdit::copy);
-    auto *goalSelectAllShortcut = new QShortcut(QKeySequence::SelectAll, m_goalEdit);
-    goalSelectAllShortcut->setContext(Qt::WidgetShortcut);
-    QObject::connect(goalSelectAllShortcut, &QShortcut::activated, m_goalEdit,
+    add_copy_shortcut_rich(this->log_view);
+    add_copy_shortcut(this->raw_markdown_view);
+    add_copy_shortcut(this->diff_view);
+    add_copy_shortcut(this->debug_log_view);
+    auto *goal_copy_shortcut = new QShortcut(QKeySequence::Copy, this->goal_edit);
+    goal_copy_shortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(goal_copy_shortcut, &QShortcut::activated, this->goal_edit, &QTextEdit::copy);
+    auto *goal_select_all_shortcut = new QShortcut(QKeySequence::SelectAll, this->goal_edit);
+    goal_select_all_shortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(goal_select_all_shortcut, &QShortcut::activated, this->goal_edit,
                      &QTextEdit::selectAll);
 }
 
-void AgentDockWidget::updateRunState(bool running)
+void agent_dock_widget_t::update_run_state(bool running)
 {
-    m_runBtn->setEnabled(!running);
-    m_stopBtn->setEnabled(running);
-    m_goalEdit->setReadOnly(running);
-    m_modeCombo->setEnabled(!running);
-    m_modelCombo->setEnabled(!running);
-    m_reasoningCombo->setEnabled(!running);
-    m_thinkingCombo->setEnabled(!running);
-    m_dryRunCheck->setEnabled(!running);
-    m_projectCombo->setEnabled(!running && m_projectCombo->count() > 0 &&
-                               !m_projectCombo->itemData(0).toString().isEmpty());
+    this->run_btn->setEnabled(!running);
+    this->stop_btn->setEnabled(running);
+    this->goal_edit->setReadOnly(running);
+    this->mode_combo->setEnabled(!running);
+    this->model_combo->setEnabled(!running);
+    this->reasoning_combo->setEnabled(!running);
+    this->thinking_combo->setEnabled(!running);
+    this->dry_run_check->setEnabled(!running);
+    this->project_combo->setEnabled(!running && this->project_combo->count() > 0 &&
+                                    !this->project_combo->itemData(0).toString().isEmpty());
 }
 
-bool AgentDockWidget::tryExecuteSlashCommand(QString &goal)
+bool agent_dock_widget_t::try_execute_slash_command(QString &goal)
 {
-    const SlashCommandDispatchResult result = m_slashCommands.dispatch(
-        goal, SlashCommandContext{[this](const QString &message) { onLogMessage(message); }});
-    if (!result.isSlashCommand)
+    const slash_command_dispatch_result_t result = this->slash_commands.dispatch(
+        goal, slash_command_context_t{
+                  [this](const QString &message) { this->on_log_message(message); }});
+    if (!result.is_slash_command)
     {
         return false;
     }
 
-    // Redirect to AI agent when the handler produced a goalOverride.
-    if (!result.goalOverride.isEmpty())
+    // Redirect to AI agent when the handler produced a goal_override.
+    if (!result.goal_override.isEmpty())
     {
-        goal = result.goalOverride;
+        goal = result.goal_override;
         return false;
     }
 
-    m_tabs->setCurrentWidget(m_logView);
+    this->tabs->setCurrentWidget(this->log_view);
 
-    if (!result.errorMessage.isEmpty())
+    if (!result.error_message.isEmpty())
     {
-        onLogMessage(result.errorMessage);
+        this->on_log_message(result.error_message);
     }
 
     if (result.executed)
     {
-        m_goalEdit->clear();
-        m_statusLabel->setText(
-            QStringLiteral("Slash command executed: /%1").arg(result.commandName));
+        this->goal_edit->clear();
+        this->status_label->setText(
+            QStringLiteral("Slash command executed: /%1").arg(result.command_name));
     }
 
-    m_sessionController->saveChat();
+    this->session_controller->save_chat();
     return true;
 }
 
-void AgentDockWidget::onRunClicked()
+void agent_dock_widget_t::on_run_clicked()
 {
-    QString goal = m_goalEdit->toPlainText().trimmed();
+    QString goal = this->goal_edit->toPlainText().trimmed();
     if (goal.isEmpty())
     {
         return;
     }
 
-    if (tryExecuteSlashCommand(goal))
+    if (this->try_execute_slash_command(goal))
     {
         return;
     }
 
-    const QString selectedModel = m_modelCombo->currentText().trimmed();
-    const QString selectedMode = m_modeCombo->currentData().toString();
-    m_controller->setRequestContext(m_linkedFilesController->linkedFilesPromptContext(),
-                                    m_linkedFilesController->effectiveLinkedFiles());
-    m_goalEdit->clear();
+    const QString selected_model = this->model_combo->currentText().trimmed();
+    const QString selected_mode = this->mode_combo->currentData().toString();
+    this->controller->set_request_context(
+        this->linked_files_controller->linked_files_prompt_context(),
+        this->linked_files_controller->effective_linked_files());
+    this->goal_edit->clear();
 
-    updateRunState(true);
-    m_tabs->setCurrentWidget(m_logView);
-    m_controller->start(goal, m_dryRunCheck->isChecked(),
-                        selectedMode == QStringLiteral("ask") ? AgentController::RunMode::Ask
-                                                              : AgentController::RunMode::Agent,
-                        selectedModel, m_reasoningCombo->currentData().toString(),
-                        m_thinkingCombo->currentData().toString());
+    this->update_run_state(true);
+    this->tabs->setCurrentWidget(this->log_view);
+    this->controller->start(goal, this->dry_run_check->isChecked(),
+                            selected_mode == QStringLiteral("ask")
+                                ? agent_controller_t::run_mode_t::ASK
+                                : agent_controller_t::run_mode_t::AGENT,
+                            selected_model, this->reasoning_combo->currentData().toString(),
+                            this->thinking_combo->currentData().toString());
 }
 
-void AgentDockWidget::onStopClicked()
+void agent_dock_widget_t::on_stop_clicked()
 {
-    m_controller->stop();
-    updateRunState(false);
+    this->controller->stop();
+    this->update_run_state(false);
 }
 
-void AgentDockWidget::onApplyPatchClicked()
+void agent_dock_widget_t::on_apply_patch_clicked()
 {
-    if (m_currentDiff.isEmpty())
+    if (this->current_diff.isEmpty())
     {
         return;
     }
 
-    auto *diffPreview = static_cast<DiffPreviewEdit *>(m_diffView);
-    if (!diffPreview->hasApprovedChanges())
+    auto *diff_preview = static_cast<diff_preview_edit_t *>(this->diff_view);
+    if (!diff_preview->has_approved_changes())
     {
         QMessageBox::information(
             this, tr("Apply Patch"),
@@ -1135,68 +1167,69 @@ void AgentDockWidget::onApplyPatchClicked()
         return;
     }
 
-    const QString diffToApply = diffPreview->approvedDiff().trimmed();
-    if (diffToApply.isEmpty())
+    const QString diff_to_apply = diff_preview->approved_diff().trimmed();
+    if (diff_to_apply.isEmpty())
     {
         QMessageBox::information(this, tr("Apply Patch"), tr("No approved changes to apply."));
         return;
     }
 
-    const QString workDir = m_sessionController->currentProjectDir();
+    const QString work_dir = this->session_controller->current_project_dir();
 
-    if (workDir.isEmpty())
+    if (work_dir.isEmpty())
     {
         QMessageBox::warning(this, tr("Apply Patch"), tr("No project directory found."));
         return;
     }
 
-    QString errorMsg;
-    if (Diff::applyPatch(diffToApply, workDir, false, errorMsg))
+    QString error_msg;
+    if (Diff::apply_patch(diff_to_apply, work_dir, false, error_msg))
     {
-        m_appliedDiff = diffToApply;
-        m_revertPatchBtn->setEnabled(true);
-        onLogMessage(tr("✅ Patch applied successfully."));
+        this->applied_diff = diff_to_apply;
+        this->revert_patch_btn->setEnabled(true);
+        on_log_message(tr("✅ Patch applied successfully."));
     }
     else
     {
-        QMessageBox::critical(this, tr("Apply Patch"), tr("Failed: %1").arg(errorMsg));
+        QMessageBox::critical(this, tr("Apply Patch"), tr("Failed: %1").arg(error_msg));
     }
 }
 
-void AgentDockWidget::onRevertPatchClicked()
+void agent_dock_widget_t::on_revert_patch_clicked()
 {
-    const QString diffToRevert = m_appliedDiff.isEmpty() ? m_currentDiff : m_appliedDiff;
-    if (diffToRevert.isEmpty())
+    const QString diff_to_revert =
+        this->applied_diff.isEmpty() ? this->current_diff : this->applied_diff;
+    if (diff_to_revert.isEmpty())
     {
         return;
     }
 
-    const QString workDir = m_sessionController->currentProjectDir();
+    const QString work_dir = this->session_controller->current_project_dir();
 
-    QString errorMsg;
-    if (Diff::revertPatch(diffToRevert, workDir, errorMsg))
+    QString error_msg;
+    if (Diff::revert_patch(diff_to_revert, work_dir, error_msg))
     {
-        m_appliedDiff.clear();
-        m_revertPatchBtn->setEnabled(false);
-        onLogMessage(tr("↩ Patch reverted successfully."));
+        this->applied_diff.clear();
+        this->revert_patch_btn->setEnabled(false);
+        on_log_message(tr("↩ Patch reverted successfully."));
     }
     else
     {
-        QMessageBox::critical(this, tr("Revert Patch"), tr("Failed: %1").arg(errorMsg));
+        QMessageBox::critical(this, tr("Revert Patch"), tr("Failed: %1").arg(error_msg));
     }
 }
 
-void AgentDockWidget::onCopyPlanClicked()
+void agent_dock_widget_t::on_copy_plan_clicked()
 {
     QStringList items;
-    for (int i = 0; i < m_planList->count(); ++i)
+    for (int i = 0; i < this->plan_list->count(); ++i)
     {
-        items.append(m_planList->item(i)->text());
+        items.append(this->plan_list->item(i)->text());
     }
     QGuiApplication::clipboard()->setText(items.join('\n'));
 }
 
-void AgentDockWidget::onLogMessage(const QString &msg)
+void agent_dock_widget_t::on_log_message(const QString &msg)
 {
     const QString text = msg.trimmed();
     if (text.isEmpty())
@@ -1204,133 +1237,135 @@ void AgentDockWidget::onLogMessage(const QString &msg)
         return;
     }
 
-    appendStampedLogEntry(text);
+    this->append_stamped_log_entry(text);
 }
 
-void AgentDockWidget::onProviderUsageAvailable(const ProviderUsage &usage, qint64 durationMs)
+void agent_dock_widget_t::on_provider_usage_available(const provider_usage_t &usage,
+                                                      qint64 duration_ms)
 {
-    const QString body = providerUsageMarkdown(usage, durationMs);
+    const QString body = provider_usage_markdown(usage, duration_ms);
     if (body.isEmpty())
     {
         return;
     }
 
-    appendStampedLogEntry(body);
+    this->append_stamped_log_entry(body);
 }
 
-void AgentDockWidget::appendStampedLogEntry(const QString &body)
+void agent_dock_widget_t::append_stamped_log_entry(const QString &body)
 {
     if (body.trimmed().isEmpty())
     {
         return;
     }
 
-    if (!m_streamingMarkdown.isEmpty())
+    if (!this->streaming_markdown.isEmpty())
     {
-        if (!m_logMarkdown.isEmpty())
+        if (!this->log_markdown.isEmpty())
         {
-            m_logMarkdown += QStringLiteral("\n\n");
+            this->log_markdown += QStringLiteral("\n\n");
         }
-        m_logMarkdown += redactReadFilePayloads(m_streamingMarkdown);
-        m_streamingMarkdown.clear();
-        m_streamingRenderedLen = 0;
-        m_isStreaming = false;
+        this->log_markdown += redact_read_file_payloads(this->streaming_markdown);
+        this->streaming_markdown.clear();
+        this->streaming_rendered_len = 0;
+        this->is_streaming = false;
     }
 
     const QString stamped =
         QStringLiteral("`[%1]`  %2")
             .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss")), body);
 
-    if (!m_logMarkdown.isEmpty())
+    if (!this->log_markdown.isEmpty())
     {
-        m_logMarkdown += QStringLiteral("\n\n");
+        this->log_markdown += QStringLiteral("\n\n");
     }
-    m_logMarkdown += stamped;
+    this->log_markdown += stamped;
 
-    m_renderThrottle->stop();
-    renderLogFull();
+    this->render_throttle->stop();
+    this->render_log_full();
 }
 
-void AgentDockWidget::renderLog()
+void agent_dock_widget_t::render_log()
 {
-    if (m_isStreaming)
+    if (this->is_streaming)
     {
         // During streaming: append only new tokens (fast, no re-parse)
-        const QString newTokens = m_streamingMarkdown.mid(m_streamingRenderedLen);
-        m_streamingRenderedLen = m_streamingMarkdown.size();
-        if (!newTokens.isEmpty())
+        const QString new_tokens = this->streaming_markdown.mid(this->streaming_rendered_len);
+        this->streaming_rendered_len = this->streaming_markdown.size();
+        if (!new_tokens.isEmpty())
         {
-            renderLogStreaming(newTokens);
+            this->render_log_streaming(new_tokens);
         }
         return;
     }
 
-    renderLogFull();
+    this->render_log_full();
 }
 
-void AgentDockWidget::renderLogFull()
+void agent_dock_widget_t::render_log_full()
 {
-    const QString text = currentLogMarkdown();
-    const QString renderedText = wrapMarkdownPayloadBlocks(text);
+    const QString text = this->current_log_markdown();
+    const QString rendered_text = wrap_markdown_payload_blocks(text);
 
-    m_logView->setMarkdown(renderedText);
-    m_rawMarkdownView->setPlainText(text);
+    this->log_view->setMarkdown(rendered_text);
+    this->raw_markdown_view->setPlainText(text);
 
     // Defer scroll to allow document layout to complete
-    QTimer::singleShot(0, m_logView, [this]() {
-        QTextCursor cursor = m_logView->textCursor();
+    QTimer::singleShot(0, this->log_view, [this]() {
+        QTextCursor cursor = this->log_view->textCursor();
         cursor.movePosition(QTextCursor::End);
-        m_logView->setTextCursor(cursor);
-        m_logView->ensureCursorVisible();
+        this->log_view->setTextCursor(cursor);
+        this->log_view->ensureCursorVisible();
     });
-    QTimer::singleShot(0, m_rawMarkdownView, [this]() {
-        QTextCursor cursor = m_rawMarkdownView->textCursor();
+    QTimer::singleShot(0, this->raw_markdown_view, [this]() {
+        QTextCursor cursor = this->raw_markdown_view->textCursor();
         cursor.movePosition(QTextCursor::End);
-        m_rawMarkdownView->setTextCursor(cursor);
-        m_rawMarkdownView->ensureCursorVisible();
+        this->raw_markdown_view->setTextCursor(cursor);
+        this->raw_markdown_view->ensureCursorVisible();
     });
 }
 
-void AgentDockWidget::renderLogStreaming(const QString &newTokens)
+void agent_dock_widget_t::render_log_streaming(const QString &new_tokens)
 {
     // Append new tokens as plain text at the end of the log view
-    QTextCursor cursor(m_logView->document());
+    QTextCursor cursor(this->log_view->document());
     cursor.movePosition(QTextCursor::End);
-    cursor.insertText(newTokens);
-    m_logView->ensureCursorVisible();
+    cursor.insertText(new_tokens);
+    this->log_view->ensureCursorVisible();
 
     // Also append to raw markdown view
-    QTextCursor rawCursor(m_rawMarkdownView->document());
+    QTextCursor rawCursor(this->raw_markdown_view->document());
     rawCursor.movePosition(QTextCursor::End);
-    rawCursor.insertText(newTokens);
-    m_rawMarkdownView->ensureCursorVisible();
+    rawCursor.insertText(new_tokens);
+    this->raw_markdown_view->ensureCursorVisible();
 }
 
-void AgentDockWidget::onPlanUpdated(const QList<PlanStep> &steps)
+void agent_dock_widget_t::on_plan_updated(const QList<plan_step_t> &steps)
 {
-    m_planList->clear();
+    this->plan_list->clear();
     for (const auto &step : steps)
     {
-        m_planList->addItem(QStringLiteral("%1. %2").arg(step.index + 1).arg(step.description));
+        this->plan_list->addItem(
+            QStringLiteral("%1. %2").arg(step.index + 1).arg(step.description));
     }
-    m_sessionController->saveChat();
-    m_tabs->setCurrentWidget(m_planList);
+    this->session_controller->save_chat();
+    this->tabs->setCurrentWidget(this->plan_list);
 }
 
-void AgentDockWidget::onDiffAvailable(const QString &diff)
+void agent_dock_widget_t::on_diff_available(const QString &diff)
 {
-    syncDiffUi(diff, true, true);
+    this->sync_diff_ui(diff, true, true);
 }
 
-void AgentDockWidget::onApprovalRequested(int id, const QString &action, const QString &reason,
-                                          const QString &preview)
+void agent_dock_widget_t::on_approval_requested(int id, const QString &action,
+                                                const QString &reason, const QString &preview)
 {
     auto *item = new QListWidgetItem(QStringLiteral("[#%1] %2 — %3").arg(id).arg(action, reason));
     item->setData(Qt::UserRole, id);
     item->setToolTip(preview);
-    m_approvalList->addItem(item);
-    m_approvalItems[id] = item;
-    m_tabs->setCurrentWidget(m_approvalList);
+    this->approval_list->addItem(item);
+    this->approval_items[id] = item;
+    this->tabs->setCurrentWidget(this->approval_list);
 
     // Show approval dialog
     auto result = QMessageBox::question(
@@ -1341,40 +1376,41 @@ void AgentDockWidget::onApprovalRequested(int id, const QString &action, const Q
     if (result == QMessageBox::Yes)
     {
         item->setText(item->text() + QStringLiteral(" ✅"));
-        m_controller->approveAction(id);
+        this->controller->approve_action(id);
     }
     else
     {
         item->setText(item->text() + QStringLiteral(" ❌"));
-        m_controller->denyAction(id);
+        this->controller->deny_action(id);
     }
 }
 
-void AgentDockWidget::onIterationChanged(int iteration)
+void agent_dock_widget_t::on_iteration_changed(int iteration)
 {
-    onLogMessage(QStringLiteral("🔄 Iteration %1 / Tool calls: %2")
-                     .arg(iteration)
-                     .arg(m_controller->toolCallCount()));
+    this->on_log_message(QStringLiteral("🔄 Iteration %1 / Tool calls: %2")
+                             .arg(iteration)
+                             .arg(this->controller->tool_call_count()));
 }
 
-void AgentDockWidget::onStopped(const QString &summary)
+void agent_dock_widget_t::on_stopped(const QString &summary)
 {
-    updateRunState(false);
-    if (m_statusLabel->text().isEmpty() == true || m_statusLabel->text() == tr("Ready") ||
-        m_statusLabel->text() == tr("Running..."))
+    this->update_run_state(false);
+    if (this->status_label->text().isEmpty() == true ||
+        this->status_label->text() == tr("Ready") ||
+        this->status_label->text() == tr("Running..."))
     {
-        m_statusLabel->setText(QStringLiteral("Done: %1").arg(summary.left(80)));
+        this->status_label->setText(QStringLiteral("Done: %1").arg(summary.left(80)));
     }
-    m_sessionController->saveChat();
+    this->session_controller->save_chat();
 }
 
-bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
+bool agent_dock_widget_t::eventFilter(QObject *obj, QEvent *event)
 {
-    if (obj == m_goalEdit && event->type() == QEvent::KeyPress)
+    if (obj == this->goal_edit && event->type() == QEvent::KeyPress)
     {
         auto *ke = static_cast<QKeyEvent *>(event);
 
-        if (m_goalEdit->hasCompletionPopup())
+        if (this->goal_edit->has_completion_popup())
         {
             switch (ke->key())
             {
@@ -1396,36 +1432,36 @@ bool AgentDockWidget::eventFilter(QObject *obj, QEvent *event)
             {
                 return false;  // Shift+Enter — newline
             }
-            onRunClicked();
+            this->on_run_clicked();
             return true;
         }
 
         // Escape — stop agent
         if (ke->key() == Qt::Key_Escape)
         {
-            onStopClicked();
+            this->on_stop_clicked();
             return true;
         }
 
         // Ctrl+L — clear log
         if (ke->key() == Qt::Key_L && ((ke->modifiers() & Qt::ControlModifier) != 0u))
         {
-            m_logView->clear();
-            m_rawMarkdownView->clear();
-            m_logMarkdown.clear();
-            m_streamingMarkdown.clear();
-            m_streamingRenderedLen = 0;
-            m_isStreaming = false;
-            m_sessionController->saveChat();
+            this->log_view->clear();
+            this->raw_markdown_view->clear();
+            this->log_markdown.clear();
+            this->streaming_markdown.clear();
+            this->streaming_rendered_len = 0;
+            this->is_streaming = false;
+            this->session_controller->save_chat();
             return true;
         }
     }
-    if (obj == m_linkedFilesView && event->type() == QEvent::KeyPress)
+    if (obj == this->linked_files_view && event->type() == QEvent::KeyPress)
     {
         auto *ke = static_cast<QKeyEvent *>(event);
         if (ke->key() == Qt::Key_Delete || ke->key() == Qt::Key_Backspace)
         {
-            m_linkedFilesController->removeSelectedLinkedFiles();
+            this->linked_files_controller->remove_selected_linked_files();
             return true;
         }
     }

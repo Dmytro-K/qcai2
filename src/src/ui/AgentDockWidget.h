@@ -23,21 +23,21 @@
 QT_BEGIN_NAMESPACE
 namespace Ui
 {
-class AgentDockWidget;
+class agent_dock_widget_t;
 }
 QT_END_NAMESPACE
 
 namespace qcai2
 {
 
-class AgentDockLinkedFilesController;
-class AgentDockSessionController;
-class ChatContextManager;
+class agent_dock_linked_files_controller_t;
+class agent_dock_session_controller_t;
+class chat_context_manager_t;
 
 /**
  * Main dock widget for goal entry, logs, diff review, and approval prompts.
  */
-class AgentDockWidget : public QWidget
+class agent_dock_widget_t : public QWidget
 {
     Q_OBJECT
 public:
@@ -46,69 +46,70 @@ public:
      * @param controller Agent controller that drives the UI.
      * @param parent Optional parent widget.
      */
-    explicit AgentDockWidget(AgentController *controller, ChatContextManager *chatContextManager,
-                             QWidget *parent = nullptr);
+    explicit agent_dock_widget_t(agent_controller_t *controller,
+                                 chat_context_manager_t *chat_context_manager,
+                                 QWidget *parent = nullptr);
 
     /**
      * Persists the current chat session before the widget is destroyed.
      */
-    ~AgentDockWidget() override;
+    ~agent_dock_widget_t() override;
 
     /**
      * Focuses the goal editor so the user can immediately type a new request.
      */
-    void focusGoalInput();
+    void focus_goal_input();
 
-private slots:
+private:
     /**
      * Starts a run using the current goal, model, and dry-run settings.
      */
-    void onRunClicked();
+    void on_run_clicked();
 
     /**
      * Stops the active run and re-enables editing controls.
      */
-    void onStopClicked();
+    void on_stop_clicked();
 
     /**
      * Applies the currently approved subset of the diff preview.
      */
-    void onApplyPatchClicked();
+    void on_apply_patch_clicked();
 
     /**
      * Reverts the last applied diff preview.
      */
-    void onRevertPatchClicked();
+    void on_revert_patch_clicked();
 
     /**
      * Copies the rendered plan list to the clipboard.
      */
-    void onCopyPlanClicked();
+    void on_copy_plan_clicked();
 
     /**
      * Appends a timestamped log entry to the log view.
      * @param msg Log message text.
      */
-    void onLogMessage(const QString &msg);
+    void on_log_message(const QString &msg);
 
     /**
      * Appends a highlighted provider usage summary line to the log view.
      * @param usage Usage counters returned by the provider.
      * @param durationMs Wall-clock duration of the completed request in milliseconds.
      */
-    void onProviderUsageAvailable(const ProviderUsage &usage, qint64 durationMs);
+    void on_provider_usage_available(const provider_usage_t &usage, qint64 duration_ms);
 
     /**
      * Rebuilds the plan tab from the latest plan steps.
      * @param steps Plan steps to display.
      */
-    void onPlanUpdated(const QList<PlanStep> &steps);
+    void on_plan_updated(const QList<plan_step_t> &steps);
 
     /**
      * Refreshes diff preview widgets and inline diff markers.
      * @param diff Unified diff text.
      */
-    void onDiffAvailable(const QString &diff);
+    void on_diff_available(const QString &diff);
 
     /**
      * Records and prompts for a tool approval request.
@@ -117,42 +118,41 @@ private slots:
      * @param reason Reason the approval is required.
      * @param preview Preview text shown with the approval request.
      */
-    void onApprovalRequested(int id, const QString &action, const QString &reason,
-                             const QString &preview);
+    void on_approval_requested(int id, const QString &action, const QString &reason,
+                               const QString &preview);
 
     /**
      * Updates the status summary for the latest iteration.
      * @param iteration Current iteration number.
      */
-    void onIterationChanged(int iteration);
+    void on_iteration_changed(int iteration);
 
     /**
      * Restores idle UI state after a run finishes.
      * @param summary Short completion summary.
      */
-    void onStopped(const QString &summary);
+    void on_stopped(const QString &summary);
 
-private:
-    friend class AgentDockLinkedFilesController;
-    friend class AgentDockSessionController;
+    friend class agent_dock_linked_files_controller_t;
+    friend class agent_dock_session_controller_t;
 
     /**
      * Builds the dock widget layout and wires local UI actions.
      */
-    void setupUi();
+    void setup_ui();
 
     /**
      * Enables or disables controls based on controller run state.
      * @param running True when the UI should show a running state.
      */
-    void updateRunState(bool running);
+    void update_run_state(bool running);
 
     /**
      * Executes a slash command locally when the goal starts with `/`.
      * @param goal Trimmed goal text from the editor.
      * @return True when the input was treated as a slash command.
      */
-    bool tryExecuteSlashCommand(QString &goal);
+    bool try_execute_slash_command(QString &goal);
 
     /**
      * Handles keyboard shortcuts from the goal editor.
@@ -164,107 +164,107 @@ private:
     /**
      * Flushes buffered log text into the visible log widget.
      */
-    void renderLog();
+    void render_log();
 
     /**
      * Performs a full markdown re-render of the Actions Log.
      */
-    void renderLogFull();
+    void render_log_full();
 
     /**
      * Appends new streaming tokens to the log view incrementally.
      */
-    void renderLogStreaming(const QString &newTokens);
+    void render_log_streaming(const QString &new_tokens);
 
     /**
      * Appends one timestamped markdown entry to the committed log buffer.
      */
-    void appendStampedLogEntry(const QString &body);
+    void append_stamped_log_entry(const QString &body);
 
     /**
      * Returns the combined committed and streaming markdown for the Actions Log.
      */
-    QString currentLogMarkdown() const;
+    QString current_log_markdown() const;
 
     /**
      * Clears the current in-memory chat, plan, diff, and approval state.
      */
-    void clearChatState();
+    void clear_chat_state();
 
     /**
      * Refreshes the diff tab state and optionally re-renders inline editor markers.
      */
-    void syncDiffUi(const QString &diff, bool focusDiffTab, bool refreshInlineMarkers);
+    void sync_diff_ui(const QString &diff, bool focus_diff_tab, bool refresh_inline_markers);
 
     /** Designer-generated UI wrapper. */
-    std::unique_ptr<Ui::AgentDockWidget> m_ui;
+    std::unique_ptr<Ui::agent_dock_widget_t> ui;
 
     /** Controller that owns the active agent run. */
-    AgentController *m_controller;
+    agent_controller_t *controller;
 
     /** Input controls shown beside the goal editor. */
-    QComboBox *m_projectCombo;
-    LinkedFilesListWidget *m_linkedFilesView = nullptr;
-    GoalTextEdit *m_goalEdit;
-    QComboBox *m_modeCombo;
-    QComboBox *m_modelCombo;
-    QComboBox *m_reasoningCombo;
-    QComboBox *m_thinkingCombo;
-    QPushButton *m_runBtn;
-    QPushButton *m_stopBtn;
-    QCheckBox *m_dryRunCheck;
+    QComboBox *project_combo;
+    linked_files_list_widget_t *linked_files_view = nullptr;
+    goal_text_edit_t *goal_edit;
+    QComboBox *mode_combo;
+    QComboBox *model_combo;
+    QComboBox *reasoning_combo;
+    QComboBox *thinking_combo;
+    QPushButton *run_btn;
+    QPushButton *stop_btn;
+    QCheckBox *dry_run_check;
 
     /** Views hosted in the tab widget. */
-    QTabWidget *m_tabs;
-    QListWidget *m_planList;
-    QTextEdit *m_logView;
-    QPlainTextEdit *m_rawMarkdownView;
-    QPlainTextEdit *m_diffView;
-    QListWidget *m_diffFileList;
-    QListWidget *m_approvalList;
-    QPlainTextEdit *m_debugLogView;
+    QTabWidget *tabs;
+    QListWidget *plan_list;
+    QTextEdit *log_view;
+    QPlainTextEdit *raw_markdown_view;
+    QPlainTextEdit *diff_view;
+    QListWidget *diff_file_list;
+    QListWidget *approval_list;
+    QPlainTextEdit *debug_log_view;
 
     /** Persistent action buttons and status label. */
-    QPushButton *m_applyPatchBtn;
-    QPushButton *m_revertPatchBtn;
-    QPushButton *m_copyPlanBtn;
-    QLabel *m_statusLabel;
+    QPushButton *apply_patch_btn;
+    QPushButton *revert_patch_btn;
+    QPushButton *copy_plan_btn;
+    QLabel *status_label;
 
     /** Full diff currently shown in the preview tab. */
-    QString m_currentDiff;
+    QString current_diff;
 
     /** Diff most recently applied so it can be reverted. */
-    QString m_appliedDiff;
+    QString applied_diff;
 
     /** Completed log text already committed to the log view. */
-    QString m_logMarkdown;
+    QString log_markdown;
 
     /** Streaming log text buffered until the throttle timer fires. */
-    QString m_streamingMarkdown;
+    QString streaming_markdown;
 
     /** Length of streaming markdown already appended to the log view. */
-    qsizetype m_streamingRenderedLen = 0;
+    qsizetype streaming_rendered_len = 0;
 
     /** True while streaming tokens are being appended incrementally. */
-    bool m_isStreaming = false;
+    bool is_streaming = false;
 
     /** Approval list items keyed by controller approval id. */
-    QMap<int, QListWidgetItem *> m_approvalItems;
+    QMap<int, QListWidgetItem *> approval_items;
 
     /** Short timer that batches frequent log renders while streaming. */
-    QTimer *m_renderThrottle;
+    QTimer *render_throttle;
 
     /** Manages inline editor markers for diff hunks. */
-    InlineDiffManager *m_inlineDiffManager;
+    inline_diff_manager_t *inline_diff_manager;
 
     /** Registry of dock-local slash commands. */
-    SlashCommandRegistry m_slashCommands;
+    slash_command_registry_t slash_commands;
 
     /** Non-UI linked-files behavior extracted out of the widget. */
-    std::unique_ptr<AgentDockLinkedFilesController> m_linkedFilesController;
+    std::unique_ptr<agent_dock_linked_files_controller_t> linked_files_controller;
 
     /** Non-UI project session persistence extracted out of the widget. */
-    std::unique_ptr<AgentDockSessionController> m_sessionController;
+    std::unique_ptr<agent_dock_session_controller_t> session_controller;
 };
 
 }  // namespace qcai2

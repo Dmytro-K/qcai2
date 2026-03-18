@@ -14,155 +14,155 @@
 namespace qcai2
 {
 
-struct ContextMessage
+struct context_message_t
 {
-    QString messageId;
-    QString workspaceId;
-    QString conversationId;
-    QString runId;
+    QString message_id;
+    QString workspace_id;
+    QString conversation_id;
+    QString run_id;
     int sequence = 0;
     QString role;
     QString source;
     QString content;
-    QString createdAt;
-    int tokenEstimate = 0;
+    QString created_at;
+    int token_estimate = 0;
     QJsonObject metadata;
 
-    QJsonObject toJson() const;
-    static ContextMessage fromJson(const QJsonObject &obj);
-    ChatMessage toChatMessage() const;
+    QJsonObject to_json() const;
+    static context_message_t from_json(const QJsonObject &obj);
+    chat_message_t to_chat_message() const;
 };
 
-struct ContextSummary
+struct context_summary_t
 {
-    QString summaryId;
-    QString workspaceId;
-    QString conversationId;
+    QString summary_id;
+    QString workspace_id;
+    QString conversation_id;
     int version = 0;
-    int startSequence = 0;
-    int endSequence = 0;
-    QString createdAt;
+    int start_sequence = 0;
+    int end_sequence = 0;
+    QString created_at;
     QString content;
-    int tokenEstimate = 0;
+    int token_estimate = 0;
     QJsonObject metadata;
 
-    bool isValid() const;
-    QJsonObject toJson() const;
-    static ContextSummary fromJson(const QJsonObject &obj);
+    bool is_valid() const;
+    QJsonObject to_json() const;
+    static context_summary_t from_json(const QJsonObject &obj);
 };
 
-struct MemoryItem
+struct memory_item_t
 {
-    QString memoryId;
-    QString workspaceId;
+    QString memory_id;
+    QString workspace_id;
     QString key;
     QString category;
     QString value;
     QString source;
-    QString updatedAt;
+    QString updated_at;
     int importance = 0;
-    int tokenEstimate = 0;
+    int token_estimate = 0;
     QJsonObject metadata;
 
-    QJsonObject toJson() const;
-    static MemoryItem fromJson(const QJsonObject &obj);
+    QJsonObject to_json() const;
+    static memory_item_t from_json(const QJsonObject &obj);
 };
 
-struct ArtifactRecord
+struct artifact_record_t
 {
-    QString artifactId;
-    QString workspaceId;
-    QString conversationId;
-    QString runId;
+    QString artifact_id;
+    QString workspace_id;
+    QString conversation_id;
+    QString run_id;
     QString kind;
     QString title;
-    QString storagePath;
+    QString storage_path;
     QString preview;
-    QString createdAt;
-    int tokenEstimate = 0;
+    QString created_at;
+    int token_estimate = 0;
     QJsonObject metadata;
 
-    QJsonObject toJson() const;
-    static ArtifactRecord fromJson(const QJsonObject &obj);
+    QJsonObject to_json() const;
+    static artifact_record_t from_json(const QJsonObject &obj);
 };
 
-struct ConversationRecord
+struct conversation_record_t
 {
-    QString conversationId;
-    QString workspaceId;
-    QString workspaceRoot;
+    QString conversation_id;
+    QString workspace_id;
+    QString workspace_root;
     QString title;
-    QString createdAt;
-    QString updatedAt;
-    int lastMessageSequence = 0;
+    QString created_at;
+    QString updated_at;
+    int last_message_sequence = 0;
     QJsonObject metadata;
 
-    bool isValid() const;
-    QJsonObject toJson() const;
-    static ConversationRecord fromJson(const QJsonObject &obj);
+    bool is_valid() const;
+    QJsonObject to_json() const;
+    static conversation_record_t from_json(const QJsonObject &obj);
 };
 
-struct RunRecord
+struct run_record_t
 {
-    QString runId;
-    QString workspaceId;
-    QString conversationId;
+    QString run_id;
+    QString workspace_id;
+    QString conversation_id;
     QString kind;
-    QString providerId;
+    QString provider_id;
     QString model;
-    QString reasoningEffort;
-    QString thinkingLevel;
-    bool dryRun = true;
+    QString reasoning_effort;
+    QString thinking_level;
+    bool dry_run = true;
     QString status;
-    QString startedAt;
-    QString finishedAt;
-    ProviderUsage usage;
+    QString started_at;
+    QString finished_at;
+    provider_usage_t usage;
     QJsonObject metadata;
 
-    QJsonObject toJson() const;
-    static RunRecord fromJson(const QJsonObject &obj);
+    QJsonObject to_json() const;
+    static run_record_t from_json(const QJsonObject &obj);
 };
 
-enum class ContextRequestKind : std::uint8_t
+enum class context_request_kind_t : std::uint8_t
 {
-    AgentChat,
-    Ask,
-    Completion,
+    AGENT_CHAT,
+    ASK,
+    COMPLETION,
 };
 
-struct ContextBudget
+struct context_budget_t
 {
-    int totalTokens = 0;
-    int memoryTokens = 0;
-    int summaryTokens = 0;
-    int recentMessageTokens = 0;
-    int artifactTokens = 0;
-    int maxRecentMessages = 0;
-    int maxArtifacts = 0;
+    int total_tokens = 0;
+    int memory_tokens = 0;
+    int summary_tokens = 0;
+    int recent_message_tokens = 0;
+    int artifact_tokens = 0;
+    int max_recent_messages = 0;
+    int max_artifacts = 0;
 
-    QJsonObject toJson() const;
+    QJsonObject to_json() const;
 };
 
-struct ContextEnvelope
+struct context_envelope_t
 {
-    QString workspaceId;
-    QString conversationId;
-    ContextBudget budget;
-    QList<MemoryItem> memoryItems;
-    ContextSummary summary;
-    QList<ContextMessage> recentMessages;
-    QList<ArtifactRecord> artifacts;
-    QList<ChatMessage> providerMessages;
+    QString workspace_id;
+    QString conversation_id;
+    context_budget_t budget;
+    QList<memory_item_t> memory_items;
+    context_summary_t summary;
+    QList<context_message_t> recent_messages;
+    QList<artifact_record_t> artifacts;
+    QList<chat_message_t> provider_messages;
 
-    QJsonObject toJson() const;
+    QJsonObject to_json() const;
 };
 
-int estimateTokenCount(const QString &text);
-QString truncateForContext(const QString &text, int maxChars);
-QString newContextId();
-QString nowUtcIsoString();
-QString requestKindName(ContextRequestKind kind);
-ContextBudget budgetForRequest(ContextRequestKind kind, int maxOutputTokens);
-QString defaultArtifactFileSuffix(const QString &kind);
+int estimate_token_count(const QString &text);
+QString truncate_for_context(const QString &text, int max_chars);
+QString new_context_id();
+QString now_utc_iso_string();
+QString request_kind_name(context_request_kind_t kind);
+context_budget_t budget_for_request(context_request_kind_t kind, int max_output_tokens);
+QString default_artifact_file_suffix(const QString &kind);
 
 }  // namespace qcai2

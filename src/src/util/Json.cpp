@@ -4,7 +4,7 @@
 
 #include "Json.h"
 
-namespace qcai2::Json
+namespace qcai2::json
 {
 
 /**
@@ -45,21 +45,21 @@ static QJsonValue traverse(const QJsonObject &root, const QStringList &parts)
     return cur;
 }
 
-QString getString(const QJsonObject &root, const QString &path, const QString &def)
+QString get_string(const QJsonObject &root, const QString &path, const QString &def)
 {
     QJsonValue v = traverse(root, path.split('/'));
     return v.isString() ? v.toString() : def;
 }
 
-int getInt(const QJsonObject &root, const QString &path, int def)
+int get_int(const QJsonObject &root, const QString &path, int def)
 {
     QJsonValue v = traverse(root, path.split('/'));
     return v.isDouble() ? static_cast<int>(v.toDouble()) : def;
 }
 
-QJsonObject errorObject(const QString &message)
+QJsonObject error_object(const QString &message)
 {
     return QJsonObject{{"error", message}};
 }
 
-}  // namespace qcai2::Json
+}  // namespace qcai2::json

@@ -8,7 +8,8 @@
 namespace qcai2::Migration
 {
 
-bool migrateGlobalSettingsTo_0_0_4_001(QSettings &settings);
-bool migrateProjectStateTo_0_0_4_001(const QString &storagePath, QJsonObject &root, QString *error);
+bool migrate_global_settings_to_0_0_4_001(QSettings &settings);
+bool migrate_project_state_to_0_0_4_001(const QString &storage_path, QJsonObject &root,
+                                        QString *error);
 
 }  // namespace qcai2::Migration

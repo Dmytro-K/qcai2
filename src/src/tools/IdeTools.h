@@ -8,7 +8,7 @@ namespace qcai2
 /**
  * Tool that opens a project file in Qt Creator at a given location.
  */
-class OpenFileAtLocationTool : public ITool
+class open_file_at_location_tool_t : public i_tool_t
 {
 public:
     /**
@@ -32,15 +32,14 @@ public:
     /**
      * Returns the JSON schema for file-open arguments.
      */
-    QJsonObject argsSchema() const override;
+    QJsonObject args_schema() const override;
 
     /**
      * Opens the requested file in the IDE on the main thread.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
-    QString execute(const QJsonObject &args, const QString &workDir) override;
-
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 };
 
 }  // namespace qcai2

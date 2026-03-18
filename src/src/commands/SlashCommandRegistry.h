@@ -11,129 +11,68 @@
 namespace qcai2
 {
 
-/**
- * Parsed slash command invocation from the goal editor.
- */
-struct SlashCommandInvocation
+struct slash_command_invocation_t
 {
-    /** Full trimmed user input, including the leading slash. */
     QString input;
-
-    /** Normalized command name without the leading slash. */
     QString name;
-
-    /** Remaining text after the command name. */
     QString arguments;
 };
 
-/**
- * Services exposed to slash command handlers.
- */
-struct SlashCommandContext
+struct slash_command_context_t
 {
-    /** Appends a user-visible entry to the Actions Log. */
-    std::function<void(const QString &)> logMessage;
-
-    /** When non-null, the handler can write a replacement goal that will be
-     *  sent to the AI agent instead of running as a simple command. */
-    QString *goalOverride = nullptr;
+    std::function<void(const QString &)> log_message;
+    QString *goal_override = nullptr;
 };
 
-/**
- * Result of trying to dispatch a goal as a slash command.
- */
-struct SlashCommandDispatchResult
+struct slash_command_dispatch_result_t
 {
-    /** True when the input started with a slash and was treated as a command. */
-    bool isSlashCommand = false;
-
-    /** True when a registered command handler ran successfully. */
+    bool is_slash_command = false;
     bool executed = false;
-
-    /** Canonical command name that matched, without the leading slash. */
-    QString commandName;
-
-    /** User-visible error to log when dispatch failed. */
-    QString errorMessage;
-
-    /** When set by the handler, the dispatcher should redirect this text
-     *  to the AI agent instead of treating the command as fully handled. */
-    QString goalOverride;
+    QString command_name;
+    QString error_message;
+    QString goal_override;
 };
 
-/**
- * Definition record for one slash command contributed by a source file.
- */
-struct SlashCommandDefinition
+struct slash_command_definition_t
 {
-    /** Command name without the leading slash. */
     const char *name = nullptr;
-
-    /** Short description for UI and debugging. */
     const char *description = nullptr;
-
-    /** Handler function invoked when the command executes. */
-    void (*handler)(const SlashCommandInvocation &, const SlashCommandContext &) = nullptr;
+    void (*handler)(const slash_command_invocation_t &, const slash_command_context_t &) = nullptr;
 };
 
 namespace detail
 {
 
-/**
- * Registers one statically declared slash command definition.
- * This is used by DECLARE_COMMAND and should not be called manually.
- */
-void registerSlashCommandDefinition(const SlashCommandDefinition *definition);
+void register_slash_command_definition(const slash_command_definition_t *definition);
 
 }  // namespace detail
 
-/**
- * Registry of dock-local slash commands such as `/hello`.
- */
-class SlashCommandRegistry
+class slash_command_registry_t
 {
 public:
-    /**
-     * Display metadata for one registered slash command.
-     */
-    struct CommandInfo
+    struct command_info_t
     {
         QString name;
         QString description;
     };
 
-    /**
-     * Creates the registry from all statically declared command definitions.
-     */
-    SlashCommandRegistry();
+    slash_command_registry_t();
 
-    /**
-     * Returns registered slash commands with names prefixed by `/`.
-     */
-    QList<CommandInfo> commands() const;
-
-    /**
-     * Returns registered slash command names prefixed with `/`, sorted for UI use.
-     */
-    QStringList commandNames() const;
-
-    /**
-     * Tries to execute a slash command from the raw goal text.
-     * @param input Goal text from the dock editor.
-     * @param context Services exposed to the command handler.
-     */
-    SlashCommandDispatchResult dispatch(const QString &input,
-                                        const SlashCommandContext &context) const;
+    QList<command_info_t> commands() const;
+    QStringList command_names() const;
+    slash_command_dispatch_result_t dispatch(const QString &input,
+                                             const slash_command_context_t &context) const;
 
 private:
-    struct Entry
+    struct entry_t
     {
-        QString displayName;
+        QString display_name;
         QString description;
-        void (*handler)(const SlashCommandInvocation &, const SlashCommandContext &) = nullptr;
+        void (*handler)(const slash_command_invocation_t &,
+                        const slash_command_context_t &) = nullptr;
     };
 
-    QHash<QString, Entry> m_commands;
+    QHash<QString, entry_t> registered_commands;
 };
 
 }  // namespace qcai2
@@ -141,28 +80,17 @@ private:
 #define QCAI2_SLASH_COMMAND_JOIN_IMPL(a, b) a##b
 #define QCAI2_SLASH_COMMAND_JOIN(a, b) QCAI2_SLASH_COMMAND_JOIN_IMPL(a, b)
 
-/**
- * Declares one slash command and auto-registers it during static initialization.
- *
- * Usage:
- * void helloCommand(const qcai2::SlashCommandInvocation &, const qcai2::SlashCommandContext &);
- * DECLARE_COMMAND(hello, "Write Hello World to the Actions Log.", helloCommand)
- * {
- *     if (context.logMessage)
- *         context.logMessage(QStringLiteral("Hello World"));
- * }
- */
 #define DECLARE_COMMAND(NAME, DESCRIPTION, FUNCTION)                                              \
     namespace                                                                                     \
     {                                                                                             \
-    const ::qcai2::SlashCommandDefinition QCAI2_SLASH_COMMAND_JOIN(qcai2SlashCommandDefinition_,  \
-                                                                   NAME){#NAME, DESCRIPTION,      \
-                                                                         FUNCTION};               \
+    const ::qcai2::slash_command_definition_t                                                     \
+        QCAI2_SLASH_COMMAND_JOIN(qcai2SlashCommandDefinition_, NAME){#NAME, DESCRIPTION,          \
+                                                                     FUNCTION};                   \
     struct QCAI2_SLASH_COMMAND_JOIN(qcai2SlashCommandRegistrar_, NAME)                            \
     {                                                                                             \
         QCAI2_SLASH_COMMAND_JOIN(qcai2SlashCommandRegistrar_, NAME)()                             \
         {                                                                                         \
-            ::qcai2::detail::registerSlashCommandDefinition(                                      \
+            ::qcai2::detail::register_slash_command_definition(                                   \
                 &QCAI2_SLASH_COMMAND_JOIN(qcai2SlashCommandDefinition_, NAME));                   \
         }                                                                                         \
     };                                                                                            \

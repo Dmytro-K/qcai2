@@ -11,85 +11,88 @@
 namespace qcai2
 {
 
-struct Settings;
+struct settings_t;
 
-class ChatContextManager : public QObject
+class chat_context_manager_t : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit ChatContextManager(QObject *parent = nullptr);
+    explicit chat_context_manager_t(QObject *parent = nullptr);
 
-    bool setActiveWorkspace(const QString &workspaceId, const QString &workspaceRoot,
-                            const QString &conversationId = {}, QString *error = nullptr);
-    QString activeWorkspaceId() const;
-    QString activeWorkspaceRoot() const;
-    QString activeConversationId() const;
+    bool set_active_workspace(const QString &workspace_id, const QString &workspace_root,
+                              const QString &conversation_id = {}, QString *error = nullptr);
+    QString active_workspace_id() const;
+    QString active_workspace_root() const;
+    QString active_conversation_id() const;
 
-    QString ensureActiveConversation(QString *error = nullptr);
-    QString startNewConversation(const QString &title = {}, QString *error = nullptr);
+    QString ensure_active_conversation(QString *error = nullptr);
+    QString start_new_conversation(const QString &title = {}, QString *error = nullptr);
 
-    void syncWorkspaceState(const EditorContext::Snapshot &snapshot, const Settings &settings,
-                            QString *error = nullptr);
+    void sync_workspace_state(const editor_context_t::snapshot_t &snapshot,
+                              const settings_t &settings, QString *error = nullptr);
 
-    QString beginRun(ContextRequestKind kind, const QString &providerId, const QString &model,
-                     const QString &reasoningEffort, const QString &thinkingLevel, bool dryRun,
-                     const QJsonObject &metadata = {}, QString *error = nullptr);
-    bool finishRun(const QString &runId, const QString &status, const ProviderUsage &usage,
-                   const QJsonObject &metadata = {}, QString *error = nullptr);
+    QString begin_run(context_request_kind_t kind, const QString &provider_id,
+                      const QString &model, const QString &reasoning_effort,
+                      const QString &thinking_level, bool dry_run,
+                      const QJsonObject &metadata = {}, QString *error = nullptr);
+    bool finish_run(const QString &run_id, const QString &status, const provider_usage_t &usage,
+                    const QJsonObject &metadata = {}, QString *error = nullptr);
 
-    bool appendUserMessage(const QString &runId, const QString &content, const QString &source,
-                           const QJsonObject &metadata = {}, QString *error = nullptr);
-    bool appendAssistantMessage(const QString &runId, const QString &content,
-                                const QString &source, const QJsonObject &metadata = {},
-                                QString *error = nullptr);
-    bool appendArtifact(const QString &runId, const QString &kind, const QString &title,
-                        const QString &content, const QJsonObject &metadata = {},
-                        QString *error = nullptr);
+    bool append_user_message(const QString &run_id, const QString &content, const QString &source,
+                             const QJsonObject &metadata = {}, QString *error = nullptr);
+    bool append_assistant_message(const QString &run_id, const QString &content,
+                                  const QString &source, const QJsonObject &metadata = {},
+                                  QString *error = nullptr);
+    bool append_artifact(const QString &run_id, const QString &kind, const QString &title,
+                         const QString &content, const QJsonObject &metadata = {},
+                         QString *error = nullptr);
 
-    ContextEnvelope buildContextEnvelope(ContextRequestKind kind, const QString &systemInstruction,
-                                         const QStringList &dynamicSystemMessages,
-                                         int maxOutputTokens, QString *error = nullptr) const;
-    QString buildCompletionContextBlock(const QString &filePath, int maxOutputTokens,
-                                        QString *error = nullptr) const;
+    context_envelope_t build_context_envelope(context_request_kind_t kind,
+                                              const QString &system_instruction,
+                                              const QStringList &dynamic_system_messages,
+                                              int max_output_tokens,
+                                              QString *error = nullptr) const;
+    QString build_completion_context_block(const QString &file_path, int max_output_tokens,
+                                           QString *error = nullptr) const;
 
-    bool maybeRefreshSummary(QString *error = nullptr);
+    bool maybe_refresh_summary(QString *error = nullptr);
 
-    QString databasePath() const;
-    QString artifactDirectoryPath() const;
+    QString database_path() const;
+    QString artifact_directory_path() const;
 
 private:
-    bool ensureStoreOpen(QString *error = nullptr) const;
-    bool ensureConversationAvailable(QString *error = nullptr);
-    bool appendMessage(const QString &runId, const QString &role, const QString &content,
-                       const QString &source, const QJsonObject &metadata,
-                       QString *error = nullptr);
+    bool ensure_store_open(QString *error = nullptr) const;
+    bool ensure_conversation_available(QString *error = nullptr);
+    bool append_message(const QString &run_id, const QString &role, const QString &content,
+                        const QString &source, const QJsonObject &metadata,
+                        QString *error = nullptr);
 
-    QString conversationSummaryBlock(const ContextSummary &summary, int maxTokens) const;
-    QString memoryBlock(const QList<MemoryItem> &items, int maxTokens) const;
-    QString artifactBlock(const QList<ArtifactRecord> &artifacts, int maxTokens) const;
-    QString recentMessagesBlock(const QList<ContextMessage> &messages, int maxTokens) const;
-    QString renderMessageBullet(const ContextMessage &message, int maxChars) const;
-    QString renderArtifactBullet(const ArtifactRecord &artifact, int maxChars) const;
-    QList<MemoryItem> selectMemoryItems(const ContextBudget &budget,
-                                        QString *error = nullptr) const;
-    QList<ArtifactRecord> selectArtifacts(const ContextBudget &budget,
-                                          QString *error = nullptr) const;
-    QList<ContextMessage> selectRecentMessages(const ContextBudget &budget,
-                                               QString *error = nullptr) const;
-    ContextSummary composeNextSummary(const ContextSummary &previous,
-                                      const QList<ContextMessage> &chunk,
-                                      const QList<ArtifactRecord> &artifacts,
-                                      QString *error = nullptr) const;
+    QString conversation_summary_block(const context_summary_t &summary, int max_tokens) const;
+    QString memory_block(const QList<memory_item_t> &items, int max_tokens) const;
+    QString artifact_block(const QList<artifact_record_t> &artifacts, int max_tokens) const;
+    QString recent_messages_block(const QList<context_message_t> &messages, int max_tokens) const;
+    QString render_message_bullet(const context_message_t &message, int max_chars) const;
+    QString render_artifact_bullet(const artifact_record_t &artifact, int max_chars) const;
+    QList<memory_item_t> select_memory_items(const context_budget_t &budget,
+                                             QString *error = nullptr) const;
+    QList<artifact_record_t> select_artifacts(const context_budget_t &budget,
+                                              QString *error = nullptr) const;
+    QList<context_message_t> select_recent_messages(const context_budget_t &budget,
+                                                    QString *error = nullptr) const;
+    context_summary_t compose_next_summary(const context_summary_t &previous,
+                                           const QList<context_message_t> &chunk,
+                                           const QList<artifact_record_t> &artifacts,
+                                           QString *error = nullptr) const;
 
-    QString databasePathForWorkspace() const;
-    QString artifactPathForWorkspace() const;
+    QString database_path_for_workspace() const;
+    QString artifact_path_for_workspace() const;
 
-    mutable std::unique_ptr<ChatContextStore> m_store;
-    QString m_workspaceId;
-    QString m_workspaceRoot;
-    ConversationRecord m_conversation;
-    QHash<QString, RunRecord> m_activeRuns;
+    mutable std::unique_ptr<chat_context_store_t> store;
+    QString workspace_id;
+    QString workspace_root;
+    conversation_record_t conversation;
+    QHash<QString, run_record_t> active_runs;
 };
 
 }  // namespace qcai2

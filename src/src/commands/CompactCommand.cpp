@@ -7,7 +7,8 @@
 namespace qcai2
 {
 
-void compactCommand(const SlashCommandInvocation &invocation, const SlashCommandContext &context)
+void compact_command(const slash_command_invocation_t &invocation,
+                     const slash_command_context_t &context)
 {
     Q_UNUSED(context);
 
@@ -73,13 +74,13 @@ void compactCommand(const SlashCommandInvocation &invocation, const SlashCommand
                       .arg(invocation.arguments.trimmed());
     }
 
-    if (context.goalOverride != nullptr)
+    if (context.goal_override != nullptr)
     {
-        *context.goalOverride = prompt;
+        *context.goal_override = prompt;
     }
 }
 
 DECLARE_COMMAND(compact, "Compress the relevant conversation context into a short summary.",
-                compactCommand)
+                compact_command)
 
 }  // namespace qcai2

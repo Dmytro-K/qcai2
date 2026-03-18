@@ -25,7 +25,7 @@ namespace
  * @param models Candidate model names.
  * @return Normalized model names with empty entries removed.
  */
-QStringList normalizeModelList(const QStringList &models)
+QStringList normalize_model_list(const QStringList &models)
 {
     QStringList normalized;
     normalized.reserve(models.size());
@@ -43,7 +43,7 @@ QStringList normalizeModelList(const QStringList &models)
     return normalized;
 }
 
-QJsonObject mcpServerConnectionStatesToJson(const McpServerConnectionStates &states)
+QJsonObject mcpServerConnectionStatesToJson(const mcp_server_connection_states_t &states)
 {
     QJsonObject root;
     for (auto it = states.cbegin(); it != states.cend(); ++it)
@@ -62,7 +62,8 @@ QJsonObject mcpServerConnectionStatesToJson(const McpServerConnectionStates &sta
     return root;
 }
 
-bool mcpServerConnectionStatesFromJson(const QJsonValue &value, McpServerConnectionStates *states,
+bool mcpServerConnectionStatesFromJson(const QJsonValue &value,
+                                       mcp_server_connection_states_t *states,
                                        QString *error = nullptr)
 {
     if (((states == nullptr) == true))
@@ -101,7 +102,7 @@ bool mcpServerConnectionStatesFromJson(const QJsonValue &value, McpServerConnect
         }
 
         const QJsonObject stateObject = it.value().toObject();
-        McpServerConnectionState state;
+        mcp_server_connection_state_t state;
         const QJsonValue stateValue = stateObject.value(QStringLiteral("state"));
         if (((!stateValue.isUndefined() && !stateValue.isNull() && !stateValue.isString()) ==
              true))
@@ -228,162 +229,164 @@ bool writeStructuredSettingsFile(const QString &path, const QJsonObject &root,
 
 }  // namespace
 
-void Settings::load()
+void settings_t::load()
 {
     QSettings s;
     s.beginGroup(kGroup);
     QString migrationError;
-    const bool migrationOk = Migration::migrateGlobalSettings(s, &migrationError);
+    const bool migrationOk = Migration::migrate_global_settings(s, &migrationError);
     if ((((!migrationOk || !migrationError.isEmpty()) && !migrationError.isEmpty()) == true))
     {
-        QCAI_WARN("Settings", migrationError);
+        QCAI_WARN("settings_t", migrationError);
     }
 
     provider = s.value("provider", provider).toString();
-    baseUrl = s.value("baseUrl", baseUrl).toString();
+    base_url = s.value("baseUrl", base_url).toString();
     // Note: apiKey is loaded but never logged
-    apiKey = s.value("apiKey", apiKey).toString();
-    modelName = s.value("modelName", modelName).toString();
-    thinkingLevel = s.value("thinkingLevel", thinkingLevel).toString();
-    reasoningEffort = s.value("reasoningEffort", thinkingLevel).toString();
+    api_key = s.value("apiKey", api_key).toString();
+    model_name = s.value("modelName", model_name).toString();
+    thinking_level = s.value("thinkingLevel", thinking_level).toString();
+    reasoning_effort = s.value("reasoningEffort", thinking_level).toString();
     temperature = s.value("temperature", temperature).toDouble();
-    maxTokens = s.value("maxTokens", maxTokens).toInt();
+    max_tokens = s.value("maxTokens", max_tokens).toInt();
 
-    localBaseUrl = s.value("localBaseUrl", localBaseUrl).toString();
-    localEndpointPath = s.value("localEndpointPath", localEndpointPath).toString();
-    localSimpleMode = s.value("localSimpleMode", localSimpleMode).toBool();
-    localCustomHeaders = s.value("localCustomHeaders", localCustomHeaders).toString();
+    local_base_url = s.value("localBaseUrl", local_base_url).toString();
+    local_endpoint_path = s.value("localEndpointPath", local_endpoint_path).toString();
+    local_simple_mode = s.value("localSimpleMode", local_simple_mode).toBool();
+    local_custom_headers = s.value("localCustomHeaders", local_custom_headers).toString();
 
-    ollamaBaseUrl = s.value("ollamaBaseUrl", ollamaBaseUrl).toString();
-    ollamaModel = s.value("ollamaModel", ollamaModel).toString();
+    ollama_base_url = s.value("ollamaBaseUrl", ollama_base_url).toString();
+    ollama_model = s.value("ollamaModel", ollama_model).toString();
 
-    copilotToken = s.value("copilotToken", copilotToken).toString();
-    copilotModel = s.value("copilotModel", copilotModel).toString();
-    copilotNodePath = s.value("copilotNodePath", copilotNodePath).toString();
-    copilotSidecarPath = s.value("copilotSidecarPath", copilotSidecarPath).toString();
-    copilotCompletionTimeoutSec =
-        s.value("copilotCompletionTimeoutSec", copilotCompletionTimeoutSec).toInt();
+    copilot_token = s.value("copilotToken", copilot_token).toString();
+    copilot_model = s.value("copilotModel", copilot_model).toString();
+    copilot_node_path = s.value("copilotNodePath", copilot_node_path).toString();
+    copilot_sidecar_path = s.value("copilotSidecarPath", copilot_sidecar_path).toString();
+    copilot_completion_timeout_sec =
+        s.value("copilotCompletionTimeoutSec", copilot_completion_timeout_sec).toInt();
 
-    maxIterations = s.value("maxIterations", maxIterations).toInt();
-    maxToolCalls = s.value("maxToolCalls", maxToolCalls).toInt();
-    maxDiffLines = s.value("maxDiffLines", maxDiffLines).toInt();
-    maxChangedFiles = s.value("maxChangedFiles", maxChangedFiles).toInt();
+    max_iterations = s.value("maxIterations", max_iterations).toInt();
+    max_tool_calls = s.value("maxToolCalls", max_tool_calls).toInt();
+    max_diff_lines = s.value("maxDiffLines", max_diff_lines).toInt();
+    max_changed_files = s.value("maxChangedFiles", max_changed_files).toInt();
 
-    dryRunDefault = s.value("dryRunDefault", dryRunDefault).toBool();
-    aiCompletionEnabled = s.value("aiCompletionEnabled", aiCompletionEnabled).toBool();
-    debugLogging = s.value("debugLogging", debugLogging).toBool();
-    agentDebug = s.value("agentDebug", agentDebug).toBool();
-    completionMinChars = s.value("completionMinChars", completionMinChars).toInt();
-    completionDelayMs = s.value("completionDelayMs", completionDelayMs).toInt();
-    completionModel = s.value("completionModel", completionModel).toString();
-    completionThinkingLevel =
-        s.value("completionThinkingLevel", completionThinkingLevel).toString();
-    completionReasoningEffort =
-        s.value("completionReasoningEffort", completionReasoningEffort).toString();
+    dry_run_default = s.value("dryRunDefault", dry_run_default).toBool();
+    ai_completion_enabled = s.value("aiCompletionEnabled", ai_completion_enabled).toBool();
+    debug_logging = s.value("debugLogging", debug_logging).toBool();
+    agent_debug = s.value("agentDebug", agent_debug).toBool();
+    completion_min_chars = s.value("completionMinChars", completion_min_chars).toInt();
+    completion_delay_ms = s.value("completionDelayMs", completion_delay_ms).toInt();
+    completion_model = s.value("completionModel", completion_model).toString();
+    completion_thinking_level =
+        s.value("completionThinkingLevel", completion_thinking_level).toString();
+    completion_reasoning_effort =
+        s.value("completionReasoningEffort", completion_reasoning_effort).toString();
 
     s.endGroup();
 
-    mcpServers.clear();
+    mcp_servers.clear();
     bool structuredSettingsExist = false;
     QString structuredError;
-    const QJsonObject structuredRoot = readStructuredSettingsFile(
-        Migration::globalStructuredSettingsFilePath(), &structuredSettingsExist, &structuredError);
+    const QJsonObject structuredRoot =
+        readStructuredSettingsFile(Migration::global_structured_settings_file_path(),
+                                   &structuredSettingsExist, &structuredError);
     if (structuredError.isEmpty() == false)
     {
-        QCAI_WARN("Settings", structuredError);
+        QCAI_WARN("settings_t", structuredError);
     }
     else if (structuredSettingsExist == true)
     {
         const QJsonValue mcpServersValue = structuredRoot.value(QStringLiteral("mcpServers"));
         if (((mcpServersValue.isUndefined() || mcpServersValue.isNull()) == true))
         {
-            mcpServers.clear();
+            mcp_servers.clear();
         }
         else if (mcpServersValue.isObject() == false)
         {
-            QCAI_WARN("Settings",
+            QCAI_WARN("settings_t",
                       QStringLiteral("Structured settings key 'mcpServers' must be an object."));
         }
         else
         {
             QString mcpError;
-            if (((!qtmcp::serverDefinitionsFromJson(mcpServersValue.toObject(), &mcpServers,
-                                                    &mcpError)) == true))
+            if (((!qtmcp::server_definitions_from_json(mcpServersValue.toObject(), &mcp_servers,
+                                                       &mcpError)) == true))
             {
-                QCAI_WARN("Settings", mcpError);
+                QCAI_WARN("settings_t", mcpError);
             }
         }
     }
-    QCAI_INFO("Settings", QStringLiteral("Loaded: provider=%1 model=%2 debug=%3")
-                              .arg(provider, modelName,
-                                   debugLogging ? QStringLiteral("on") : QStringLiteral("off")));
+    QCAI_INFO("settings_t",
+              QStringLiteral("Loaded: provider=%1 model=%2 debug=%3")
+                  .arg(provider, model_name,
+                       debug_logging ? QStringLiteral("on") : QStringLiteral("off")));
 }
 
-void Settings::save() const
+void settings_t::save() const
 {
     QSettings s;
     s.beginGroup(kGroup);
 
     s.setValue("provider", provider);
-    s.setValue("baseUrl", baseUrl);
-    s.setValue("apiKey", apiKey);
-    s.setValue("modelName", modelName);
-    s.setValue("reasoningEffort", reasoningEffort);
-    s.setValue("thinkingLevel", thinkingLevel);
+    s.setValue("baseUrl", base_url);
+    s.setValue("apiKey", api_key);
+    s.setValue("modelName", model_name);
+    s.setValue("reasoningEffort", reasoning_effort);
+    s.setValue("thinkingLevel", thinking_level);
     s.setValue("temperature", temperature);
-    s.setValue("maxTokens", maxTokens);
+    s.setValue("maxTokens", max_tokens);
 
-    s.setValue("localBaseUrl", localBaseUrl);
-    s.setValue("localEndpointPath", localEndpointPath);
-    s.setValue("localSimpleMode", localSimpleMode);
-    s.setValue("localCustomHeaders", localCustomHeaders);
+    s.setValue("localBaseUrl", local_base_url);
+    s.setValue("localEndpointPath", local_endpoint_path);
+    s.setValue("localSimpleMode", local_simple_mode);
+    s.setValue("localCustomHeaders", local_custom_headers);
 
-    s.setValue("ollamaBaseUrl", ollamaBaseUrl);
-    s.setValue("ollamaModel", ollamaModel);
+    s.setValue("ollamaBaseUrl", ollama_base_url);
+    s.setValue("ollamaModel", ollama_model);
 
-    s.setValue("copilotToken", copilotToken);
-    s.setValue("copilotModel", copilotModel);
-    s.setValue("copilotNodePath", copilotNodePath);
-    s.setValue("copilotSidecarPath", copilotSidecarPath);
-    s.setValue("copilotCompletionTimeoutSec", copilotCompletionTimeoutSec);
+    s.setValue("copilotToken", copilot_token);
+    s.setValue("copilotModel", copilot_model);
+    s.setValue("copilotNodePath", copilot_node_path);
+    s.setValue("copilotSidecarPath", copilot_sidecar_path);
+    s.setValue("copilotCompletionTimeoutSec", copilot_completion_timeout_sec);
 
-    s.setValue("maxIterations", maxIterations);
-    s.setValue("maxToolCalls", maxToolCalls);
-    s.setValue("maxDiffLines", maxDiffLines);
-    s.setValue("maxChangedFiles", maxChangedFiles);
+    s.setValue("maxIterations", max_iterations);
+    s.setValue("maxToolCalls", max_tool_calls);
+    s.setValue("maxDiffLines", max_diff_lines);
+    s.setValue("maxChangedFiles", max_changed_files);
 
-    s.setValue("dryRunDefault", dryRunDefault);
-    s.setValue("aiCompletionEnabled", aiCompletionEnabled);
-    s.setValue("debugLogging", debugLogging);
-    s.setValue("agentDebug", agentDebug);
-    s.setValue("completionMinChars", completionMinChars);
-    s.setValue("completionDelayMs", completionDelayMs);
-    s.setValue("completionModel", completionModel);
-    s.setValue("completionThinkingLevel", completionThinkingLevel);
-    s.setValue("completionReasoningEffort", completionReasoningEffort);
-    Migration::stampGlobalSettings(s);
+    s.setValue("dryRunDefault", dry_run_default);
+    s.setValue("aiCompletionEnabled", ai_completion_enabled);
+    s.setValue("debugLogging", debug_logging);
+    s.setValue("agentDebug", agent_debug);
+    s.setValue("completionMinChars", completion_min_chars);
+    s.setValue("completionDelayMs", completion_delay_ms);
+    s.setValue("completionModel", completion_model);
+    s.setValue("completionThinkingLevel", completion_thinking_level);
+    s.setValue("completionReasoningEffort", completion_reasoning_effort);
+    Migration::stamp_global_settings(s);
 
     s.endGroup();
 
-    const QString structuredSettingsPath = Migration::globalStructuredSettingsFilePath();
+    const QString structuredSettingsPath = Migration::global_structured_settings_file_path();
     bool structuredSettingsExist = false;
     QString structuredError;
     QJsonObject structuredRoot = readStructuredSettingsFile(
         structuredSettingsPath, &structuredSettingsExist, &structuredError);
     if (structuredError.isEmpty() == false)
     {
-        QCAI_WARN("Settings", structuredError);
+        QCAI_WARN("settings_t", structuredError);
         structuredRoot = QJsonObject{};
     }
 
-    if (mcpServers.isEmpty() == true)
+    if (mcp_servers.isEmpty() == true)
     {
         structuredRoot.remove(QStringLiteral("mcpServers"));
     }
     else
     {
         structuredRoot.insert(QStringLiteral("mcpServers"),
-                              qtmcp::serverDefinitionsToJson(mcpServers));
+                              qtmcp::server_definitions_to_json(mcp_servers));
     }
 
     if (structuredRoot.isEmpty() == true)
@@ -396,26 +399,27 @@ void Settings::save() const
         if (((writeStructuredSettingsFile(structuredSettingsPath, structuredRoot,
                                           &structuredError)) == false))
         {
-            QCAI_WARN("Settings", structuredError);
+            QCAI_WARN("settings_t", structuredError);
         }
     }
 
-    QCAI_DEBUG("Settings", QStringLiteral("Settings saved"));
+    QCAI_DEBUG("settings_t", QStringLiteral("settings_t saved"));
 }
 
-Settings &settings()
+settings_t &settings()
 {
-    static Settings s;
+    static settings_t s;
     return s;
 }
 
-McpServerConnectionStates loadMcpServerConnectionStates(QString *error)
+mcp_server_connection_states_t loadMcpServerConnectionStates(QString *error)
 {
-    McpServerConnectionStates states;
+    mcp_server_connection_states_t states;
     bool structuredSettingsExist = false;
     QString structuredError;
-    const QJsonObject structuredRoot = readStructuredSettingsFile(
-        Migration::globalStructuredSettingsFilePath(), &structuredSettingsExist, &structuredError);
+    const QJsonObject structuredRoot =
+        readStructuredSettingsFile(Migration::global_structured_settings_file_path(),
+                                   &structuredSettingsExist, &structuredError);
     if (structuredError.isEmpty() == false)
     {
         if (((error != nullptr) == true))
@@ -443,9 +447,9 @@ McpServerConnectionStates loadMcpServerConnectionStates(QString *error)
     return states;
 }
 
-bool saveMcpServerConnectionStates(const McpServerConnectionStates &states, QString *error)
+bool saveMcpServerConnectionStates(const mcp_server_connection_states_t &states, QString *error)
 {
-    const QString structuredSettingsPath = Migration::globalStructuredSettingsFilePath();
+    const QString structuredSettingsPath = Migration::global_structured_settings_file_path();
     bool structuredSettingsExist = false;
     QString structuredError;
     QJsonObject structuredRoot = readStructuredSettingsFile(
@@ -477,29 +481,29 @@ bool saveMcpServerConnectionStates(const McpServerConnectionStates &states, QStr
     return writeStructuredSettingsFile(structuredSettingsPath, structuredRoot, error);
 }
 
-ModelCatalog::ModelCatalog(QObject *parent)
-    : QObject(parent), m_copilotModels(defaultCopilotModels())
+model_catalog_t::model_catalog_t(QObject *parent)
+    : QObject(parent), available_copilot_models(default_copilot_models())
 {
 }
 
-QStringList ModelCatalog::copilotModels() const
+QStringList model_catalog_t::copilot_models() const
 {
-    return m_copilotModels;
+    return this->available_copilot_models;
 }
 
-void ModelCatalog::setCopilotModels(const QStringList &models)
+void model_catalog_t::set_copilot_models(const QStringList &models)
 {
-    const QStringList normalized = normalizeModelList(models);
-    if (((normalized.isEmpty() || normalized == m_copilotModels) == true))
+    const QStringList normalized = normalize_model_list(models);
+    if (((normalized.isEmpty() || normalized == this->available_copilot_models) == true))
     {
         return;
     }
 
-    m_copilotModels = normalized;
-    emit copilotModelsChanged(m_copilotModels);
+    this->available_copilot_models = normalized;
+    emit this->copilot_models_changed(this->available_copilot_models);
 }
 
-QStringList ModelCatalog::defaultCopilotModels()
+QStringList model_catalog_t::default_copilot_models()
 {
     return {
         QStringLiteral("gpt-5.4"),           QStringLiteral("gpt-5.4"),
@@ -518,9 +522,9 @@ QStringList ModelCatalog::defaultCopilotModels()
     };
 }
 
-ModelCatalog &modelCatalog()
+model_catalog_t &model_catalog()
 {
-    static ModelCatalog catalog;
+    static model_catalog_t catalog;
     return catalog;
 }
 

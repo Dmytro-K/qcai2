@@ -18,7 +18,7 @@ namespace qcai2
  * Creates an OpenAI-compatible provider instance.
  * @param parent Parent QObject that owns this instance.
  */
-OpenAICompatibleProvider::OpenAICompatibleProvider(QObject *parent) : QObject(parent)
+open_ai_compatible_provider_t::open_ai_compatible_provider_t(QObject *parent) : QObject(parent)
 {
 }
 
@@ -27,45 +27,46 @@ OpenAICompatibleProvider::OpenAICompatibleProvider(QObject *parent) : QObject(pa
  * @param messages Conversation history to send.
  * @param model Remote model identifier.
  * @param temperature Sampling temperature.
- * @param maxTokens Maximum completion token count.
- * @param reasoningEffort Optional reasoning hint forwarded when enabled.
+ * @param max_tokens Maximum completion token count.
+ * @param reasoning_effort Optional reasoning hint forwarded when enabled.
  * @param callback Receives the final response text or an error.
- * @param streamCallback Receives streamed SSE deltas when streaming is enabled.
+ * @param stream_callback Receives streamed SSE deltas when streaming is enabled.
  */
-void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, const QString &model,
-                                        double temperature, int maxTokens,
-                                        const QString &reasoningEffort,
-                                        CompletionCallback callback, StreamCallback streamCallback,
-                                        ProgressCallback progressCallback)
+void open_ai_compatible_provider_t::complete(const QList<chat_message_t> &messages,
+                                             const QString &model, double temperature,
+                                             int max_tokens, const QString &reasoning_effort,
+                                             completion_callback_t callback,
+                                             stream_callback_t stream_callback,
+                                             progress_callback_t progress_callback)
 {
-    if (progressCallback != nullptr)
+    if (progress_callback != nullptr)
     {
-        progressCallback({ProviderRawEventKind::RequestStarted,
-                          id(),
-                          QStringLiteral("request.started"),
-                          {},
-                          {}});
+        progress_callback({provider_raw_event_kind_t::REQUEST_STARTED,
+                           this->id(),
+                           QStringLiteral("request.started"),
+                           {},
+                           {}});
     }
 
     // Build request body
     QJsonArray msgArr;
     for (const auto &m : messages)
     {
-        msgArr.append(m.toJson());
+        msgArr.append(m.to_json());
     }
 
     QJsonObject body;
     body[QStringLiteral("model")] = model;
     body[QStringLiteral("messages")] = msgArr;
     body[QStringLiteral("temperature")] = temperature;
-    body[QStringLiteral("max_tokens")] = maxTokens;
+    body[QStringLiteral("max_tokens")] = max_tokens;
 
-    if (((!reasoningEffort.isEmpty() && reasoningEffort != QStringLiteral("off")) == true))
+    if (((!reasoning_effort.isEmpty() && reasoning_effort != QStringLiteral("off")) == true))
     {
-        body[QStringLiteral("reasoning_effort")] = reasoningEffort;
+        body[QStringLiteral("reasoning_effort")] = reasoning_effort;
     }
 
-    const bool streaming = (streamCallback != nullptr);
+    const bool streaming = (stream_callback != nullptr);
     if (streaming == true)
     {
         body[QStringLiteral("stream")] = true;
@@ -74,7 +75,7 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
     }
 
     // Build URL
-    QString urlStr = m_baseUrl;
+    QString urlStr = this->base_url;
     if (((urlStr.endsWith(QLatin1Char('/'))) == false))
     {
         urlStr += QLatin1Char('/');
@@ -84,7 +85,7 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
     QCAI_DEBUG("OpenAI", QStringLiteral("POST %1 | model=%2 temp=%3 maxTok=%4 stream=%5 msgs=%6")
                              .arg(urlStr, model)
                              .arg(temperature)
-                             .arg(maxTokens)
+                             .arg(max_tokens)
                              .arg(streaming ? QStringLiteral("yes") : QStringLiteral("no"))
                              .arg(messages.size()));
 
@@ -92,12 +93,12 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
     QNetworkRequest req{url};
     req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
 
-    if (((!m_apiKey.isEmpty()) == true))
+    if (((!this->api_key.isEmpty()) == true))
     {
-        req.setRawHeader("Authorization", QStringLiteral("Bearer %1").arg(m_apiKey).toUtf8());
+        req.setRawHeader("Authorization", QStringLiteral("Bearer %1").arg(this->api_key).toUtf8());
     }
 
-    for (auto it = m_extraHeaders.begin(); ((it != m_extraHeaders.end()) == true); ++it)
+    for (auto it = this->extra_headers.begin(); ((it != this->extra_headers.end()) == true); ++it)
     {
         req.setRawHeader(it.key().toUtf8(), it.value().toUtf8());
     }
@@ -108,11 +109,11 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
         req.setRawHeader("Connection", "close");
     }
 
-    m_sseBuffer.clear();
-    m_streamAccum.clear();
-    m_streamUsage = {};
+    this->sse_buffer.clear();
+    this->stream_accum.clear();
+    this->stream_usage = {};
 
-    m_currentReply = m_nam.post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    this->current_reply = this->nam.post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
 
     if (streaming == true)
     {
@@ -120,21 +121,21 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
 
         // Stream mode: process SSE chunks as they arrive
         connect(
-            m_currentReply, &QNetworkReply::readyRead, this,
-            [this, streamCallback, progressCallback, activeTools]() {
-                m_sseBuffer.append(m_currentReply->readAll());
+            this->current_reply, &QNetworkReply::readyRead, this,
+            [this, stream_callback, progress_callback, activeTools]() {
+                this->sse_buffer.append(this->current_reply->readAll());
 
                 // Process complete SSE lines
                 while (true == true)
                 {
-                    qsizetype idx = m_sseBuffer.indexOf('\n');
+                    qsizetype idx = this->sse_buffer.indexOf('\n');
                     if (idx < 0)
                     {
                         break;
                     }
 
-                    QByteArray line = m_sseBuffer.left(idx).trimmed();
-                    m_sseBuffer.remove(0, idx + 1);
+                    QByteArray line = this->sse_buffer.left(idx).trimmed();
+                    this->sse_buffer.remove(0, idx + 1);
 
                     if (line.isEmpty() == true)
                     {
@@ -161,10 +162,10 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                     }
 
                     QJsonObject obj = doc.object();
-                    const ProviderUsage usage = providerUsageFromResponseObject(obj);
-                    if (usage.hasAny() == true)
+                    const provider_usage_t usage = provider_usage_from_response_object(obj);
+                    if (usage.has_any() == true)
                     {
-                        m_streamUsage = usage;
+                        this->stream_usage = usage;
                     }
 
                     // Extract delta content: choices[0].delta.content
@@ -183,15 +184,15 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                             : deltaObj.value(QStringLiteral("reasoning")).toString();
                     if (reasoningDelta.isEmpty() == false)
                     {
-                        if (progressCallback != nullptr)
+                        if (progress_callback != nullptr)
                         {
-                            progressCallback({ProviderRawEventKind::ReasoningDelta,
-                                              id(),
-                                              QStringLiteral("response.reasoning.delta"),
-                                              {},
-                                              reasoningDelta});
+                            progress_callback({provider_raw_event_kind_t::REASONING_DELTA,
+                                               this->id(),
+                                               QStringLiteral("response.reasoning.delta"),
+                                               {},
+                                               reasoningDelta});
                         }
-                        streamCallback(reasoningDelta);
+                        stream_callback(reasoningDelta);
                     }
 
                     const QJsonArray toolCalls =
@@ -204,13 +205,13 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                                                      .value(QStringLiteral("name"))
                                                      .toString()
                                                      .trimmed();
-                        if (!toolName.isEmpty() && progressCallback != nullptr)
+                        if (!toolName.isEmpty() && progress_callback != nullptr)
                         {
-                            progressCallback({ProviderRawEventKind::ToolStarted,
-                                              id(),
-                                              QStringLiteral("response.tool_call.delta"),
-                                              toolName,
-                                              {}});
+                            progress_callback({provider_raw_event_kind_t::TOOL_STARTED,
+                                               this->id(),
+                                               QStringLiteral("response.tool_call.delta"),
+                                               toolName,
+                                               {}});
                         }
                         if (!toolName.isEmpty())
                         {
@@ -221,30 +222,30 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                     const QString delta = deltaObj.value(QStringLiteral("content")).toString();
                     if (delta.isEmpty() == false)
                     {
-                        m_streamAccum += delta;
-                        if (progressCallback != nullptr)
+                        this->stream_accum += delta;
+                        if (progress_callback != nullptr)
                         {
-                            progressCallback({ProviderRawEventKind::MessageDelta,
-                                              id(),
-                                              QStringLiteral("assistant.message_delta"),
-                                              {},
-                                              delta});
+                            progress_callback({provider_raw_event_kind_t::MESSAGE_DELTA,
+                                               this->id(),
+                                               QStringLiteral("assistant.message_delta"),
+                                               {},
+                                               delta});
                         }
-                        streamCallback(delta);
+                        stream_callback(delta);
                     }
 
                     const QString finishReason =
                         choices[0].toObject().value(QStringLiteral("finish_reason")).toString();
                     if (finishReason == QStringLiteral("tool_calls") &&
-                        progressCallback != nullptr)
+                        progress_callback != nullptr)
                     {
                         for (const QString &toolName : std::as_const(*activeTools))
                         {
-                            progressCallback({ProviderRawEventKind::ToolCompleted,
-                                              id(),
-                                              QStringLiteral("response.tool_call.completed"),
-                                              toolName,
-                                              {}});
+                            progress_callback({provider_raw_event_kind_t::TOOL_COMPLETED,
+                                               id(),
+                                               QStringLiteral("response.tool_call.completed"),
+                                               toolName,
+                                               {}});
                         }
                         activeTools->clear();
                     }
@@ -252,10 +253,10 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
             });
 
         connect(
-            m_currentReply, &QNetworkReply::finished, this,
-            [this, callback, streamCallback, progressCallback, activeTools]() {
-                QNetworkReply *reply = m_currentReply;
-                m_currentReply = nullptr;
+            this->current_reply, &QNetworkReply::finished, this,
+            [this, callback, stream_callback, progress_callback, activeTools]() {
+                QNetworkReply *reply = this->current_reply;
+                this->current_reply = nullptr;
 
                 if (((reply == nullptr) == true))
                 {
@@ -267,13 +268,13 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                       reply->error() != QNetworkReply::OperationCanceledError) == true))
                 {
                     const QString errBody = QString::fromUtf8(reply->readAll());
-                    if (progressCallback != nullptr)
+                    if (progress_callback != nullptr)
                     {
-                        progressCallback({ProviderRawEventKind::Error,
-                                          id(),
-                                          QStringLiteral("response.error"),
-                                          {},
-                                          reply->errorString()});
+                        progress_callback({provider_raw_event_kind_t::ERROR_EVENT,
+                                           this->id(),
+                                           QStringLiteral("response.error"),
+                                           {},
+                                           reply->errorString()});
                     }
                     QCAI_ERROR("OpenAI", QStringLiteral("HTTP error (streaming): %1 — %2")
                                              .arg(reply->errorString(), errBody.left(300)));
@@ -285,40 +286,41 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                     return;
                 }
 
-                if (progressCallback != nullptr)
+                if (progress_callback != nullptr)
                 {
                     for (const QString &toolName : std::as_const(*activeTools))
                     {
-                        progressCallback({ProviderRawEventKind::ToolCompleted,
-                                          id(),
-                                          QStringLiteral("response.tool_call.completed"),
-                                          toolName,
-                                          {}});
+                        progress_callback({provider_raw_event_kind_t::TOOL_COMPLETED,
+                                           id(),
+                                           QStringLiteral("response.tool_call.completed"),
+                                           toolName,
+                                           {}});
                     }
-                    progressCallback({ProviderRawEventKind::ResponseCompleted,
-                                      id(),
-                                      QStringLiteral("response.completed"),
-                                      {},
-                                      {}});
+                    progress_callback({provider_raw_event_kind_t::RESPONSE_COMPLETED,
+                                       this->id(),
+                                       QStringLiteral("response.completed"),
+                                       {},
+                                       {}});
                 }
-                const ProviderUsage usage = m_streamUsage;
+                const provider_usage_t usage = this->stream_usage;
                 reply->deleteLater();
                 QCAI_DEBUG("OpenAI", QStringLiteral("Stream complete, accumulated %1 chars")
-                                         .arg(m_streamAccum.length()));
-                streamCallback({});  // signal stream end
-                callback(m_streamAccum, {}, usage);
-                m_streamAccum.clear();
-                m_sseBuffer.clear();
-                m_streamUsage = {};
+                                         .arg(this->stream_accum.length()));
+                stream_callback({});  // signal stream end
+                callback(this->stream_accum, {}, usage);
+                this->stream_accum.clear();
+                this->sse_buffer.clear();
+                this->stream_usage = {};
             });
     }
     else
     {
         // Non-streaming mode (original)
         connect(
-            m_currentReply, &QNetworkReply::finished, this, [this, callback, progressCallback]() {
-                QNetworkReply *reply = m_currentReply;
-                m_currentReply = nullptr;
+            this->current_reply, &QNetworkReply::finished, this,
+            [this, callback, progress_callback]() {
+                QNetworkReply *reply = this->current_reply;
+                this->current_reply = nullptr;
 
                 if (!reply)
                 {
@@ -329,13 +331,13 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                 if (reply->error() != QNetworkReply::NoError)
                 {
                     const QString errBody = QString::fromUtf8(reply->readAll());
-                    if (progressCallback != nullptr)
+                    if (progress_callback != nullptr)
                     {
-                        progressCallback({ProviderRawEventKind::Error,
-                                          id(),
-                                          QStringLiteral("response.error"),
-                                          {},
-                                          reply->errorString()});
+                        progress_callback({provider_raw_event_kind_t::ERROR_EVENT,
+                                           this->id(),
+                                           QStringLiteral("response.error"),
+                                           {},
+                                           reply->errorString()});
                     }
                     QCAI_ERROR("OpenAI", QStringLiteral("HTTP error: %1 — %2")
                                              .arg(reply->errorString(), errBody.left(300)));
@@ -359,9 +361,9 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
                     return;
                 }
 
-                const ProviderUsage usage = providerUsageFromResponseObject(doc.object());
+                const provider_usage_t usage = provider_usage_from_response_object(doc.object());
                 const QString content =
-                    Json::getString(doc.object(), QStringLiteral("choices/0/message/content"));
+                    json::get_string(doc.object(), QStringLiteral("choices/0/message/content"));
                 if (content.isEmpty())
                 {
                     QCAI_WARN("OpenAI", QStringLiteral("No content in response: %1")
@@ -375,13 +377,13 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
 
                 QCAI_DEBUG("OpenAI",
                            QStringLiteral("Response received, %1 chars").arg(content.length()));
-                if (progressCallback != nullptr)
+                if (progress_callback != nullptr)
                 {
-                    progressCallback({ProviderRawEventKind::ResponseCompleted,
-                                      id(),
-                                      QStringLiteral("response.completed"),
-                                      {},
-                                      {}});
+                    progress_callback({provider_raw_event_kind_t::RESPONSE_COMPLETED,
+                                       this->id(),
+                                       QStringLiteral("response.completed"),
+                                       {},
+                                       {}});
                 }
                 callback(content, {}, usage);
             });
@@ -391,13 +393,13 @@ void OpenAICompatibleProvider::complete(const QList<ChatMessage> &messages, cons
 /**
  * Aborts the active network reply, if one is running.
  */
-void OpenAICompatibleProvider::cancel()
+void open_ai_compatible_provider_t::cancel()
 {
-    if (m_currentReply != nullptr)
+    if (this->current_reply != nullptr)
     {
-        m_currentReply->abort();
-        m_currentReply->deleteLater();
-        m_currentReply = nullptr;
+        this->current_reply->abort();
+        this->current_reply->deleteLater();
+        this->current_reply = nullptr;
     }
 }
 

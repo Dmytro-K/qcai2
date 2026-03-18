@@ -14,49 +14,49 @@ class QNetworkRequest;
 namespace qtmcp
 {
 
-struct SseTransportConfig
+struct sse_transport_config_t
 {
     QUrl endpoint;
     QMap<QString, QString> headers;
-    int requestTimeoutMs = 30000;
-    int reconnectDelayMs = 3000;
+    int request_timeout_ms = 30000;
+    int reconnect_delay_ms = 3000;
 };
 
-class SseTransport final : public Transport
+class sse_transport_t final : public transport_t
 {
     Q_OBJECT
 
 public:
-    explicit SseTransport(SseTransportConfig config, QObject *parent = nullptr);
-    ~SseTransport() override;
+    explicit sse_transport_t(sse_transport_config_t config, QObject *parent = nullptr);
+    ~sse_transport_t() override;
 
-    QString transportName() const override;
-    State state() const override;
-    const SseTransportConfig &config() const;
+    QString transport_name() const override;
+    state_t state() const override;
+    const sse_transport_config_t &config() const;
 
     void start() override;
     void stop() override;
-    bool sendMessage(const QJsonObject &message) override;
+    bool send_message(const QJsonObject &message) override;
 
 private:
-    void setState(State state);
-    void openSseStream();
-    void processStreamReadyRead();
-    void processStreamFinished();
-    void processSseBuffer(bool flush);
-    void handleSseEvent();
-    void postMessage(const QByteArray &payload);
-    void applyConfiguredHeaders(QNetworkRequest &request) const;
+    void set_state(state_t state);
+    void open_sse_stream();
+    void process_stream_ready_read();
+    void process_stream_finished();
+    void process_sse_buffer(bool flush);
+    void handle_sse_event();
+    void post_message(const QByteArray &payload);
+    void apply_configured_headers(QNetworkRequest &request) const;
 
-    SseTransportConfig m_config;
-    QNetworkAccessManager *m_networkAccessManager = nullptr;
-    QNetworkReply *m_sseReply = nullptr;
-    QUrl m_postEndpoint;
-    State m_state = State::Disconnected;
+    sse_transport_config_t transport_config;
+    QNetworkAccessManager *network_access_manager = nullptr;
+    QNetworkReply *sse_reply = nullptr;
+    QUrl post_endpoint;
+    state_t transport_state = state_t::DISCONNECTED;
 
-    QByteArray m_sseBuffer;
-    QByteArray m_currentEventData;
-    QString m_currentEventType;
+    QByteArray sse_buffer;
+    QByteArray current_event_data;
+    QString current_event_type;
 };
 
 }  // namespace qtmcp

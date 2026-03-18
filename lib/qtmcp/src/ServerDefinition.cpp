@@ -10,7 +10,7 @@ namespace qtmcp
 namespace
 {
 
-QJsonObject stringMapToJson(const QMap<QString, QString> &map)
+QJsonObject string_map_to_json(const QMap<QString, QString> &map)
 {
     QJsonObject object;
     for (auto it = map.cbegin(); it != map.cend(); ++it)
@@ -20,8 +20,8 @@ QJsonObject stringMapToJson(const QMap<QString, QString> &map)
     return object;
 }
 
-bool stringMapFromJson(const QJsonValue &value, QMap<QString, QString> *map, QString *error,
-                       const QString &fieldName)
+bool string_map_from_json(const QJsonValue &value, QMap<QString, QString> *map, QString *error,
+                          const QString &field_name)
 {
     if (((map == nullptr) == true))
     {
@@ -37,7 +37,7 @@ bool stringMapFromJson(const QJsonValue &value, QMap<QString, QString> *map, QSt
     {
         if (((error != nullptr) == true))
         {
-            *error = QStringLiteral("Field '%1' must be an object.").arg(fieldName);
+            *error = QStringLiteral("Field '%1' must be an object.").arg(field_name);
         }
         return false;
     }
@@ -50,7 +50,7 @@ bool stringMapFromJson(const QJsonValue &value, QMap<QString, QString> *map, QSt
             if (((error != nullptr) == true))
             {
                 *error =
-                    QStringLiteral("Field '%1.%2' must be a string.").arg(fieldName, it.key());
+                    QStringLiteral("Field '%1.%2' must be a string.").arg(field_name, it.key());
             }
             return false;
         }
@@ -59,8 +59,8 @@ bool stringMapFromJson(const QJsonValue &value, QMap<QString, QString> *map, QSt
     return true;
 }
 
-bool stringListFromJson(const QJsonValue &value, QStringList *list, QString *error,
-                        const QString &fieldName)
+bool string_list_from_json(const QJsonValue &value, QStringList *list, QString *error,
+                           const QString &field_name)
 {
     if (((list == nullptr) == true))
     {
@@ -76,7 +76,7 @@ bool stringListFromJson(const QJsonValue &value, QStringList *list, QString *err
     {
         if (((error != nullptr) == true))
         {
-            *error = QStringLiteral("Field '%1' must be an array.").arg(fieldName);
+            *error = QStringLiteral("Field '%1' must be an array.").arg(field_name);
         }
         return false;
     }
@@ -89,7 +89,7 @@ bool stringListFromJson(const QJsonValue &value, QStringList *list, QString *err
         {
             if (((error != nullptr) == true))
             {
-                *error = QStringLiteral("Field '%1[%2]' must be a string.").arg(fieldName).arg(i);
+                *error = QStringLiteral("Field '%1[%2]' must be a string.").arg(field_name).arg(i);
             }
             return false;
         }
@@ -100,9 +100,9 @@ bool stringListFromJson(const QJsonValue &value, QStringList *list, QString *err
 
 }  // namespace
 
-QJsonObject serverDefinitionToJson(const ServerDefinition &definition)
+QJsonObject server_definition_to_json(const server_definition_t &definition)
 {
-    QJsonObject object = definition.extraFields;
+    QJsonObject object = definition.extra_fields;
     object.insert(QStringLiteral("enabled"), definition.enabled);
     object.insert(QStringLiteral("transport"), definition.transport);
     if (((!definition.command.isEmpty()) == true))
@@ -115,34 +115,34 @@ QJsonObject serverDefinitionToJson(const ServerDefinition &definition)
     }
     if (((!definition.env.isEmpty()) == true))
     {
-        object.insert(QStringLiteral("env"), stringMapToJson(definition.env));
+        object.insert(QStringLiteral("env"), string_map_to_json(definition.env));
     }
-    object.insert(QStringLiteral("startupTimeoutMs"), definition.startupTimeoutMs);
-    object.insert(QStringLiteral("requestTimeoutMs"), definition.requestTimeoutMs);
+    object.insert(QStringLiteral("startupTimeoutMs"), definition.startup_timeout_ms);
+    object.insert(QStringLiteral("requestTimeoutMs"), definition.request_timeout_ms);
     if (((!definition.url.isEmpty()) == true))
     {
         object.insert(QStringLiteral("url"), definition.url);
     }
     if (((!definition.headers.isEmpty()) == true))
     {
-        object.insert(QStringLiteral("headers"), stringMapToJson(definition.headers));
+        object.insert(QStringLiteral("headers"), string_map_to_json(definition.headers));
     }
     return object;
 }
 
-bool serverDefinitionFromJson(const QJsonObject &json, ServerDefinition *definition,
-                              QString *error)
+bool server_definition_from_json(const QJsonObject &json, server_definition_t *definition,
+                                 QString *error)
 {
     if (((definition == nullptr) == true))
     {
         return false;
     }
 
-    ServerDefinition parsed;
-    parsed.extraFields = json;
+    server_definition_t parsed;
+    parsed.extra_fields = json;
 
-    const QJsonValue enabledValue = json.value(QStringLiteral("enabled"));
-    if (((!enabledValue.isUndefined() && !enabledValue.isBool()) == true))
+    const QJsonValue enabled_value = json.value(QStringLiteral("enabled"));
+    if (((!enabled_value.isUndefined() && !enabled_value.isBool()) == true))
     {
         if (((error != nullptr) == true))
         {
@@ -150,13 +150,13 @@ bool serverDefinitionFromJson(const QJsonObject &json, ServerDefinition *definit
         }
         return false;
     }
-    if (enabledValue.isBool() == true)
+    if (enabled_value.isBool() == true)
     {
-        parsed.enabled = enabledValue.toBool();
+        parsed.enabled = enabled_value.toBool();
     }
 
-    const QJsonValue transportValue = json.value(QStringLiteral("transport"));
-    if (((!transportValue.isUndefined() && !transportValue.isString()) == true))
+    const QJsonValue transport_value = json.value(QStringLiteral("transport"));
+    if (((!transport_value.isUndefined() && !transport_value.isString()) == true))
     {
         if (((error != nullptr) == true))
         {
@@ -164,13 +164,13 @@ bool serverDefinitionFromJson(const QJsonObject &json, ServerDefinition *definit
         }
         return false;
     }
-    if (transportValue.isString() == true)
+    if (transport_value.isString() == true)
     {
-        parsed.transport = transportValue.toString();
+        parsed.transport = transport_value.toString();
     }
 
-    const QJsonValue commandValue = json.value(QStringLiteral("command"));
-    if (((!commandValue.isUndefined() && !commandValue.isString()) == true))
+    const QJsonValue command_value = json.value(QStringLiteral("command"));
+    if (((!command_value.isUndefined() && !command_value.isString()) == true))
     {
         if (((error != nullptr) == true))
         {
@@ -178,13 +178,13 @@ bool serverDefinitionFromJson(const QJsonObject &json, ServerDefinition *definit
         }
         return false;
     }
-    if (commandValue.isString() == true)
+    if (command_value.isString() == true)
     {
-        parsed.command = commandValue.toString();
+        parsed.command = command_value.toString();
     }
 
-    const QJsonValue urlValue = json.value(QStringLiteral("url"));
-    if (((!urlValue.isUndefined() && !urlValue.isString()) == true))
+    const QJsonValue url_value = json.value(QStringLiteral("url"));
+    if (((!url_value.isUndefined() && !url_value.isString()) == true))
     {
         if (((error != nullptr) == true))
         {
@@ -192,13 +192,13 @@ bool serverDefinitionFromJson(const QJsonObject &json, ServerDefinition *definit
         }
         return false;
     }
-    if (urlValue.isString() == true)
+    if (url_value.isString() == true)
     {
-        parsed.url = urlValue.toString();
+        parsed.url = url_value.toString();
     }
 
-    const QJsonValue startupTimeoutValue = json.value(QStringLiteral("startupTimeoutMs"));
-    if (((!startupTimeoutValue.isUndefined() && !startupTimeoutValue.isDouble()) == true))
+    const QJsonValue startup_timeout_value = json.value(QStringLiteral("startupTimeoutMs"));
+    if (((!startup_timeout_value.isUndefined() && !startup_timeout_value.isDouble()) == true))
     {
         if (((error != nullptr) == true))
         {
@@ -206,13 +206,13 @@ bool serverDefinitionFromJson(const QJsonObject &json, ServerDefinition *definit
         }
         return false;
     }
-    if (startupTimeoutValue.isDouble() == true)
+    if (startup_timeout_value.isDouble() == true)
     {
-        parsed.startupTimeoutMs = startupTimeoutValue.toInt(parsed.startupTimeoutMs);
+        parsed.startup_timeout_ms = startup_timeout_value.toInt(parsed.startup_timeout_ms);
     }
 
-    const QJsonValue requestTimeoutValue = json.value(QStringLiteral("requestTimeoutMs"));
-    if (((!requestTimeoutValue.isUndefined() && !requestTimeoutValue.isDouble()) == true))
+    const QJsonValue request_timeout_value = json.value(QStringLiteral("requestTimeoutMs"));
+    if (((!request_timeout_value.isUndefined() && !request_timeout_value.isDouble()) == true))
     {
         if (((error != nullptr) == true))
         {
@@ -220,62 +220,62 @@ bool serverDefinitionFromJson(const QJsonObject &json, ServerDefinition *definit
         }
         return false;
     }
-    if (requestTimeoutValue.isDouble() == true)
+    if (request_timeout_value.isDouble() == true)
     {
-        parsed.requestTimeoutMs = requestTimeoutValue.toInt(parsed.requestTimeoutMs);
+        parsed.request_timeout_ms = request_timeout_value.toInt(parsed.request_timeout_ms);
     }
 
-    if (!stringListFromJson(json.value(QStringLiteral("args")), &parsed.args, error,
-                            QStringLiteral("args")))
-    {
-        return false;
-    }
-
-    if (!stringMapFromJson(json.value(QStringLiteral("env")), &parsed.env, error,
-                           QStringLiteral("env")))
+    if (!string_list_from_json(json.value(QStringLiteral("args")), &parsed.args, error,
+                               QStringLiteral("args")))
     {
         return false;
     }
 
-    if (!stringMapFromJson(json.value(QStringLiteral("headers")), &parsed.headers, error,
-                           QStringLiteral("headers")))
+    if (!string_map_from_json(json.value(QStringLiteral("env")), &parsed.env, error,
+                              QStringLiteral("env")))
     {
         return false;
     }
 
-    parsed.extraFields.remove(QStringLiteral("enabled"));
-    parsed.extraFields.remove(QStringLiteral("transport"));
-    parsed.extraFields.remove(QStringLiteral("command"));
-    parsed.extraFields.remove(QStringLiteral("args"));
-    parsed.extraFields.remove(QStringLiteral("env"));
-    parsed.extraFields.remove(QStringLiteral("startupTimeoutMs"));
-    parsed.extraFields.remove(QStringLiteral("requestTimeoutMs"));
-    parsed.extraFields.remove(QStringLiteral("url"));
-    parsed.extraFields.remove(QStringLiteral("headers"));
+    if (!string_map_from_json(json.value(QStringLiteral("headers")), &parsed.headers, error,
+                              QStringLiteral("headers")))
+    {
+        return false;
+    }
+
+    parsed.extra_fields.remove(QStringLiteral("enabled"));
+    parsed.extra_fields.remove(QStringLiteral("transport"));
+    parsed.extra_fields.remove(QStringLiteral("command"));
+    parsed.extra_fields.remove(QStringLiteral("args"));
+    parsed.extra_fields.remove(QStringLiteral("env"));
+    parsed.extra_fields.remove(QStringLiteral("startupTimeoutMs"));
+    parsed.extra_fields.remove(QStringLiteral("requestTimeoutMs"));
+    parsed.extra_fields.remove(QStringLiteral("url"));
+    parsed.extra_fields.remove(QStringLiteral("headers"));
 
     *definition = parsed;
     return true;
 }
 
-QJsonObject serverDefinitionsToJson(const ServerDefinitions &definitions)
+QJsonObject server_definitions_to_json(const server_definitions_t &definitions)
 {
     QJsonObject object;
     for (auto it = definitions.cbegin(); it != definitions.cend(); ++it)
     {
-        object.insert(it.key(), serverDefinitionToJson(it.value()));
+        object.insert(it.key(), server_definition_to_json(it.value()));
     }
     return object;
 }
 
-bool serverDefinitionsFromJson(const QJsonObject &json, ServerDefinitions *definitions,
-                               QString *error)
+bool server_definitions_from_json(const QJsonObject &json, server_definitions_t *definitions,
+                                  QString *error)
 {
     if (((definitions == nullptr) == true))
     {
         return false;
     }
 
-    ServerDefinitions parsed;
+    server_definitions_t parsed;
     for (auto it = json.begin(); ((it != json.end()) == true); ++it)
     {
         if (((!it.value().isObject()) == true))
@@ -287,15 +287,15 @@ bool serverDefinitionsFromJson(const QJsonObject &json, ServerDefinitions *defin
             return false;
         }
 
-        ServerDefinition definition;
-        QString definitionError;
-        if (((!serverDefinitionFromJson(it.value().toObject(), &definition, &definitionError)) ==
-             true))
+        server_definition_t definition;
+        QString definition_error;
+        if (((!server_definition_from_json(it.value().toObject(), &definition,
+                                           &definition_error)) == true))
         {
             if (((error != nullptr) == true))
             {
                 *error =
-                    QStringLiteral("Invalid MCP server '%1': %2").arg(it.key(), definitionError);
+                    QStringLiteral("Invalid MCP server '%1': %2").arg(it.key(), definition_error);
             }
             return false;
         }

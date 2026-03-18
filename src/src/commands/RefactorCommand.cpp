@@ -12,15 +12,15 @@ namespace qcai2
 namespace
 {
 
-constexpr qsizetype kMaxSelectedChars = 8000;
+constexpr qsizetype k_max_selected_chars = 8000;
 
-QString languageHintForFile(const QString &filePath)
+QString language_hint_for_file(const QString &file_path)
 {
-    if (filePath.isEmpty())
+    if (file_path.isEmpty())
     {
         return {};
     }
-    const QString suffix = QFileInfo(filePath).suffix().toLower();
+    const QString suffix = QFileInfo(file_path).suffix().toLower();
     if (suffix == QStringLiteral("cpp") || suffix == QStringLiteral("cxx") ||
         suffix == QStringLiteral("cc") || suffix == QStringLiteral("h") ||
         suffix == QStringLiteral("hpp") || suffix == QStringLiteral("hxx"))
@@ -45,35 +45,36 @@ QString languageHintForFile(const QString &filePath)
 
 }  // namespace
 
-void refactorCommand(const SlashCommandInvocation &invocation, const SlashCommandContext &context)
+void refactor_command(const slash_command_invocation_t &invocation,
+                      const slash_command_context_t &context)
 {
-    EditorContext editorCtx;
-    const EditorContext::Snapshot snapshot = editorCtx.capture();
+    editor_context_t editor_ctx;
+    const editor_context_t::snapshot_t snapshot = editor_ctx.capture();
 
-    if (snapshot.selectedText.isEmpty())
+    if (snapshot.selected_text.isEmpty())
     {
-        if (context.logMessage)
+        if (context.log_message)
         {
-            context.logMessage(QStringLiteral("❌ No text selected in the editor."));
+            context.log_message(QStringLiteral("❌ No text selected in the editor."));
         }
         return;
     }
 
-    QString code = snapshot.selectedText;
+    QString code = snapshot.selected_text;
     code.replace(QChar(0x2029), QLatin1Char('\n'));
     code.replace(QChar(0x2028), QLatin1Char('\n'));
 
     bool truncated = false;
-    if (code.size() > kMaxSelectedChars)
+    if (code.size() > k_max_selected_chars)
     {
-        code.truncate(kMaxSelectedChars);
+        code.truncate(k_max_selected_chars);
         truncated = true;
     }
 
     QString prompt = QStringLiteral("Refactor the following code");
-    if (!snapshot.filePath.isEmpty())
+    if (!snapshot.file_path.isEmpty())
     {
-        prompt += QStringLiteral(" from `%1`").arg(snapshot.filePath);
+        prompt += QStringLiteral(" from `%1`").arg(snapshot.file_path);
     }
 
     if (!invocation.arguments.isEmpty())
@@ -86,22 +87,22 @@ void refactorCommand(const SlashCommandInvocation &invocation, const SlashComman
             QStringLiteral(". Improve readability, reduce duplication, and follow best practices");
     }
 
-    const QString lang = languageHintForFile(snapshot.filePath);
+    const QString lang = language_hint_for_file(snapshot.file_path);
     prompt += QStringLiteral(":\n\n```%1\n%2\n```").arg(lang, code);
     if (truncated)
     {
-        prompt +=
-            QStringLiteral("\n\n*(selection truncated to %1 characters)*").arg(kMaxSelectedChars);
+        prompt += QStringLiteral("\n\n*(selection truncated to %1 characters)*")
+                      .arg(k_max_selected_chars);
     }
 
     prompt += QStringLiteral("\n\nReturn the refactored code using `apply_patch`.");
 
-    if (context.goalOverride != nullptr)
+    if (context.goal_override != nullptr)
     {
-        *context.goalOverride = prompt;
+        *context.goal_override = prompt;
     }
 }
 
-DECLARE_COMMAND(refactor, "Refactor the selected code in the editor.", refactorCommand)
+DECLARE_COMMAND(refactor, "Refactor the selected code in the editor.", refactor_command)
 
 }  // namespace qcai2

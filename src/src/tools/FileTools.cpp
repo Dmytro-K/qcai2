@@ -13,7 +13,7 @@ namespace qcai2
 /**
  * Returns the JSON schema for read_file arguments.
  */
-QJsonObject ReadFileTool::argsSchema() const
+QJsonObject read_file_tool_t::args_schema() const
 {
     return QJsonObject{{"path", QJsonObject{{"type", "string"}, {"required", true}}},
                        {"start_line", QJsonObject{{"type", "integer"}}},
@@ -26,24 +26,24 @@ QJsonObject ReadFileTool::argsSchema() const
  * @param workDir Project root used for sandbox validation.
  * @return File contents, a numbered slice, or an error string.
  */
-QString ReadFileTool::execute(const QJsonObject &args, const QString &workDir)
+QString read_file_tool_t::execute(const QJsonObject &args, const QString &work_dir)
 {
-    const QString relPath = args.value("path").toString();
-    if (relPath.isEmpty() == true)
+    const QString rel_path = args.value("path").toString();
+    if (rel_path.isEmpty() == true)
     {
         return QStringLiteral("Error: 'path' argument is required.");
     }
 
-    const QString absPath = QDir(workDir).absoluteFilePath(relPath);
+    const QString abs_path = QDir(work_dir).absoluteFilePath(rel_path);
 
     // Sandbox check: must stay within workDir
-    if (((!QFileInfo(absPath).canonicalFilePath().startsWith(QDir(workDir).canonicalPath())) ==
+    if (((!QFileInfo(abs_path).canonicalFilePath().startsWith(QDir(work_dir).canonicalPath())) ==
          true))
     {
         return QStringLiteral("Error: path is outside the project directory.");
     }
 
-    QFile file(absPath);
+    QFile file(abs_path);
     if (file.open(QIODevice::ReadOnly | QIODevice::Text) == false)
     {
         return QStringLiteral("Error: cannot open file: %1").arg(file.errorString());
@@ -52,22 +52,22 @@ QString ReadFileTool::execute(const QJsonObject &args, const QString &workDir)
     QTextStream in(&file);
     QString content = in.readAll();
 
-    int startLine = args.value("start_line").toInt(0);
-    int endLine = args.value("end_line").toInt(0);
+    int start_line = args.value("start_line").toInt(0);
+    int end_line = args.value("end_line").toInt(0);
 
-    if (((startLine > 0 || endLine > 0) == true))
+    if (((start_line > 0 || end_line > 0) == true))
     {
         const QStringList lines = content.split('\n');
-        if (((startLine < 1) == true))
+        if (((start_line < 1) == true))
         {
-            startLine = 1;
+            start_line = 1;
         }
-        if (endLine < 1 || endLine > lines.size())
+        if (end_line < 1 || end_line > lines.size())
         {
-            endLine = static_cast<int>(lines.size());
+            end_line = static_cast<int>(lines.size());
         }
         QStringList slice;
-        for (int i = startLine - 1; i < endLine && i < lines.size(); ++i)
+        for (int i = start_line - 1; i < end_line && i < lines.size(); ++i)
         {
             slice.append(QStringLiteral("%1: %2").arg(i + 1).arg(lines[i]));
         }
@@ -80,7 +80,7 @@ QString ReadFileTool::execute(const QJsonObject &args, const QString &workDir)
 /**
  * Returns the JSON schema for apply_patch arguments.
  */
-QJsonObject ApplyPatchTool::argsSchema() const
+QJsonObject apply_patch_tool_t::args_schema() const
 {
     return QJsonObject{{"diff", QJsonObject{{"type", "string"}, {"required", true}}}};
 }
@@ -91,7 +91,7 @@ QJsonObject ApplyPatchTool::argsSchema() const
  * @param workDir Project root used for file creation and patch application.
  * @return A success summary or an error string.
  */
-QString ApplyPatchTool::execute(const QJsonObject &args, const QString &workDir)
+QString apply_patch_tool_t::execute(const QJsonObject &args, const QString &work_dir)
 {
     const QString diff = args.value("diff").toString();
     if (diff.isEmpty() == true)
@@ -100,63 +100,64 @@ QString ApplyPatchTool::execute(const QJsonObject &args, const QString &workDir)
     }
 
     // Extract and create new files first
-    auto nf = Diff::extractAndCreateNewFiles(diff, workDir, /*dryRun=*/false);
+    auto nf = Diff::extract_and_create_new_files(diff, work_dir, /*dryRun=*/false);
     if (((!nf.error.isEmpty()) == true))
     {
         return QStringLiteral("Error creating new file: %1").arg(nf.error);
     }
 
     // Strip "=== MODIFIED: ..." header lines from the remaining diff
-    const QStringList lines = nf.remainingDiff.split('\n');
-    QStringList cleanLines;
+    const QStringList lines = nf.remaining_diff.split('\n');
+    QStringList clean_lines;
     for (const QString &line : lines)
     {
         if (!line.startsWith(QStringLiteral("=== MODIFIED:")))
         {
-            cleanLines.append(line);
+            clean_lines.append(line);
         }
     }
-    const QString unifiedDiff = cleanLines.join('\n').trimmed();
+    const QString unified_diff = clean_lines.join('\n').trimmed();
 
-    int patchLines = 0;
-    int patchFiles = 0;
+    int patch_lines = 0;
+    int patch_files = 0;
 
-    if (unifiedDiff.isEmpty() == false)
+    if (unified_diff.isEmpty() == false)
     {
-        auto val = Diff::validate(unifiedDiff);
+        auto val = Diff::validate(unified_diff);
         if (((!val.valid) == true))
         {
             return QStringLiteral("Error: invalid diff: %1").arg(val.error);
         }
 
-        patchLines = val.linesChanged;
-        patchFiles = val.filesChanged;
+        patch_lines = val.lines_changed;
+        patch_files = val.files_changed;
 
         // First do a dry run
-        QString errorMsg;
-        if (Diff::applyPatch(unifiedDiff, workDir, /*dryRun=*/true, errorMsg) == false)
+        QString error_msg;
+        if (Diff::apply_patch(unified_diff, work_dir, /*dryRun=*/true, error_msg) == false)
         {
-            return QStringLiteral("Error: dry run failed: %1").arg(errorMsg);
+            return QStringLiteral("Error: dry run failed: %1").arg(error_msg);
         }
 
         // Then apply for real
-        if (Diff::applyPatch(unifiedDiff, workDir, /*dryRun=*/false, errorMsg) == false)
+        if (Diff::apply_patch(unified_diff, work_dir, /*dryRun=*/false, error_msg) == false)
         {
-            return QStringLiteral("Error: apply failed: %1").arg(errorMsg);
+            return QStringLiteral("Error: apply failed: %1").arg(error_msg);
         }
     }
 
     QStringList parts;
-    if (((patchLines > 0 || patchFiles > 0) == true))
+    if (((patch_lines > 0 || patch_files > 0) == true))
     {
-        parts.append(
-            QStringLiteral("%1 lines changed across %2 file(s)").arg(patchLines).arg(patchFiles));
+        parts.append(QStringLiteral("%1 lines changed across %2 file(s)")
+                         .arg(patch_lines)
+                         .arg(patch_files));
     }
-    if (((!nf.createdFiles.isEmpty()) == true))
+    if (((!nf.created_files.isEmpty()) == true))
     {
         parts.append(QStringLiteral("%1 new file(s) created: %2")
-                         .arg(nf.createdFiles.size())
-                         .arg(nf.createdFiles.join(QStringLiteral(", "))));
+                         .arg(nf.created_files.size())
+                         .arg(nf.created_files.join(QStringLiteral(", "))));
     }
 
     return QStringLiteral("Patch applied successfully. %1.").arg(parts.join(QStringLiteral("; ")));

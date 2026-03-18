@@ -12,7 +12,7 @@ namespace qcai2
 /**
  * Returns the JSON schema for optional build arguments.
  */
-QJsonObject RunBuildTool::argsSchema() const
+QJsonObject run_build_tool_t::args_schema() const
 {
     return QJsonObject{
         {"target", QJsonObject{{"type", "string"}, {"description", "Optional build target"}}}};
@@ -24,15 +24,15 @@ QJsonObject RunBuildTool::argsSchema() const
  * @param workDir Project root used as the command working directory.
  * @return Combined build output with a success or failure prefix.
  */
-QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
+QString run_build_tool_t::execute(const QJsonObject &args, const QString &workDir)
 {
-    const QString buildDir = m_buildDir.isEmpty() ? workDir : m_buildDir;
-    if (((!QDir(buildDir).exists()) == true))
+    const QString build_dir = this->build_dir.isEmpty() ? workDir : this->build_dir;
+    if (((!QDir(build_dir).exists()) == true))
     {
-        return QStringLiteral("Error: build directory does not exist: %1").arg(buildDir);
+        return QStringLiteral("Error: build directory does not exist: %1").arg(build_dir);
     }
 
-    QStringList cmakeArgs = {QStringLiteral("--build"), buildDir, QStringLiteral("--parallel")};
+    QStringList cmakeArgs = {QStringLiteral("--build"), build_dir, QStringLiteral("--parallel")};
 
     const QString target = args.value("target").toString();
     if (target.isEmpty() == false)
@@ -40,7 +40,7 @@ QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
         cmakeArgs << QStringLiteral("--target") << target;
     }
 
-    ProcessRunner runner;
+    process_runner_t runner;
     auto result = runner.run(QStringLiteral("cmake"), cmakeArgs, workDir, 120000);
 
     QString output;
@@ -50,17 +50,17 @@ QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
     }
     else
     {
-        output = QStringLiteral("Build FAILED (exit code %1).\n").arg(result.exitCode);
+        output = QStringLiteral("Build FAILED (exit code %1).\n").arg(result.exit_code);
     }
-    output += result.stdOut;
-    if (((!result.stdErr.isEmpty()) == true))
+    output += result.std_out;
+    if (((!result.std_err.isEmpty()) == true))
     {
-        output += QStringLiteral("\nSTDERR:\n") + result.stdErr;
+        output += QStringLiteral("\nSTDERR:\n") + result.std_err;
     }
 
-    if (((m_outputCapture != nullptr) == true))
+    if (((this->output_capture != nullptr) == true))
     {
-        m_outputCapture->ingestExternalBuildOutput(output);
+        this->output_capture->ingest_external_build_output(output);
     }
 
     return output;
@@ -69,7 +69,7 @@ QString RunBuildTool::execute(const QJsonObject &args, const QString &workDir)
 /**
  * Returns the JSON schema for optional test filter arguments.
  */
-QJsonObject RunTestsTool::argsSchema() const
+QJsonObject run_tests_tool_t::args_schema() const
 {
     return QJsonObject{
         {"filter", QJsonObject{{"type", "string"}, {"description", "ctest -R filter regex"}}}};
@@ -81,11 +81,11 @@ QJsonObject RunTestsTool::argsSchema() const
  * @param workDir Project root used as the command working directory.
  * @return Combined test output with a success or failure prefix.
  */
-QString RunTestsTool::execute(const QJsonObject &args, const QString &workDir)
+QString run_tests_tool_t::execute(const QJsonObject &args, const QString &workDir)
 {
-    const QString buildDir = m_buildDir.isEmpty() ? workDir : m_buildDir;
+    const QString build_dir = this->build_dir.isEmpty() ? workDir : this->build_dir;
 
-    QStringList ctestArgs = {QStringLiteral("--test-dir"), buildDir,
+    QStringList ctestArgs = {QStringLiteral("--test-dir"), build_dir,
                              QStringLiteral("--output-on-failure")};
 
     const QString filter = args.value("filter").toString();
@@ -94,7 +94,7 @@ QString RunTestsTool::execute(const QJsonObject &args, const QString &workDir)
         ctestArgs << QStringLiteral("-R") << filter;
     }
 
-    ProcessRunner runner;
+    process_runner_t runner;
     auto result = runner.run(QStringLiteral("ctest"), ctestArgs, workDir, 120000);
 
     QString output;
@@ -104,13 +104,13 @@ QString RunTestsTool::execute(const QJsonObject &args, const QString &workDir)
     }
     else
     {
-        output = QStringLiteral("Tests FAILED (exit code %1).\n").arg(result.exitCode);
+        output = QStringLiteral("Tests FAILED (exit code %1).\n").arg(result.exit_code);
     }
 
-    output += result.stdOut;
-    if (((!result.stdErr.isEmpty()) == true))
+    output += result.std_out;
+    if (((!result.std_err.isEmpty()) == true))
     {
-        output += QStringLiteral("\nSTDERR:\n") + result.stdErr;
+        output += QStringLiteral("\nSTDERR:\n") + result.std_err;
     }
     return output;
 }
@@ -118,7 +118,7 @@ QString RunTestsTool::execute(const QJsonObject &args, const QString &workDir)
 /**
  * Returns the empty schema for show_diagnostics.
  */
-QJsonObject ShowDiagnosticsTool::argsSchema() const
+QJsonObject show_diagnostics_tool_t::args_schema() const
 {
     return QJsonObject{
         {"max_items", QJsonObject{{"type", "integer"},
@@ -131,27 +131,28 @@ QJsonObject ShowDiagnosticsTool::argsSchema() const
  * @param workDir Unused.
  * @return Matching error, warning, or note lines.
  */
-QString ShowDiagnosticsTool::execute(const QJsonObject &args, const QString & /*workDir*/)
+QString show_diagnostics_tool_t::execute(const QJsonObject &args, const QString & /*workDir*/)
 {
     const int maxItems = qBound(1, args.value("max_items").toInt(50), 500);
-    if (((m_outputCapture != nullptr) == true))
+    if (((this->output_capture != nullptr) == true))
     {
-        const QString report = m_outputCapture->diagnosticsSnapshot(maxItems);
+        const QString report = this->output_capture->diagnostics_snapshot(maxItems);
         if (((report != QStringLiteral("No diagnostics found.")) == true))
         {
             return report;
         }
     }
 
-    if (m_lastBuildOutput.isEmpty() == true)
+    if (this->last_build_output.isEmpty() == true)
     {
         return QStringLiteral("No build diagnostics available.");
     }
 
-    return formatCapturedDiagnostics(extractDiagnosticsFromText(m_lastBuildOutput), maxItems);
+    return format_captured_diagnostics(extract_diagnostics_from_text(this->last_build_output),
+                                       maxItems);
 }
 
-QJsonObject ShowCompileOutputTool::argsSchema() const
+QJsonObject show_compile_output_tool_t::args_schema() const
 {
     return QJsonObject{
         {"max_lines",
@@ -160,9 +161,9 @@ QJsonObject ShowCompileOutputTool::argsSchema() const
          QJsonObject{{"type", "boolean"}, {"description", "Return only compile diagnostics"}}}};
 }
 
-QString ShowCompileOutputTool::execute(const QJsonObject &args, const QString & /*workDir*/)
+QString show_compile_output_tool_t::execute(const QJsonObject &args, const QString & /*workDir*/)
 {
-    if (((m_outputCapture == nullptr) == true))
+    if (((this->output_capture == nullptr) == true))
     {
         return QStringLiteral("Compile Output integration is not available.");
     }
@@ -170,13 +171,13 @@ QString ShowCompileOutputTool::execute(const QJsonObject &args, const QString & 
     const int maxLines = qBound(10, args.value("max_lines").toInt(200), 2000);
     const bool diagnosticsOnly = args.value("diagnostics_only").toBool(false);
 
-    QString diagnostics = m_outputCapture->diagnosticsSnapshot(50);
+    QString diagnostics = this->output_capture->diagnostics_snapshot(50);
     if (diagnosticsOnly == true)
     {
         return diagnostics;
     }
 
-    QString output = m_outputCapture->compileOutputSnapshot(maxLines);
+    QString output = this->output_capture->compile_output_snapshot(maxLines);
     if (((diagnostics == QStringLiteral("No diagnostics found.")) == true))
     {
         return output;
@@ -185,22 +186,23 @@ QString ShowCompileOutputTool::execute(const QJsonObject &args, const QString & 
     return QStringLiteral("%1\n\nRecent Compile Output:\n%2").arg(diagnostics, output);
 }
 
-QJsonObject ShowApplicationOutputTool::argsSchema() const
+QJsonObject show_application_output_tool_t::args_schema() const
 {
     return QJsonObject{
         {"max_lines",
          QJsonObject{{"type", "integer"}, {"description", "Maximum output lines to return"}}}};
 }
 
-QString ShowApplicationOutputTool::execute(const QJsonObject &args, const QString & /*workDir*/)
+QString show_application_output_tool_t::execute(const QJsonObject &args,
+                                                const QString & /*workDir*/)
 {
-    if (((m_outputCapture == nullptr) == true))
+    if (((this->output_capture == nullptr) == true))
     {
         return QStringLiteral("Application Output integration is not available.");
     }
 
     const int maxLines = qBound(10, args.value("max_lines").toInt(200), 2000);
-    return m_outputCapture->applicationOutputSnapshot(maxLines);
+    return this->output_capture->application_output_snapshot(maxLines);
 }
 
 }  // namespace qcai2

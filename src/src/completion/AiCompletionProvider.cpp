@@ -15,35 +15,36 @@
 namespace qcai2
 {
 
-AiCompletionProvider::AiCompletionProvider(QObject *parent) : CompletionAssistProvider(parent)
+ai_completion_provider_t::ai_completion_provider_t(QObject *parent)
+    : CompletionAssistProvider(parent)
 {
 }
 
-TextEditor::IAssistProcessor *AiCompletionProvider::createProcessor(
+TextEditor::IAssistProcessor *ai_completion_provider_t::createProcessor(
     const TextEditor::AssistInterface * /*assistInterface*/) const
 {
-    if (((!m_enabled || (m_provider == nullptr)) == true))
+    if (((!this->enabled || (this->provider == nullptr)) == true))
     {
         return nullptr;
     }
 
     // Use completion-specific model if set, otherwise fall back to agent model
     const auto &s = settings();
-    const QString model = s.completionModel.isEmpty() ? m_model : s.completionModel;
+    const QString model = s.completion_model.isEmpty() ? this->model : s.completion_model;
     QCAI_DEBUG("Completion",
                QStringLiteral("createProcessor: completionModel='%1' agentModel='%2' using='%3'")
-                   .arg(s.completionModel, m_model, model));
-    return new AiCompletionProcessor(m_provider, m_chatContextManager, model);
+                   .arg(s.completion_model, this->model, model));
+    return new ai_completion_processor_t(this->provider, this->chat_context_manager, model);
 }
 
-int AiCompletionProvider::activationCharSequenceLength() const
+int ai_completion_provider_t::activationCharSequenceLength() const
 {
     return 1;
 }
 
-bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) const
+bool ai_completion_provider_t::isActivationCharSequence(const QString &sequence) const
 {
-    if (((!m_enabled || (m_provider == nullptr) || sequence.isEmpty()) == true))
+    if (((!this->enabled || (this->provider == nullptr) || sequence.isEmpty()) == true))
     {
         return false;
     }
@@ -59,7 +60,7 @@ bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) con
 
     // Word-boundary activation: trigger when word length reaches completionMinChars
     const auto &s = settings();
-    if (((!s.aiCompletionEnabled || s.completionMinChars <= 0) == true))
+    if (((!s.ai_completion_enabled || s.completion_min_chars <= 0) == true))
     {
         return false;
     }
@@ -73,16 +74,16 @@ bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) con
         }
 
         QTextCursor tc = editor->textCursor();
-        const QString lineText = tc.block().text();
+        const QString line_text = tc.block().text();
         const int col = tc.positionInBlock();
 
-        int wordLen = 0;
+        int word_len = 0;
         for (int i = col - 1; ((i >= 0) == true); --i)
         {
-            const QChar ch = lineText.at(i);
+            const QChar ch = line_text.at(i);
             if (ch.isLetterOrNumber() || ch == QLatin1Char('_'))
             {
-                ++wordLen;
+                ++word_len;
             }
             else
             {
@@ -90,10 +91,10 @@ bool AiCompletionProvider::isActivationCharSequence(const QString &sequence) con
             }
         }
 
-        if (((wordLen == s.completionMinChars) == true))
+        if (((word_len == s.completion_min_chars) == true))
         {
             QCAI_DEBUG("Completion",
-                       QStringLiteral("Word activation: %1 chars at cursor").arg(wordLen));
+                       QStringLiteral("Word activation: %1 chars at cursor").arg(word_len));
             return true;
         }
     }

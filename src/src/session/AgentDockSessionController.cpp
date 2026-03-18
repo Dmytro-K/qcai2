@@ -1,4 +1,4 @@
-/*! Implements project-session persistence extracted from AgentDockWidget. */
+/*! Implements project-session persistence extracted from agent_dock_widget_t. */
 
 #include "AgentDockSessionController.h"
 
@@ -35,7 +35,7 @@ namespace qcai2
 namespace
 {
 
-QString startupProjectFilePath()
+QString startup_project_file_path()
 {
     if (auto *project = ProjectExplorer::ProjectManager::startupProject();
         ((project != nullptr) == true))
@@ -45,26 +45,27 @@ QString startupProjectFilePath()
     return {};
 }
 
-QString legacySanitizedSessionFileName(const QString &projectFilePath)
+QString legacy_sanitized_session_file_name(const QString &project_file_path)
 {
-    QString baseName = QFileInfo(projectFilePath).completeBaseName();
-    if (baseName.isEmpty() == true)
+    QString base_name = QFileInfo(project_file_path).completeBaseName();
+    if (base_name.isEmpty() == true)
     {
-        baseName = QStringLiteral("session");
+        base_name = QStringLiteral("session");
     }
 
-    baseName.replace(QRegularExpression(QStringLiteral(R"([^A-Za-z0-9._-])")),
-                     QStringLiteral("_"));
-    return QStringLiteral("%1.json").arg(baseName);
+    base_name.replace(QRegularExpression(QStringLiteral(R"([^A-Za-z0-9._-])")),
+                      QStringLiteral("_"));
+    return QStringLiteral("%1.json").arg(base_name);
 }
 
-void selectEffortValue(QComboBox *combo, const QString &value, int fallbackIndex)
+void select_effort_value(QComboBox *combo, const QString &value, int fallback_index)
 {
     const int index = combo->findData(value);
-    combo->setCurrentIndex(index >= 0 ? index : fallbackIndex);
+    combo->setCurrentIndex(index >= 0 ? index : fallback_index);
 }
 
-bool writeContextTextFile(const QString &path, const QString &content, const QString &description)
+bool write_context_text_file(const QString &path, const QString &content,
+                             const QString &description)
 {
     if (content.isEmpty() == true)
     {
@@ -90,7 +91,7 @@ bool writeContextTextFile(const QString &path, const QString &content, const QSt
     return true;
 }
 
-QString readContextTextFile(const QString &path, const QString &description, bool *ok = nullptr)
+QString read_context_text_file(const QString &path, const QString &description, bool *ok = nullptr)
 {
     QFile file(path);
     if (file.exists() == false)
@@ -122,119 +123,121 @@ QString readContextTextFile(const QString &path, const QString &description, boo
 
 }  // namespace
 
-AgentDockSessionController::AgentDockSessionController(AgentDockWidget &dock,
-                                                       ChatContextManager *chatContextManager)
-    : m_dock(dock), m_chatContextManager(chatContextManager),
-      m_sessionFileWatcher(std::make_unique<QFileSystemWatcher>()),
-      m_sessionReloadTimer(std::make_unique<QTimer>())
+agent_dock_session_controller_t::agent_dock_session_controller_t(
+    agent_dock_widget_t &dock, chat_context_manager_t *chat_context_manager)
+    : dock(dock), chat_context_manager(chat_context_manager),
+      session_file_watcher(std::make_unique<QFileSystemWatcher>()),
+      session_reload_timer(std::make_unique<QTimer>())
 {
-    m_sessionReloadTimer->setSingleShot(true);
-    m_sessionReloadTimer->setInterval(150);
-    QObject::connect(m_sessionFileWatcher.get(), &QFileSystemWatcher::fileChanged, &m_dock,
-                     [this](const QString &) {
-                         updateSessionFileWatcher();
-                         m_sessionReloadTimer->start();
+    this->session_reload_timer->setSingleShot(true);
+    this->session_reload_timer->setInterval(150);
+    QObject::connect(this->session_file_watcher.get(), &QFileSystemWatcher::fileChanged,
+                     &this->dock, [this](const QString &) {
+                         update_session_file_watcher();
+                         this->session_reload_timer->start();
                      });
-    QObject::connect(m_sessionFileWatcher.get(), &QFileSystemWatcher::directoryChanged, &m_dock,
-                     [this](const QString &) {
-                         updateSessionFileWatcher();
-                         m_sessionReloadTimer->start();
+    QObject::connect(this->session_file_watcher.get(), &QFileSystemWatcher::directoryChanged,
+                     &this->dock, [this](const QString &) {
+                         update_session_file_watcher();
+                         this->session_reload_timer->start();
                      });
-    QObject::connect(m_sessionReloadTimer.get(), &QTimer::timeout, &m_dock,
-                     [this]() { reloadSessionFromDisk(); });
+    QObject::connect(this->session_reload_timer.get(), &QTimer::timeout, &this->dock,
+                     [this]() { reload_session_from_disk(); });
 }
 
-AgentDockSessionController::~AgentDockSessionController() = default;
+agent_dock_session_controller_t::~agent_dock_session_controller_t() = default;
 
-void AgentDockSessionController::saveChat()
+void agent_dock_session_controller_t::save_chat()
 {
-    migrateLegacySessionFiles();
-    const QString storagePath = currentProjectStorageFilePath();
-    if (storagePath.isEmpty() == true)
+    this->migrate_legacy_session_files();
+    const QString storage_path = this->current_project_storage_file_path();
+    if (storage_path.isEmpty() == true)
     {
         return;
     }
-    const QString goalPath = Migration::projectGoalFilePath(storagePath);
-    const QString logPath = Migration::projectActionsLogFilePath(storagePath);
+    const QString goal_path = Migration::project_goal_file_path(storage_path);
+    const QString log_path = Migration::project_actions_log_file_path(storage_path);
 
-    const QString persistedMarkdown = m_dock.currentLogMarkdown();
-    const QString goalText = m_dock.m_goalEdit->toPlainText();
-    QStringList planItems;
-    for (int i = 0; ((i < m_dock.m_planList->count()) == true); ++i)
+    const QString persisted_markdown = this->dock.current_log_markdown();
+    const QString goal_text = this->dock.goal_edit->toPlainText();
+    QStringList plan_items;
+    for (int i = 0; ((i < this->dock.plan_list->count()) == true); ++i)
     {
-        planItems.append(m_dock.m_planList->item(i)->text());
+        plan_items.append(this->dock.plan_list->item(i)->text());
     }
     const auto &cfg = settings();
-    const bool uiStateDiffers =
-        m_dock.m_modeCombo->currentData().toString() != QStringLiteral("agent") ||
-        m_dock.m_modelCombo->currentText().trimmed() != cfg.modelName ||
-        m_dock.m_reasoningCombo->currentData().toString() != cfg.reasoningEffort ||
-        m_dock.m_thinkingCombo->currentData().toString() != cfg.thinkingLevel ||
-        m_dock.m_dryRunCheck->isChecked() != cfg.dryRunDefault;
+    const bool ui_state_differs =
+        this->dock.mode_combo->currentData().toString() != QStringLiteral("agent") ||
+        this->dock.model_combo->currentText().trimmed() != cfg.model_name ||
+        this->dock.reasoning_combo->currentData().toString() != cfg.reasoning_effort ||
+        this->dock.thinking_combo->currentData().toString() != cfg.thinking_level ||
+        this->dock.dry_run_check->isChecked() != cfg.dry_run_default;
 
-    const bool hasContent =
-        !goalText.trimmed().isEmpty() || !persistedMarkdown.trimmed().isEmpty() ||
-        !m_dock.m_currentDiff.isEmpty() || !planItems.isEmpty() ||
-        !m_dock.m_linkedFilesController->manualLinkedFiles().isEmpty() ||
-        !m_dock.m_linkedFilesController->ignoredLinkedFiles().isEmpty() ||
-        !m_projectMcpServers.isEmpty() || uiStateDiffers || !m_activeConversationId.isEmpty();
+    const bool has_content =
+        !goal_text.trimmed().isEmpty() || !persisted_markdown.trimmed().isEmpty() ||
+        !this->dock.current_diff.isEmpty() || !plan_items.isEmpty() ||
+        !this->dock.linked_files_controller->manual_linked_files().isEmpty() ||
+        !this->dock.linked_files_controller->ignored_linked_files().isEmpty() ||
+        !this->current_project_mcp_servers.isEmpty() || ui_state_differs ||
+        !this->active_conversation_id.isEmpty();
 
-    if (((!hasContent) == true))
+    if (((!has_content) == true))
     {
-        QFile::remove(storagePath);
-        QFile::remove(goalPath);
-        QFile::remove(logPath);
-        updateSessionFileWatcher();
+        QFile::remove(storage_path);
+        QFile::remove(goal_path);
+        QFile::remove(log_path);
+        this->update_session_file_watcher();
         return;
     }
 
-    const QFileInfo storageInfo(storagePath);
-    if (((!QDir().mkpath(storageInfo.absolutePath())) == true))
+    const QFileInfo storage_info(storage_path);
+    if (((!QDir().mkpath(storage_info.absolutePath())) == true))
     {
         QCAI_WARN("Dock", QStringLiteral("Failed to create project context dir: %1")
-                              .arg(storageInfo.absolutePath()));
+                              .arg(storage_info.absolutePath()));
         return;
     }
 
-    if (((!writeContextTextFile(goalPath, goalText, QStringLiteral("project goal file")) ||
-          !writeContextTextFile(logPath, persistedMarkdown,
-                                QStringLiteral("project Actions Log markdown file"))) == true))
+    if (((!write_context_text_file(goal_path, goal_text, QStringLiteral("project goal file")) ||
+          !write_context_text_file(log_path, persisted_markdown,
+                                   QStringLiteral("project Actions Log markdown file"))) == true))
     {
         return;
     }
 
     QJsonObject root;
-    root[QStringLiteral("diff")] = m_dock.m_currentDiff;
-    root[QStringLiteral("status")] = m_dock.m_statusLabel->text();
-    root[QStringLiteral("activeTab")] = m_dock.m_tabs->currentIndex();
-    root[QStringLiteral("mode")] = m_dock.m_modeCombo->currentData().toString();
-    root[QStringLiteral("model")] = m_dock.m_modelCombo->currentText().trimmed();
-    root[QStringLiteral("reasoningEffort")] = m_dock.m_reasoningCombo->currentData().toString();
-    root[QStringLiteral("thinkingLevel")] = m_dock.m_thinkingCombo->currentData().toString();
-    root[QStringLiteral("dryRun")] = m_dock.m_dryRunCheck->isChecked();
-    root[QStringLiteral("conversationId")] = m_activeConversationId;
+    root[QStringLiteral("diff")] = this->dock.current_diff;
+    root[QStringLiteral("status")] = this->dock.status_label->text();
+    root[QStringLiteral("activeTab")] = this->dock.tabs->currentIndex();
+    root[QStringLiteral("mode")] = this->dock.mode_combo->currentData().toString();
+    root[QStringLiteral("model")] = this->dock.model_combo->currentText().trimmed();
+    root[QStringLiteral("reasoningEffort")] = this->dock.reasoning_combo->currentData().toString();
+    root[QStringLiteral("thinkingLevel")] = this->dock.thinking_combo->currentData().toString();
+    root[QStringLiteral("dryRun")] = this->dock.dry_run_check->isChecked();
+    root[QStringLiteral("conversationId")] = this->active_conversation_id;
     root[QStringLiteral("linkedFiles")] =
-        QJsonArray::fromStringList(m_dock.m_linkedFilesController->manualLinkedFiles());
-    root[QStringLiteral("ignoredLinkedFiles")] =
-        QJsonArray::fromStringList(m_dock.m_linkedFilesController->ignoredLinkedFiles());
-    if (((!m_projectMcpServers.isEmpty()) == true))
+        QJsonArray::fromStringList(this->dock.linked_files_controller->manual_linked_files());
+    root[QStringLiteral("ignored_linked_files")] =
+        QJsonArray::fromStringList(this->dock.linked_files_controller->ignored_linked_files());
+    if (((!this->current_project_mcp_servers.isEmpty()) == true))
     {
-        root[QStringLiteral("mcpServers")] = qtmcp::serverDefinitionsToJson(m_projectMcpServers);
+        root[QStringLiteral("mcpServers")] =
+            qtmcp::server_definitions_to_json(this->current_project_mcp_servers);
     }
-    Migration::stampProjectState(root);
+    Migration::stamp_project_state(root);
 
-    QJsonArray planJson;
-    for (const QString &item : planItems)
+    QJsonArray plan_json;
+    for (const QString &item : plan_items)
     {
-        planJson.append(item);
+        plan_json.append(item);
     }
-    root[QStringLiteral("plan")] = planJson;
+    root[QStringLiteral("plan")] = plan_json;
 
-    QSaveFile file(storagePath);
+    QSaveFile file(storage_path);
     if (file.open(QIODevice::WriteOnly) == false)
     {
         QCAI_WARN("Dock", QStringLiteral("Failed to open project context file for writing: %1")
-                              .arg(storagePath));
+                              .arg(storage_path));
         return;
     }
 
@@ -242,34 +245,34 @@ void AgentDockSessionController::saveChat()
     if (file.commit() == false)
     {
         QCAI_WARN("Dock",
-                  QStringLiteral("Failed to commit project context file: %1").arg(storagePath));
+                  QStringLiteral("Failed to commit project context file: %1").arg(storage_path));
     }
 
-    updateSessionFileWatcher();
+    this->update_session_file_watcher();
 }
 
-void AgentDockSessionController::restoreChat()
+void agent_dock_session_controller_t::restore_chat()
 {
-    migrateLegacySessionFiles();
-    const QString storagePath = currentProjectStorageFilePath();
-    if (storagePath.isEmpty() == true)
+    this->migrate_legacy_session_files();
+    const QString storage_path = this->current_project_storage_file_path();
+    if (storage_path.isEmpty() == true)
     {
         return;
     }
-    QString migrationError;
-    if (Migration::migrateProjectState(storagePath, &migrationError) == false)
+    QString migration_error;
+    if (Migration::migrate_project_state(storage_path, &migration_error) == false)
     {
-        if (migrationError.isEmpty() == false)
+        if (migration_error.isEmpty() == false)
         {
-            QCAI_WARN("Dock", migrationError);
+            QCAI_WARN("Dock", migration_error);
         }
         return;
     }
 
-    const QString goalPath = Migration::projectGoalFilePath(storagePath);
-    const QString logPath = Migration::projectActionsLogFilePath(storagePath);
+    const QString goal_path = Migration::project_goal_file_path(storage_path);
+    const QString log_path = Migration::project_actions_log_file_path(storage_path);
 
-    QFile file(storagePath);
+    QFile file(storage_path);
     if (file.exists() == false)
     {
         return;
@@ -277,422 +280,428 @@ void AgentDockSessionController::restoreChat()
     if (file.open(QIODevice::ReadOnly) == false)
     {
         QCAI_WARN("Dock", QStringLiteral("Failed to open project context file for reading: %1")
-                              .arg(storagePath));
+                              .arg(storage_path));
         return;
     }
 
     const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
     if (doc.isObject() == false)
     {
-        QCAI_WARN("Dock", QStringLiteral("Invalid project context JSON: %1").arg(storagePath));
+        QCAI_WARN("Dock", QStringLiteral("Invalid project context JSON: %1").arg(storage_path));
         return;
     }
 
     const QJsonObject root = doc.object();
-    m_activeConversationId = root.value(QStringLiteral("conversationId")).toString().trimmed();
+    this->active_conversation_id =
+        root.value(QStringLiteral("conversationId")).toString().trimmed();
 
-    if ((m_chatContextManager != nullptr) && (m_activeProjectFilePath.isEmpty() == false))
+    if ((this->chat_context_manager != nullptr) &&
+        (this->active_project_file_path.isEmpty() == false))
     {
-        QString contextError;
-        const QString projectDir = currentProjectDir();
-        if (projectDir.isEmpty() == false)
+        QString context_error;
+        const QString project_dir = this->current_project_dir();
+        if (project_dir.isEmpty() == false)
         {
-            if (m_chatContextManager->setActiveWorkspace(m_activeProjectFilePath, projectDir,
-                                                         m_activeConversationId,
-                                                         &contextError) == true)
+            if (this->chat_context_manager->set_active_workspace(
+                    this->active_project_file_path, project_dir, this->active_conversation_id,
+                    &context_error) == true)
             {
-                if (m_activeConversationId.isEmpty() == true)
+                if (this->active_conversation_id.isEmpty() == true)
                 {
-                    m_activeConversationId =
-                        m_chatContextManager->startNewConversation({}, &contextError);
+                    this->active_conversation_id =
+                        this->chat_context_manager->start_new_conversation({}, &context_error);
                 }
                 else
                 {
-                    m_activeConversationId =
-                        m_chatContextManager->ensureActiveConversation(&contextError);
+                    this->active_conversation_id =
+                        this->chat_context_manager->ensure_active_conversation(&context_error);
                 }
             }
         }
 
-        if (contextError.isEmpty() == false)
+        if (context_error.isEmpty() == false)
         {
-            QCAI_WARN(
-                "Dock",
-                QStringLiteral("Failed to restore persistent chat context: %1").arg(contextError));
+            QCAI_WARN("Dock", QStringLiteral("Failed to restore persistent chat context: %1")
+                                  .arg(context_error));
         }
     }
 
     {
-        const QSignalBlocker modeBlocker(m_dock.m_modeCombo);
-        const QSignalBlocker modelBlocker(m_dock.m_modelCombo);
-        const QSignalBlocker reasoningBlocker(m_dock.m_reasoningCombo);
-        const QSignalBlocker thinkingBlocker(m_dock.m_thinkingCombo);
-        const QSignalBlocker dryRunBlocker(m_dock.m_dryRunCheck);
+        const QSignalBlocker mode_blocker(this->dock.mode_combo);
+        const QSignalBlocker model_blocker(this->dock.model_combo);
+        const QSignalBlocker reasoning_blocker(this->dock.reasoning_combo);
+        const QSignalBlocker thinking_blocker(this->dock.thinking_combo);
+        const QSignalBlocker dry_run_blocker(this->dock.dry_run_check);
 
-        selectEffortValue(m_dock.m_reasoningCombo,
-                          root.value(QStringLiteral("reasoningEffort"))
-                              .toString(m_dock.m_reasoningCombo->currentData().toString()),
-                          m_dock.m_reasoningCombo->currentIndex());
-        selectEffortValue(m_dock.m_thinkingCombo,
-                          root.value(QStringLiteral("thinkingLevel"))
-                              .toString(m_dock.m_thinkingCombo->currentData().toString()),
-                          m_dock.m_thinkingCombo->currentIndex());
+        select_effort_value(this->dock.reasoning_combo,
+                            root.value(QStringLiteral("reasoningEffort"))
+                                .toString(this->dock.reasoning_combo->currentData().toString()),
+                            this->dock.reasoning_combo->currentIndex());
+        select_effort_value(this->dock.thinking_combo,
+                            root.value(QStringLiteral("thinkingLevel"))
+                                .toString(this->dock.thinking_combo->currentData().toString()),
+                            this->dock.thinking_combo->currentIndex());
 
-        const QString savedMode = root.value(QStringLiteral("mode")).toString();
-        const int modeIndex = m_dock.m_modeCombo->findData(savedMode);
-        if (((modeIndex >= 0) == true))
+        const QString saved_mode = root.value(QStringLiteral("mode")).toString();
+        const int mode_index = this->dock.mode_combo->findData(saved_mode);
+        if (((mode_index >= 0) == true))
         {
-            m_dock.m_modeCombo->setCurrentIndex(modeIndex);
+            this->dock.mode_combo->setCurrentIndex(mode_index);
         }
 
-        const QString savedModel = root.value(QStringLiteral("model")).toString().trimmed();
-        if (savedModel.isEmpty() == false)
+        const QString saved_model = root.value(QStringLiteral("model")).toString().trimmed();
+        if (saved_model.isEmpty() == false)
         {
-            m_dock.m_modelCombo->setCurrentText(savedModel);
+            this->dock.model_combo->setCurrentText(saved_model);
         }
 
         if (((root.contains(QStringLiteral("dryRun"))) == true))
         {
-            m_dock.m_dryRunCheck->setChecked(root.value(QStringLiteral("dryRun")).toBool());
+            this->dock.dry_run_check->setChecked(root.value(QStringLiteral("dryRun")).toBool());
         }
     }
 
-    bool goalLoadedFromFile = false;
-    const QString goal =
-        readContextTextFile(goalPath, QStringLiteral("project goal file"), &goalLoadedFromFile);
-    const QString legacyGoal = root.value(QStringLiteral("goal")).toString();
-    const QString restoredGoal = goalLoadedFromFile ? goal : legacyGoal;
-    if (restoredGoal.isEmpty() == false)
+    bool goal_loaded_from_file = false;
+    const QString goal = read_context_text_file(goal_path, QStringLiteral("project goal file"),
+                                                &goal_loaded_from_file);
+    const QString legacy_goal = root.value(QStringLiteral("goal")).toString();
+    const QString restored_goal = goal_loaded_from_file ? goal : legacy_goal;
+    if (restored_goal.isEmpty() == false)
     {
-        m_dock.m_goalEdit->setPlainText(restoredGoal);
+        this->dock.goal_edit->setPlainText(restored_goal);
     }
 
-    bool logLoadedFromFile = false;
-    const QString logMarkdown = readContextTextFile(
-        logPath, QStringLiteral("project Actions Log markdown file"), &logLoadedFromFile);
-    const QString legacyLogMarkdown = root.value(QStringLiteral("logMarkdown")).toString();
-    const QString restoredLogMarkdown = logLoadedFromFile ? logMarkdown : legacyLogMarkdown;
-    if (restoredLogMarkdown.isEmpty() == false)
+    bool log_loaded_from_file = false;
+    const QString log_markdown = read_context_text_file(
+        log_path, QStringLiteral("project Actions Log markdown file"), &log_loaded_from_file);
+    const QString legacy_log_markdown = root.value(QStringLiteral("log_markdown")).toString();
+    const QString restored_log_markdown =
+        log_loaded_from_file ? log_markdown : legacy_log_markdown;
+    if (restored_log_markdown.isEmpty() == false)
     {
-        m_dock.m_logMarkdown = restoredLogMarkdown;
-        int fenceCount = 0;
-        const auto lines = m_dock.m_logMarkdown.split('\n');
+        this->dock.log_markdown = restored_log_markdown;
+        int fence_count = 0;
+        const auto lines = this->dock.log_markdown.split('\n');
         for (const auto &line : lines)
         {
             if (line.trimmed().startsWith(QStringLiteral("```")))
             {
-                ++fenceCount;
+                ++fence_count;
             }
         }
-        if (((fenceCount % 2 != 0) == true))
+        if (((fence_count % 2 != 0) == true))
         {
-            m_dock.m_logMarkdown += QStringLiteral("\n```\n");
+            this->dock.log_markdown += QStringLiteral("\n```\n");
         }
-        m_dock.m_streamingMarkdown.clear();
-        m_dock.renderLog();
+        this->dock.streaming_markdown.clear();
+        this->dock.render_log();
     }
     else
     {
         const QString log = root.value(QStringLiteral("log")).toString();
         if (log.isEmpty() == false)
         {
-            m_dock.m_logMarkdown = log;
-            m_dock.renderLog();
+            this->dock.log_markdown = log;
+            this->dock.render_log();
         }
     }
 
-    m_dock.m_currentDiff = root.value(QStringLiteral("diff")).toString();
-    if (((!m_dock.m_currentDiff.isEmpty()) == true))
+    this->dock.current_diff = root.value(QStringLiteral("diff")).toString();
+    if (((!this->dock.current_diff.isEmpty()) == true))
     {
-        m_dock.syncDiffUi(m_dock.m_currentDiff, false, true);
+        this->dock.sync_diff_ui(this->dock.current_diff, false, true);
     }
 
     const QString status = root.value(QStringLiteral("status")).toString();
     if (status.isEmpty() == false)
     {
-        m_dock.m_statusLabel->setText(status);
+        this->dock.status_label->setText(status);
     }
 
-    const QJsonArray planItems = root.value(QStringLiteral("plan")).toArray();
-    for (const auto &item : planItems)
+    const QJsonArray plan_items = root.value(QStringLiteral("plan")).toArray();
+    for (const auto &item : plan_items)
     {
         if (item.isString())
         {
-            m_dock.m_planList->addItem(item.toString());
+            this->dock.plan_list->addItem(item.toString());
         }
     }
 
-    QStringList manualLinkedFiles;
-    const QJsonArray linkedFiles = root.value(QStringLiteral("linkedFiles")).toArray();
-    for (const QJsonValue &value : linkedFiles)
+    QStringList manual_linked_files;
+    const QJsonArray linked_files = root.value(QStringLiteral("linkedFiles")).toArray();
+    for (const QJsonValue &value : linked_files)
     {
         if (value.isString())
         {
-            manualLinkedFiles.append(value.toString());
+            manual_linked_files.append(value.toString());
         }
     }
-    QStringList ignoredLinkedFilesList;
-    QJsonArray ignoredLinkedFiles = root.value(QStringLiteral("ignoredLinkedFiles")).toArray();
-    if (ignoredLinkedFiles.isEmpty() == true)
+    QStringList ignored_linked_files_list;
+    QJsonArray ignored_linked_files = root.value(QStringLiteral("ignored_linked_files")).toArray();
+    if (ignored_linked_files.isEmpty() == true)
     {
-        ignoredLinkedFiles = root.value(QStringLiteral("excludedDefaultLinkedFiles")).toArray();
+        ignored_linked_files = root.value(QStringLiteral("excludedDefaultLinkedFiles")).toArray();
     }
-    for (const QJsonValue &value : ignoredLinkedFiles)
+    for (const QJsonValue &value : ignored_linked_files)
     {
         if (value.isString())
         {
-            ignoredLinkedFilesList.append(value.toString());
+            ignored_linked_files_list.append(value.toString());
         }
     }
-    m_dock.m_linkedFilesController->setManualLinkedFiles(manualLinkedFiles);
-    m_dock.m_linkedFilesController->setIgnoredLinkedFiles(ignoredLinkedFilesList);
-    m_dock.m_linkedFilesController->invalidateCandidates();
-    m_dock.m_linkedFilesController->refreshUi();
+    this->dock.linked_files_controller->set_manual_linked_files(manual_linked_files);
+    this->dock.linked_files_controller->set_ignored_linked_files(ignored_linked_files_list);
+    this->dock.linked_files_controller->invalidate_candidates();
+    this->dock.linked_files_controller->refresh_ui();
 
-    m_projectMcpServers.clear();
-    const QJsonValue mcpServersValue = root.value(QStringLiteral("mcpServers"));
-    if (((!mcpServersValue.isUndefined() && !mcpServersValue.isNull()) == true))
+    this->current_project_mcp_servers.clear();
+    const QJsonValue mcp_servers_value = root.value(QStringLiteral("mcpServers"));
+    if (((!mcp_servers_value.isUndefined() && !mcp_servers_value.isNull()) == true))
     {
-        if (mcpServersValue.isObject() == false)
+        if (mcp_servers_value.isObject() == false)
         {
             QCAI_WARN("Dock",
                       QStringLiteral("Project session key 'mcpServers' must be an object."));
         }
         else
         {
-            QString mcpError;
-            if (((!qtmcp::serverDefinitionsFromJson(mcpServersValue.toObject(),
-                                                    &m_projectMcpServers, &mcpError)) == true))
+            QString mcp_error;
+            if (((!qtmcp::server_definitions_from_json(mcp_servers_value.toObject(),
+                                                       &this->current_project_mcp_servers,
+                                                       &mcp_error)) == true))
             {
-                QCAI_WARN("Dock",
-                          QStringLiteral("Failed to parse project MCP servers: %1").arg(mcpError));
-                m_projectMcpServers.clear();
+                QCAI_WARN(
+                    "Dock",
+                    QStringLiteral("Failed to parse project MCP servers: %1").arg(mcp_error));
+                this->current_project_mcp_servers.clear();
             }
         }
     }
 
     const int tab = root.value(QStringLiteral("activeTab")).toInt(0);
-    if (((tab >= 0 && tab < m_dock.m_tabs->count()) == true))
+    if (((tab >= 0 && tab < this->dock.tabs->count()) == true))
     {
-        m_dock.m_tabs->setCurrentIndex(tab);
+        this->dock.tabs->setCurrentIndex(tab);
     }
 
-    updateSessionFileWatcher();
+    this->update_session_file_watcher();
 }
 
-void AgentDockSessionController::refreshProjectSelector()
+void agent_dock_session_controller_t::refresh_project_selector()
 {
-    if (((m_dock.m_projectCombo == nullptr) == true))
+    if (((this->dock.project_combo == nullptr) == true))
     {
         return;
     }
 
-    QString desiredProject = startupProjectFilePath();
-    if (desiredProject.isEmpty() == true)
+    QString desired_project = startup_project_file_path();
+    if (desired_project.isEmpty() == true)
     {
-        if (auto *ctx = m_dock.m_controller->editorContext(); ((ctx != nullptr) == true))
+        if (auto *ctx = this->dock.controller->editor_context(); ((ctx != nullptr) == true))
         {
-            desiredProject = ctx->selectedProjectFilePath();
+            desired_project = ctx->selected_project_file_path();
         }
     }
-    if (desiredProject.isEmpty() == true)
+    if (desired_project.isEmpty() == true)
     {
-        desiredProject = m_activeProjectFilePath;
+        desired_project = this->active_project_file_path;
     }
 
-    const QList<EditorContext::ProjectInfo> projects =
-        (m_dock.m_controller->editorContext() != nullptr)
-            ? m_dock.m_controller->editorContext()->openProjects()
-            : QList<EditorContext::ProjectInfo>{};
+    const QList<editor_context_t::project_info_t> projects =
+        (this->dock.controller->editor_context() != nullptr)
+            ? this->dock.controller->editor_context()->open_projects()
+            : QList<editor_context_t::project_info_t>{};
 
-    const QSignalBlocker blocker(m_dock.m_projectCombo);
-    m_dock.m_projectCombo->clear();
+    const QSignalBlocker blocker(this->dock.project_combo);
+    this->dock.project_combo->clear();
 
     if (projects.isEmpty())
     {
-        m_dock.m_projectCombo->addItem(QObject::tr("No open projects"), QString());
-        m_dock.m_projectCombo->setEnabled(false);
-        switchProjectContext(QString());
-        m_dock.updateRunState(m_dock.m_stopBtn->isEnabled());
+        this->dock.project_combo->addItem(QObject::tr("No open projects"), QString());
+        this->dock.project_combo->setEnabled(false);
+        this->switch_project_context(QString());
+        this->dock.update_run_state(this->dock.stop_btn->isEnabled());
         return;
     }
 
-    QSet<QString> duplicateNames;
-    QSet<QString> seenNames;
+    QSet<QString> duplicate_names;
+    QSet<QString> seen_names;
     for (const auto &project : projects)
     {
-        if (seenNames.contains(project.projectName))
+        if (seen_names.contains(project.project_name))
         {
-            duplicateNames.insert(project.projectName);
+            duplicate_names.insert(project.project_name);
         }
-        seenNames.insert(project.projectName);
+        seen_names.insert(project.project_name);
     }
 
-    int selectedIndex = -1;
+    int selected_index = -1;
     for (int i = 0; i < projects.size(); ++i)
     {
         const auto &project = projects.at(i);
-        QString label = project.projectName;
-        if (duplicateNames.contains(project.projectName))
+        QString label = project.project_name;
+        if (duplicate_names.contains(project.project_name))
         {
-            label = QStringLiteral("%1 — %2").arg(project.projectName,
-                                                  QFileInfo(project.projectDir).fileName());
+            label = QStringLiteral("%1 — %2").arg(project.project_name,
+                                                  QFileInfo(project.project_dir).fileName());
         }
-        m_dock.m_projectCombo->addItem(label, project.projectFilePath);
-        m_dock.m_projectCombo->setItemData(i, project.projectDir, Qt::ToolTipRole);
-        if (project.projectFilePath == desiredProject)
+        this->dock.project_combo->addItem(label, project.project_file_path);
+        this->dock.project_combo->setItemData(i, project.project_dir, Qt::ToolTipRole);
+        if (project.project_file_path == desired_project)
         {
-            selectedIndex = i;
+            selected_index = i;
         }
     }
 
-    if (selectedIndex < 0)
+    if (selected_index < 0)
     {
-        selectedIndex = 0;
+        selected_index = 0;
     }
 
-    m_dock.m_projectCombo->setEnabled(true);
-    m_dock.m_projectCombo->setCurrentIndex(selectedIndex);
+    this->dock.project_combo->setEnabled(true);
+    this->dock.project_combo->setCurrentIndex(selected_index);
 
-    const QString selectedProject = m_dock.m_projectCombo->currentData().toString();
-    if (selectedProject != m_activeProjectFilePath)
+    const QString selected_project = this->dock.project_combo->currentData().toString();
+    if (selected_project != this->active_project_file_path)
     {
-        switchProjectContext(selectedProject);
+        this->switch_project_context(selected_project);
     }
-    m_dock.updateRunState(m_dock.m_stopBtn->isEnabled());
+    this->dock.update_run_state(this->dock.stop_btn->isEnabled());
 }
 
-void AgentDockSessionController::switchProjectContext(const QString &projectFilePath)
+void agent_dock_session_controller_t::switch_project_context(const QString &project_file_path)
 {
-    if (projectFilePath == m_activeProjectFilePath)
+    if (project_file_path == this->active_project_file_path)
     {
         return;
     }
 
-    if (!m_activeProjectFilePath.isEmpty())
+    if (!this->active_project_file_path.isEmpty())
     {
-        saveChat();
+        this->save_chat();
     }
 
-    m_dock.clearChatState();
-    applyProjectUiDefaults();
-    m_dock.m_linkedFilesController->invalidateCandidates();
-    m_activeProjectFilePath = projectFilePath;
-    m_activeConversationId.clear();
-    m_projectMcpServers.clear();
+    this->dock.clear_chat_state();
+    this->apply_project_ui_defaults();
+    this->dock.linked_files_controller->invalidate_candidates();
+    this->active_project_file_path = project_file_path;
+    this->active_conversation_id.clear();
+    this->current_project_mcp_servers.clear();
 
-    if (auto *ctx = m_dock.m_controller->editorContext())
+    if (auto *ctx = this->dock.controller->editor_context())
     {
-        ctx->setSelectedProjectFilePath(projectFilePath);
+        ctx->set_selected_project_file_path(project_file_path);
     }
 
-    if ((m_chatContextManager != nullptr) && (projectFilePath.isEmpty() == false))
+    if ((this->chat_context_manager != nullptr) && (project_file_path.isEmpty() == false))
     {
-        QString contextError;
-        const QString projectDir = projectDirForPath(projectFilePath);
-        if (projectDir.isEmpty() == false)
+        QString context_error;
+        const QString project_dir = this->project_dir_for_path(project_file_path);
+        if (project_dir.isEmpty() == false)
         {
-            m_chatContextManager->setActiveWorkspace(projectFilePath, projectDir, {},
-                                                     &contextError);
+            this->chat_context_manager->set_active_workspace(project_file_path, project_dir, {},
+                                                             &context_error);
         }
-        if (contextError.isEmpty() == false)
+        if (context_error.isEmpty() == false)
         {
             QCAI_WARN(
                 "Dock",
-                QStringLiteral("Failed to switch persistent chat context: %1").arg(contextError));
+                QStringLiteral("Failed to switch persistent chat context: %1").arg(context_error));
         }
     }
 
-    restoreChat();
-    if ((m_activeConversationId.isEmpty() == true) && (m_chatContextManager != nullptr) &&
-        (projectFilePath.isEmpty() == false))
+    this->restore_chat();
+    if ((this->active_conversation_id.isEmpty() == true) &&
+        (this->chat_context_manager != nullptr) && (project_file_path.isEmpty() == false))
     {
-        QString contextError;
-        m_activeConversationId = m_chatContextManager->startNewConversation({}, &contextError);
-        if (contextError.isEmpty() == false)
+        QString context_error;
+        this->active_conversation_id =
+            this->chat_context_manager->start_new_conversation({}, &context_error);
+        if (context_error.isEmpty() == false)
         {
             QCAI_WARN(
                 "Dock",
-                QStringLiteral("Failed to create project conversation: %1").arg(contextError));
+                QStringLiteral("Failed to create project conversation: %1").arg(context_error));
         }
     }
-    updateSessionFileWatcher();
+    this->update_session_file_watcher();
 }
 
-void AgentDockSessionController::startNewConversation()
+void agent_dock_session_controller_t::start_new_conversation()
 {
-    if (m_chatContextManager == nullptr)
+    if (this->chat_context_manager == nullptr)
     {
-        m_activeConversationId.clear();
+        this->active_conversation_id.clear();
         return;
     }
-    if (m_activeProjectFilePath.isEmpty() == true)
+    if (this->active_project_file_path.isEmpty() == true)
     {
-        m_activeConversationId.clear();
+        this->active_conversation_id.clear();
         return;
     }
 
-    QString contextError;
-    m_activeConversationId = m_chatContextManager->startNewConversation({}, &contextError);
-    if (contextError.isEmpty() == false)
+    QString context_error;
+    this->active_conversation_id =
+        this->chat_context_manager->start_new_conversation({}, &context_error);
+    if (context_error.isEmpty() == false)
     {
         QCAI_WARN("Dock",
-                  QStringLiteral("Failed to start new conversation: %1").arg(contextError));
+                  QStringLiteral("Failed to start new conversation: %1").arg(context_error));
     }
 }
 
-QString AgentDockSessionController::currentProjectFilePath() const
+QString agent_dock_session_controller_t::current_project_file_path() const
 {
-    return m_activeProjectFilePath;
+    return this->active_project_file_path;
 }
 
-QString AgentDockSessionController::currentProjectStorageFilePath() const
+QString agent_dock_session_controller_t::current_project_storage_file_path() const
 {
-    if (m_activeProjectFilePath.isEmpty())
+    if (this->active_project_file_path.isEmpty())
     {
         return {};
     }
 
-    const QString projectDir = projectDirForPath(m_activeProjectFilePath);
-    if (projectDir.isEmpty())
+    const QString project_dir = this->project_dir_for_path(this->active_project_file_path);
+    if (project_dir.isEmpty())
     {
         return {};
     }
 
-    return QDir(projectDir).filePath(QStringLiteral(".qcai2/session.json"));
+    return QDir(project_dir).filePath(QStringLiteral(".qcai2/session.json"));
 }
 
-QString AgentDockSessionController::legacyProjectStorageFilePath() const
+QString agent_dock_session_controller_t::legacy_project_storage_file_path() const
 {
-    if (m_activeProjectFilePath.isEmpty())
+    if (this->active_project_file_path.isEmpty())
     {
         return {};
     }
 
-    const QString projectDir = projectDirForPath(m_activeProjectFilePath);
-    if (projectDir.isEmpty())
+    const QString project_dir = this->project_dir_for_path(this->active_project_file_path);
+    if (project_dir.isEmpty())
     {
         return {};
     }
 
-    return QDir(projectDir)
+    return QDir(project_dir)
         .filePath(QStringLiteral(".qcai2/%1")
-                      .arg(legacySanitizedSessionFileName(m_activeProjectFilePath)));
+                      .arg(legacy_sanitized_session_file_name(this->active_project_file_path)));
 }
 
-QStringList AgentDockSessionController::currentSessionWatchPaths() const
+QStringList agent_dock_session_controller_t::current_session_watch_paths() const
 {
-    const QString storagePath = currentProjectStorageFilePath();
-    if (storagePath.isEmpty())
+    const QString storage_path = this->current_project_storage_file_path();
+    if (storage_path.isEmpty())
     {
         return {};
     }
 
     QStringList paths;
-    const QString goalPath = Migration::projectGoalFilePath(storagePath);
-    const QString logPath = Migration::projectActionsLogFilePath(storagePath);
-    const QFileInfo storageInfo(storagePath);
-    const QString sessionDirPath = storageInfo.absolutePath();
+    const QString goal_path = Migration::project_goal_file_path(storage_path);
+    const QString log_path = Migration::project_actions_log_file_path(storage_path);
+    const QFileInfo storage_info(storage_path);
+    const QString session_dirPath = storage_info.absolutePath();
 
     const auto appendIfExists = [&paths](const QString &path) {
         if (!path.isEmpty() && QFileInfo::exists(path) && !paths.contains(path))
@@ -701,85 +710,87 @@ QStringList AgentDockSessionController::currentSessionWatchPaths() const
         }
     };
 
-    if (QDir(sessionDirPath).exists())
+    if (QDir(session_dirPath).exists())
     {
-        paths.append(sessionDirPath);
+        paths.append(session_dirPath);
     }
     else
     {
-        const QString projectDir = currentProjectDir();
-        if (!projectDir.isEmpty())
+        const QString project_dir = this->current_project_dir();
+        if (!project_dir.isEmpty())
         {
-            paths.append(projectDir);
+            paths.append(project_dir);
         }
     }
 
-    appendIfExists(storagePath);
-    appendIfExists(goalPath);
-    appendIfExists(logPath);
+    appendIfExists(storage_path);
+    appendIfExists(goal_path);
+    appendIfExists(log_path);
     return paths;
 }
 
-QString AgentDockSessionController::currentProjectDir() const
+QString agent_dock_session_controller_t::current_project_dir() const
 {
-    return projectDirForPath(m_activeProjectFilePath);
+    return this->project_dir_for_path(this->active_project_file_path);
 }
 
-const qtmcp::ServerDefinitions &AgentDockSessionController::projectMcpServers() const
+const qtmcp::server_definitions_t &agent_dock_session_controller_t::project_mcp_servers() const
 {
-    return m_projectMcpServers;
+    return this->current_project_mcp_servers;
 }
 
-void AgentDockSessionController::applyProjectUiDefaults()
+void agent_dock_session_controller_t::apply_project_ui_defaults()
 {
     const auto &cfg = settings();
-    const QSignalBlocker modeBlocker(m_dock.m_modeCombo);
-    const QSignalBlocker modelBlocker(m_dock.m_modelCombo);
-    const QSignalBlocker reasoningBlocker(m_dock.m_reasoningCombo);
-    const QSignalBlocker thinkingBlocker(m_dock.m_thinkingCombo);
-    const QSignalBlocker dryRunBlocker(m_dock.m_dryRunCheck);
+    const QSignalBlocker mode_blocker(this->dock.mode_combo);
+    const QSignalBlocker model_blocker(this->dock.model_combo);
+    const QSignalBlocker reasoning_blocker(this->dock.reasoning_combo);
+    const QSignalBlocker thinking_blocker(this->dock.thinking_combo);
+    const QSignalBlocker dry_run_blocker(this->dock.dry_run_check);
 
-    const int modeIndex = m_dock.m_modeCombo->findData(QStringLiteral("agent"));
-    m_dock.m_modeCombo->setCurrentIndex(modeIndex >= 0 ? modeIndex : 0);
-    m_dock.m_modelCombo->setCurrentText(cfg.modelName);
-    selectEffortValue(m_dock.m_reasoningCombo, cfg.reasoningEffort, 2);
-    selectEffortValue(m_dock.m_thinkingCombo, cfg.thinkingLevel, 2);
-    m_dock.m_dryRunCheck->setChecked(cfg.dryRunDefault);
+    const int mode_index = this->dock.mode_combo->findData(QStringLiteral("agent"));
+    this->dock.mode_combo->setCurrentIndex(mode_index >= 0 ? mode_index : 0);
+    this->dock.model_combo->setCurrentText(cfg.model_name);
+    select_effort_value(this->dock.reasoning_combo, cfg.reasoning_effort, 2);
+    select_effort_value(this->dock.thinking_combo, cfg.thinking_level, 2);
+    this->dock.dry_run_check->setChecked(cfg.dry_run_default);
 }
 
-void AgentDockSessionController::migrateLegacySessionFiles()
+void agent_dock_session_controller_t::migrate_legacy_session_files()
 {
-    const QString storagePath = currentProjectStorageFilePath();
-    const QString legacyStoragePath = legacyProjectStorageFilePath();
-    if (storagePath.isEmpty() || legacyStoragePath.isEmpty() || storagePath == legacyStoragePath)
+    const QString storage_path = this->current_project_storage_file_path();
+    const QString legacy_storage_path = this->legacy_project_storage_file_path();
+    if (storage_path.isEmpty() || legacy_storage_path.isEmpty() ||
+        storage_path == legacy_storage_path)
     {
         return;
     }
 
-    const QString goalPath = Migration::projectGoalFilePath(storagePath);
-    const QString logPath = Migration::projectActionsLogFilePath(storagePath);
-    const QString legacyGoalPath = Migration::projectGoalFilePath(legacyStoragePath);
-    const QString legacyLogPath = Migration::projectActionsLogFilePath(legacyStoragePath);
+    const QString goal_path = Migration::project_goal_file_path(storage_path);
+    const QString log_path = Migration::project_actions_log_file_path(storage_path);
+    const QString legacy_goal_path = Migration::project_goal_file_path(legacy_storage_path);
+    const QString legacy_log_path = Migration::project_actions_log_file_path(legacy_storage_path);
 
-    const bool hasCurrentFiles = QFileInfo::exists(storagePath) || QFileInfo::exists(goalPath) ||
-                                 QFileInfo::exists(logPath);
-    const bool hasLegacyFiles = QFileInfo::exists(legacyStoragePath) ||
-                                QFileInfo::exists(legacyGoalPath) ||
-                                QFileInfo::exists(legacyLogPath);
-    if (hasCurrentFiles || !hasLegacyFiles)
+    const bool has_current_files = QFileInfo::exists(storage_path) ||
+                                   QFileInfo::exists(goal_path) || QFileInfo::exists(log_path);
+    const bool has_legacy_files = QFileInfo::exists(legacy_storage_path) ||
+                                  QFileInfo::exists(legacy_goal_path) ||
+                                  QFileInfo::exists(legacy_log_path);
+    if (has_current_files || !has_legacy_files)
     {
         return;
     }
 
-    const QFileInfo storageInfo(storagePath);
-    if (!QDir().mkpath(storageInfo.absolutePath()))
+    const QFileInfo storage_info(storage_path);
+    if (!QDir().mkpath(storage_info.absolutePath()))
     {
         QCAI_WARN("Dock", QStringLiteral("Failed to create project context dir: %1")
-                              .arg(storageInfo.absolutePath()));
+                              .arg(storage_info.absolutePath()));
         return;
     }
 
-    const auto renameIfExists = [](const QString &from, const QString &to, const QString &label) {
+    const auto rename_if_exists = [](const QString &from, const QString &to,
+                                     const QString &label) {
         if (!QFileInfo::exists(from))
         {
             return true;
@@ -798,97 +809,99 @@ void AgentDockSessionController::migrateLegacySessionFiles()
         return false;
     };
 
-    const bool movedGoal =
-        renameIfExists(legacyGoalPath, goalPath, QStringLiteral("legacy project goal file"));
-    const bool movedLog =
-        renameIfExists(legacyLogPath, logPath, QStringLiteral("legacy project Actions Log file"));
-    const bool movedStorage = renameIfExists(legacyStoragePath, storagePath,
-                                             QStringLiteral("legacy project context file"));
+    const bool moved_goal =
+        rename_if_exists(legacy_goal_path, goal_path, QStringLiteral("legacy project goal file"));
+    const bool moved_log = rename_if_exists(legacy_log_path, log_path,
+                                            QStringLiteral("legacy project Actions Log file"));
+    const bool moved_storage = rename_if_exists(legacy_storage_path, storage_path,
+                                                QStringLiteral("legacy project context file"));
 
-    if (!(movedGoal && movedLog && movedStorage))
+    if (!(moved_goal && moved_log && moved_storage))
     {
         QCAI_WARN("Dock",
                   QStringLiteral("Failed to fully migrate legacy session file names for %1")
-                      .arg(m_activeProjectFilePath));
+                      .arg(this->active_project_file_path));
     }
 }
 
-void AgentDockSessionController::updateSessionFileWatcher()
+void agent_dock_session_controller_t::update_session_file_watcher()
 {
-    const QString storagePath = currentProjectStorageFilePath();
-    const QString goalPath =
-        storagePath.isEmpty() ? QString() : Migration::projectGoalFilePath(storagePath);
-    const QString logPath =
-        storagePath.isEmpty() ? QString() : Migration::projectActionsLogFilePath(storagePath);
-    const QFileInfo storageInfo(storagePath);
-    m_sessionStoragePresent =
-        !storagePath.isEmpty() &&
-        (QFileInfo::exists(storagePath) || QFileInfo::exists(goalPath) ||
-         QFileInfo::exists(logPath) || QDir(storageInfo.absolutePath()).exists());
+    const QString storage_path = this->current_project_storage_file_path();
+    const QString goal_path =
+        storage_path.isEmpty() ? QString() : Migration::project_goal_file_path(storage_path);
+    const QString log_path = storage_path.isEmpty()
+                                 ? QString()
+                                 : Migration::project_actions_log_file_path(storage_path);
+    const QFileInfo storage_info(storage_path);
+    this->session_storage_present =
+        !storage_path.isEmpty() &&
+        (QFileInfo::exists(storage_path) || QFileInfo::exists(goal_path) ||
+         QFileInfo::exists(log_path) || QDir(storage_info.absolutePath()).exists());
 
-    const QStringList currentPaths =
-        m_sessionFileWatcher->files() + m_sessionFileWatcher->directories();
-    if (!currentPaths.isEmpty())
+    const QStringList current_paths =
+        this->session_file_watcher->files() + this->session_file_watcher->directories();
+    if (!current_paths.isEmpty())
     {
-        m_sessionFileWatcher->removePaths(currentPaths);
+        this->session_file_watcher->removePaths(current_paths);
     }
 
-    const QStringList watchPaths = currentSessionWatchPaths();
-    if (!watchPaths.isEmpty())
+    const QStringList watch_paths = this->current_session_watch_paths();
+    if (!watch_paths.isEmpty())
     {
-        m_sessionFileWatcher->addPaths(watchPaths);
+        this->session_file_watcher->addPaths(watch_paths);
     }
 }
 
-void AgentDockSessionController::reloadSessionFromDisk()
+void agent_dock_session_controller_t::reload_session_from_disk()
 {
-    const QString storagePath = currentProjectStorageFilePath();
-    if (storagePath.isEmpty())
+    const QString storage_path = this->current_project_storage_file_path();
+    if (storage_path.isEmpty())
     {
         return;
     }
 
-    const QString goalPath = Migration::projectGoalFilePath(storagePath);
-    const QString logPath = Migration::projectActionsLogFilePath(storagePath);
-    const QFileInfo storageInfo(storagePath);
-    const bool sessionExists = QFileInfo::exists(storagePath) || QFileInfo::exists(goalPath) ||
-                               QFileInfo::exists(logPath) ||
-                               QDir(storageInfo.absolutePath()).exists();
-    if (!sessionExists && !m_sessionStoragePresent)
+    const QString goal_path = Migration::project_goal_file_path(storage_path);
+    const QString log_path = Migration::project_actions_log_file_path(storage_path);
+    const QFileInfo storage_info(storage_path);
+    const bool session_exists = QFileInfo::exists(storage_path) || QFileInfo::exists(goal_path) ||
+                                QFileInfo::exists(log_path) ||
+                                QDir(storage_info.absolutePath()).exists();
+    if (!session_exists && !this->session_storage_present)
     {
-        updateSessionFileWatcher();
+        this->update_session_file_watcher();
         return;
     }
 
-    const bool wasRunning = m_dock.m_stopBtn->isEnabled();
-    m_dock.clearChatState();
-    applyProjectUiDefaults();
-    m_projectMcpServers.clear();
-    restoreChat();
-    updateSessionFileWatcher();
-    m_dock.updateRunState(wasRunning);
+    const bool was_running = this->dock.stop_btn->isEnabled();
+    this->dock.clear_chat_state();
+    this->apply_project_ui_defaults();
+    this->current_project_mcp_servers.clear();
+    this->restore_chat();
+    this->update_session_file_watcher();
+    this->dock.update_run_state(was_running);
 }
 
-QString AgentDockSessionController::projectDirForPath(const QString &projectFilePath) const
+QString
+agent_dock_session_controller_t::project_dir_for_path(const QString &project_file_path) const
 {
-    if (projectFilePath.isEmpty())
+    if (project_file_path.isEmpty())
     {
         return {};
     }
 
-    if (auto *ctx = m_dock.m_controller->editorContext())
+    if (auto *ctx = this->dock.controller->editor_context())
     {
-        const auto projects = ctx->openProjects();
+        const auto projects = ctx->open_projects();
         for (const auto &project : projects)
         {
-            if (project.projectFilePath == projectFilePath)
+            if (project.project_file_path == project_file_path)
             {
-                return project.projectDir;
+                return project.project_dir;
             }
         }
     }
 
-    return QFileInfo(projectFilePath).absolutePath();
+    return QFileInfo(project_file_path).absolutePath();
 }
 
 }  // namespace qcai2

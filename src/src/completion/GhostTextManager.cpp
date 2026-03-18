@@ -27,23 +27,23 @@ static const int kContextBefore = 2000;
 static const int kContextAfter = 500;
 static const int kDebounceMs = 500;
 
-GhostTextManager::GhostTextManager(QObject *parent) : QObject(parent)
+ghost_text_manager_t::ghost_text_manager_t(QObject *parent) : QObject(parent)
 {
 }
 
-GhostTextManager::~GhostTextManager()
+ghost_text_manager_t::~ghost_text_manager_t()
 {
-    *m_alive = false;
+    *this->alive = false;
 }
 
-void GhostTextManager::setEnabled(bool enabled)
+void ghost_text_manager_t::set_enabled(bool enabled)
 {
-    m_enabled = enabled;
+    this->enabled = enabled;
 }
 
-void GhostTextManager::attachToEditor(TextEditor::TextEditorWidget *editor)
+void ghost_text_manager_t::attach_to_editor(TextEditor::TextEditorWidget *editor)
 {
-    if ((((editor == nullptr) || m_debounceTimers.contains(editor)) == true))
+    if ((((editor == nullptr) || this->debounce_timers.contains(editor)) == true))
     {
         return;
     }
@@ -51,9 +51,9 @@ void GhostTextManager::attachToEditor(TextEditor::TextEditorWidget *editor)
     auto *timer = new QTimer(this);
     timer->setSingleShot(true);
     timer->setInterval(kDebounceMs);
-    connect(timer, &QTimer::timeout, this, [this, editor]() { requestCompletion(editor); });
-    m_debounceTimers.insert(editor, timer);
-    m_lastEditPositions.insert(editor, editor->textCursor().position());
+    connect(timer, &QTimer::timeout, this, [this, editor]() { this->request_completion(editor); });
+    this->debounce_timers.insert(editor, timer);
+    this->last_edit_positions.insert(editor, editor->textCursor().position());
 
     connect(editor->document(), &QTextDocument::contentsChange, this,
             [this, editor](int position, int charsRemoved, int charsAdded) {
@@ -67,56 +67,56 @@ void GhostTextManager::attachToEditor(TextEditor::TextEditorWidget *editor)
                 {
                     return;
                 }
-                onContentsChanged(editor);
+                this->on_contents_changed(editor);
             });
 
     connect(editor, &QObject::destroyed, this, [this, editor]() {
-        if (auto *t = m_debounceTimers.take(editor); ((t != nullptr) == true))
+        if (auto *t = this->debounce_timers.take(editor); ((t != nullptr) == true))
         {
             t->deleteLater();
         }
-        m_lastEditPositions.remove(editor);
+        this->last_edit_positions.remove(editor);
     });
 
     QCAI_DEBUG("GhostText", QStringLiteral("Attached to editor"));
 }
 
-void GhostTextManager::onContentsChanged(TextEditor::TextEditorWidget *editor)
+void ghost_text_manager_t::on_contents_changed(TextEditor::TextEditorWidget *editor)
 {
-    if (((!m_enabled || (m_provider == nullptr)) == true))
+    if (((!this->enabled || (this->provider == nullptr)) == true))
     {
         return;
     }
 
     const auto &s = settings();
-    if (s.aiCompletionEnabled == false)
+    if (s.ai_completion_enabled == false)
     {
         return;
     }
 
-    m_lastEditPositions.insert(editor, editor->textCursor().position());
-    if (auto *timer = m_debounceTimers.value(editor); ((timer != nullptr) == true))
+    this->last_edit_positions.insert(editor, editor->textCursor().position());
+    if (auto *timer = this->debounce_timers.value(editor); ((timer != nullptr) == true))
     {
         timer->start();
     }
 }
 
-void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
+void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *editor)
 {
-    if (((!m_enabled || (m_provider == nullptr) || (editor == nullptr)) == true))
+    if (((!this->enabled || (this->provider == nullptr) || (editor == nullptr)) == true))
     {
         return;
     }
 
     const auto &s = settings();
-    if (s.aiCompletionEnabled == false)
+    if (s.ai_completion_enabled == false)
     {
         return;
     }
 
     QTextCursor tc = editor->textCursor();
     const int pos = tc.position();
-    if (((pos != m_lastEditPositions.value(editor, pos)) == true))
+    if (((pos != this->last_edit_positions.value(editor, pos)) == true))
     {
         return;
     }
@@ -135,7 +135,7 @@ void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
                                  ? editor->textDocument()->filePath().toUrlishString()
                                  : QStringLiteral("untitled");
 
-    const QString model = s.completionModel.isEmpty() ? m_model : s.completionModel;
+    const QString model = s.completion_model.isEmpty() ? this->model : s.completion_model;
 
     const QString prompt =
         QStringLiteral("You are a code completion engine. Complete the code at the cursor "
@@ -145,17 +145,18 @@ void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
                        "```\n%2<CURSOR>%3\n```")
             .arg(fileName, prefix, suffix);
 
-    QList<ChatMessage> messages;
+    QList<chat_message_t> messages;
     messages.append({QStringLiteral("system"),
                      QStringLiteral("You are a code completion assistant. "
                                     "Return only the code that should be inserted at the cursor. "
                                     "No explanations, no markdown fences, no comments. "
                                     "Keep completions short (1-5 lines).")});
-    if (m_chatContextManager != nullptr)
+    if (this->chat_context_manager != nullptr)
     {
         QString contextError;
         const QString completionContext =
-            m_chatContextManager->buildCompletionContextBlock(fileName, 128, &contextError);
+            this->chat_context_manager->build_completion_context_block(fileName, 128,
+                                                                       &contextError);
         if (contextError.isEmpty() == false)
         {
             QCAI_WARN("GhostText",
@@ -171,19 +172,19 @@ void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
     QCAI_DEBUG("GhostText", QStringLiteral("Requesting completion at pos %1").arg(pos));
 
     using namespace std::placeholders;
-    const auto alive = m_alive;
+    const auto alive = this->alive;
     const QPointer<TextEditor::TextEditorWidget> editorGuard(editor);
-    const IAIProvider::CompletionCallback completionCallback = std::bind(
-        &GhostTextManager::dispatchCompletionResponse, this, editorGuard, pos, alive, _1, _2, _3);
-    m_provider->complete(messages, model, 0.0, 128, settings().completionReasoningEffort,
-                         completionCallback);
+    const iai_provider_t::completion_callback_t completion_callback =
+        std::bind(&ghost_text_manager_t::dispatch_completion_response, this, editorGuard, pos,
+                  alive, _1, _2, _3);
+    this->provider->complete(messages, model, 0.0, 128, settings().completion_reasoning_effort,
+                             completion_callback);
 }
 
-void GhostTextManager::dispatchCompletionResponse(GhostTextManager *manager,
-                                                  QPointer<TextEditor::TextEditorWidget> editor,
-                                                  int pos, const std::shared_ptr<bool> &alive,
-                                                  const QString &response, const QString &error,
-                                                  const ProviderUsage &usage)
+void ghost_text_manager_t::dispatch_completion_response(
+    ghost_text_manager_t *manager, QPointer<TextEditor::TextEditorWidget> editor, int pos,
+    const std::shared_ptr<bool> &alive, const QString &response, const QString &error,
+    const provider_usage_t &usage)
 {
     Q_UNUSED(usage);
 
@@ -192,11 +193,12 @@ void GhostTextManager::dispatchCompletionResponse(GhostTextManager *manager,
         return;
     }
 
-    manager->handleCompletionResponse(editor.data(), pos, response, error);
+    manager->handle_completion_response(editor.data(), pos, response, error);
 }
 
-void GhostTextManager::handleCompletionResponse(TextEditor::TextEditorWidget *editor, int pos,
-                                                const QString &response, const QString &error)
+void ghost_text_manager_t::handle_completion_response(TextEditor::TextEditorWidget *editor,
+                                                      int pos, const QString &response,
+                                                      const QString &error)
 {
     if (error.isEmpty() == false)
     {
@@ -204,7 +206,7 @@ void GhostTextManager::handleCompletionResponse(TextEditor::TextEditorWidget *ed
         return;
     }
 
-    const QString completion = cleanCompletion(response);
+    const QString completion = this->clean_completion(response);
     if (completion.isEmpty() == true)
     {
         return;
@@ -235,7 +237,7 @@ void GhostTextManager::handleCompletionResponse(TextEditor::TextEditorWidget *ed
                QStringLiteral("Showing suggestion: %1 chars").arg(completion.length()));
 }
 
-QString GhostTextManager::cleanCompletion(const QString &raw)
+QString ghost_text_manager_t::clean_completion(const QString &raw)
 {
     QString text = raw.trimmed();
     if (((text.startsWith(QStringLiteral("```"))) == true))

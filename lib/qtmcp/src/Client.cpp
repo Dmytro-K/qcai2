@@ -14,14 +14,14 @@ namespace qtmcp
 namespace
 {
 
-constexpr int kMaxLoggedJsonChars = 2000;
+constexpr int k_max_logged_json_chars = 2000;
 
-QString formatJsonForLog(const QJsonObject &message)
+QString format_json_for_log(const QJsonObject &message)
 {
     QString json = QString::fromUtf8(QJsonDocument(message).toJson(QJsonDocument::Compact));
-    if (json.size() > kMaxLoggedJsonChars)
+    if (json.size() > k_max_logged_json_chars)
     {
-        json = json.left(kMaxLoggedJsonChars);
+        json = json.left(k_max_logged_json_chars);
         json += QStringLiteral("... [truncated]");
     }
     return json;
@@ -29,80 +29,81 @@ QString formatJsonForLog(const QJsonObject &message)
 
 }  // namespace
 
-Client::Client(QObject *parent) : QObject(parent)
+client_t::client_t(QObject *parent) : QObject(parent)
 {
 }
 
-Client::~Client() = default;
+client_t::~client_t() = default;
 
-void Client::setTransport(std::unique_ptr<Transport> transport)
+void client_t::set_transport(std::unique_ptr<transport_t> transport)
 {
-    if (((m_transport != nullptr) == true))
+    if (((this->current_transport != nullptr) == true))
     {
-        emit transportLogMessage(
-            QStringLiteral("Replacing MCP transport `%1`.").arg(m_transport->transportName()));
-        if (((m_transport->state() != Transport::State::Disconnected) == true))
+        emit this->transport_log_message(QStringLiteral("Replacing MCP transport `%1`.")
+                                             .arg(this->current_transport->transport_name()));
+        if (((this->current_transport->state() != transport_t::state_t::DISCONNECTED) == true))
         {
-            m_transport->stop();
+            this->current_transport->stop();
         }
-        m_transport->disconnect(this);
+        this->current_transport->disconnect(this);
     }
 
-    m_transport = std::move(transport);
-    if (((m_transport != nullptr) == true))
+    this->current_transport = std::move(transport);
+    if (((this->current_transport != nullptr) == true))
     {
-        emit transportLogMessage(
-            QStringLiteral("Configured MCP transport `%1`.").arg(m_transport->transportName()));
+        emit this->transport_log_message(QStringLiteral("Configured MCP transport `%1`.")
+                                             .arg(this->current_transport->transport_name()));
     }
-    attachTransport();
+    this->attach_transport();
 }
 
-Transport *Client::transport() const
+transport_t *client_t::transport() const
 {
-    return m_transport.get();
+    return this->current_transport.get();
 }
 
-bool Client::isConnected() const
+bool client_t::is_connected() const
 {
-    return m_transport != nullptr && m_transport->state() == Transport::State::Connected;
+    return this->current_transport != nullptr &&
+           this->current_transport->state() == transport_t::state_t::CONNECTED;
 }
 
-void Client::start()
+void client_t::start()
 {
-    if (((m_transport == nullptr) == true))
+    if (((this->current_transport == nullptr) == true))
     {
-        emit transportErrorOccurred(
+        emit this->transport_error_occurred(
             QStringLiteral("Cannot start MCP client without a transport."));
         return;
     }
 
-    emit transportLogMessage(QStringLiteral("Starting MCP client with transport `%1`.")
-                                 .arg(m_transport->transportName()));
-    m_transport->start();
+    emit this->transport_log_message(QStringLiteral("Starting MCP client with transport `%1`.")
+                                         .arg(this->current_transport->transport_name()));
+    this->current_transport->start();
 }
 
-void Client::stop()
+void client_t::stop()
 {
-    if (((m_transport != nullptr) == true))
+    if (((this->current_transport != nullptr) == true))
     {
-        emit transportLogMessage(QStringLiteral("Stopping MCP client transport `%1`.")
-                                     .arg(m_transport->transportName()));
-        m_transport->stop();
+        emit this->transport_log_message(QStringLiteral("Stopping MCP client transport `%1`.")
+                                             .arg(this->current_transport->transport_name()));
+        this->current_transport->stop();
     }
 }
 
-qint64 Client::sendRequest(const QString &method, const QJsonValue &params)
+qint64 client_t::send_request(const QString &method, const QJsonValue &params)
 {
     if (((method.trimmed().isEmpty()) == true))
     {
-        emit transportErrorOccurred(
+        emit this->transport_error_occurred(
             QStringLiteral("Cannot send an MCP request with an empty method."));
         return 0;
     }
 
-    const qint64 requestId = m_nextRequestId++;
+    const qint64 request_id = this->next_request_id++;
     QJsonObject message{
-        {QStringLiteral("id"), requestId},
+        {QStringLiteral("id"), request_id},
         {QStringLiteral("method"), method},
     };
 
@@ -111,20 +112,20 @@ qint64 Client::sendRequest(const QString &method, const QJsonValue &params)
         message.insert(QStringLiteral("params"), params);
     }
 
-    if (sendEnvelope(message) == false)
+    if (this->send_envelope(message) == false)
     {
         return 0;
     }
-    emit transportLogMessage(
-        QStringLiteral("MCP request sent: id=%1 method=%2").arg(requestId).arg(method));
-    return requestId;
+    emit this->transport_log_message(
+        QStringLiteral("MCP request sent: id=%1 method=%2").arg(request_id).arg(method));
+    return request_id;
 }
 
-bool Client::sendNotification(const QString &method, const QJsonValue &params)
+bool client_t::send_notification(const QString &method, const QJsonValue &params)
 {
     if (((method.trimmed().isEmpty()) == true))
     {
-        emit transportErrorOccurred(
+        emit this->transport_error_occurred(
             QStringLiteral("Cannot send an MCP notification with an empty method."));
         return false;
     }
@@ -138,20 +139,22 @@ bool Client::sendNotification(const QString &method, const QJsonValue &params)
         message.insert(QStringLiteral("params"), params);
     }
 
-    const bool ok = sendEnvelope(message);
+    const bool ok = this->send_envelope(message);
 
     if (ok == true)
     {
-        emit transportLogMessage(QStringLiteral("MCP notification sent: method=%1").arg(method));
+        emit this->transport_log_message(
+            QStringLiteral("MCP notification sent: method=%1").arg(method));
     }
     return ok;
 }
 
-bool Client::sendResult(const QJsonValue &id, const QJsonValue &result)
+bool client_t::send_result(const QJsonValue &id, const QJsonValue &result)
 {
     if (id.isUndefined() == true)
     {
-        emit transportErrorOccurred(QStringLiteral("Cannot send an MCP result without an id."));
+        emit this->transport_error_occurred(
+            QStringLiteral("Cannot send an MCP result without an id."));
         return false;
     }
 
@@ -159,106 +162,114 @@ bool Client::sendResult(const QJsonValue &id, const QJsonValue &result)
         {QStringLiteral("id"), id},
         {QStringLiteral("result"), result},
     };
-    const bool ok = sendEnvelope(message);
+    const bool ok = this->send_envelope(message);
     if (ok == true)
     {
-        emit transportLogMessage(QStringLiteral("MCP result sent."));
+        emit this->transport_log_message(QStringLiteral("MCP result sent."));
     }
     return ok;
 }
 
-bool Client::sendError(const QJsonValue &id, int code, const QString &message,
-                       const QJsonValue &data)
+bool client_t::send_error(const QJsonValue &id, int code, const QString &message,
+                          const QJsonValue &data)
 {
     if (id.isUndefined() == true)
     {
-        emit transportErrorOccurred(QStringLiteral("Cannot send an MCP error without an id."));
+        emit this->transport_error_occurred(
+            QStringLiteral("Cannot send an MCP error without an id."));
         return false;
     }
 
-    QJsonObject errorObject{
+    QJsonObject error_object{
         {QStringLiteral("code"), code},
         {QStringLiteral("message"), message},
     };
     if (data.isUndefined() == false)
     {
-        errorObject.insert(QStringLiteral("data"), data);
+        error_object.insert(QStringLiteral("data"), data);
     }
 
     QJsonObject envelope{
         {QStringLiteral("id"), id},
-        {QStringLiteral("error"), errorObject},
+        {QStringLiteral("error"), error_object},
     };
-    const bool ok = sendEnvelope(envelope);
+    const bool ok = this->send_envelope(envelope);
     if (ok == true)
     {
-        emit transportLogMessage(
+        emit this->transport_log_message(
             QStringLiteral("MCP error response sent: code=%1 message=%2").arg(code).arg(message));
     }
     return ok;
 }
 
-bool Client::sendEnvelope(QJsonObject message)
+bool client_t::send_envelope(QJsonObject message)
 {
-    if (((m_transport == nullptr) == true))
+    if (((this->current_transport == nullptr) == true))
     {
-        emit transportErrorOccurred(
+        emit this->transport_error_occurred(
             QStringLiteral("Cannot send an MCP message without a transport."));
         return false;
     }
 
     message.insert(QStringLiteral("jsonrpc"), QStringLiteral("2.0"));
-    emit transportLogMessage(QStringLiteral("MCP -> %1").arg(formatJsonForLog(message)));
-    return m_transport->sendMessage(message);
+    emit this->transport_log_message(
+        QStringLiteral("MCP -> %1").arg(format_json_for_log(message)));
+    return this->current_transport->send_message(message);
 }
 
-void Client::attachTransport()
+void client_t::attach_transport()
 {
-    if (((m_transport == nullptr) == true))
+    if (((this->current_transport == nullptr) == true))
     {
         return;
     }
 
-    m_transport->setParent(this);
-    connect(m_transport.get(), &Transport::started, this, [this]() {
-        emit transportLogMessage(QStringLiteral("MCP transport started."));
-        emit connected();
+    this->current_transport->setParent(this);
+    connect(this->current_transport.get(), &transport_t::started, this, [this]() {
+        emit this->transport_log_message(QStringLiteral("MCP transport started."));
+        emit this->connected();
     });
-    connect(m_transport.get(), &Transport::stopped, this, [this]() {
-        emit transportLogMessage(QStringLiteral("MCP transport stopped."));
-        emit disconnected();
+    connect(this->current_transport.get(), &transport_t::stopped, this, [this]() {
+        emit this->transport_log_message(QStringLiteral("MCP transport stopped."));
+        emit this->disconnected();
     });
-    connect(m_transport.get(), &Transport::stateChanged, this, [this](Transport::State state) {
-        QString stateLabel = QStringLiteral("unknown");
-        switch (state)
-        {
-            case Transport::State::Disconnected:
-                stateLabel = QStringLiteral("disconnected");
-                break;
-            case Transport::State::Starting:
-                stateLabel = QStringLiteral("starting");
-                break;
-            case Transport::State::Connected:
-                stateLabel = QStringLiteral("connected");
-                break;
-            case Transport::State::Stopping:
-                stateLabel = QStringLiteral("stopping");
-                break;
-        }
-        emit transportLogMessage(
-            QStringLiteral("MCP transport state changed: %1").arg(stateLabel));
-    });
-    connect(m_transport.get(), &Transport::logMessage, this, &Client::transportLogMessage);
-    connect(m_transport.get(), &Transport::errorOccurred, this, &Client::transportErrorOccurred);
-    connect(m_transport.get(), &Transport::messageReceived, this, &Client::handleTransportMessage);
+    connect(this->current_transport.get(), &transport_t::state_changed, this,
+            [this](transport_t::state_t state) {
+                QString state_label = QStringLiteral("unknown");
+                switch (state)
+                {
+                    case transport_t::state_t::DISCONNECTED:
+                        state_label = QStringLiteral("disconnected");
+                        break;
+                    case transport_t::state_t::STARTING:
+                        state_label = QStringLiteral("starting");
+                        break;
+                    case transport_t::state_t::CONNECTED:
+                        state_label = QStringLiteral("connected");
+                        break;
+                    case transport_t::state_t::STOPPING:
+                        state_label = QStringLiteral("stopping");
+                        break;
+                }
+                emit this->transport_log_message(
+                    QStringLiteral("MCP transport state changed: %1").arg(state_label));
+            });
+    connect(this->current_transport.get(), &transport_t::log_message, this,
+            &client_t::transport_log_message);
+    connect(this->current_transport.get(), &transport_t::error_occurred, this,
+            &client_t::transport_error_occurred);
+    connect(this->current_transport.get(), &transport_t::message_received, this,
+            &client_t::handle_transport_message);
 }
 
-void Client::handleTransportMessage(const QJsonObject &message)
+void client_t::handle_transport_message(const QJsonObject &message)
 {
-    emit transportLogMessage(QStringLiteral("MCP <- %1").arg(formatJsonForLog(message)));
+    emit this->transport_log_message(
+        QStringLiteral("MCP <- %1").arg(format_json_for_log(message)));
     if (((message.value(QStringLiteral("jsonrpc")).toString() != QStringLiteral("2.0")) == true))
     {
-        emit transportErrorOccurred(QStringLiteral("Received a non-JSON-RPC-2.0 MCP message."));
+        emit this->transport_error_occurred(
+            QStringLiteral("Received a non-JSON-RPC-2.0 MCP message."));
         return;
     }
 
@@ -270,15 +281,15 @@ void Client::handleTransportMessage(const QJsonObject &message)
         const QJsonValue params = message.value(QStringLiteral("params"));
         if (id.isUndefined() == true)
         {
-            emit transportLogMessage(
+            emit this->transport_log_message(
                 QStringLiteral("MCP notification received: method=%1").arg(method.toString()));
-            emit notificationReceived(method.toString(), params);
+            emit this->notification_received(method.toString(), params);
         }
         else
         {
-            emit transportLogMessage(
+            emit this->transport_log_message(
                 QStringLiteral("MCP request received: method=%1").arg(method.toString()));
-            emit requestReceived(id, method.toString(), params);
+            emit this->request_received(id, method.toString(), params);
         }
         return;
     }
@@ -287,26 +298,28 @@ void Client::handleTransportMessage(const QJsonObject &message)
     {
         if (((message.contains(QStringLiteral("error"))) == true))
         {
-            const QJsonObject errorObject = message.value(QStringLiteral("error")).toObject();
-            emit transportLogMessage(
+            const QJsonObject error_object = message.value(QStringLiteral("error")).toObject();
+            emit this->transport_log_message(
                 QStringLiteral("MCP error response received: code=%1 message=%2")
-                    .arg(errorObject.value(QStringLiteral("code")).toInt())
-                    .arg(errorObject.value(QStringLiteral("message")).toString()));
-            emit errorResponseReceived(id, errorObject.value(QStringLiteral("code")).toInt(),
-                                       errorObject.value(QStringLiteral("message")).toString(),
-                                       errorObject.value(QStringLiteral("data")));
+                    .arg(error_object.value(QStringLiteral("code")).toInt())
+                    .arg(error_object.value(QStringLiteral("message")).toString()));
+            emit this->error_response_received(
+                id, error_object.value(QStringLiteral("code")).toInt(),
+                error_object.value(QStringLiteral("message")).toString(),
+                error_object.value(QStringLiteral("data")));
             return;
         }
 
         if (((message.contains(QStringLiteral("result"))) == true))
         {
-            emit transportLogMessage(QStringLiteral("MCP response received."));
-            emit responseReceived(id, message.value(QStringLiteral("result")));
+            emit this->transport_log_message(QStringLiteral("MCP response received."));
+            emit this->response_received(id, message.value(QStringLiteral("result")));
             return;
         }
     }
 
-    emit transportErrorOccurred(QStringLiteral("Received an unrecognized MCP JSON-RPC message."));
+    emit this->transport_error_occurred(
+        QStringLiteral("Received an unrecognized MCP JSON-RPC message."));
 }
 
 }  // namespace qtmcp

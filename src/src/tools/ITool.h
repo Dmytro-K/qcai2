@@ -9,13 +9,13 @@ namespace qcai2
 /**
  * Abstract interface implemented by agent tools.
  */
-class ITool
+class i_tool_t
 {
 public:
     /**
      * Destroys the tool interface.
      */
-    virtual ~ITool() = default;
+    virtual ~i_tool_t() = default;
 
     /**
      * Returns the stable tool name, such as "read_file".
@@ -30,7 +30,7 @@ public:
     /**
      * Returns a JSON schema fragment describing accepted arguments.
      */
-    virtual QJsonObject argsSchema() const = 0;
+    virtual QJsonObject args_schema() const = 0;
 
     /**
      * Executes the tool against the current project.
@@ -38,16 +38,15 @@ public:
      * @param workDir Project root used for sandbox checks.
      * @return Tool result text for the agent conversation.
      */
-    virtual QString execute(const QJsonObject &args, const QString &workDir) = 0;
+    virtual QString execute(const QJsonObject &args, const QString &work_dir) = 0;
 
     /**
      * Returns true when the tool should be approval-gated.
      */
-    virtual bool requiresApproval() const
+    virtual bool requires_approval() const
     {
         return false;
     }
-
 };
 
 }  // namespace qcai2

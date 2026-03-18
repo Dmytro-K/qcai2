@@ -10,7 +10,7 @@ namespace qcai2
 namespace
 {
 
-QString normalizedCommandName(QString name)
+QString normalized_command_name(QString name)
 {
     name = name.trimmed();
     if (((name.startsWith(QLatin1Char('/'))) == true))
@@ -20,10 +20,10 @@ QString normalizedCommandName(QString name)
     return name.toLower();
 }
 
-SlashCommandInvocation parseSlashCommand(const QString &input)
+slash_command_invocation_t parse_slash_command(const QString &input)
 {
-    const QString trimmedInput = input.trimmed();
-    const QString body = trimmedInput.mid(1).trimmed();
+    const QString trimmed_input = input.trimmed();
+    const QString body = trimmed_input.mid(1).trimmed();
 
     qsizetype nameEnd = 0;
     while (nameEnd < body.size() && !body.at(nameEnd).isSpace())
@@ -31,9 +31,9 @@ SlashCommandInvocation parseSlashCommand(const QString &input)
         ++nameEnd;
     }
 
-    SlashCommandInvocation invocation;
-    invocation.input = trimmedInput;
-    invocation.name = normalizedCommandName(body.left(nameEnd));
+    slash_command_invocation_t invocation;
+    invocation.input = trimmed_input;
+    invocation.name = normalized_command_name(body.left(nameEnd));
     invocation.arguments = body.mid(nameEnd).trimmed();
     return invocation;
 }
@@ -43,112 +43,115 @@ SlashCommandInvocation parseSlashCommand(const QString &input)
 namespace detail
 {
 
-QList<const SlashCommandDefinition *> &registeredSlashCommandDefinitions()
+QList<const slash_command_definition_t *> &registered_slash_command_definitions()
 {
-    static QList<const SlashCommandDefinition *> definitions;
+    static QList<const slash_command_definition_t *> definitions;
     return definitions;
 }
 
-void registerSlashCommandDefinition(const SlashCommandDefinition *definition)
+void register_slash_command_definition(const slash_command_definition_t *definition)
 {
     if (((definition == nullptr) == true))
     {
         return;
     }
 
-    registeredSlashCommandDefinitions().append(definition);
+    registered_slash_command_definitions().append(definition);
 }
 
 }  // namespace detail
 
-SlashCommandRegistry::SlashCommandRegistry()
+slash_command_registry_t::slash_command_registry_t()
 {
-    const auto &definitions = detail::registeredSlashCommandDefinitions();
-    for (const SlashCommandDefinition *definition : definitions)
+    const auto &definitions = detail::registered_slash_command_definitions();
+    for (const slash_command_definition_t *definition : definitions)
     {
         if (definition == nullptr || definition->handler == nullptr)
         {
             continue;
         }
 
-        const QString key = normalizedCommandName(QString::fromUtf8(definition->name));
+        const QString key = normalized_command_name(QString::fromUtf8(definition->name));
         if (key.isEmpty())
         {
             continue;
         }
 
-        Entry entry;
-        entry.displayName = key;
+        entry_t entry;
+        entry.display_name = key;
         entry.description = QString::fromUtf8(definition->description).trimmed();
         entry.handler = definition->handler;
-        m_commands.insert(key, std::move(entry));
+        this->registered_commands.insert(key, std::move(entry));
     }
 }
 
-QList<SlashCommandRegistry::CommandInfo> SlashCommandRegistry::commands() const
+QList<slash_command_registry_t::command_info_t> slash_command_registry_t::commands() const
 {
-    QList<CommandInfo> commandInfos;
-    commandInfos.reserve(m_commands.size());
+    QList<command_info_t> command_infos;
+    command_infos.reserve(this->registered_commands.size());
 
-    for (auto it = m_commands.cbegin(); ((it != m_commands.cend()) == true); ++it)
+    for (auto it = this->registered_commands.cbegin();
+         ((it != this->registered_commands.cend()) == true); ++it)
     {
-        commandInfos.append({QStringLiteral("/%1").arg(it->displayName), it->description});
+        command_infos.append({QStringLiteral("/%1").arg(it->display_name), it->description});
     }
 
-    std::sort(commandInfos.begin(), commandInfos.end(),
-              [](const CommandInfo &lhs, const CommandInfo &rhs) {
+    std::sort(command_infos.begin(), command_infos.end(),
+              [](const command_info_t &lhs, const command_info_t &rhs) {
                   return lhs.name.compare(rhs.name, Qt::CaseInsensitive) < 0;
               });
-    return commandInfos;
+    return command_infos;
 }
 
-QStringList SlashCommandRegistry::commandNames() const
+QStringList slash_command_registry_t::command_names() const
 {
     QStringList names;
-    const QList<CommandInfo> commandInfos = commands();
-    names.reserve(commandInfos.size());
-    for (const CommandInfo &command : commandInfos)
+    const QList<command_info_t> command_infos = this->commands();
+    names.reserve(command_infos.size());
+    for (const command_info_t &command : command_infos)
     {
         names.append(command.name);
     }
     return names;
 }
 
-SlashCommandDispatchResult SlashCommandRegistry::dispatch(const QString &input,
-                                                          const SlashCommandContext &context) const
+slash_command_dispatch_result_t
+slash_command_registry_t::dispatch(const QString &input,
+                                   const slash_command_context_t &context) const
 {
-    const QString trimmedInput = input.trimmed();
-    if (((trimmedInput.startsWith(QLatin1Char('/'))) == false))
+    const QString trimmed_input = input.trimmed();
+    if (((trimmed_input.startsWith(QLatin1Char('/'))) == false))
     {
         return {};
     }
 
-    const SlashCommandInvocation invocation = parseSlashCommand(trimmedInput);
-    SlashCommandDispatchResult result;
-    result.isSlashCommand = true;
-    result.commandName = invocation.name;
+    const slash_command_invocation_t invocation = parse_slash_command(trimmed_input);
+    slash_command_dispatch_result_t result;
+    result.is_slash_command = true;
+    result.command_name = invocation.name;
 
     if (invocation.name.isEmpty())
     {
-        result.errorMessage = QStringLiteral("❌ Slash command is empty.");
+        result.error_message = QStringLiteral("❌ Slash command is empty.");
         return result;
     }
 
-    const auto it = m_commands.constFind(invocation.name);
-    if (it == m_commands.cend())
+    const auto it = this->registered_commands.constFind(invocation.name);
+    if (it == this->registered_commands.cend())
     {
-        result.errorMessage = QStringLiteral("❌ Unknown slash command: /%1").arg(invocation.name);
+        result.error_message =
+            QStringLiteral("❌ Unknown slash command: /%1").arg(invocation.name);
         return result;
     }
 
-    result.commandName = it->displayName;
+    result.command_name = it->display_name;
 
-    QString goalOverride;
-    SlashCommandContext handlerContext = context;
-    handlerContext.goalOverride = &goalOverride;
-    it->handler(invocation, handlerContext);
+    QString goal_override;
+    slash_command_context_t handler_context = context;
+    handler_context.goal_override = &goal_override;
+    it->handler(invocation, handler_context);
 
-    result.goalOverride = goalOverride;
+    result.goal_override = goal_override;
     result.executed = true;
     return result;
 }

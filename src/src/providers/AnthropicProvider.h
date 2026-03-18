@@ -12,7 +12,7 @@ namespace qcai2
 /**
  * Provider for Anthropic's Messages API.
  */
-class AnthropicProvider : public QObject, public IAIProvider
+class anthropic_provider_t : public QObject, public iai_provider_t
 {
     Q_OBJECT
 public:
@@ -20,7 +20,7 @@ public:
      * Creates an Anthropic provider with the default cloud endpoint.
      * @param parent Parent QObject that owns this instance.
      */
-    explicit AnthropicProvider(QObject *parent = nullptr);
+    explicit anthropic_provider_t(QObject *parent = nullptr);
 
     /**
      * Returns the provider identifier used in configuration.
@@ -33,7 +33,7 @@ public:
     /**
      * Returns the user-visible provider name.
      */
-    QString displayName() const override
+    QString display_name() const override
     {
         return QStringLiteral("Anthropic API");
     }
@@ -43,15 +43,15 @@ public:
      * @param messages Conversation history serialized for Anthropic.
      * @param model Remote model identifier.
      * @param temperature Sampling temperature.
-     * @param maxTokens Maximum completion token count.
-     * @param reasoningEffort Optional effort hint; currently used only as a prompt-level hint.
+     * @param max_tokens Maximum completion token count.
+     * @param reasoning_effort Optional effort hint; currently used only as a prompt-level hint.
      * @param callback Receives the final response text or an error.
-     * @param streamCallback Receives streamed text deltas; an empty string ends the stream.
+     * @param stream_callback Receives streamed text deltas; an empty string ends the stream.
      */
-    void complete(const QList<ChatMessage> &messages, const QString &model, double temperature,
-                  int maxTokens, const QString &reasoningEffort, CompletionCallback callback,
-                  StreamCallback streamCallback = nullptr,
-                  ProgressCallback progressCallback = nullptr) override;
+    void complete(const QList<chat_message_t> &messages, const QString &model, double temperature,
+                  int max_tokens, const QString &reasoning_effort, completion_callback_t callback,
+                  stream_callback_t stream_callback = nullptr,
+                  progress_callback_t progress_callback = nullptr) override;
 
     /**
      * Aborts the active network reply, if any.
@@ -62,41 +62,41 @@ public:
      * Sets the base URL for the Anthropic API server.
      * @param url Base URL to use.
      */
-    void setBaseUrl(const QString &url) override
+    void set_base_url(const QString &url) override
     {
-        m_baseUrl = url;
+        this->base_url = url;
     }
 
     /**
      * Sets the API key sent via the x-api-key header.
      * @param key API key.
      */
-    void setApiKey(const QString &key) override
+    void set_api_key(const QString &key) override
     {
-        m_apiKey = key;
+        this->api_key = key;
     }
 
 private:
     /** Network access manager shared by provider requests. */
-    QNetworkAccessManager m_nam;
+    QNetworkAccessManager nam;
 
     /** Active reply for the current request, or null when idle. */
-    QNetworkReply *m_currentReply = nullptr;
+    QNetworkReply *current_reply = nullptr;
 
     /** Base URL for the Anthropic API endpoint. */
-    QString m_baseUrl = QStringLiteral("https://api.anthropic.com");
+    QString base_url = QStringLiteral("https://api.anthropic.com");
 
     /** API key sent via the x-api-key header. */
-    QString m_apiKey;
+    QString api_key;
 
     /** Partial SSE data waiting for a complete line. */
-    QByteArray m_sseBuffer;
+    QByteArray sse_buffer;
 
     /** Accumulated streamed text returned to the caller at completion. */
-    QString m_streamAccum;
+    QString stream_accum;
 
     /** Usage counters captured from the current streaming response. */
-    ProviderUsage m_streamUsage;
+    provider_usage_t stream_usage;
 };
 
 }  // namespace qcai2

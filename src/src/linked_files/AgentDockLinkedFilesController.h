@@ -1,4 +1,4 @@
-/*! Declares linked-files behavior used by AgentDockWidget. */
+/*! Declares linked-files behavior used by agent_dock_widget_t. */
 #pragma once
 
 #include <QStringList>
@@ -6,42 +6,42 @@
 namespace qcai2
 {
 
-class AgentDockWidget;
+class agent_dock_widget_t;
 
-class AgentDockLinkedFilesController
+class agent_dock_linked_files_controller_t
 {
 public:
-    explicit AgentDockLinkedFilesController(AgentDockWidget &dock);
+    explicit agent_dock_linked_files_controller_t(agent_dock_widget_t &dock);
 
-    QStringList linkedFileCandidates() const;
-    QStringList effectiveLinkedFiles() const;
-    QString linkedFilesPromptContext() const;
-    QString linkedFileAbsolutePath(const QString &path) const;
+    QStringList linked_file_candidates() const;
+    QStringList effective_linked_files() const;
+    QString linked_files_prompt_context() const;
+    QString linked_file_absolute_path(const QString &path) const;
 
-    void addLinkedFiles(const QStringList &paths);
-    void removeSelectedLinkedFiles();
-    void refreshUi();
-    void clearState();
+    void add_linked_files(const QStringList &paths);
+    void remove_selected_linked_files();
+    void refresh_ui();
+    void clear_state();
 
-    const QStringList &manualLinkedFiles() const;
-    const QStringList &ignoredLinkedFiles() const;
-    void setManualLinkedFiles(const QStringList &paths);
-    void setIgnoredLinkedFiles(const QStringList &paths);
-    void invalidateCandidates();
+    const QStringList &manual_linked_files() const;
+    const QStringList &ignored_linked_files() const;
+    void set_manual_linked_files(const QStringList &paths);
+    void set_ignored_linked_files(const QStringList &paths);
+    void invalidate_candidates();
 
 private:
-    QString currentProjectDir() const;
-    QStringList linkedFilesFromGoalText() const;
-    QString currentEditorLinkedFile() const;
-    QString defaultLinkedFile() const;
-    QString normalizeLinkedFilePath(const QString &path) const;
+    QString current_project_dir() const;
+    QStringList linked_files_from_goal_text() const;
+    QString current_editor_linked_file() const;
+    QString default_linked_file() const;
+    QString normalize_linked_file_path(const QString &path) const;
 
-    AgentDockWidget &m_dock;
-    QStringList m_manualLinkedFiles;
-    QStringList m_ignoredLinkedFiles;
-    QStringList m_hiddenDefaultLinkedFiles;
-    mutable QString m_cachedLinkedFileRoot;
-    mutable QStringList m_cachedLinkedFileCandidates;
+    agent_dock_widget_t &dock;
+    QStringList manual_linked_file_paths;
+    QStringList ignored_linked_file_paths;
+    QStringList hidden_default_linked_files;
+    mutable QString cached_linked_file_root;
+    mutable QStringList cached_linked_file_candidates;
 };
 
 }  // namespace qcai2

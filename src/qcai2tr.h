@@ -9,7 +9,7 @@ namespace qcai2
 /**
  * Translation context wrapper for QObject-free tr() calls.
  */
-struct Tr
+struct tr_t
 {
     Q_DECLARE_TR_FUNCTIONS(QtC::qcai2)
 };

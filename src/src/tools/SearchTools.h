@@ -8,7 +8,7 @@ namespace qcai2
 /**
  * Tool that searches repository text with ripgrep or a Qt fallback.
  */
-class SearchRepoTool : public ITool
+class search_repo_tool_t : public i_tool_t
 {
 public:
     /**
@@ -32,14 +32,14 @@ public:
     /**
      * Returns the JSON schema for repository search arguments.
      */
-    QJsonObject argsSchema() const override;
+    QJsonObject args_schema() const override;
 
     /**
      * Searches the repository and returns matching lines.
      * @param args Tool arguments.
      * @param workDir Working directory used by the operation.
      */
-    QString execute(const QJsonObject &args, const QString &workDir) override;
+    QString execute(const QJsonObject &args, const QString &work_dir) override;
 
 private:
     /**
@@ -49,8 +49,8 @@ private:
      * @param maxResults Maximum number of matches to return.
      * @param workDir Working directory used by the operation.
      */
-    QString searchWithRipgrep(const QString &pattern, const QString &glob, int maxResults,
-                              const QString &workDir);
+    QString search_with_ripgrep(const QString &pattern, const QString &glob, int max_results,
+                                const QString &work_dir);
 
     /**
      * Uses QDirIterator and QRegularExpression when ripgrep is unavailable.
@@ -59,9 +59,8 @@ private:
      * @param maxResults Maximum number of matches to return.
      * @param workDir Working directory used by the operation.
      */
-    QString searchFallback(const QString &pattern, const QString &glob, int maxResults,
-                           const QString &workDir);
-
+    QString search_fallback(const QString &pattern, const QString &glob, int max_results,
+                            const QString &work_dir);
 };
 
 }  // namespace qcai2

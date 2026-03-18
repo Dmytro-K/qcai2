@@ -9,68 +9,69 @@
 
 using namespace qcai2;
 
-class tst_ChatContext : public QObject
+class tst_chat_context_t : public QObject
 {
     Q_OBJECT
 
 private slots:
-    void storesArtifactsAndBuildsEnvelope();
-    void newConversationIsIsolated();
+    void stores_artifacts_and_builds_envelope();
+    void new_conversation_is_isolated();
 };
 
-void tst_ChatContext::storesArtifactsAndBuildsEnvelope()
+void tst_chat_context_t::stores_artifacts_and_builds_envelope()
 {
-    QTemporaryDir tempDir;
-    QVERIFY(tempDir.isValid());
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
 
-    QDir rootDir(tempDir.path());
-    QVERIFY(rootDir.mkpath(QStringLiteral(".qcai2")));
-    QVERIFY(rootDir.mkpath(QStringLiteral("docs")));
+    QDir root_dir(temp_dir.path());
+    QVERIFY(root_dir.mkpath(QStringLiteral(".qcai2")));
+    QVERIFY(root_dir.mkpath(QStringLiteral("docs")));
 
-    QFile styleFile(rootDir.filePath(QStringLiteral("docs/CODING_STYLE.md")));
-    QVERIFY(styleFile.open(QIODevice::WriteOnly | QIODevice::Text));
-    QVERIFY(styleFile.write("Always use braces.\n") >= 0);
-    styleFile.close();
+    QFile style_file(root_dir.filePath(QStringLiteral("docs/CODING_STYLE.md")));
+    QVERIFY(style_file.open(QIODevice::WriteOnly | QIODevice::Text));
+    QVERIFY(style_file.write("Always use braces.\n") >= 0);
+    style_file.close();
 
-    ChatContextManager manager;
+    chat_context_manager_t manager;
     QString error;
-    QVERIFY(manager.setActiveWorkspace(QStringLiteral("workspace-1"), tempDir.path(), {}, &error));
+    QVERIFY(
+        manager.set_active_workspace(QStringLiteral("workspace-1"), temp_dir.path(), {}, &error));
     QVERIFY(error.isEmpty());
 
-    Settings settings;
-    settings.modelName = QStringLiteral("gpt-5.4");
-    settings.reasoningEffort = QStringLiteral("medium");
-    settings.thinkingLevel = QStringLiteral("high");
+    settings_t settings;
+    settings.model_name = QStringLiteral("gpt-5.4");
+    settings.reasoning_effort = QStringLiteral("medium");
+    settings.thinking_level = QStringLiteral("high");
 
-    EditorContext::Snapshot snapshot;
-    snapshot.projectDir = tempDir.path();
-    snapshot.projectFilePath = rootDir.filePath(QStringLiteral("project.qtc"));
-    snapshot.buildDir = rootDir.filePath(QStringLiteral("build"));
-    snapshot.filePath = rootDir.filePath(QStringLiteral("src/main.cpp"));
+    editor_context_t::snapshot_t snapshot;
+    snapshot.project_dir = temp_dir.path();
+    snapshot.project_file_path = root_dir.filePath(QStringLiteral("project.qtc"));
+    snapshot.build_dir = root_dir.filePath(QStringLiteral("build"));
+    snapshot.file_path = root_dir.filePath(QStringLiteral("src/main.cpp"));
 
-    manager.syncWorkspaceState(snapshot, settings, &error);
+    manager.sync_workspace_state(snapshot, settings, &error);
     QVERIFY(error.isEmpty());
 
-    const QString conversationId = manager.startNewConversation(QStringLiteral("Test"), &error);
+    const QString conversation_id = manager.start_new_conversation(QStringLiteral("Test"), &error);
     QVERIFY2(error.isEmpty(), qPrintable(error));
-    QVERIFY2(conversationId.isEmpty() == false, qPrintable(error));
+    QVERIFY2(conversation_id.isEmpty() == false, qPrintable(error));
 
-    const QString runId = manager.beginRun(
-        ContextRequestKind::AgentChat, QStringLiteral("provider"), QStringLiteral("model"),
+    const QString run_id = manager.begin_run(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("provider"), QStringLiteral("model"),
         QStringLiteral("medium"), QStringLiteral("high"), true, {}, &error);
     QVERIFY2(error.isEmpty(), qPrintable(error));
-    QVERIFY2(runId.isEmpty() == false, qPrintable(error));
+    QVERIFY2(run_id.isEmpty() == false, qPrintable(error));
 
     for (int index = 0; index < 7; ++index)
     {
-        QVERIFY(manager.appendUserMessage(
-            runId,
+        QVERIFY(manager.append_user_message(
+            run_id,
             QStringLiteral("User message %1 with enough text to force summary refresh.")
                 .arg(index),
             QStringLiteral("goal"), {}, &error));
         QVERIFY(error.isEmpty());
-        QVERIFY(manager.appendAssistantMessage(
-            runId,
+        QVERIFY(manager.append_assistant_message(
+            run_id,
             QStringLiteral("Assistant response %1 with enough detail to keep the rolling summary "
                            "useful.")
                 .arg(index),
@@ -78,108 +79,110 @@ void tst_ChatContext::storesArtifactsAndBuildsEnvelope()
         QVERIFY(error.isEmpty());
     }
 
-    QVERIFY(manager.appendArtifact(
-        runId, QStringLiteral("build_log"), QStringLiteral("cmake build"),
+    QVERIFY(manager.append_artifact(
+        run_id, QStringLiteral("build_log"), QStringLiteral("cmake build"),
         QStringLiteral("Build output line 1\nBuild output line 2\n"), {}, &error));
     QVERIFY(error.isEmpty());
-    QVERIFY(manager.maybeRefreshSummary(&error));
+    QVERIFY(manager.maybe_refresh_summary(&error));
     QVERIFY(error.isEmpty());
 
-    const ContextEnvelope envelope = manager.buildContextEnvelope(
-        ContextRequestKind::AgentChat, QStringLiteral("System prompt"),
+    const context_envelope_t envelope = manager.build_context_envelope(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("System prompt"),
         QStringList{QStringLiteral("Request-specific context")}, 4096, &error);
     QVERIFY(error.isEmpty());
-    QVERIFY(envelope.providerMessages.isEmpty() == false);
-    QVERIFY(envelope.summary.isValid());
+    QVERIFY(envelope.provider_messages.isEmpty() == false);
+    QVERIFY(envelope.summary.is_valid());
 
-    bool hasMemoryBlock = false;
-    bool hasSummaryBlock = false;
-    bool hasArtifactBlock = false;
-    for (const ChatMessage &message : envelope.providerMessages)
+    bool has_memory_block = false;
+    bool has_summary_block = false;
+    bool has_artifact_block = false;
+    for (const chat_message_t &message : envelope.provider_messages)
     {
         if (message.role != QStringLiteral("system"))
         {
             continue;
         }
-        hasMemoryBlock =
-            hasMemoryBlock || message.content.contains(QStringLiteral("Stable workspace memory:"));
-        hasSummaryBlock =
-            hasSummaryBlock || message.content.contains(QStringLiteral("Rolling summary"));
-        hasArtifactBlock = hasArtifactBlock ||
-                           message.content.contains(QStringLiteral("Relevant prior artifacts"));
+        has_memory_block = has_memory_block ||
+                           message.content.contains(QStringLiteral("Stable workspace memory:"));
+        has_summary_block =
+            has_summary_block || message.content.contains(QStringLiteral("Rolling summary"));
+        has_artifact_block = has_artifact_block ||
+                             message.content.contains(QStringLiteral("Relevant prior artifacts"));
     }
 
-    QVERIFY(hasMemoryBlock);
-    QVERIFY(hasSummaryBlock);
-    QVERIFY(hasArtifactBlock);
-    QVERIFY(QFileInfo::exists(manager.databasePath()));
-    QVERIFY(QFileInfo(manager.databasePath()).isDir());
+    QVERIFY(has_memory_block);
+    QVERIFY(has_summary_block);
+    QVERIFY(has_artifact_block);
+    QVERIFY(QFileInfo::exists(manager.database_path()));
+    QVERIFY(QFileInfo(manager.database_path()).isDir());
     QVERIFY(
-        QFileInfo::exists(QDir(manager.databasePath()).filePath(QStringLiteral("format.json"))));
+        QFileInfo::exists(QDir(manager.database_path()).filePath(QStringLiteral("format.json"))));
     QVERIFY(QFileInfo::exists(
-        QDir(manager.databasePath())
-            .filePath(QStringLiteral("conversations/%1/messages.jsonl").arg(conversationId))));
+        QDir(manager.database_path())
+            .filePath(QStringLiteral("conversations/%1/messages.jsonl").arg(conversation_id))));
 
-    const QDir artifactDir(manager.artifactDirectoryPath());
-    QVERIFY(artifactDir.exists());
-    QVERIFY(artifactDir.entryList(QDir::Files | QDir::NoDotAndDotDot).isEmpty() == false);
+    const QDir artifact_dir(manager.artifact_directory_path());
+    QVERIFY(artifact_dir.exists());
+    QVERIFY(artifact_dir.entryList(QDir::Files | QDir::NoDotAndDotDot).isEmpty() == false);
 }
 
-void tst_ChatContext::newConversationIsIsolated()
+void tst_chat_context_t::new_conversation_is_isolated()
 {
-    QTemporaryDir tempDir;
-    QVERIFY(tempDir.isValid());
-    QVERIFY(QDir(tempDir.path()).mkpath(QStringLiteral(".qcai2")));
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+    QVERIFY(QDir(temp_dir.path()).mkpath(QStringLiteral(".qcai2")));
 
-    ChatContextManager manager;
+    chat_context_manager_t manager;
     QString error;
-    QVERIFY(manager.setActiveWorkspace(QStringLiteral("workspace-2"), tempDir.path(), {}, &error));
+    QVERIFY(
+        manager.set_active_workspace(QStringLiteral("workspace-2"), temp_dir.path(), {}, &error));
     QVERIFY(error.isEmpty());
 
-    const QString firstConversation = manager.startNewConversation({}, &error);
+    const QString first_conversation = manager.start_new_conversation({}, &error);
     QVERIFY2(error.isEmpty(), qPrintable(error));
-    QVERIFY2(firstConversation.isEmpty() == false, qPrintable(error));
+    QVERIFY2(first_conversation.isEmpty() == false, qPrintable(error));
 
-    QString runId = manager.beginRun(ContextRequestKind::AgentChat, QStringLiteral("provider"),
-                                     QStringLiteral("model"), QStringLiteral("off"),
-                                     QStringLiteral("off"), true, {}, &error);
+    QString run_id = manager.begin_run(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("provider"), QStringLiteral("model"),
+        QStringLiteral("off"), QStringLiteral("off"), true, {}, &error);
     QVERIFY(error.isEmpty());
-    QVERIFY(runId.isEmpty() == false);
-    QVERIFY(manager.appendUserMessage(runId, QStringLiteral("first-conversation-marker"),
-                                      QStringLiteral("goal"), {}, &error));
+    QVERIFY(run_id.isEmpty() == false);
+    QVERIFY(manager.append_user_message(run_id, QStringLiteral("first-conversation-marker"),
+                                        QStringLiteral("goal"), {}, &error));
     QVERIFY(error.isEmpty());
-    QVERIFY(manager.finishRun(runId, QStringLiteral("completed"), ProviderUsage{}, {}, &error));
+    QVERIFY(
+        manager.finish_run(run_id, QStringLiteral("completed"), provider_usage_t{}, {}, &error));
     QVERIFY(error.isEmpty());
 
-    const QString secondConversation = manager.startNewConversation({}, &error);
+    const QString second_conversation = manager.start_new_conversation({}, &error);
     QVERIFY(error.isEmpty());
-    QVERIFY(secondConversation.isEmpty() == false);
-    QVERIFY(secondConversation != firstConversation);
+    QVERIFY(second_conversation.isEmpty() == false);
+    QVERIFY(second_conversation != first_conversation);
 
-    runId = manager.beginRun(ContextRequestKind::AgentChat, QStringLiteral("provider"),
-                             QStringLiteral("model"), QStringLiteral("off"), QStringLiteral("off"),
-                             true, {}, &error);
+    run_id = manager.begin_run(context_request_kind_t::AGENT_CHAT, QStringLiteral("provider"),
+                               QStringLiteral("model"), QStringLiteral("off"),
+                               QStringLiteral("off"), true, {}, &error);
     QVERIFY2(error.isEmpty(), qPrintable(error));
-    QVERIFY2(runId.isEmpty() == false, qPrintable(error));
-    QVERIFY(manager.appendUserMessage(runId, QStringLiteral("second-conversation-marker"),
-                                      QStringLiteral("goal"), {}, &error));
+    QVERIFY2(run_id.isEmpty() == false, qPrintable(error));
+    QVERIFY(manager.append_user_message(run_id, QStringLiteral("second-conversation-marker"),
+                                        QStringLiteral("goal"), {}, &error));
     QVERIFY(error.isEmpty());
 
-    const ContextEnvelope envelope = manager.buildContextEnvelope(
-        ContextRequestKind::AgentChat, QStringLiteral("System prompt"), {}, 1024, &error);
+    const context_envelope_t envelope = manager.build_context_envelope(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("System prompt"), {}, 1024, &error);
     QVERIFY(error.isEmpty());
 
-    QString combinedPrompt;
-    for (const ChatMessage &message : envelope.providerMessages)
+    QString combined_prompt;
+    for (const chat_message_t &message : envelope.provider_messages)
     {
-        combinedPrompt += message.content;
-        combinedPrompt += QLatin1Char('\n');
+        combined_prompt += message.content;
+        combined_prompt += QLatin1Char('\n');
     }
 
-    QVERIFY(combinedPrompt.contains(QStringLiteral("second-conversation-marker")));
-    QVERIFY(combinedPrompt.contains(QStringLiteral("first-conversation-marker")) == false);
+    QVERIFY(combined_prompt.contains(QStringLiteral("second-conversation-marker")));
+    QVERIFY(combined_prompt.contains(QStringLiteral("first-conversation-marker")) == false);
 }
 
-QTEST_MAIN(tst_ChatContext)
+QTEST_MAIN(tst_chat_context_t)
 
 #include "tst_chat_context.moc"

@@ -16,37 +16,36 @@ namespace qcai2
 /**
  * @brief Runs external commands with timeout handling for plugin tools.
  */
-class ProcessRunner : public QObject
+class process_runner_t : public QObject
 {
     Q_OBJECT
 public:
     /**
      * @brief Describes the outcome of a completed process.
      */
-    struct Result
+    struct result_t
     {
         /** @brief True when the process exits normally with code zero. */
         bool success = false;
 
         /** @brief Exit code reported by the child process. */
-        int exitCode = -1;
+        int exit_code = -1;
 
         /** @brief Captured standard output. */
-        QString stdOut;
+        QString std_out;
 
         /** @brief Captured standard error. */
-        QString stdErr;
+        QString std_err;
 
         /** @brief QProcess error text such as startup failures. */
-        QString errorString;
-
+        QString error_string;
     };
 
     /**
      * @brief Creates a process runner owned by an optional parent object.
      * @param parent QObject parent for lifecycle management.
      */
-    explicit ProcessRunner(QObject *parent = nullptr);
+    explicit process_runner_t(QObject *parent = nullptr);
 
     /**
      * @brief Runs a command synchronously.
@@ -57,8 +56,8 @@ public:
      * @param stdinData Optional text written to the process stdin.
      * @return Captured process result including stdout, stderr, and exit code.
      */
-    Result run(const QString &program, const QStringList &args, const QString &workDir = {},
-               int timeoutMs = 30000, const QString &stdinData = {});
+    result_t run(const QString &program, const QStringList &args, const QString &work_dir = {},
+                 int timeout_ms = 30000, const QString &stdin_data = {});
 
     /**
      * @brief Starts a command asynchronously.
@@ -67,31 +66,30 @@ public:
      * @param workDir Optional working directory for the child process.
      * @param timeoutMs Maximum runtime before the child process is killed.
      */
-    void runAsync(const QString &program, const QStringList &args, const QString &workDir = {},
-                  int timeoutMs = 30000);
+    void run_async(const QString &program, const QStringList &args, const QString &work_dir = {},
+                   int timeout_ms = 30000);
 
 signals:
     /**
      * @brief Emitted when an asynchronous process finishes.
      * @param result Captured process outcome.
      */
-    void finished(const ProcessRunner::Result &result);
+    void finished(const process_runner_t::result_t &result);
 
     /**
      * @brief Reserved signal for line-oriented asynchronous output.
      * @param line Parsed stdout line.
      */
-    void outputLine(const QString &line);
+    void output_line(const QString &line);
 
 private:
     /**
      * @brief Placeholder hook for parsing asynchronous stdout.
      */
-    void handleReadyRead();
+    void handle_ready_read();
 
     /** @brief Buffered partial line for async stdout parsing. */
-    QString m_pendingLine;
-
+    QString pending_line;
 };
 
 }  // namespace qcai2

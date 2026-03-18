@@ -39,150 +39,152 @@ namespace qtmcp
 namespace
 {
 
-constexpr int kMaxLoggedPayloadChars = 2000;
+constexpr int k_max_logged_payload_chars = 2000;
 
-QString formatPayloadForLog(const QByteArray &payload)
+QString format_payload_for_log(const QByteArray &payload)
 {
     QString text = QString::fromUtf8(payload);
     text.replace(QLatin1Char('\n'), QStringLiteral("\\n"));
     text.replace(QLatin1Char('\r'), QStringLiteral("\\r"));
-    if (text.size() > kMaxLoggedPayloadChars)
+    if (text.size() > k_max_logged_payload_chars)
     {
-        text = text.left(kMaxLoggedPayloadChars);
+        text = text.left(k_max_logged_payload_chars);
         text += QStringLiteral("... [truncated]");
     }
     return text;
 }
 
-QString normalizedContentType(QNetworkReply *reply)
+QString normalized_content_type(QNetworkReply *reply)
 {
     const QString raw = reply->header(QNetworkRequest::ContentTypeHeader).toString();
     const qsizetype separator = raw.indexOf(QLatin1Char(';'));
     return (separator >= 0 ? raw.left(separator) : raw).trimmed().toLower();
 }
 
-QString scopesCacheKey(QStringList scopes)
+QString scopes_cache_key(QStringList scopes)
 {
     std::sort(scopes.begin(), scopes.end());
     return scopes.join(QLatin1Char(' '));
 }
 
-QString oauthCacheKey(const HttpTransportConfig &config)
+QString oauth_cache_key(const http_transport_config_t &config)
 {
     return QStringLiteral("%1|%2|%3")
-        .arg(config.endpoint.toString(QUrl::FullyEncoded), config.oauthClientId,
-             scopesCacheKey(config.oauthScopes));
+        .arg(config.endpoint.toString(QUrl::FullyEncoded), config.oauth_client_id,
+             scopes_cache_key(config.oauth_scopes));
 }
 
-QString tokenPresenceSummary(const QString &token)
+QString token_presence_summary(const QString &token)
 {
     return token.isEmpty() ? QStringLiteral("absent")
                            : QStringLiteral("present(len=%1)").arg(token.size());
 }
 
-QString expirySummary(const QDateTime &expiration)
+QString expiry_summary(const QDateTime &expiration)
 {
     return expiration.isValid() ? expiration.toString(Qt::ISODate) : QStringLiteral("none");
 }
 
-struct OAuthCacheEntry
+struct o_auth_cache_entry_t
 {
-    QString accessToken;
-    QString refreshToken;
+    QString access_token;
+    QString refresh_token;
     QDateTime expiration;
-    QUrl authorizationUrl;
-    QUrl tokenUrl;
-    QString clientId;
-    QString clientSecret;
+    QUrl authorization_url;
+    QUrl token_url;
+    QString client_id;
+    QString client_secret;
     QString resource;
-    QUrl resourceMetadataUrl;
+    QUrl resource_metadata_url;
 };
 
-QHash<QString, OAuthCacheEntry> &oauthCache()
+QHash<QString, o_auth_cache_entry_t> &oauth_cache()
 {
-    static QHash<QString, OAuthCacheEntry> cache;
+    static QHash<QString, o_auth_cache_entry_t> cache;
     return cache;
 }
 
-QString persistentOAuthCachePath()
+QString persistent_o_auth_cache_path()
 {
-    QString basePath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    if (((basePath.trimmed().isEmpty()) == true))
+    QString base_path = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    if (((base_path.trimmed().isEmpty()) == true))
     {
-        basePath = QDir::homePath() + QStringLiteral("/.config");
+        base_path = QDir::homePath() + QStringLiteral("/.config");
     }
-    return QDir(basePath).filePath(QStringLiteral("qtmcp/oauth-cache.json"));
+    return QDir(base_path).filePath(QStringLiteral("qtmcp/oauth-cache.json"));
 }
 
-QJsonObject oauthCacheEntryToJson(const OAuthCacheEntry &entry)
+QJsonObject oauth_cache_entry_to_json(const o_auth_cache_entry_t &entry)
 {
     QJsonObject object;
-    if (((!entry.accessToken.isEmpty()) == true))
+    if (((!entry.access_token.isEmpty()) == true))
     {
-        object.insert(QStringLiteral("accessToken"), entry.accessToken);
+        object.insert(QStringLiteral("accessToken"), entry.access_token);
     }
-    if (((!entry.refreshToken.isEmpty()) == true))
+    if (((!entry.refresh_token.isEmpty()) == true))
     {
-        object.insert(QStringLiteral("refreshToken"), entry.refreshToken);
+        object.insert(QStringLiteral("refreshToken"), entry.refresh_token);
     }
     if (entry.expiration.isValid() == true)
     {
         object.insert(QStringLiteral("expiration"), entry.expiration.toString(Qt::ISODate));
     }
-    if (((entry.authorizationUrl.isValid() && !entry.authorizationUrl.isEmpty()) == true))
+    if (((entry.authorization_url.isValid() && !entry.authorization_url.isEmpty()) == true))
     {
-        object.insert(QStringLiteral("authorizationUrl"), entry.authorizationUrl.toString());
+        object.insert(QStringLiteral("authorizationUrl"), entry.authorization_url.toString());
     }
-    if (((entry.tokenUrl.isValid() && !entry.tokenUrl.isEmpty()) == true))
+    if (((entry.token_url.isValid() && !entry.token_url.isEmpty()) == true))
     {
-        object.insert(QStringLiteral("tokenUrl"), entry.tokenUrl.toString());
+        object.insert(QStringLiteral("tokenUrl"), entry.token_url.toString());
     }
-    if (((!entry.clientId.isEmpty()) == true))
+    if (((!entry.client_id.isEmpty()) == true))
     {
-        object.insert(QStringLiteral("clientId"), entry.clientId);
+        object.insert(QStringLiteral("clientId"), entry.client_id);
     }
-    if (((!entry.clientSecret.isEmpty()) == true))
+    if (((!entry.client_secret.isEmpty()) == true))
     {
-        object.insert(QStringLiteral("clientSecret"), entry.clientSecret);
+        object.insert(QStringLiteral("clientSecret"), entry.client_secret);
     }
     if (((!entry.resource.isEmpty()) == true))
     {
         object.insert(QStringLiteral("resource"), entry.resource);
     }
-    if (((entry.resourceMetadataUrl.isValid() && !entry.resourceMetadataUrl.isEmpty()) == true))
+    if (((entry.resource_metadata_url.isValid() && !entry.resource_metadata_url.isEmpty()) ==
+         true))
     {
-        object.insert(QStringLiteral("resourceMetadataUrl"), entry.resourceMetadataUrl.toString());
+        object.insert(QStringLiteral("resourceMetadataUrl"),
+                      entry.resource_metadata_url.toString());
     }
     return object;
 }
 
-bool oauthCacheEntryFromJson(const QJsonObject &object, OAuthCacheEntry *entry)
+bool oauth_cache_entry_from_json(const QJsonObject &object, o_auth_cache_entry_t *entry)
 {
     if (((entry == nullptr) == true))
     {
         return false;
     }
 
-    OAuthCacheEntry parsed;
-    parsed.accessToken = object.value(QStringLiteral("accessToken")).toString();
-    parsed.refreshToken = object.value(QStringLiteral("refreshToken")).toString();
+    o_auth_cache_entry_t parsed;
+    parsed.access_token = object.value(QStringLiteral("accessToken")).toString();
+    parsed.refresh_token = object.value(QStringLiteral("refreshToken")).toString();
     parsed.expiration =
         QDateTime::fromString(object.value(QStringLiteral("expiration")).toString(), Qt::ISODate);
-    parsed.authorizationUrl = QUrl(object.value(QStringLiteral("authorizationUrl")).toString());
-    parsed.tokenUrl = QUrl(object.value(QStringLiteral("tokenUrl")).toString());
-    parsed.clientId = object.value(QStringLiteral("clientId")).toString();
-    parsed.clientSecret = object.value(QStringLiteral("clientSecret")).toString();
+    parsed.authorization_url = QUrl(object.value(QStringLiteral("authorizationUrl")).toString());
+    parsed.token_url = QUrl(object.value(QStringLiteral("tokenUrl")).toString());
+    parsed.client_id = object.value(QStringLiteral("clientId")).toString();
+    parsed.client_secret = object.value(QStringLiteral("clientSecret")).toString();
     parsed.resource = object.value(QStringLiteral("resource")).toString();
-    parsed.resourceMetadataUrl =
+    parsed.resource_metadata_url =
         QUrl(object.value(QStringLiteral("resourceMetadataUrl")).toString());
     *entry = parsed;
     return true;
 }
 
-bool loadPersistentOAuthCacheEntry(const QString &cacheKey, OAuthCacheEntry *entry,
-                                   QString *error = nullptr)
+bool load_persistent_o_auth_cache_entry(const QString &cache_key, o_auth_cache_entry_t *entry,
+                                        QString *error = nullptr)
 {
-    QFile file(persistentOAuthCachePath());
+    QFile file(persistent_o_auth_cache_path());
     if (file.exists() == false)
     {
         return false;
@@ -197,68 +199,69 @@ bool loadPersistentOAuthCacheEntry(const QString &cacheKey, OAuthCacheEntry *ent
         return false;
     }
 
-    QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
-    if (((parseError.error != QJsonParseError::NoError || !document.isObject()) == true))
+    QJsonParseError parse_error;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parse_error);
+    if (((parse_error.error != QJsonParseError::NoError || !document.isObject()) == true))
     {
         if (((error != nullptr) == true))
         {
             *error = QStringLiteral("Failed to parse OAuth cache file: %1")
-                         .arg(parseError.error == QJsonParseError::NoError
+                         .arg(parse_error.error == QJsonParseError::NoError
                                   ? QStringLiteral("root must be an object")
-                                  : parseError.errorString());
+                                  : parse_error.errorString());
         }
         return false;
     }
 
-    const QJsonValue value = document.object().value(cacheKey);
+    const QJsonValue value = document.object().value(cache_key);
     if (value.isObject() == false)
     {
         return false;
     }
-    return oauthCacheEntryFromJson(value.toObject(), entry);
+    return oauth_cache_entry_from_json(value.toObject(), entry);
 }
 
-bool savePersistentOAuthCacheEntry(const QString &cacheKey, const OAuthCacheEntry &entry,
-                                   QString *error = nullptr)
+bool save_persistent_o_auth_cache_entry(const QString &cache_key,
+                                        const o_auth_cache_entry_t &entry,
+                                        QString *error = nullptr)
 {
-    const QString path = persistentOAuthCachePath();
+    const QString path = persistent_o_auth_cache_path();
     QJsonObject root;
 
-    QFile existingFile(path);
-    if (existingFile.exists() == true)
+    QFile existing_file(path);
+    if (existing_file.exists() == true)
     {
-        if (existingFile.open(QIODevice::ReadOnly) == false)
+        if (existing_file.open(QIODevice::ReadOnly) == false)
         {
             if (((error != nullptr) == true))
             {
                 *error = QStringLiteral("Failed to open OAuth cache file for reading: %1")
-                             .arg(existingFile.errorString());
+                             .arg(existing_file.errorString());
             }
             return false;
         }
 
-        QJsonParseError parseError;
+        QJsonParseError parse_error;
         const QJsonDocument document =
-            QJsonDocument::fromJson(existingFile.readAll(), &parseError);
-        if (((parseError.error != QJsonParseError::NoError || !document.isObject()) == true))
+            QJsonDocument::fromJson(existing_file.readAll(), &parse_error);
+        if (((parse_error.error != QJsonParseError::NoError || !document.isObject()) == true))
         {
             if (((error != nullptr) == true))
             {
                 *error = QStringLiteral("Failed to parse OAuth cache file: %1")
-                             .arg(parseError.error == QJsonParseError::NoError
+                             .arg(parse_error.error == QJsonParseError::NoError
                                       ? QStringLiteral("root must be an object")
-                                      : parseError.errorString());
+                                      : parse_error.errorString());
             }
             return false;
         }
         root = document.object();
     }
 
-    root.insert(cacheKey, oauthCacheEntryToJson(entry));
+    root.insert(cache_key, oauth_cache_entry_to_json(entry));
 
-    const QFileInfo fileInfo(path);
-    if (((!QDir().mkpath(fileInfo.absolutePath())) == true))
+    const QFileInfo file_info(path);
+    if (((!QDir().mkpath(file_info.absolutePath())) == true))
     {
         if (((error != nullptr) == true))
         {
@@ -291,27 +294,27 @@ bool savePersistentOAuthCacheEntry(const QString &cacheKey, const OAuthCacheEntr
     return true;
 }
 
-QMap<QString, QString> parseBearerChallengeParameters(const QByteArray &wwwAuthenticateHeader)
+QMap<QString, QString> parse_bearer_challenge_parameters(const QByteArray &www_authenticate_header)
 {
     QMap<QString, QString> parameters;
-    const QString header = QString::fromUtf8(wwwAuthenticateHeader);
-    const qsizetype bearerIndex = header.indexOf(QRegularExpression(
+    const QString header = QString::fromUtf8(www_authenticate_header);
+    const qsizetype bearer_index = header.indexOf(QRegularExpression(
         QStringLiteral("(^|\\s|,)Bearer\\s+"), QRegularExpression::CaseInsensitiveOption));
-    if (bearerIndex < 0)
+    if (bearer_index < 0)
     {
         return parameters;
     }
 
-    const qsizetype paramsStart = header.indexOf(QLatin1Char(' '), bearerIndex);
-    if (paramsStart < 0)
+    const qsizetype params_start = header.indexOf(QLatin1Char(' '), bearer_index);
+    if (params_start < 0)
     {
         return parameters;
     }
 
-    const QString params = header.mid(paramsStart + 1);
-    static const QRegularExpression pairExpression(
+    const QString params = header.mid(params_start + 1);
+    static const QRegularExpression pair_expression(
         QStringLiteral(R"re(([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*"([^"]*)")re"));
-    auto it = pairExpression.globalMatch(params);
+    auto it = pair_expression.globalMatch(params);
     while (it.hasNext())
     {
         const auto match = it.next();
@@ -323,46 +326,46 @@ QMap<QString, QString> parseBearerChallengeParameters(const QByteArray &wwwAuthe
 
 #if QTMCP_HAS_NETWORKAUTH
 
-constexpr int kOAuthInteractiveTimeoutMs = 5 * 60 * 1000;
+constexpr int k_o_auth_interactive_timeout_ms = 5 * 60 * 1000;
 
-QUrl authorizationBaseUrl(const QUrl &endpoint)
+QUrl authorization_base_url(const QUrl &endpoint)
 {
     QUrl base = endpoint.adjusted(QUrl::RemovePath | QUrl::RemoveQuery | QUrl::RemoveFragment);
     base.setPath(QString());
     return base;
 }
 
-QUrl appendPath(const QUrl &base, const QString &path)
+QUrl append_path(const QUrl &base, const QString &path)
 {
     QUrl url(base);
     url.setPath(path);
     return url;
 }
 
-struct SyncHttpResponse
+struct sync_http_response_t
 {
-    int statusCode = 0;
-    QNetworkReply::NetworkError networkError = QNetworkReply::NoError;
-    QString errorString;
+    int status_code = 0;
+    QNetworkReply::NetworkError network_error = QNetworkReply::NoError;
+    QString error_string;
     QByteArray body;
-    QJsonDocument jsonBody;
-    bool hasJsonBody = false;
+    QJsonDocument json_body;
+    bool has_json_body = false;
 };
 
-SyncHttpResponse performSyncRequest(QNetworkAccessManager *networkAccessManager,
-                                    QNetworkRequest request, const QByteArray &verb,
-                                    const QByteArray &body = {})
+sync_http_response_t perform_sync_request(QNetworkAccessManager *network_access_manager,
+                                          QNetworkRequest request, const QByteArray &verb,
+                                          const QByteArray &body = {})
 {
-    SyncHttpResponse result;
+    sync_http_response_t result;
     QNetworkReply *reply = nullptr;
 
     if (((verb == QByteArrayLiteral("GET")) == true))
     {
-        reply = networkAccessManager->get(request);
+        reply = network_access_manager->get(request);
     }
     else if (((verb == QByteArrayLiteral("POST")) == true))
     {
-        reply = networkAccessManager->post(request, body);
+        reply = network_access_manager->post(request, body);
     }
     else
     {
@@ -373,19 +376,19 @@ SyncHttpResponse performSyncRequest(QNetworkAccessManager *networkAccessManager,
     QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
     loop.exec(QEventLoop::ExcludeUserInputEvents);
 
-    result.statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    result.networkError = reply->error();
-    result.errorString = reply->errorString();
+    result.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    result.network_error = reply->error();
+    result.error_string = reply->errorString();
     result.body = reply->readAll();
 
     if (((!result.body.isEmpty()) == true))
     {
-        QJsonParseError parseError;
-        const QJsonDocument json = QJsonDocument::fromJson(result.body, &parseError);
-        if (((parseError.error == QJsonParseError::NoError) == true))
+        QJsonParseError parse_error;
+        const QJsonDocument json = QJsonDocument::fromJson(result.body, &parse_error);
+        if (((parse_error.error == QJsonParseError::NoError) == true))
         {
-            result.jsonBody = json;
-            result.hasJsonBody = true;
+            result.json_body = json;
+            result.has_json_body = true;
         }
     }
 
@@ -393,34 +396,34 @@ SyncHttpResponse performSyncRequest(QNetworkAccessManager *networkAccessManager,
     return result;
 }
 
-struct OAuthEndpoints
+struct o_auth_endpoints_t
 {
-    QUrl authorizationEndpoint;
-    QUrl tokenEndpoint;
-    QUrl registrationEndpoint;
+    QUrl authorization_endpoint;
+    QUrl token_endpoint;
+    QUrl registration_endpoint;
 };
 
-struct ProtectedResourceMetadata
+struct protected_resource_metadata_t
 {
     QString resource;
-    QList<QUrl> authorizationServers;
-    QUrl metadataUrl;
+    QList<QUrl> authorization_servers;
+    QUrl metadata_url;
 };
 
-struct RegisteredOAuthClient
+struct registered_o_auth_client_t
 {
-    QString clientId;
-    QString clientSecret;
+    QString client_id;
+    QString client_secret;
 };
 
-struct OAuthListenAttempt
+struct o_auth_listen_attempt_t
 {
-    QString callbackHost;
+    QString callback_host;
     QHostAddress address;
     QString label;
 };
 
-QSet<QByteArray> requestedScopeTokens(const QStringList &scopes)
+QSet<QByteArray> requested_scope_tokens(const QStringList &scopes)
 {
     QSet<QByteArray> tokens;
     for (const QString &scope : scopes)
@@ -434,161 +437,164 @@ QSet<QByteArray> requestedScopeTokens(const QStringList &scopes)
     return tokens;
 }
 
-QUrl oauthAuthorizationMetadataUrl(const QUrl &authorizationServer)
+QUrl oauth_authorization_metadata_url(const QUrl &authorization_server)
 {
-    QUrl base(authorizationServer);
+    QUrl base(authorization_server);
     base.setQuery(QString());
     base.setFragment(QString());
-    return appendPath(base, QStringLiteral("/.well-known/oauth-authorization-server"));
+    return append_path(base, QStringLiteral("/.well-known/oauth-authorization-server"));
 }
 
-QUrl defaultProtectedResourceMetadataUrl(const QUrl &endpoint)
+QUrl default_protected_resource_metadata_url(const QUrl &endpoint)
 {
-    return appendPath(authorizationBaseUrl(endpoint),
-                      QStringLiteral("/.well-known/oauth-protected-resource"));
+    return append_path(authorization_base_url(endpoint),
+                       QStringLiteral("/.well-known/oauth-protected-resource"));
 }
 
-bool loadProtectedResourceMetadata(QNetworkAccessManager *networkAccessManager,
-                                   const HttpTransportConfig &config, const QUrl &metadataUrl,
-                                   ProtectedResourceMetadata *metadata, QString *logMessage)
+bool load_protected_resource_metadata(QNetworkAccessManager *network_access_manager,
+                                      const http_transport_config_t &config,
+                                      const QUrl &metadata_url,
+                                      protected_resource_metadata_t *metadata,
+                                      QString *log_message)
 {
-    if (((!metadataUrl.isValid() || metadataUrl.isEmpty()) == true))
+    if (((!metadata_url.isValid() || metadata_url.isEmpty()) == true))
     {
         return false;
     }
 
-    QNetworkRequest request(metadataUrl);
+    QNetworkRequest request(metadata_url);
     request.setRawHeader("Accept", "application/json");
-    if (((config.requestTimeoutMs > 0) == true))
+    if (((config.request_timeout_ms > 0) == true))
     {
-        request.setTransferTimeout(config.requestTimeoutMs);
+        request.setTransferTimeout(config.request_timeout_ms);
     }
 
-    const SyncHttpResponse response =
-        performSyncRequest(networkAccessManager, request, QByteArrayLiteral("GET"));
-    if (response.networkError != QNetworkReply::NoError || response.statusCode < 200 ||
-        response.statusCode >= 300 || !response.hasJsonBody || !response.jsonBody.isObject())
+    const sync_http_response_t response =
+        perform_sync_request(network_access_manager, request, QByteArrayLiteral("GET"));
+    if (response.network_error != QNetworkReply::NoError || response.status_code < 200 ||
+        response.status_code >= 300 || !response.has_json_body || !response.json_body.isObject())
     {
         return false;
     }
 
-    const QJsonObject root = response.jsonBody.object();
-    metadata->metadataUrl = metadataUrl;
+    const QJsonObject root = response.json_body.object();
+    metadata->metadata_url = metadata_url;
     metadata->resource = root.value(QStringLiteral("resource")).toString();
-    const QJsonArray authorizationServers =
+    const QJsonArray authorization_servers =
         root.value(QStringLiteral("authorization_servers")).toArray();
-    for (const QJsonValue &value : authorizationServers)
+    for (const QJsonValue &value : authorization_servers)
     {
         const QUrl url(value.toString());
         if (url.isValid() && !url.isEmpty())
         {
-            metadata->authorizationServers.append(url);
+            metadata->authorization_servers.append(url);
         }
     }
 
-    if (((logMessage != nullptr) == true))
+    if (((log_message != nullptr) == true))
     {
-        *logMessage = QStringLiteral("Loaded OAuth protected-resource metadata from %1")
-                          .arg(metadataUrl.toString());
+        *log_message = QStringLiteral("Loaded OAuth protected-resource metadata from %1")
+                           .arg(metadata_url.toString());
     }
     return true;
 }
 
-bool discoverOAuthEndpoints(QNetworkAccessManager *networkAccessManager,
-                            const HttpTransportConfig &config, const QUrl &metadataUrl,
-                            OAuthEndpoints *endpoints, QString *logMessage)
+bool discover_o_auth_endpoints(QNetworkAccessManager *network_access_manager,
+                               const http_transport_config_t &config, const QUrl &metadata_url,
+                               o_auth_endpoints_t *endpoints, QString *log_message)
 {
-    const QUrl resolvedMetadataUrl =
-        metadataUrl.isValid() && !metadataUrl.isEmpty()
-            ? metadataUrl
-            : oauthAuthorizationMetadataUrl(authorizationBaseUrl(config.endpoint));
+    const QUrl resolved_metadata_url =
+        metadata_url.isValid() && !metadata_url.isEmpty()
+            ? metadata_url
+            : oauth_authorization_metadata_url(authorization_base_url(config.endpoint));
 
-    QNetworkRequest request(resolvedMetadataUrl);
+    QNetworkRequest request(resolved_metadata_url);
     request.setRawHeader("Accept", "application/json");
-    request.setRawHeader("MCP-Protocol-Version", config.protocolVersion.toUtf8());
-    if (((config.requestTimeoutMs > 0) == true))
+    request.setRawHeader("MCP-Protocol-Version", config.protocol_version.toUtf8());
+    if (((config.request_timeout_ms > 0) == true))
     {
-        request.setTransferTimeout(config.requestTimeoutMs);
+        request.setTransferTimeout(config.request_timeout_ms);
     }
 
-    const SyncHttpResponse response =
-        performSyncRequest(networkAccessManager, request, QByteArrayLiteral("GET"));
+    const sync_http_response_t response =
+        perform_sync_request(network_access_manager, request, QByteArrayLiteral("GET"));
 
-    if (response.networkError == QNetworkReply::NoError && response.statusCode >= 200 &&
-        response.statusCode < 300 && response.hasJsonBody && response.jsonBody.isObject())
+    if (response.network_error == QNetworkReply::NoError && response.status_code >= 200 &&
+        response.status_code < 300 && response.has_json_body && response.json_body.isObject())
     {
-        const QJsonObject root = response.jsonBody.object();
-        endpoints->authorizationEndpoint =
+        const QJsonObject root = response.json_body.object();
+        endpoints->authorization_endpoint =
             QUrl(root.value(QStringLiteral("authorization_endpoint")).toString());
-        endpoints->tokenEndpoint = QUrl(root.value(QStringLiteral("token_endpoint")).toString());
-        endpoints->registrationEndpoint =
+        endpoints->token_endpoint = QUrl(root.value(QStringLiteral("token_endpoint")).toString());
+        endpoints->registration_endpoint =
             QUrl(root.value(QStringLiteral("registration_endpoint")).toString());
 
-        if (((logMessage != nullptr) == true))
+        if (((log_message != nullptr) == true))
         {
-            *logMessage = QStringLiteral("Discovered OAuth metadata at %1")
-                              .arg(resolvedMetadataUrl.toString());
+            *log_message = QStringLiteral("Discovered OAuth metadata at %1")
+                               .arg(resolved_metadata_url.toString());
         }
-        return endpoints->authorizationEndpoint.isValid() && endpoints->tokenEndpoint.isValid();
+        return endpoints->authorization_endpoint.isValid() && endpoints->token_endpoint.isValid();
     }
 
-    const QUrl authBase = authorizationBaseUrl(config.endpoint);
-    endpoints->authorizationEndpoint = appendPath(authBase, QStringLiteral("/authorize"));
-    endpoints->tokenEndpoint = appendPath(authBase, QStringLiteral("/token"));
-    endpoints->registrationEndpoint = QUrl();
-    if (((logMessage != nullptr) == true))
+    const QUrl auth_base = authorization_base_url(config.endpoint);
+    endpoints->authorization_endpoint = append_path(auth_base, QStringLiteral("/authorize"));
+    endpoints->token_endpoint = append_path(auth_base, QStringLiteral("/token"));
+    endpoints->registration_endpoint = QUrl();
+    if (((log_message != nullptr) == true))
     {
-        *logMessage =
+        *log_message =
             QStringLiteral("OAuth metadata unavailable at %1, using default authorization/token "
                            "endpoint paths without assuming dynamic client registration.")
-                .arg(resolvedMetadataUrl.toString());
+                .arg(resolved_metadata_url.toString());
     }
     return true;
 }
 
-bool registerOAuthClient(QNetworkAccessManager *networkAccessManager,
-                         const HttpTransportConfig &config, const QUrl &registrationEndpoint,
-                         const QString &callbackUrl, RegisteredOAuthClient *client, QString *error)
+bool register_o_auth_client(QNetworkAccessManager *network_access_manager,
+                            const http_transport_config_t &config,
+                            const QUrl &registration_endpoint, const QString &callback_url,
+                            registered_o_auth_client_t *client, QString *error)
 {
-    QNetworkRequest request(registrationEndpoint);
+    QNetworkRequest request(registration_endpoint);
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Accept", "application/json");
-    if (((config.requestTimeoutMs > 0) == true))
+    if (((config.request_timeout_ms > 0) == true))
     {
-        request.setTransferTimeout(config.requestTimeoutMs);
+        request.setTransferTimeout(config.request_timeout_ms);
     }
 
     const QJsonObject body{
-        {QStringLiteral("client_name"), config.oauthClientName},
-        {QStringLiteral("redirect_uris"), QJsonArray{callbackUrl}},
+        {QStringLiteral("client_name"), config.oauth_client_name},
+        {QStringLiteral("redirect_uris"), QJsonArray{callback_url}},
         {QStringLiteral("grant_types"),
          QJsonArray{QStringLiteral("authorization_code"), QStringLiteral("refresh_token")}},
         {QStringLiteral("response_types"), QJsonArray{QStringLiteral("code")}},
         {QStringLiteral("token_endpoint_auth_method"),
-         config.oauthClientSecret.isEmpty() ? QStringLiteral("none")
-                                            : QStringLiteral("client_secret_post")}};
+         config.oauth_client_secret.isEmpty() ? QStringLiteral("none")
+                                              : QStringLiteral("client_secret_post")}};
 
-    const SyncHttpResponse response =
-        performSyncRequest(networkAccessManager, request, QByteArrayLiteral("POST"),
-                           QJsonDocument(body).toJson(QJsonDocument::Compact));
+    const sync_http_response_t response =
+        perform_sync_request(network_access_manager, request, QByteArrayLiteral("POST"),
+                             QJsonDocument(body).toJson(QJsonDocument::Compact));
 
-    if (response.networkError != QNetworkReply::NoError || response.statusCode < 200 ||
-        response.statusCode >= 300 || !response.hasJsonBody || !response.jsonBody.isObject())
+    if (response.network_error != QNetworkReply::NoError || response.status_code < 200 ||
+        response.status_code >= 300 || !response.has_json_body || !response.json_body.isObject())
     {
         if (((error != nullptr) == true))
         {
             *error = QStringLiteral("Dynamic client registration failed at %1 (HTTP %2): %3")
-                         .arg(registrationEndpoint.toString())
-                         .arg(response.statusCode)
-                         .arg(response.errorString);
+                         .arg(registration_endpoint.toString())
+                         .arg(response.status_code)
+                         .arg(response.error_string);
         }
         return false;
     }
 
-    const QJsonObject root = response.jsonBody.object();
-    client->clientId = root.value(QStringLiteral("client_id")).toString();
-    client->clientSecret = root.value(QStringLiteral("client_secret")).toString();
-    if (client->clientId.isEmpty())
+    const QJsonObject root = response.json_body.object();
+    client->client_id = root.value(QStringLiteral("client_id")).toString();
+    client->client_secret = root.value(QStringLiteral("client_secret")).toString();
+    if (client->client_id.isEmpty())
     {
         if (((error != nullptr) == true))
         {
@@ -600,14 +606,14 @@ bool registerOAuthClient(QNetworkAccessManager *networkAccessManager,
     return true;
 }
 
-bool startOAuthCallbackListener(QOAuthHttpServerReplyHandler *replyHandler, QString *details)
+bool start_o_auth_callback_listener(QOAuthHttpServerReplyHandler *reply_handler, QString *details)
 {
-    if (((replyHandler == nullptr) == true))
+    if (((reply_handler == nullptr) == true))
     {
         return false;
     }
 
-    const std::array<OAuthListenAttempt, 4> attempts{{
+    const std::array<o_auth_listen_attempt_t, 4> attempts{{
         {QStringLiteral("127.0.0.1"), QHostAddress(QStringLiteral("127.0.0.1")),
          QStringLiteral("127.0.0.1")},
         {QStringLiteral("localhost"), QHostAddress(QHostAddress::LocalHost),
@@ -617,27 +623,27 @@ bool startOAuthCallbackListener(QOAuthHttpServerReplyHandler *replyHandler, QStr
          QStringLiteral("AnyIPv4 via 127.0.0.1")},
     }};
 
-    QStringList failureLabels;
-    for (const OAuthListenAttempt &attempt : attempts)
+    QStringList failure_labels;
+    for (const o_auth_listen_attempt_t &attempt : attempts)
     {
-        replyHandler->close();
-        replyHandler->setCallbackHost(attempt.callbackHost);
-        if (replyHandler->listen(attempt.address, 0))
+        reply_handler->close();
+        reply_handler->setCallbackHost(attempt.callback_host);
+        if (reply_handler->listen(attempt.address, 0))
         {
             if (details != nullptr)
             {
                 *details = QStringLiteral("Listening for OAuth callback on %1")
-                               .arg(replyHandler->callback());
+                               .arg(reply_handler->callback());
             }
             return true;
         }
-        failureLabels.append(attempt.label);
+        failure_labels.append(attempt.label);
     }
 
     if (((details != nullptr) == true))
     {
         *details = QStringLiteral("Failed to start local OAuth callback listener. Tried %1.")
-                       .arg(failureLabels.join(QStringLiteral(", ")));
+                       .arg(failure_labels.join(QStringLiteral(", ")));
     }
     return false;
 }
@@ -646,215 +652,224 @@ bool startOAuthCallbackListener(QOAuthHttpServerReplyHandler *replyHandler, QStr
 
 }  // namespace
 
-struct HttpTransport::ReplyState
+struct http_transport_t::ReplyState
 {
     QByteArray buffer;
-    QByteArray currentEventData;
-    QString currentEventType;
-    QByteArray requestPayload;
-    bool isSse = false;
-    bool oauthRetried = false;
-    int emittedMessages = 0;
+    QByteArray current_event_data;
+    QString current_event_type;
+    QByteArray request_payload;
+    bool is_sse = false;
+    bool oauth_retried = false;
+    int emitted_messages = 0;
 };
 
-HttpTransport::HttpTransport(HttpTransportConfig config, QObject *parent)
-    : Transport(parent), m_config(std::move(config)),
-      m_networkAccessManager(new QNetworkAccessManager(this))
+http_transport_t::http_transport_t(http_transport_config_t config, QObject *parent)
+    : transport_t(parent), transport_config(std::move(config)),
+      network_access_manager(new QNetworkAccessManager(this))
 {
 }
 
-HttpTransport::~HttpTransport() = default;
+http_transport_t::~http_transport_t() = default;
 
-QString HttpTransport::transportName() const
+QString http_transport_t::transport_name() const
 {
     return QStringLiteral("http");
 }
 
-Transport::State HttpTransport::state() const
+transport_t::state_t http_transport_t::state() const
 {
-    return m_state;
+    return this->transport_state;
 }
 
-const HttpTransportConfig &HttpTransport::config() const
+const http_transport_config_t &http_transport_t::config() const
 {
-    return m_config;
+    return this->transport_config;
 }
 
-QString HttpTransport::lastOAuthError() const
+QString http_transport_t::last_o_auth_error() const
 {
-    return m_lastOAuthError;
+    return this->last_o_auth_error_message;
 }
 
-bool HttpTransport::lastAuthorizationRequired() const
+bool http_transport_t::last_authorization_required() const
 {
-    return m_lastAuthorizationRequired;
+    return this->authorization_required;
 }
 
-bool HttpTransport::hasCachedOAuthCredentials() const
+bool http_transport_t::has_cached_o_auth_credentials() const
 {
-    return !m_accessToken.isEmpty() || !m_refreshToken.isEmpty();
+    return !this->access_token.isEmpty() || !this->refresh_token.isEmpty();
 }
 
-bool HttpTransport::authorize(QString *errorMessage)
+bool http_transport_t::authorize(QString *error_message)
 {
-    emit logMessage(
+    emit log_message(
         QStringLiteral(
             "Manual OAuth authorization requested: accessToken=%1 refreshToken=%2 expires=%3")
-            .arg(tokenPresenceSummary(m_accessToken), tokenPresenceSummary(m_refreshToken),
-                 expirySummary(m_accessTokenExpiration)));
-    m_lastAuthorizationRequired = false;
-    if (((m_state == State::Disconnected) == true))
+            .arg(token_presence_summary(this->access_token),
+                 token_presence_summary(this->refresh_token),
+                 expiry_summary(this->access_token_expiration)));
+    this->authorization_required = false;
+    if (((this->transport_state == state_t::DISCONNECTED) == true))
     {
-        start();
+        this->start();
     }
 
-    if (((m_state != State::Connected) == true))
+    if (((this->transport_state != state_t::CONNECTED) == true))
     {
-        if (((errorMessage != nullptr) == true))
+        if (((error_message != nullptr) == true))
         {
-            *errorMessage = m_lastOAuthError.isEmpty()
-                                ? QStringLiteral("MCP HTTP transport is not connected.")
-                                : m_lastOAuthError;
+            *error_message = this->last_o_auth_error_message.isEmpty()
+                                 ? QStringLiteral("MCP HTTP transport is not connected.")
+                                 : this->last_o_auth_error_message;
         }
         return false;
     }
 
-    const bool authorized = ensureAuthorized();
-    if (((!authorized && m_lastOAuthError.isEmpty()) == true))
+    const bool authorized = this->ensure_authorized();
+    if (((!authorized && this->last_o_auth_error_message.isEmpty()) == true))
     {
-        m_lastOAuthError = QStringLiteral("OAuth authorization did not complete successfully.");
+        this->last_o_auth_error_message =
+            QStringLiteral("OAuth authorization did not complete successfully.");
     }
-    if (((errorMessage != nullptr) == true))
+    if (((error_message != nullptr) == true))
     {
-        *errorMessage = authorized ? QString()
-                                   : (m_lastOAuthError.isEmpty()
-                                          ? QStringLiteral("MCP OAuth authorization failed.")
-                                          : m_lastOAuthError);
+        *error_message = authorized ? QString()
+                                    : (this->last_o_auth_error_message.isEmpty()
+                                           ? QStringLiteral("MCP OAuth authorization failed.")
+                                           : this->last_o_auth_error_message);
     }
     return authorized;
 }
 
-void HttpTransport::start()
+void http_transport_t::start()
 {
-    if (((m_state != State::Disconnected) == true))
+    if (((this->transport_state != state_t::DISCONNECTED) == true))
     {
         return;
     }
 
-    if (((!m_config.endpoint.isValid() || m_config.endpoint.isEmpty()) == true))
+    if (((!this->transport_config.endpoint.isValid() ||
+          this->transport_config.endpoint.isEmpty()) == true))
     {
-        m_lastOAuthError = QStringLiteral("MCP HTTP transport requires a valid endpoint URL.");
-        emit errorOccurred(m_lastOAuthError);
+        this->last_o_auth_error_message =
+            QStringLiteral("MCP HTTP transport requires a valid endpoint URL.");
+        emit error_occurred(this->last_o_auth_error_message);
         return;
     }
 
-    const QString scheme = m_config.endpoint.scheme().toLower();
+    const QString scheme = this->transport_config.endpoint.scheme().toLower();
     if (((scheme != QStringLiteral("http") && scheme != QStringLiteral("https")) == true))
     {
-        m_lastOAuthError = QStringLiteral("MCP HTTP transport only supports http/https URLs.");
-        emit errorOccurred(m_lastOAuthError);
+        this->last_o_auth_error_message =
+            QStringLiteral("MCP HTTP transport only supports http/https URLs.");
+        emit error_occurred(this->last_o_auth_error_message);
         return;
     }
 
-    loadCachedOAuthState();
-    m_lastOAuthError.clear();
-    m_lastAuthorizationRequired = false;
-    emit logMessage(QStringLiteral("HTTP transport ready: endpoint=%1 oauth=%2")
-                        .arg(m_config.endpoint.toString(), m_config.oauthEnabled
-                                                               ? QStringLiteral("enabled")
-                                                               : QStringLiteral("disabled")));
-    if (m_config.oauthEnabled == true)
+    this->load_cached_o_auth_state();
+    this->last_o_auth_error_message.clear();
+    this->authorization_required = false;
+    emit log_message(QStringLiteral("HTTP transport ready: endpoint=%1 oauth=%2")
+                         .arg(this->transport_config.endpoint.toString(),
+                              this->transport_config.oauth_enabled ? QStringLiteral("enabled")
+                                                                   : QStringLiteral("disabled")));
+    if (this->transport_config.oauth_enabled == true)
     {
-        emit logMessage(QStringLiteral("Initial OAuth state: accessToken=%1 refreshToken=%2 "
-                                       "expires=%3 clientIdConfigured=%4")
-                            .arg(tokenPresenceSummary(m_accessToken),
-                                 tokenPresenceSummary(m_refreshToken),
-                                 expirySummary(m_accessTokenExpiration),
-                                 m_registeredClientId.isEmpty() ? QStringLiteral("no")
-                                                                : QStringLiteral("yes")));
+        emit log_message(QStringLiteral("Initial OAuth state: accessToken=%1 refreshToken=%2 "
+                                        "expires=%3 clientIdConfigured=%4")
+                             .arg(token_presence_summary(this->access_token),
+                                  token_presence_summary(this->refresh_token),
+                                  expiry_summary(this->access_token_expiration),
+                                  this->registered_client_id.isEmpty() ? QStringLiteral("no")
+                                                                       : QStringLiteral("yes")));
     }
-    setState(State::Connected);
+    this->set_state(state_t::CONNECTED);
     emit started();
 }
 
-void HttpTransport::stop()
+void http_transport_t::stop()
 {
-    if (((m_state == State::Disconnected || m_state == State::Stopping) == true))
+    if (((this->transport_state == state_t::DISCONNECTED ||
+          this->transport_state == state_t::STOPPING) == true))
     {
         return;
     }
 
-    setState(State::Stopping);
-    emit logMessage(
-        QStringLiteral("Stopping HTTP transport: %1 active request(s)").arg(m_replyStates.size()));
+    this->set_state(state_t::STOPPING);
+    emit log_message(QStringLiteral("Stopping HTTP transport: %1 active request(s)")
+                         .arg(this->reply_states.size()));
 
-    const auto replies = m_replyStates.keys();
+    const auto replies = this->reply_states.keys();
     for (QNetworkReply *reply : replies)
     {
         reply->abort();
     }
-    m_replyStates.clear();
-    m_sessionId.clear();
-    m_lastAuthorizationRequired = false;
+    this->reply_states.clear();
+    this->session_id.clear();
+    this->authorization_required = false;
 
-    setState(State::Disconnected);
+    this->set_state(state_t::DISCONNECTED);
     emit stopped();
 }
 
-bool HttpTransport::sendMessage(const QJsonObject &message)
+bool http_transport_t::send_message(const QJsonObject &message)
 {
-    if (((m_state != State::Connected) == true))
+    if (((this->transport_state != state_t::CONNECTED) == true))
     {
-        emit errorOccurred(QStringLiteral(
+        emit error_occurred(QStringLiteral(
             "Cannot send an MCP HTTP message while the transport is disconnected."));
         return false;
     }
 
-    m_lastAuthorizationRequired = false;
-    if (m_config.oauthEnabled == true)
+    this->authorization_required = false;
+    if (this->transport_config.oauth_enabled == true)
     {
-        emit logMessage(
+        emit log_message(
             QStringLiteral("Preparing HTTP MCP request: accessToken=%1 refreshToken=%2 expires=%3")
-                .arg(tokenPresenceSummary(m_accessToken), tokenPresenceSummary(m_refreshToken),
-                     expirySummary(m_accessTokenExpiration)));
+                .arg(token_presence_summary(this->access_token),
+                     token_presence_summary(this->refresh_token),
+                     expiry_summary(this->access_token_expiration)));
     }
 
-    if (((m_config.oauthEnabled && !m_refreshToken.isEmpty() &&
-          m_accessTokenExpiration.isValid() &&
-          QDateTime::currentDateTimeUtc() >= m_accessTokenExpiration.addSecs(-30)) == true))
+    if (((this->transport_config.oauth_enabled && !this->refresh_token.isEmpty() &&
+          this->access_token_expiration.isValid() &&
+          QDateTime::currentDateTimeUtc() >= this->access_token_expiration.addSecs(-30)) == true))
     {
-        emit logMessage(QStringLiteral(
+        emit log_message(QStringLiteral(
             "OAuth access token is near expiry; attempting refresh before request."));
-        refreshAccessToken();
+        refresh_access_token();
     }
 
     const QByteArray payload = QJsonDocument(message).toJson(QJsonDocument::Compact);
-    return postPayload(payload, false);
+    return this->post_payload(payload, false);
 }
 
-QNetworkRequest HttpTransport::buildPostRequest() const
+QNetworkRequest http_transport_t::build_post_request() const
 {
-    QNetworkRequest request(m_config.endpoint);
+    QNetworkRequest request(this->transport_config.endpoint);
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Accept", "application/json, text/event-stream");
-    request.setRawHeader("MCP-Protocol-Version", m_config.protocolVersion.toUtf8());
-    if (((m_config.requestTimeoutMs > 0) == true))
+    request.setRawHeader("MCP-Protocol-Version", this->transport_config.protocol_version.toUtf8());
+    if (((this->transport_config.request_timeout_ms > 0) == true))
     {
-        request.setTransferTimeout(m_config.requestTimeoutMs);
+        request.setTransferTimeout(this->transport_config.request_timeout_ms);
     }
 
-    applyConfiguredHeaders(request);
-    applySessionHeader(request);
-    applyAuthorizationHeader(request);
+    this->apply_configured_headers(request);
+    this->apply_session_header(request);
+    this->apply_authorization_header(request);
     return request;
 }
 
-void HttpTransport::applyConfiguredHeaders(QNetworkRequest &request) const
+void http_transport_t::apply_configured_headers(QNetworkRequest &request) const
 {
-    for (auto it = m_config.headers.begin(); ((it != m_config.headers.end()) == true); ++it)
+    for (auto it = this->transport_config.headers.begin();
+         ((it != this->transport_config.headers.end()) == true); ++it)
     {
-        if (((m_config.oauthEnabled && it.key().compare(QStringLiteral("Authorization"),
-                                                        Qt::CaseInsensitive) == 0) == true))
+        if (((this->transport_config.oauth_enabled &&
+              it.key().compare(QStringLiteral("Authorization"), Qt::CaseInsensitive) == 0) ==
+             true))
         {
             continue;
         }
@@ -862,96 +877,100 @@ void HttpTransport::applyConfiguredHeaders(QNetworkRequest &request) const
     }
 }
 
-void HttpTransport::applySessionHeader(QNetworkRequest &request) const
+void http_transport_t::apply_session_header(QNetworkRequest &request) const
 {
-    if (((!m_sessionId.isEmpty()) == true))
+    if (((!this->session_id.isEmpty()) == true))
     {
-        request.setRawHeader("Mcp-Session-Id", m_sessionId.toUtf8());
+        request.setRawHeader("Mcp-Session-Id", this->session_id.toUtf8());
     }
 }
 
-void HttpTransport::applyAuthorizationHeader(QNetworkRequest &request) const
+void http_transport_t::apply_authorization_header(QNetworkRequest &request) const
 {
-    if (((m_config.oauthEnabled && !m_accessToken.isEmpty()) == true))
+    if (((this->transport_config.oauth_enabled && !this->access_token.isEmpty()) == true))
     {
-        emit const_cast<HttpTransport *>(this)->logMessage(
+        emit const_cast<http_transport_t *>(this)->log_message(
             QStringLiteral("Applying OAuth Authorization header: token=%1 expires=%2")
-                .arg(tokenPresenceSummary(m_accessToken), expirySummary(m_accessTokenExpiration)));
+                .arg(token_presence_summary(this->access_token),
+                     expiry_summary(this->access_token_expiration)));
         request.setRawHeader("Authorization",
-                             QStringLiteral("Bearer %1").arg(m_accessToken).toUtf8());
+                             QStringLiteral("Bearer %1").arg(this->access_token).toUtf8());
     }
-    else if (m_config.oauthEnabled == true)
+    else if (this->transport_config.oauth_enabled == true)
     {
-        emit const_cast<HttpTransport *>(this)->logMessage(
+        emit const_cast<http_transport_t *>(this)->log_message(
             QStringLiteral("Skipping OAuth Authorization header: accessToken=%1 expires=%2")
-                .arg(tokenPresenceSummary(m_accessToken), expirySummary(m_accessTokenExpiration)));
+                .arg(token_presence_summary(this->access_token),
+                     expiry_summary(this->access_token_expiration)));
     }
 }
 
-bool HttpTransport::postPayload(const QByteArray &payload, bool oauthRetried)
+bool http_transport_t::post_payload(const QByteArray &payload, bool oauth_retried)
 {
-    const QNetworkRequest request = buildPostRequest();
-    if (m_config.oauthEnabled == true)
+    const QNetworkRequest request = this->build_post_request();
+    if (this->transport_config.oauth_enabled == true)
     {
-        emit logMessage(
+        emit log_message(
             QStringLiteral(
                 "Posting HTTP payload: oauthRetry=%1 accessToken=%2 refreshToken=%3 sessionId=%4")
-                .arg(oauthRetried ? QStringLiteral("yes") : QStringLiteral("no"),
-                     tokenPresenceSummary(m_accessToken), tokenPresenceSummary(m_refreshToken),
-                     m_sessionId.isEmpty() ? QStringLiteral("absent")
-                                           : QStringLiteral("present")));
+                .arg(oauth_retried ? QStringLiteral("yes") : QStringLiteral("no"),
+                     token_presence_summary(this->access_token),
+                     token_presence_summary(this->refresh_token),
+                     this->session_id.isEmpty() ? QStringLiteral("absent")
+                                                : QStringLiteral("present")));
     }
-    emit logMessage(QStringLiteral("http -> %1").arg(formatPayloadForLog(payload)));
+    emit log_message(QStringLiteral("http -> %1").arg(format_payload_for_log(payload)));
 
-    QNetworkReply *reply = m_networkAccessManager->post(request, payload);
-    attachReply(reply, payload, oauthRetried);
+    QNetworkReply *reply = this->network_access_manager->post(request, payload);
+    this->attach_reply(reply, payload, oauth_retried);
     return true;
 }
 
-void HttpTransport::setState(State state)
+void http_transport_t::set_state(state_t state)
 {
-    if (((m_state == state) == true))
+    if (((this->transport_state == state) == true))
     {
         return;
     }
 
-    m_state = state;
-    QString stateLabel = QStringLiteral("unknown");
-    switch (m_state)
+    this->transport_state = state;
+    QString state_label = QStringLiteral("unknown");
+    switch (this->transport_state)
     {
-        case State::Disconnected:
-            stateLabel = QStringLiteral("disconnected");
+        case state_t::DISCONNECTED:
+            state_label = QStringLiteral("disconnected");
             break;
-        case State::Starting:
-            stateLabel = QStringLiteral("starting");
+        case state_t::STARTING:
+            state_label = QStringLiteral("starting");
             break;
-        case State::Connected:
-            stateLabel = QStringLiteral("connected");
+        case state_t::CONNECTED:
+            state_label = QStringLiteral("connected");
             break;
-        case State::Stopping:
-            stateLabel = QStringLiteral("stopping");
+        case state_t::STOPPING:
+            state_label = QStringLiteral("stopping");
             break;
     }
-    emit logMessage(QStringLiteral("http state changed: %1").arg(stateLabel));
-    emit stateChanged(m_state);
+    emit log_message(QStringLiteral("http state changed: %1").arg(state_label));
+    emit state_changed(this->transport_state);
 }
 
-void HttpTransport::attachReply(QNetworkReply *reply, const QByteArray &payload, bool oauthRetried)
+void http_transport_t::attach_reply(QNetworkReply *reply, const QByteArray &payload,
+                                    bool oauth_retried)
 {
     ReplyState state;
-    state.requestPayload = payload;
-    state.oauthRetried = oauthRetried;
-    m_replyStates.insert(reply, state);
+    state.request_payload = payload;
+    state.oauth_retried = oauth_retried;
+    this->reply_states.insert(reply, state);
 
     connect(reply, &QNetworkReply::readyRead, this,
-            [this, reply]() { processReplyReadyRead(reply); });
+            [this, reply]() { this->process_reply_ready_read(reply); });
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply]() { processReplyFinished(reply); });
+            [this, reply]() { this->process_reply_finished(reply); });
     connect(reply, &QNetworkReply::errorOccurred, this,
             [this, reply](QNetworkReply::NetworkError code) {
-                emit logMessage(QStringLiteral("HTTP reply error: code=%1 text=%2")
-                                    .arg(static_cast<int>(code))
-                                    .arg(reply->errorString()));
+                emit log_message(QStringLiteral("HTTP reply error: code=%1 text=%2")
+                                     .arg(static_cast<int>(code))
+                                     .arg(reply->errorString()));
             });
     connect(reply, &QNetworkReply::sslErrors, this, [this](const QList<QSslError> &errors) {
         QStringList parts;
@@ -961,21 +980,21 @@ void HttpTransport::attachReply(QNetworkReply *reply, const QByteArray &payload,
         }
         if (((!parts.isEmpty()) == true))
         {
-            emit logMessage(
+            emit log_message(
                 QStringLiteral("HTTP SSL errors: %1").arg(parts.join(QStringLiteral("; "))));
         }
     });
 }
 
-void HttpTransport::processReplyReadyRead(QNetworkReply *reply)
+void http_transport_t::process_reply_ready_read(QNetworkReply *reply)
 {
-    auto it = m_replyStates.find(reply);
-    if (((it == m_replyStates.end()) == true))
+    auto it = this->reply_states.find(reply);
+    if (((it == this->reply_states.end()) == true))
     {
         return;
     }
 
-    applySessionId(reply);
+    this->apply_session_id(reply);
     const QByteArray chunk = reply->readAll();
     if (chunk.isEmpty() == true)
     {
@@ -983,161 +1002,163 @@ void HttpTransport::processReplyReadyRead(QNetworkReply *reply)
     }
 
     it->buffer += chunk;
-    emit logMessage(QStringLiteral("http reply bytes: %1").arg(chunk.size()));
+    emit log_message(QStringLiteral("http reply bytes: %1").arg(chunk.size()));
 
-    const QString contentType = normalizedContentType(reply);
-    if (((contentType == QStringLiteral("text/event-stream")) == true))
+    const QString content_type = normalized_content_type(reply);
+    if (((content_type == QStringLiteral("text/event-stream")) == true))
     {
-        it->isSse = true;
-        processSseBuffer(reply, false);
+        it->is_sse = true;
+        this->process_sse_buffer(reply, false);
     }
 }
 
-void HttpTransport::processReplyFinished(QNetworkReply *reply)
+void http_transport_t::process_reply_finished(QNetworkReply *reply)
 {
-    auto it = m_replyStates.find(reply);
-    if (((it == m_replyStates.end()) == true))
+    auto it = this->reply_states.find(reply);
+    if (((it == this->reply_states.end()) == true))
     {
         reply->deleteLater();
         return;
     }
 
-    applySessionId(reply);
+    this->apply_session_id(reply);
 
-    const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    const QString contentType = normalizedContentType(reply);
-    emit logMessage(QStringLiteral("HTTP reply finished: status=%1 type=%2")
-                        .arg(statusCode)
-                        .arg(contentType.isEmpty() ? QStringLiteral("(none)") : contentType));
+    const int status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QString content_type = normalized_content_type(reply);
+    emit log_message(QStringLiteral("HTTP reply finished: status=%1 type=%2")
+                         .arg(status_code)
+                         .arg(content_type.isEmpty() ? QStringLiteral("(none)") : content_type));
 
-    if (((statusCode == 401 && it->emittedMessages == 0 && m_config.oauthEnabled &&
-          !it->oauthRetried) == true))
+    if (((status_code == 401 && it->emitted_messages == 0 &&
+          this->transport_config.oauth_enabled && !it->oauth_retried) == true))
     {
-        m_lastAuthorizationRequired = true;
-        const QByteArray retryPayload = it->requestPayload;
+        this->authorization_required = true;
+        const QByteArray retry_payload = it->request_payload;
         if (((!it->buffer.isEmpty()) == true))
         {
-            emit logMessage(QStringLiteral("http <- %1").arg(formatPayloadForLog(it->buffer)));
+            emit log_message(QStringLiteral("http <- %1").arg(format_payload_for_log(it->buffer)));
         }
         const QMap<QString, QString> challenge =
-            parseBearerChallengeParameters(reply->rawHeader("WWW-Authenticate"));
+            parse_bearer_challenge_parameters(reply->rawHeader("WWW-Authenticate"));
         if (((!challenge.isEmpty()) == true))
         {
-            const QString resourceMetadata =
+            const QString resource_metadata =
                 challenge.value(QStringLiteral("resource_metadata")).trimmed();
-            const QString errorDescription =
+            const QString error_description =
                 challenge.value(QStringLiteral("error_description")).trimmed();
-            const QString errorCode = challenge.value(QStringLiteral("error")).trimmed();
-            if (resourceMetadata.isEmpty() == false)
+            const QString error_code = challenge.value(QStringLiteral("error")).trimmed();
+            if (resource_metadata.isEmpty() == false)
             {
-                m_oauthResourceMetadataUrl = QUrl(resourceMetadata);
-                emit logMessage(
+                this->oauth_resource_metadata_url = QUrl(resource_metadata);
+                emit log_message(
                     QStringLiteral("OAuth challenge advertised protected-resource metadata: %1")
-                        .arg(m_oauthResourceMetadataUrl.toString()));
+                        .arg(this->oauth_resource_metadata_url.toString()));
             }
-            if (errorCode.isEmpty() == false)
+            if (error_code.isEmpty() == false)
             {
-                m_lastOAuthError = errorDescription.isEmpty()
-                                       ? QStringLiteral("OAuth challenge error: %1").arg(errorCode)
-                                       : QStringLiteral("OAuth challenge error: %1 (%2)")
-                                             .arg(errorCode, errorDescription);
+                this->last_o_auth_error_message =
+                    error_description.isEmpty()
+                        ? QStringLiteral("OAuth challenge error: %1").arg(error_code)
+                        : QStringLiteral("OAuth challenge error: %1 (%2)")
+                              .arg(error_code, error_description);
             }
-            if (errorDescription.isEmpty() == false)
+            if (error_description.isEmpty() == false)
             {
-                emit logMessage(
-                    QStringLiteral("OAuth challenge error description: %1").arg(errorDescription));
+                emit log_message(QStringLiteral("OAuth challenge error description: %1")
+                                     .arg(error_description));
             }
         }
         else if (((!it->buffer.trimmed().isEmpty()) == true))
         {
-            m_lastOAuthError = QStringLiteral("OAuth authorization required: %1")
-                                   .arg(QString::fromUtf8(it->buffer).trimmed());
+            this->last_o_auth_error_message = QStringLiteral("OAuth authorization required: %1")
+                                                  .arg(QString::fromUtf8(it->buffer).trimmed());
         }
-        m_accessToken.clear();
-        m_accessTokenExpiration = {};
-        emit logMessage(QStringLiteral("Cleared cached access token after 401; refreshToken=%1")
-                            .arg(tokenPresenceSummary(m_refreshToken)));
-        const bool authorized = ensureAuthorized();
-        m_replyStates.erase(it);
+        this->access_token.clear();
+        this->access_token_expiration = {};
+        emit log_message(QStringLiteral("Cleared cached access token after 401; refreshToken=%1")
+                             .arg(token_presence_summary(this->refresh_token)));
+        const bool authorized = this->ensure_authorized();
+        this->reply_states.erase(it);
         reply->deleteLater();
         if (authorized == false)
         {
-            emit errorOccurred(m_lastOAuthError.isEmpty()
-                                   ? QStringLiteral("MCP OAuth authorization failed.")
-                                   : m_lastOAuthError);
+            emit error_occurred(this->last_o_auth_error_message.isEmpty()
+                                    ? QStringLiteral("MCP OAuth authorization failed.")
+                                    : this->last_o_auth_error_message);
             return;
         }
 
-        emit logMessage(QStringLiteral("Retrying MCP HTTP request after OAuth authorization."));
-        postPayload(retryPayload, true);
+        emit log_message(QStringLiteral("Retrying MCP HTTP request after OAuth authorization."));
+        this->post_payload(retry_payload, true);
         return;
     }
 
-    if (it->isSse)
+    if (it->is_sse)
     {
-        processSseBuffer(reply, true);
+        this->process_sse_buffer(reply, true);
     }
     else if (((!it->buffer.isEmpty()) == true))
     {
-        emit logMessage(QStringLiteral("http <- %1").arg(formatPayloadForLog(it->buffer)));
-        QJsonParseError parseError;
-        const QJsonDocument document = QJsonDocument::fromJson(it->buffer, &parseError);
-        if (((parseError.error != QJsonParseError::NoError) == true))
+        emit log_message(QStringLiteral("http <- %1").arg(format_payload_for_log(it->buffer)));
+        QJsonParseError parse_error;
+        const QJsonDocument document = QJsonDocument::fromJson(it->buffer, &parse_error);
+        if (((parse_error.error != QJsonParseError::NoError) == true))
         {
-            emit errorOccurred(QStringLiteral("Failed to parse MCP HTTP JSON message: %1")
-                                   .arg(parseError.errorString()));
+            emit error_occurred(QStringLiteral("Failed to parse MCP HTTP JSON message: %1")
+                                    .arg(parse_error.errorString()));
         }
         else
         {
-            emitJsonDocument(reply, document, QStringLiteral("http response"));
+            this->emit_json_document(reply, document, QStringLiteral("http response"));
         }
     }
 
-    if (((statusCode == 404 && !m_sessionId.isEmpty()) == true))
+    if (((status_code == 404 && !this->session_id.isEmpty()) == true))
     {
-        emit logMessage(QStringLiteral("HTTP MCP session expired; clearing stored session id."));
-        m_sessionId.clear();
+        emit log_message(QStringLiteral("HTTP MCP session expired; clearing stored session id."));
+        this->session_id.clear();
     }
 
-    if (reply->error() != QNetworkReply::NoError && it->emittedMessages == 0)
+    if (reply->error() != QNetworkReply::NoError && it->emitted_messages == 0)
     {
-        emit errorOccurred(QStringLiteral("MCP HTTP transport error (%1): %2")
-                               .arg(statusCode)
-                               .arg(reply->errorString()));
+        emit error_occurred(QStringLiteral("MCP HTTP transport error (%1): %2")
+                                .arg(status_code)
+                                .arg(reply->errorString()));
     }
 
-    if (statusCode == 202 && it->emittedMessages == 0)
+    if (status_code == 202 && it->emitted_messages == 0)
     {
-        emit logMessage(QStringLiteral("HTTP request accepted with 202 and no response body."));
+        emit log_message(QStringLiteral("HTTP request accepted with 202 and no response body."));
     }
-    else if (statusCode != 202 && it->emittedMessages == 0 &&
+    else if (status_code != 202 && it->emitted_messages == 0 &&
              reply->error() == QNetworkReply::NoError)
     {
-        emit errorOccurred(QStringLiteral("MCP HTTP reply completed without a JSON-RPC payload."));
+        emit error_occurred(
+            QStringLiteral("MCP HTTP reply completed without a JSON-RPC payload."));
     }
 
-    m_replyStates.erase(it);
+    this->reply_states.erase(it);
     reply->deleteLater();
 }
 
-void HttpTransport::processSseBuffer(QNetworkReply *reply, bool flush)
+void http_transport_t::process_sse_buffer(QNetworkReply *reply, bool flush)
 {
     while (true == true)
     {
-        auto it = m_replyStates.find(reply);
-        if (((it == m_replyStates.end()) == true))
+        auto it = this->reply_states.find(reply);
+        if (((it == this->reply_states.end()) == true))
         {
             return;
         }
 
-        const qsizetype newlineIndex = it->buffer.indexOf('\n');
-        if (newlineIndex < 0)
+        const qsizetype newline_index = it->buffer.indexOf('\n');
+        if (newline_index < 0)
         {
             break;
         }
 
-        QByteArray line = it->buffer.left(newlineIndex);
-        it->buffer.remove(0, newlineIndex + 1);
+        QByteArray line = it->buffer.left(newline_index);
+        it->buffer.remove(0, newline_index + 1);
         if (line.endsWith('\r') == true)
         {
             line.chop(1);
@@ -1145,7 +1166,7 @@ void HttpTransport::processSseBuffer(QNetworkReply *reply, bool flush)
 
         if (line.isEmpty() == true)
         {
-            handleSseEvent(reply);
+            this->handle_sse_event(reply);
             continue;
         }
 
@@ -1156,7 +1177,7 @@ void HttpTransport::processSseBuffer(QNetworkReply *reply, bool flush)
 
         if (line.startsWith("event:") == true)
         {
-            it->currentEventType = QString::fromUtf8(line.mid(6)).trimmed();
+            it->current_event_type = QString::fromUtf8(line.mid(6)).trimmed();
             continue;
         }
 
@@ -1167,102 +1188,102 @@ void HttpTransport::processSseBuffer(QNetworkReply *reply, bool flush)
             {
                 data.remove(0, 1);
             }
-            if (((!it->currentEventData.isEmpty()) == true))
+            if (((!it->current_event_data.isEmpty()) == true))
             {
-                it->currentEventData.append('\n');
+                it->current_event_data.append('\n');
             }
-            it->currentEventData.append(data);
+            it->current_event_data.append(data);
         }
     }
 
-    auto it = m_replyStates.find(reply);
-    if (((flush && it != m_replyStates.end() &&
-          (!it->currentEventData.isEmpty() || !it->currentEventType.isEmpty())) == true))
+    auto it = this->reply_states.find(reply);
+    if (((flush && it != this->reply_states.end() &&
+          (!it->current_event_data.isEmpty() || !it->current_event_type.isEmpty())) == true))
     {
-        handleSseEvent(reply);
+        this->handle_sse_event(reply);
     }
 }
 
-void HttpTransport::handleSseEvent(QNetworkReply *reply)
+void http_transport_t::handle_sse_event(QNetworkReply *reply)
 {
-    auto it = m_replyStates.find(reply);
-    if (((it == m_replyStates.end()) == true))
+    auto it = this->reply_states.find(reply);
+    if (((it == this->reply_states.end()) == true))
     {
         return;
     }
 
-    const QByteArray data = it->currentEventData;
-    const QString eventType = it->currentEventType;
-    it->currentEventData.clear();
-    it->currentEventType.clear();
+    const QByteArray data = it->current_event_data;
+    const QString event_type = it->current_event_type;
+    it->current_event_data.clear();
+    it->current_event_type.clear();
 
     if (((data.trimmed().isEmpty()) == true))
     {
         return;
     }
 
-    emit logMessage(QStringLiteral("sse event `%1` <- %2")
-                        .arg(eventType.isEmpty() ? QStringLiteral("message") : eventType,
-                             formatPayloadForLog(data)));
+    emit log_message(QStringLiteral("sse event `%1` <- %2")
+                         .arg(event_type.isEmpty() ? QStringLiteral("message") : event_type,
+                              format_payload_for_log(data)));
 
-    if (((eventType == QStringLiteral("endpoint")) == true))
+    if (((event_type == QStringLiteral("endpoint")) == true))
     {
-        emit logMessage(QStringLiteral("Received legacy endpoint event: %1")
-                            .arg(QString::fromUtf8(data).trimmed()));
+        emit log_message(QStringLiteral("Received legacy endpoint event: %1")
+                             .arg(QString::fromUtf8(data).trimmed()));
         return;
     }
 
-    QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(data, &parseError);
-    if (((parseError.error != QJsonParseError::NoError) == true))
+    QJsonParseError parse_error;
+    const QJsonDocument document = QJsonDocument::fromJson(data, &parse_error);
+    if (((parse_error.error != QJsonParseError::NoError) == true))
     {
-        emit errorOccurred(QStringLiteral("Failed to parse MCP SSE event JSON: %1")
-                               .arg(parseError.errorString()));
+        emit error_occurred(QStringLiteral("Failed to parse MCP SSE event JSON: %1")
+                                .arg(parse_error.errorString()));
         return;
     }
 
-    emitJsonDocument(reply, document, QStringLiteral("http sse"));
+    this->emit_json_document(reply, document, QStringLiteral("http sse"));
 }
 
-void HttpTransport::emitJsonDocument(QNetworkReply *reply, const QJsonDocument &document,
-                                     const QString &source)
+void http_transport_t::emit_json_document(QNetworkReply *reply, const QJsonDocument &document,
+                                          const QString &source)
 {
-    auto it = m_replyStates.find(reply);
-    if (((it == m_replyStates.end()) == true))
+    auto it = this->reply_states.find(reply);
+    if (((it == this->reply_states.end()) == true))
     {
         return;
     }
 
     if (document.isObject() == true)
     {
-        ++it->emittedMessages;
-        emit messageReceived(document.object());
+        ++it->emitted_messages;
+        emit message_received(document.object());
         return;
     }
 
     if (document.isArray() == true)
     {
         const QJsonArray messages = document.array();
-        for (const QJsonValue &messageValue : messages)
+        for (const QJsonValue &message_value : messages)
         {
-            if (messageValue.isObject() == false)
+            if (message_value.isObject() == false)
             {
-                emit errorOccurred(
+                emit error_occurred(
                     QStringLiteral("Received a non-object JSON-RPC batch item from %1.")
                         .arg(source));
                 continue;
             }
-            ++it->emittedMessages;
-            emit messageReceived(messageValue.toObject());
+            ++it->emitted_messages;
+            emit message_received(message_value.toObject());
         }
         return;
     }
 
-    emit errorOccurred(
+    emit error_occurred(
         QStringLiteral("Received an unsupported JSON payload from %1.").arg(source));
 }
 
-void HttpTransport::applySessionId(QNetworkReply *reply)
+void http_transport_t::apply_session_id(QNetworkReply *reply)
 {
     const QByteArray header = reply->rawHeader("Mcp-Session-Id");
     if (header.isEmpty() == true)
@@ -1270,112 +1291,117 @@ void HttpTransport::applySessionId(QNetworkReply *reply)
         return;
     }
 
-    const QString sessionId = QString::fromUtf8(header).trimmed();
-    if (((sessionId.isEmpty() || sessionId == m_sessionId) == true))
+    const QString session_id = QString::fromUtf8(header).trimmed();
+    if (((session_id.isEmpty() || session_id == this->session_id) == true))
     {
         return;
     }
 
-    m_sessionId = sessionId;
-    emit logMessage(QStringLiteral("Stored MCP session id: %1").arg(m_sessionId));
+    this->session_id = session_id;
+    emit log_message(QStringLiteral("Stored MCP session id: %1").arg(this->session_id));
 }
 
-bool HttpTransport::ensureAuthorized()
+bool http_transport_t::ensure_authorized()
 {
-    if (((!m_config.oauthEnabled) == true))
+    if (((!this->transport_config.oauth_enabled) == true))
     {
         return false;
     }
 
-    m_lastOAuthError.clear();
-    emit logMessage(
+    this->last_o_auth_error_message.clear();
+    emit log_message(
         QStringLiteral("Ensuring OAuth authorization: accessToken=%1 refreshToken=%2 expires=%3 "
                        "authorizationUrl=%4 tokenUrl=%5")
-            .arg(tokenPresenceSummary(m_accessToken), tokenPresenceSummary(m_refreshToken),
-                 expirySummary(m_accessTokenExpiration),
-                 m_authorizationUrl.isEmpty() ? QStringLiteral("(unset)")
-                                              : m_authorizationUrl.toString(),
-                 m_tokenUrl.isEmpty() ? QStringLiteral("(unset)") : m_tokenUrl.toString()));
+            .arg(token_presence_summary(this->access_token),
+                 token_presence_summary(this->refresh_token),
+                 expiry_summary(this->access_token_expiration),
+                 this->authorization_url.isEmpty() ? QStringLiteral("(unset)")
+                                                   : this->authorization_url.toString(),
+                 this->token_url.isEmpty() ? QStringLiteral("(unset)")
+                                           : this->token_url.toString()));
 
 #if !QTMCP_HAS_NETWORKAUTH
-    m_lastOAuthError = QStringLiteral("MCP OAuth requires Qt NetworkAuth support in qtmcp.");
-    emit errorOccurred(m_lastOAuthError);
+    this->lastOAuthErrorMessage =
+        QStringLiteral("MCP OAuth requires Qt NetworkAuth support in qtmcp.");
+    emit error_occurred(this->lastOAuthErrorMessage);
     return false;
 #else
-    if (((!m_refreshToken.isEmpty()) == true))
+    if (((!this->refresh_token.isEmpty()) == true))
     {
-        emit logMessage(QStringLiteral("Attempting OAuth refresh token flow."));
-        if (refreshAccessToken() == true)
+        emit log_message(QStringLiteral("Attempting OAuth refresh token flow."));
+        if (this->refresh_access_token() == true)
         {
             return true;
         }
-        emit logMessage(QStringLiteral(
+        emit log_message(QStringLiteral(
             "OAuth refresh failed; falling back to interactive authorization code flow."));
     }
 
-    if (((!m_config.interactiveOAuthEnabled) == true))
+    if (((!this->transport_config.interactive_o_auth_enabled) == true))
     {
-        if (m_lastOAuthError.isEmpty() == true)
+        if (this->last_o_auth_error_message.isEmpty() == true)
         {
-            m_lastOAuthError =
-                m_lastAuthorizationRequired
+            this->last_o_auth_error_message =
+                this->authorization_required
                     ? QStringLiteral("OAuth authorization required.")
                     : QStringLiteral("Interactive OAuth authorization is disabled.");
         }
-        emit logMessage(
+        emit log_message(
             QStringLiteral("Interactive OAuth authorization is disabled for this flow."));
         return false;
     }
 
-    return runAuthorizationCodeGrant();
+    return this->run_authorization_code_grant();
 #endif
 }
 
-bool HttpTransport::refreshAccessToken()
+bool http_transport_t::refresh_access_token()
 {
 #if !QTMCP_HAS_NETWORKAUTH
     return false;
 #else
-    if (((m_registeredClientId.isEmpty() || !m_tokenUrl.isValid() || m_refreshToken.isEmpty()) ==
-         true))
+    if (((this->registered_client_id.isEmpty() || !this->token_url.isValid() ||
+          this->refresh_token.isEmpty()) == true))
     {
-        m_lastOAuthError = QStringLiteral("OAuth refresh cannot start because client "
-                                          "registration, token URL, or refresh token is missing.");
+        this->last_o_auth_error_message =
+            QStringLiteral("OAuth refresh cannot start because client "
+                           "registration, token URL, or refresh token is missing.");
         return false;
     }
 
-    emit logMessage(
+    emit log_message(
         QStringLiteral("Starting OAuth refresh: clientIdConfigured=%1 refreshToken=%2 tokenUrl=%3")
-            .arg(m_registeredClientId.isEmpty() ? QStringLiteral("no") : QStringLiteral("yes"),
-                 tokenPresenceSummary(m_refreshToken), m_tokenUrl.toString()));
-    QOAuth2AuthorizationCodeFlow oauth(m_networkAccessManager);
-    oauth.setClientIdentifier(m_registeredClientId);
-    if (((!m_registeredClientSecret.isEmpty()) == true))
+            .arg(this->registered_client_id.isEmpty() ? QStringLiteral("no")
+                                                      : QStringLiteral("yes"),
+                 token_presence_summary(this->refresh_token), this->token_url.toString()));
+    QOAuth2AuthorizationCodeFlow oauth(this->network_access_manager);
+    oauth.setClientIdentifier(this->registered_client_id);
+    if (((!this->registered_client_secret.isEmpty()) == true))
     {
-        oauth.setClientIdentifierSharedKey(m_registeredClientSecret);
+        oauth.setClientIdentifierSharedKey(this->registered_client_secret);
     }
-    oauth.setTokenUrl(m_tokenUrl);
-    if (m_authorizationUrl.isValid() == true)
+    oauth.setTokenUrl(this->token_url);
+    if (this->authorization_url.isValid() == true)
     {
-        oauth.setAuthorizationUrl(m_authorizationUrl);
+        oauth.setAuthorizationUrl(this->authorization_url);
     }
-    oauth.setRefreshToken(m_refreshToken);
-    if (((!m_accessToken.isEmpty()) == true))
+    oauth.setRefreshToken(this->refresh_token);
+    if (((!this->access_token.isEmpty()) == true))
     {
-        oauth.setToken(m_accessToken);
+        oauth.setToken(this->access_token);
     }
-    if (((!m_config.oauthScopes.isEmpty()) == true))
+    if (((!this->transport_config.oauth_scopes.isEmpty()) == true))
     {
-        oauth.setRequestedScopeTokens(requestedScopeTokens(m_config.oauthScopes));
+        oauth.setRequestedScopeTokens(requested_scope_tokens(this->transport_config.oauth_scopes));
     }
     oauth.setModifyParametersFunction(
         [this](QAbstractOAuth::Stage stage, QMultiMap<QString, QVariant> *parameters) {
-            applyOAuthParameters(stage, parameters);
+            this->apply_o_auth_parameters(stage, parameters);
         });
     oauth.setNetworkRequestModifier(this, [this](QNetworkRequest &request, QAbstractOAuth::Stage) {
-        if (((m_config.requestTimeoutMs > 0) == true))
+        if (((this->transport_config.request_timeout_ms > 0) == true))
         {
-            request.setTransferTimeout(m_config.requestTimeoutMs);
+            request.setTransferTimeout(this->transport_config.request_timeout_ms);
         }
     });
 
@@ -1386,8 +1412,8 @@ bool HttpTransport::refreshAccessToken()
     bool success = false;
 
     QObject::connect(&oauth, &QAbstractOAuth::tokenChanged, &loop, [&](const QString &token) {
-        emit logMessage(
-            QStringLiteral("OAuth refresh tokenChanged: %1").arg(tokenPresenceSummary(token)));
+        emit log_message(
+            QStringLiteral("OAuth refresh tokenChanged: %1").arg(token_presence_summary(token)));
         if (token.isEmpty() == false)
         {
             success = true;
@@ -1395,11 +1421,11 @@ bool HttpTransport::refreshAccessToken()
         }
     });
     QObject::connect(&oauth, &QAbstractOAuth::granted, &loop, [&]() {
-        emit logMessage(
+        emit log_message(
             QStringLiteral("OAuth refresh granted signal: token=%1 refreshToken=%2 expires=%3")
-                .arg(tokenPresenceSummary(oauth.token()),
-                     tokenPresenceSummary(oauth.refreshToken()),
-                     expirySummary(oauth.expirationAt())));
+                .arg(token_presence_summary(oauth.token()),
+                     token_presence_summary(oauth.refreshToken()),
+                     expiry_summary(oauth.expirationAt())));
         success = true;
         loop.quit();
     });
@@ -1418,173 +1444,181 @@ bool HttpTransport::refreshAccessToken()
         });
     QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
 
-    timer.start(m_config.requestTimeoutMs > 0 ? m_config.requestTimeoutMs
-                                              : kOAuthInteractiveTimeoutMs);
+    timer.start(this->transport_config.request_timeout_ms > 0
+                    ? this->transport_config.request_timeout_ms
+                    : k_o_auth_interactive_timeout_ms);
     oauth.refreshTokens();
     loop.exec(QEventLoop::ExcludeUserInputEvents);
 
     if (success == false)
     {
-        m_lastOAuthError =
+        this->last_o_auth_error_message =
             failure.isEmpty() ? QStringLiteral("OAuth refresh timed out.") : failure;
-        emit logMessage(m_lastOAuthError);
+        emit log_message(this->last_o_auth_error_message);
         return false;
     }
 
-    m_accessToken = oauth.token();
+    this->access_token = oauth.token();
     if (((!oauth.refreshToken().isEmpty()) == true))
     {
-        m_refreshToken = oauth.refreshToken();
+        this->refresh_token = oauth.refreshToken();
     }
-    m_accessTokenExpiration = oauth.expirationAt();
-    if (m_accessToken.isEmpty() == true)
+    this->access_token_expiration = oauth.expirationAt();
+    if (this->access_token.isEmpty() == true)
     {
-        m_lastOAuthError =
+        this->last_o_auth_error_message =
             QStringLiteral("OAuth refresh finished without returning an access token.");
-        emit logMessage(m_lastOAuthError);
+        emit log_message(this->last_o_auth_error_message);
         return false;
     }
-    emit logMessage(
+    emit log_message(
         QStringLiteral("OAuth refresh result: accessToken=%1 refreshToken=%2 expires=%3")
-            .arg(tokenPresenceSummary(m_accessToken), tokenPresenceSummary(m_refreshToken),
-                 expirySummary(m_accessTokenExpiration)));
-    saveCachedOAuthState();
-    emit logMessage(QStringLiteral("OAuth refresh succeeded."));
+            .arg(token_presence_summary(this->access_token),
+                 token_presence_summary(this->refresh_token),
+                 expiry_summary(this->access_token_expiration)));
+    this->save_cached_o_auth_state();
+    emit log_message(QStringLiteral("OAuth refresh succeeded."));
     return true;
 #endif
 }
 
-bool HttpTransport::runAuthorizationCodeGrant()
+bool http_transport_t::run_authorization_code_grant()
 {
 #if !QTMCP_HAS_NETWORKAUTH
     return false;
 #else
-    QOAuthHttpServerReplyHandler replyHandler;
-    replyHandler.setCallbackPath(QStringLiteral("/oauth2/callback"));
-    replyHandler.setCallbackText(
+    QOAuthHttpServerReplyHandler reply_handler;
+    reply_handler.setCallbackPath(QStringLiteral("/oauth2/callback"));
+    reply_handler.setCallbackText(
         QStringLiteral("Authorization completed. You can return to Qt Creator."));
-    QString listenDetails;
-    if (startOAuthCallbackListener(&replyHandler, &listenDetails) == false)
+    QString listen_details;
+    if (start_o_auth_callback_listener(&reply_handler, &listen_details) == false)
     {
-        m_lastOAuthError = listenDetails.isEmpty()
-                               ? QStringLiteral("Failed to start local OAuth callback listener.")
-                               : listenDetails;
-        emit errorOccurred(m_lastOAuthError);
+        this->last_o_auth_error_message =
+            listen_details.isEmpty()
+                ? QStringLiteral("Failed to start local OAuth callback listener.")
+                : listen_details;
+        emit error_occurred(this->last_o_auth_error_message);
         return false;
     }
-    if (listenDetails.isEmpty() == false)
+    if (listen_details.isEmpty() == false)
     {
-        emit logMessage(listenDetails);
+        emit log_message(listen_details);
     }
-    emit logMessage(
-        QStringLiteral("OAuth callback configuration: callback=%1").arg(replyHandler.callback()));
+    emit log_message(
+        QStringLiteral("OAuth callback configuration: callback=%1").arg(reply_handler.callback()));
 
-    OAuthEndpoints endpoints;
-    QString discoveryLog;
-    ProtectedResourceMetadata protectedResource;
-    QString protectedResourceLog;
-    const QUrl protectedResourceMetadataUrl =
-        m_oauthResourceMetadataUrl.isValid() && !m_oauthResourceMetadataUrl.isEmpty()
-            ? m_oauthResourceMetadataUrl
-            : defaultProtectedResourceMetadataUrl(m_config.endpoint);
-    const bool haveProtectedResourceMetadata = loadProtectedResourceMetadata(
-        m_networkAccessManager, m_config, protectedResourceMetadataUrl, &protectedResource,
-        &protectedResourceLog);
-    if (protectedResourceLog.isEmpty() == false)
+    o_auth_endpoints_t endpoints;
+    QString discovery_log;
+    protected_resource_metadata_t protected_resource;
+    QString protected_resource_log;
+    const QUrl protected_resource_metadata_url =
+        this->oauth_resource_metadata_url.isValid() && !this->oauth_resource_metadata_url.isEmpty()
+            ? this->oauth_resource_metadata_url
+            : default_protected_resource_metadata_url(this->transport_config.endpoint);
+    const bool have_protected_resource_metadata = load_protected_resource_metadata(
+        this->network_access_manager, this->transport_config, protected_resource_metadata_url,
+        &protected_resource, &protected_resource_log);
+    if (protected_resource_log.isEmpty() == false)
     {
-        emit logMessage(protectedResourceLog);
-    }
-
-    if (haveProtectedResourceMetadata && !protectedResource.resource.trimmed().isEmpty())
-    {
-        m_oauthResource = protectedResource.resource.trimmed();
+        emit log_message(protected_resource_log);
     }
 
-    const QUrl authorizationMetadataUrl =
-        haveProtectedResourceMetadata && !protectedResource.authorizationServers.isEmpty()
-            ? oauthAuthorizationMetadataUrl(protectedResource.authorizationServers.constFirst())
-            : oauthAuthorizationMetadataUrl(authorizationBaseUrl(m_config.endpoint));
-
-    if (((!discoverOAuthEndpoints(m_networkAccessManager, m_config, authorizationMetadataUrl,
-                                  &endpoints, &discoveryLog)) == true))
+    if (have_protected_resource_metadata && !protected_resource.resource.trimmed().isEmpty())
     {
-        m_lastOAuthError = QStringLiteral("Failed to resolve OAuth endpoints.");
-        emit errorOccurred(m_lastOAuthError);
+        this->oauth_resource = protected_resource.resource.trimmed();
+    }
+
+    const QUrl authorization_metadata_url =
+        have_protected_resource_metadata && !protected_resource.authorization_servers.isEmpty()
+            ? oauth_authorization_metadata_url(
+                  protected_resource.authorization_servers.constFirst())
+            : oauth_authorization_metadata_url(
+                  authorization_base_url(this->transport_config.endpoint));
+
+    if (((!discover_o_auth_endpoints(this->network_access_manager, this->transport_config,
+                                     authorization_metadata_url, &endpoints, &discovery_log)) ==
+         true))
+    {
+        this->last_o_auth_error_message = QStringLiteral("Failed to resolve OAuth endpoints.");
+        emit error_occurred(this->last_o_auth_error_message);
         return false;
     }
-    if (discoveryLog.isEmpty() == false)
+    if (discovery_log.isEmpty() == false)
     {
-        emit logMessage(discoveryLog);
+        emit log_message(discovery_log);
     }
 
-    m_authorizationUrl = endpoints.authorizationEndpoint;
-    m_tokenUrl = endpoints.tokenEndpoint;
-    emit logMessage(
+    this->authorization_url = endpoints.authorization_endpoint;
+    this->token_url = endpoints.token_endpoint;
+    emit log_message(
         QStringLiteral(
             "Resolved OAuth endpoints: authorization=%1 token=%2 registration=%3 resource=%4")
-            .arg(m_authorizationUrl.toString(), m_tokenUrl.toString(),
-                 endpoints.registrationEndpoint.isEmpty()
+            .arg(this->authorization_url.toString(), this->token_url.toString(),
+                 endpoints.registration_endpoint.isEmpty()
                      ? QStringLiteral("(unset)")
-                     : endpoints.registrationEndpoint.toString(),
-                 m_oauthResource.isEmpty() ? QStringLiteral("(unset)") : m_oauthResource));
+                     : endpoints.registration_endpoint.toString(),
+                 this->oauth_resource.isEmpty() ? QStringLiteral("(unset)")
+                                                : this->oauth_resource));
 
-    if (((!m_config.oauthClientId.isEmpty()) == true))
+    if (((!this->transport_config.oauth_client_id.isEmpty()) == true))
     {
-        m_registeredClientId = m_config.oauthClientId;
+        this->registered_client_id = this->transport_config.oauth_client_id;
     }
-    if (((!m_config.oauthClientSecret.isEmpty()) == true))
+    if (((!this->transport_config.oauth_client_secret.isEmpty()) == true))
     {
-        m_registeredClientSecret = m_config.oauthClientSecret;
+        this->registered_client_secret = this->transport_config.oauth_client_secret;
     }
 
-    if (m_registeredClientId.isEmpty() == true)
+    if (this->registered_client_id.isEmpty() == true)
     {
-        if (endpoints.registrationEndpoint.isValid() == false)
+        if (endpoints.registration_endpoint.isValid() == false)
         {
-            m_lastOAuthError = QStringLiteral("OAuth server does not expose dynamic client "
-                                              "registration and no oauthClientId was configured.");
-            emit errorOccurred(m_lastOAuthError);
+            this->last_o_auth_error_message =
+                QStringLiteral("OAuth server does not expose dynamic client "
+                               "registration and no oauthClientId was configured.");
+            emit error_occurred(this->last_o_auth_error_message);
             return false;
         }
 
-        RegisteredOAuthClient registeredClient;
-        QString registrationError;
-        if (((!registerOAuthClient(m_networkAccessManager, m_config,
-                                   endpoints.registrationEndpoint, replyHandler.callback(),
-                                   &registeredClient, &registrationError)) == true))
+        registered_o_auth_client_t registered_client;
+        QString registration_error;
+        if (((!register_o_auth_client(this->network_access_manager, this->transport_config,
+                                      endpoints.registration_endpoint, reply_handler.callback(),
+                                      &registered_client, &registration_error)) == true))
         {
-            m_lastOAuthError = registrationError;
-            emit errorOccurred(m_lastOAuthError);
+            this->last_o_auth_error_message = registration_error;
+            emit error_occurred(this->last_o_auth_error_message);
             return false;
         }
 
-        m_registeredClientId = registeredClient.clientId;
-        m_registeredClientSecret = registeredClient.clientSecret;
-        emit logMessage(QStringLiteral("Registered OAuth client dynamically."));
+        this->registered_client_id = registered_client.client_id;
+        this->registered_client_secret = registered_client.client_secret;
+        emit log_message(QStringLiteral("Registered OAuth client dynamically."));
     }
 
-    QOAuth2AuthorizationCodeFlow oauth(m_networkAccessManager);
-    oauth.setReplyHandler(&replyHandler);
-    oauth.setAuthorizationUrl(m_authorizationUrl);
-    oauth.setTokenUrl(m_tokenUrl);
-    oauth.setClientIdentifier(m_registeredClientId);
-    if (((!m_registeredClientSecret.isEmpty()) == true))
+    QOAuth2AuthorizationCodeFlow oauth(this->network_access_manager);
+    oauth.setReplyHandler(&reply_handler);
+    oauth.setAuthorizationUrl(this->authorization_url);
+    oauth.setTokenUrl(this->token_url);
+    oauth.setClientIdentifier(this->registered_client_id);
+    if (((!this->registered_client_secret.isEmpty()) == true))
     {
-        oauth.setClientIdentifierSharedKey(m_registeredClientSecret);
+        oauth.setClientIdentifierSharedKey(this->registered_client_secret);
     }
     oauth.setPkceMethod(QOAuth2AuthorizationCodeFlow::PkceMethod::S256);
-    if (((!m_config.oauthScopes.isEmpty()) == true))
+    if (((!this->transport_config.oauth_scopes.isEmpty()) == true))
     {
-        oauth.setRequestedScopeTokens(requestedScopeTokens(m_config.oauthScopes));
+        oauth.setRequestedScopeTokens(requested_scope_tokens(this->transport_config.oauth_scopes));
     }
     oauth.setModifyParametersFunction(
         [this](QAbstractOAuth::Stage stage, QMultiMap<QString, QVariant> *parameters) {
-            applyOAuthParameters(stage, parameters);
+            this->apply_o_auth_parameters(stage, parameters);
         });
     oauth.setNetworkRequestModifier(this, [this](QNetworkRequest &request, QAbstractOAuth::Stage) {
-        if (((m_config.requestTimeoutMs > 0) == true))
+        if (((this->transport_config.request_timeout_ms > 0) == true))
         {
-            request.setTransferTimeout(m_config.requestTimeoutMs);
+            request.setTransferTimeout(this->transport_config.request_timeout_ms);
         }
     });
 
@@ -1595,18 +1629,18 @@ bool HttpTransport::runAuthorizationCodeGrant()
     bool success = false;
 
     QObject::connect(&oauth, &QAbstractOAuth::authorizeWithBrowser, this, [this](const QUrl &url) {
-        emit logMessage(
+        emit log_message(
             QStringLiteral("Opening browser for OAuth authorization: %1").arg(url.toString()));
         if (QDesktopServices::openUrl(url) == false)
         {
-            emit logMessage(
+            emit log_message(
                 QStringLiteral("Failed to open browser automatically. Open this URL manually: %1")
                     .arg(url.toString()));
         }
     });
     QObject::connect(&oauth, &QAbstractOAuth::tokenChanged, &loop, [&](const QString &token) {
-        emit logMessage(QStringLiteral("OAuth authorization tokenChanged: %1")
-                            .arg(tokenPresenceSummary(token)));
+        emit log_message(QStringLiteral("OAuth authorization tokenChanged: %1")
+                             .arg(token_presence_summary(token)));
         if (token.isEmpty() == false)
         {
             success = true;
@@ -1614,12 +1648,12 @@ bool HttpTransport::runAuthorizationCodeGrant()
         }
     });
     QObject::connect(&oauth, &QAbstractOAuth::granted, &loop, [&]() {
-        emit logMessage(
+        emit log_message(
             QStringLiteral(
                 "OAuth authorization granted signal: token=%1 refreshToken=%2 expires=%3")
-                .arg(tokenPresenceSummary(oauth.token()),
-                     tokenPresenceSummary(oauth.refreshToken()),
-                     expirySummary(oauth.expirationAt())));
+                .arg(token_presence_summary(oauth.token()),
+                     token_presence_summary(oauth.refreshToken()),
+                     expiry_summary(oauth.expirationAt())));
         success = true;
         loop.quit();
     });
@@ -1637,157 +1671,168 @@ bool HttpTransport::runAuthorizationCodeGrant()
                      });
     QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
 
-    timer.start(kOAuthInteractiveTimeoutMs);
-    emit logMessage(
+    timer.start(k_o_auth_interactive_timeout_ms);
+    emit log_message(
         QStringLiteral("Starting OAuth authorization code flow: clientIdConfigured=%1 "
                        "clientSecretConfigured=%2 scopes=%3")
-            .arg(m_registeredClientId.isEmpty() ? QStringLiteral("no") : QStringLiteral("yes"),
-                 m_registeredClientSecret.isEmpty() ? QStringLiteral("no") : QStringLiteral("yes"),
-                 m_config.oauthScopes.join(QStringLiteral(","))));
+            .arg(this->registered_client_id.isEmpty() ? QStringLiteral("no")
+                                                      : QStringLiteral("yes"),
+                 this->registered_client_secret.isEmpty() ? QStringLiteral("no")
+                                                          : QStringLiteral("yes"),
+                 this->transport_config.oauth_scopes.join(QStringLiteral(","))));
     oauth.grant();
     loop.exec();
 
     if (success == false)
     {
-        m_lastOAuthError =
+        this->last_o_auth_error_message =
             failure.isEmpty() ? QStringLiteral("OAuth authorization timed out.") : failure;
-        emit errorOccurred(m_lastOAuthError);
+        emit error_occurred(this->last_o_auth_error_message);
         return false;
     }
 
-    m_accessToken = oauth.token();
-    m_refreshToken = oauth.refreshToken();
-    m_accessTokenExpiration = oauth.expirationAt();
-    if (m_accessToken.isEmpty() == true)
+    this->access_token = oauth.token();
+    this->refresh_token = oauth.refreshToken();
+    this->access_token_expiration = oauth.expirationAt();
+    if (this->access_token.isEmpty() == true)
     {
-        m_lastOAuthError =
+        this->last_o_auth_error_message =
             QStringLiteral("OAuth authorization finished without returning an access token.");
-        emit errorOccurred(m_lastOAuthError);
+        emit error_occurred(this->last_o_auth_error_message);
         return false;
     }
-    emit logMessage(
+    emit log_message(
         QStringLiteral("OAuth authorization result: accessToken=%1 refreshToken=%2 expires=%3")
-            .arg(tokenPresenceSummary(m_accessToken), tokenPresenceSummary(m_refreshToken),
-                 expirySummary(m_accessTokenExpiration)));
-    saveCachedOAuthState();
-    emit logMessage(QStringLiteral("OAuth authorization succeeded."));
+            .arg(token_presence_summary(this->access_token),
+                 token_presence_summary(this->refresh_token),
+                 expiry_summary(this->access_token_expiration)));
+    this->save_cached_o_auth_state();
+    emit log_message(QStringLiteral("OAuth authorization succeeded."));
     return true;
 #endif
 }
 
 #if QTMCP_HAS_NETWORKAUTH
-void HttpTransport::applyOAuthParameters(QAbstractOAuth::Stage stage,
-                                         QMultiMap<QString, QVariant> *parameters) const
+void http_transport_t::apply_o_auth_parameters(QAbstractOAuth::Stage stage,
+                                               QMultiMap<QString, QVariant> *parameters) const
 {
     Q_UNUSED(stage);
-    if (((parameters == nullptr || m_oauthResource.trimmed().isEmpty()) == true))
+    if (((parameters == nullptr || this->oauth_resource.trimmed().isEmpty()) == true))
     {
         return;
     }
 
-    parameters->insert(QStringLiteral("resource"), m_oauthResource.trimmed());
+    parameters->insert(QStringLiteral("resource"), this->oauth_resource.trimmed());
 }
 #endif
 
-void HttpTransport::loadCachedOAuthState()
+void http_transport_t::load_cached_o_auth_state()
 {
-    if (((!m_config.oauthEnabled) == true))
+    if (((!this->transport_config.oauth_enabled) == true))
     {
         return;
     }
 
-    const QString cacheKey = oauthCacheKey(m_config);
-    emit logMessage(
+    const QString cache_key = oauth_cache_key(this->transport_config);
+    emit log_message(
         QStringLiteral("Looking up OAuth cache: endpoint=%1 clientIdConfigured=%2 scopes=%3")
-            .arg(m_config.endpoint.toString(),
-                 m_config.oauthClientId.isEmpty() ? QStringLiteral("no") : QStringLiteral("yes"),
-                 m_config.oauthScopes.join(QStringLiteral(","))));
-    auto it = oauthCache().constFind(cacheKey);
-    if (it == oauthCache().cend())
+            .arg(this->transport_config.endpoint.toString(),
+                 this->transport_config.oauth_client_id.isEmpty() ? QStringLiteral("no")
+                                                                  : QStringLiteral("yes"),
+                 this->transport_config.oauth_scopes.join(QStringLiteral(","))));
+    auto it = oauth_cache().constFind(cache_key);
+    if (it == oauth_cache().cend())
     {
-        OAuthCacheEntry persistedEntry;
-        QString persistentError;
-        if (loadPersistentOAuthCacheEntry(cacheKey, &persistedEntry, &persistentError) == true)
+        o_auth_cache_entry_t persisted_entry;
+        QString persistent_error;
+        if (load_persistent_o_auth_cache_entry(cache_key, &persisted_entry, &persistent_error) ==
+            true)
         {
-            oauthCache().insert(cacheKey, persistedEntry);
-            it = oauthCache().constFind(cacheKey);
-            emit logMessage(QStringLiteral("Loaded OAuth state from persistent cache file: %1")
-                                .arg(persistentOAuthCachePath()));
+            oauth_cache().insert(cache_key, persisted_entry);
+            it = oauth_cache().constFind(cache_key);
+            emit log_message(QStringLiteral("Loaded OAuth state from persistent cache file: %1")
+                                 .arg(persistent_o_auth_cache_path()));
         }
         else
         {
-            if (persistentError.isEmpty() == false)
+            if (persistent_error.isEmpty() == false)
             {
-                emit logMessage(
-                    QStringLiteral("Persistent OAuth cache read failed: %1").arg(persistentError));
+                emit log_message(QStringLiteral("Persistent OAuth cache read failed: %1")
+                                     .arg(persistent_error));
             }
-            if (((!m_config.oauthClientId.isEmpty()) == true))
+            if (((!this->transport_config.oauth_client_id.isEmpty()) == true))
             {
-                m_registeredClientId = m_config.oauthClientId;
+                this->registered_client_id = this->transport_config.oauth_client_id;
             }
-            if (((!m_config.oauthClientSecret.isEmpty()) == true))
+            if (((!this->transport_config.oauth_client_secret.isEmpty()) == true))
             {
-                m_registeredClientSecret = m_config.oauthClientSecret;
+                this->registered_client_secret = this->transport_config.oauth_client_secret;
             }
-            emit logMessage(QStringLiteral("OAuth cache miss."));
+            emit log_message(QStringLiteral("OAuth cache miss."));
             return;
         }
     }
 
-    m_accessToken = it->accessToken;
-    m_refreshToken = it->refreshToken;
-    m_accessTokenExpiration = it->expiration;
-    m_authorizationUrl = it->authorizationUrl;
-    m_tokenUrl = it->tokenUrl;
-    m_registeredClientId =
-        m_config.oauthClientId.isEmpty() ? it->clientId : m_config.oauthClientId;
-    m_registeredClientSecret =
-        m_config.oauthClientSecret.isEmpty() ? it->clientSecret : m_config.oauthClientSecret;
-    m_oauthResource = it->resource;
-    m_oauthResourceMetadataUrl = it->resourceMetadataUrl;
+    this->access_token = it->access_token;
+    this->refresh_token = it->refresh_token;
+    this->access_token_expiration = it->expiration;
+    this->authorization_url = it->authorization_url;
+    this->token_url = it->token_url;
+    this->registered_client_id = this->transport_config.oauth_client_id.isEmpty()
+                                     ? it->client_id
+                                     : this->transport_config.oauth_client_id;
+    this->registered_client_secret = this->transport_config.oauth_client_secret.isEmpty()
+                                         ? it->client_secret
+                                         : this->transport_config.oauth_client_secret;
+    this->oauth_resource = it->resource;
+    this->oauth_resource_metadata_url = it->resource_metadata_url;
 
-    emit logMessage(
+    emit log_message(
         QStringLiteral(
             "Loaded cached OAuth state for %1: accessToken=%2 refreshToken=%3 expires=%4")
-            .arg(m_config.endpoint.toString(), tokenPresenceSummary(m_accessToken),
-                 tokenPresenceSummary(m_refreshToken), expirySummary(m_accessTokenExpiration)));
+            .arg(this->transport_config.endpoint.toString(),
+                 token_presence_summary(this->access_token),
+                 token_presence_summary(this->refresh_token),
+                 expiry_summary(this->access_token_expiration)));
 }
 
-void HttpTransport::saveCachedOAuthState() const
+void http_transport_t::save_cached_o_auth_state() const
 {
-    if (((!m_config.oauthEnabled) == true))
+    if (((!this->transport_config.oauth_enabled) == true))
     {
         return;
     }
 
-    OAuthCacheEntry entry;
-    entry.accessToken = m_accessToken;
-    entry.refreshToken = m_refreshToken;
-    entry.expiration = m_accessTokenExpiration;
-    entry.authorizationUrl = m_authorizationUrl;
-    entry.tokenUrl = m_tokenUrl;
-    entry.clientId = m_registeredClientId;
-    entry.clientSecret = m_registeredClientSecret;
-    entry.resource = m_oauthResource;
-    entry.resourceMetadataUrl = m_oauthResourceMetadataUrl;
-    oauthCache().insert(oauthCacheKey(m_config), entry);
-    emit const_cast<HttpTransport *>(this)->logMessage(
+    o_auth_cache_entry_t entry;
+    entry.access_token = this->access_token;
+    entry.refresh_token = this->refresh_token;
+    entry.expiration = this->access_token_expiration;
+    entry.authorization_url = this->authorization_url;
+    entry.token_url = this->token_url;
+    entry.client_id = this->registered_client_id;
+    entry.client_secret = this->registered_client_secret;
+    entry.resource = this->oauth_resource;
+    entry.resource_metadata_url = this->oauth_resource_metadata_url;
+    oauth_cache().insert(oauth_cache_key(this->transport_config), entry);
+    emit const_cast<http_transport_t *>(this)->log_message(
         QStringLiteral(
             "Saved OAuth state to cache for %1: accessToken=%2 refreshToken=%3 expires=%4")
-            .arg(m_config.endpoint.toString(), tokenPresenceSummary(m_accessToken),
-                 tokenPresenceSummary(m_refreshToken), expirySummary(m_accessTokenExpiration)));
-    QString persistentError;
-    if (((!savePersistentOAuthCacheEntry(oauthCacheKey(m_config), entry, &persistentError)) ==
-         true))
+            .arg(this->transport_config.endpoint.toString(),
+                 token_presence_summary(this->access_token),
+                 token_presence_summary(this->refresh_token),
+                 expiry_summary(this->access_token_expiration)));
+    QString persistent_error;
+    if (((!save_persistent_o_auth_cache_entry(oauth_cache_key(this->transport_config), entry,
+                                              &persistent_error)) == true))
     {
-        emit const_cast<HttpTransport *>(this)->logMessage(
-            QStringLiteral("Failed to persist OAuth cache: %1").arg(persistentError));
+        emit const_cast<http_transport_t *>(this)->log_message(
+            QStringLiteral("Failed to persist OAuth cache: %1").arg(persistent_error));
     }
     else
     {
-        emit const_cast<HttpTransport *>(this)->logMessage(
+        emit const_cast<http_transport_t *>(this)->log_message(
             QStringLiteral("Saved OAuth state to persistent cache file: %1")
-                .arg(persistentOAuthCachePath()));
+                .arg(persistent_o_auth_cache_path()));
     }
 }
 

@@ -5,13 +5,13 @@
 namespace qcai2
 {
 
-class IAIProvider;
-class ChatContextManager;
+class iai_provider_t;
+class chat_context_manager_t;
 
 /**
  * Provides AI-powered code completions for editor assist requests.
  */
-class AiCompletionProvider : public TextEditor::CompletionAssistProvider
+class ai_completion_provider_t : public TextEditor::CompletionAssistProvider
 {
     Q_OBJECT
 public:
@@ -19,7 +19,7 @@ public:
      * Creates a completion provider.
      * @param parent Owning QObject.
      */
-    explicit AiCompletionProvider(QObject *parent = nullptr);
+    explicit ai_completion_provider_t(QObject *parent = nullptr);
 
     /**
      * Creates a processor for the current assist request.
@@ -27,7 +27,7 @@ public:
      * @return Async processor, or nullptr when completion is unavailable.
      */
     TextEditor::IAssistProcessor *
-    createProcessor(const TextEditor::AssistInterface *assistInterface) const override;
+    createProcessor(const TextEditor::AssistInterface *assist_interface) const override;
 
     /**
      * Returns the activation sequence length inspected by this provider.
@@ -46,59 +46,59 @@ public:
      * Sets the shared AI provider.
      * @param provider Provider used to fetch completion suggestions.
      */
-    void setAiProvider(IAIProvider *provider)
+    void set_ai_provider(iai_provider_t *provider)
     {
-        m_provider = provider;
+        this->provider = provider;
     }
 
     /**
      * Sets the default model for completion requests.
      * @param model Model name used when settings do not override it.
      */
-    void setModel(const QString &model)
+    void set_model(const QString &model)
     {
-        m_model = model;
+        this->model = model;
     }
 
     /**
      * Sets the persistent chat context manager used for tiny completion context retrieval.
      * @param manager Shared context manager instance.
      */
-    void setChatContextManager(ChatContextManager *manager)
+    void set_chat_context_manager(chat_context_manager_t *manager)
     {
-        m_chatContextManager = manager;
+        this->chat_context_manager = manager;
     }
 
     /**
      * Enables or disables AI completion.
      * @param enabled True to allow this provider to create processors.
      */
-    void setEnabled(bool enabled)
+    void set_enabled(bool enabled)
     {
-        m_enabled = enabled;
+        this->enabled = enabled;
     }
 
     /**
      * Returns whether AI completion is enabled.
      * @return True when the provider may serve requests.
      */
-    bool isEnabled() const
+    bool is_enabled() const
     {
-        return m_enabled;
+        return this->enabled;
     }
 
 private:
     /** Non-owning AI backend used for completion requests. */
-    IAIProvider *m_provider = nullptr;
+    iai_provider_t *provider = nullptr;
 
     /** Default model name used when no completion-specific model is configured. */
-    QString m_model;
+    QString model;
 
     /** Shared persistent chat context used for lightweight completion context. */
-    ChatContextManager *m_chatContextManager = nullptr;
+    chat_context_manager_t *chat_context_manager = nullptr;
 
     /** Enables or disables the provider. */
-    bool m_enabled = true;
+    bool enabled = true;
 };
 
 }  // namespace qcai2

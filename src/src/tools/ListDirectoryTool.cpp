@@ -14,7 +14,7 @@ static constexpr int kMaxEntries = 500;
 /**
  * Returns the JSON schema for list_directory arguments.
  */
-QJsonObject ListDirectoryTool::argsSchema() const
+QJsonObject list_directory_tool_t::args_schema() const
 {
     return QJsonObject{
         {"path", QJsonObject{{"type", "string"}, {"description", "Relative path, default '.'"}}},
@@ -27,7 +27,7 @@ QJsonObject ListDirectoryTool::argsSchema() const
  * @param workDir Project root used for sandbox validation.
  * @return Tree-formatted listing or an error string.
  */
-QString ListDirectoryTool::execute(const QJsonObject &args, const QString &workDir)
+QString list_directory_tool_t::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString relPath = args.value("path").toString(QStringLiteral("."));
     int depth = args.value("depth").toInt(kDefaultDepth);
@@ -62,7 +62,7 @@ QString ListDirectoryTool::execute(const QJsonObject &args, const QString &workD
 
     QStringList lines;
     lines.append(relPath + QStringLiteral("/"));
-    listRecursive(QDir(absPath), QString(), 0, depth, lines, kMaxEntries);
+    this->list_recursive(QDir(absPath), QString(), 0, depth, lines, kMaxEntries);
 
     if (lines.size() >= kMaxEntries)
     {
@@ -75,8 +75,9 @@ QString ListDirectoryTool::execute(const QJsonObject &args, const QString &workD
 /**
  * Recursively lists entries, building an indented tree.
  */
-void ListDirectoryTool::listRecursive(const QDir &dir, const QString &prefix, int currentDepth,
-                                      int maxDepth, QStringList &lines, int maxEntries)
+void list_directory_tool_t::list_recursive(const QDir &dir, const QString &prefix,
+                                           int currentDepth, int maxDepth, QStringList &lines,
+                                           int maxEntries)
 {
     if (currentDepth >= maxDepth || lines.size() >= maxEntries)
     {
@@ -102,8 +103,8 @@ void ListDirectoryTool::listRecursive(const QDir &dir, const QString &prefix, in
         if (entry.isDir() == true)
         {
             lines.append(prefix + entry.fileName() + QStringLiteral("/"));
-            listRecursive(QDir(entry.absoluteFilePath()), prefix + QStringLiteral("  "),
-                          currentDepth + 1, maxDepth, lines, maxEntries);
+            this->list_recursive(QDir(entry.absoluteFilePath()), prefix + QStringLiteral("  "),
+                                 currentDepth + 1, maxDepth, lines, maxEntries);
         }
         else
         {

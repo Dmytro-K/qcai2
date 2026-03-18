@@ -10,71 +10,71 @@
 namespace qcai2
 {
 
-enum class ProviderRawEventKind : std::uint8_t
+enum class provider_raw_event_kind_t : std::uint8_t
 {
-    RequestStarted,
-    ReasoningDelta,
-    MessageDelta,
-    ToolStarted,
-    ToolCompleted,
-    ResponseCompleted,
-    Idle,
-    Error
+    REQUEST_STARTED,
+    REASONING_DELTA,
+    MESSAGE_DELTA,
+    TOOL_STARTED,
+    TOOL_COMPLETED,
+    RESPONSE_COMPLETED,
+    IDLE,
+    ERROR_EVENT
 };
 
-struct ProviderRawEvent
+struct provider_raw_event_t
 {
-    ProviderRawEventKind kind = ProviderRawEventKind::RequestStarted;
-    QString providerId;
-    QString rawType;
-    QString toolName;
+    provider_raw_event_kind_t kind = provider_raw_event_kind_t::REQUEST_STARTED;
+    QString provider_id;
+    QString raw_type;
+    QString tool_name;
     QString message;
 };
 
-enum class AgentProgressEventKind : std::uint8_t
+enum class agent_progress_event_kind_t : std::uint8_t
 {
-    RequestStarted,
-    ReasoningStarted,
-    ReasoningUpdated,
-    ToolStarted,
-    ToolCompleted,
-    ValidationStarted,
-    ValidationCompleted,
-    MessageDelta,
-    FinalAnswerStarted,
-    FinalAnswerCompleted,
-    Idle,
-    Error
+    REQUEST_STARTED,
+    REASONING_STARTED,
+    REASONING_UPDATED,
+    TOOL_STARTED,
+    TOOL_COMPLETED,
+    VALIDATION_STARTED,
+    VALIDATION_COMPLETED,
+    MESSAGE_DELTA,
+    FINAL_ANSWER_STARTED,
+    FINAL_ANSWER_COMPLETED,
+    IDLE,
+    ERROR
 };
 
-enum class AgentProgressOperation : std::uint8_t
+enum class agent_progress_operation_t : std::uint8_t
 {
-    None,
-    Explore,
-    Search,
-    Read,
-    Test,
-    Build,
-    ApplyChanges,
-    Generic
+    NONE,
+    EXPLORE,
+    SEARCH,
+    READ,
+    TEST,
+    BUILD,
+    APPLY_CHANGES,
+    GENERIC
 };
 
-struct AgentProgressEvent
+struct agent_progress_event_t
 {
-    AgentProgressEventKind kind = AgentProgressEventKind::Idle;
-    AgentProgressOperation operation = AgentProgressOperation::None;
-    QString providerId;
-    QString rawType;
-    QString toolName;
+    agent_progress_event_kind_t kind = agent_progress_event_kind_t::IDLE;
+    agent_progress_operation_t operation = agent_progress_operation_t::NONE;
+    QString provider_id;
+    QString raw_type;
+    QString tool_name;
     QString label;
     QString message;
 };
 
-QString providerRawEventKindName(ProviderRawEventKind kind);
-QString agentProgressEventKindName(AgentProgressEventKind kind);
-QString agentProgressOperationName(AgentProgressOperation operation);
-QString prettifyToolName(const QString &toolName);
-AgentProgressOperation classifyToolOperation(const QString &toolName);
-QString progressLabelForTool(const QString &toolName, AgentProgressOperation operation);
+QString provider_raw_event_kind_name(provider_raw_event_kind_t kind);
+QString agent_progress_event_kind_name(agent_progress_event_kind_t kind);
+QString agent_progress_operation_name(agent_progress_operation_t operation);
+QString prettify_tool_name(const QString &tool_name);
+agent_progress_operation_t classify_tool_operation(const QString &tool_name);
+QString progress_label_for_tool(const QString &tool_name, agent_progress_operation_t operation);
 
 }  // namespace qcai2

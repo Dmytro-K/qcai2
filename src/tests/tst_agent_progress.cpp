@@ -13,153 +13,161 @@
 
 using namespace qcai2;
 
-class tst_AgentProgress : public QObject
+class tst_agent_progress_t : public QObject
 {
     Q_OBJECT
 
 private slots:
-    void classifiesToolNames();
-    void mapsProviderEventsToThinkingAndTools();
-    void coalescesNoisyThinkingUpdates();
-    void rendersFinalLifecycle();
-    void rendersStructuredLogsInNonInteractiveMode();
-    void rendersErrors();
+    void classifies_tool_names();
+    void maps_provider_events_to_thinking_and_tools();
+    void coalesces_noisy_thinking_updates();
+    void renders_final_lifecycle();
+    void renders_structured_logs_in_non_interactive_mode();
+    void renders_errors();
 };
 
-void tst_AgentProgress::classifiesToolNames()
+void tst_agent_progress_t::classifies_tool_names()
 {
-    QCOMPARE(classifyToolOperation(QStringLiteral("compact")), AgentProgressOperation::Explore);
-    QCOMPARE(progressLabelForTool(QStringLiteral("compact"), AgentProgressOperation::Explore),
-             QStringLiteral("compact command"));
+    QCOMPARE(classify_tool_operation(QStringLiteral("compact")),
+             agent_progress_operation_t::EXPLORE);
+    QCOMPARE(
+        progress_label_for_tool(QStringLiteral("compact"), agent_progress_operation_t::EXPLORE),
+        QStringLiteral("compact command"));
 
-    QCOMPARE(classifyToolOperation(QStringLiteral("run_tests")), AgentProgressOperation::Test);
-    QCOMPARE(classifyToolOperation(QStringLiteral("run_build")), AgentProgressOperation::Build);
-    QCOMPARE(classifyToolOperation(QStringLiteral("search_repo")), AgentProgressOperation::Search);
-    QCOMPARE(progressLabelForTool(QStringLiteral("search_repo"), AgentProgressOperation::Search),
-             QStringLiteral("repository"));
+    QCOMPARE(classify_tool_operation(QStringLiteral("run_tests")),
+             agent_progress_operation_t::TEST);
+    QCOMPARE(classify_tool_operation(QStringLiteral("run_build")),
+             agent_progress_operation_t::BUILD);
+    QCOMPARE(classify_tool_operation(QStringLiteral("search_repo")),
+             agent_progress_operation_t::SEARCH);
+    QCOMPARE(
+        progress_label_for_tool(QStringLiteral("search_repo"), agent_progress_operation_t::SEARCH),
+        QStringLiteral("repository"));
 
-    QCOMPARE(classifyToolOperation(QStringLiteral("apply_patch")),
-             AgentProgressOperation::ApplyChanges);
-    QCOMPARE(classifyToolOperation(QStringLiteral("read_file")), AgentProgressOperation::Read);
-    QCOMPARE(progressLabelForTool(QStringLiteral("read_file"), AgentProgressOperation::Read),
-             QStringLiteral("file"));
+    QCOMPARE(classify_tool_operation(QStringLiteral("apply_patch")),
+             agent_progress_operation_t::APPLY_CHANGES);
+    QCOMPARE(classify_tool_operation(QStringLiteral("read_file")),
+             agent_progress_operation_t::READ);
+    QCOMPARE(
+        progress_label_for_tool(QStringLiteral("read_file"), agent_progress_operation_t::READ),
+        QStringLiteral("file"));
 }
 
-void tst_AgentProgress::mapsProviderEventsToThinkingAndTools()
+void tst_agent_progress_t::maps_provider_events_to_thinking_and_tools()
 {
-    AgentProgressTracker tracker(QStringLiteral("copilot"), AgentStatusRenderMode::Interactive,
-                                 false);
+    agent_progress_tracker_t tracker(QStringLiteral("copilot"),
+                                     agent_status_render_mode_t::INTERACTIVE, false);
 
-    const AgentProgressRenderResult requestResult =
-        tracker.handleProviderRawEvent({ProviderRawEventKind::RequestStarted,
-                                        QStringLiteral("copilot"),
-                                        QStringLiteral("request.started"),
-                                        {},
-                                        {}});
-    QVERIFY(requestResult.statusChanged);
-    QCOMPARE(requestResult.statusText, QStringLiteral("Thinking"));
+    const agent_progress_render_result_t request_result =
+        tracker.handle_provider_raw_event({provider_raw_event_kind_t::REQUEST_STARTED,
+                                           QStringLiteral("copilot"),
+                                           QStringLiteral("request.started"),
+                                           {},
+                                           {}});
+    QVERIFY(request_result.status_changed);
+    QCOMPARE(request_result.status_text, QStringLiteral("Thinking"));
 
-    const AgentProgressRenderResult toolResult =
-        tracker.handleProviderRawEvent({ProviderRawEventKind::ToolStarted,
-                                        QStringLiteral("copilot"),
-                                        QStringLiteral("tool.execution_start"),
-                                        QStringLiteral("compact"),
-                                        {}});
-    QVERIFY(toolResult.statusChanged);
-    QCOMPARE(toolResult.statusText, QStringLiteral("Exploring compact command"));
+    const agent_progress_render_result_t tool_result =
+        tracker.handle_provider_raw_event({provider_raw_event_kind_t::TOOL_STARTED,
+                                           QStringLiteral("copilot"),
+                                           QStringLiteral("tool.execution_start"),
+                                           QStringLiteral("compact"),
+                                           {}});
+    QVERIFY(tool_result.status_changed);
+    QCOMPARE(tool_result.status_text, QStringLiteral("Exploring compact command"));
 
-    const AgentProgressRenderResult completedToolResult =
-        tracker.handleProviderRawEvent({ProviderRawEventKind::ToolCompleted,
-                                        QStringLiteral("copilot"),
-                                        QStringLiteral("tool.execution_complete"),
-                                        QStringLiteral("compact"),
-                                        {}});
-    QVERIFY(!completedToolResult.statusChanged);
+    const agent_progress_render_result_t completed_tool_result =
+        tracker.handle_provider_raw_event({provider_raw_event_kind_t::TOOL_COMPLETED,
+                                           QStringLiteral("copilot"),
+                                           QStringLiteral("tool.execution_complete"),
+                                           QStringLiteral("compact"),
+                                           {}});
+    QVERIFY(!completed_tool_result.status_changed);
 }
 
-void tst_AgentProgress::coalescesNoisyThinkingUpdates()
+void tst_agent_progress_t::coalesces_noisy_thinking_updates()
 {
-    AgentProgressTracker tracker(QStringLiteral("openai"), AgentStatusRenderMode::Interactive,
-                                 false);
+    agent_progress_tracker_t tracker(QStringLiteral("openai"),
+                                     agent_status_render_mode_t::INTERACTIVE, false);
 
-    const AgentProgressRenderResult started =
-        tracker.handleProviderRawEvent({ProviderRawEventKind::RequestStarted,
-                                        QStringLiteral("openai"),
-                                        QStringLiteral("request.started"),
-                                        {},
-                                        {}});
-    QVERIFY(started.statusChanged);
-    QCOMPARE(started.statusText, QStringLiteral("Thinking"));
+    const agent_progress_render_result_t started =
+        tracker.handle_provider_raw_event({provider_raw_event_kind_t::REQUEST_STARTED,
+                                           QStringLiteral("openai"),
+                                           QStringLiteral("request.started"),
+                                           {},
+                                           {}});
+    QVERIFY(started.status_changed);
+    QCOMPARE(started.status_text, QStringLiteral("Thinking"));
 
-    const AgentProgressRenderResult firstReasoning =
-        tracker.handleProviderRawEvent({ProviderRawEventKind::ReasoningDelta,
-                                        QStringLiteral("openai"),
-                                        QStringLiteral("response.reasoning.delta"),
-                                        {},
-                                        QStringLiteral("step 1")});
-    QVERIFY(!firstReasoning.statusChanged);
+    const agent_progress_render_result_t first_reasoning =
+        tracker.handle_provider_raw_event({provider_raw_event_kind_t::REASONING_DELTA,
+                                           QStringLiteral("openai"),
+                                           QStringLiteral("response.reasoning.delta"),
+                                           {},
+                                           QStringLiteral("step 1")});
+    QVERIFY(!first_reasoning.status_changed);
 
-    const AgentProgressRenderResult firstMessage =
-        tracker.handleProviderRawEvent({ProviderRawEventKind::MessageDelta,
-                                        QStringLiteral("openai"),
-                                        QStringLiteral("assistant.message_delta"),
-                                        {},
-                                        QStringLiteral("hello")});
-    QVERIFY(!firstMessage.statusChanged);
+    const agent_progress_render_result_t first_message =
+        tracker.handle_provider_raw_event({provider_raw_event_kind_t::MESSAGE_DELTA,
+                                           QStringLiteral("openai"),
+                                           QStringLiteral("assistant.message_delta"),
+                                           {},
+                                           QStringLiteral("hello")});
+    QVERIFY(!first_message.status_changed);
 
-    const AgentProgressRenderResult secondMessage =
-        tracker.handleProviderRawEvent({ProviderRawEventKind::MessageDelta,
-                                        QStringLiteral("openai"),
-                                        QStringLiteral("assistant.message_delta"),
-                                        {},
-                                        QStringLiteral("world")});
-    QVERIFY(!secondMessage.statusChanged);
+    const agent_progress_render_result_t second_message =
+        tracker.handle_provider_raw_event({provider_raw_event_kind_t::MESSAGE_DELTA,
+                                           QStringLiteral("openai"),
+                                           QStringLiteral("assistant.message_delta"),
+                                           {},
+                                           QStringLiteral("world")});
+    QVERIFY(!second_message.status_changed);
 }
 
-void tst_AgentProgress::rendersFinalLifecycle()
+void tst_agent_progress_t::renders_final_lifecycle()
 {
-    AgentProgressTracker tracker(QStringLiteral("openai"), AgentStatusRenderMode::Interactive,
-                                 false);
+    agent_progress_tracker_t tracker(QStringLiteral("openai"),
+                                     agent_status_render_mode_t::INTERACTIVE, false);
 
-    const AgentProgressRenderResult finalStarted =
-        tracker.handleNormalizedEvent({AgentProgressEventKind::FinalAnswerStarted,
-                                       AgentProgressOperation::None,
-                                       QStringLiteral("openai"),
-                                       QStringLiteral("controller.final.start"),
-                                       {},
-                                       {},
-                                       {}});
-    QVERIFY(finalStarted.statusChanged);
-    QCOMPARE(finalStarted.statusText, QStringLiteral("Preparing final answer"));
+    const agent_progress_render_result_t final_started =
+        tracker.handle_normalized_event({agent_progress_event_kind_t::FINAL_ANSWER_STARTED,
+                                         agent_progress_operation_t::NONE,
+                                         QStringLiteral("openai"),
+                                         QStringLiteral("controller.final.start"),
+                                         {},
+                                         {},
+                                         {}});
+    QVERIFY(final_started.status_changed);
+    QCOMPARE(final_started.status_text, QStringLiteral("Preparing final answer"));
 
-    const AgentProgressRenderResult finalCompleted =
-        tracker.handleNormalizedEvent({AgentProgressEventKind::FinalAnswerCompleted,
-                                       AgentProgressOperation::None,
-                                       QStringLiteral("openai"),
-                                       QStringLiteral("controller.final.completed"),
-                                       {},
-                                       {},
-                                       {}});
-    QVERIFY(finalCompleted.statusChanged);
-    QCOMPARE(finalCompleted.statusText, QStringLiteral("Done"));
+    const agent_progress_render_result_t final_completed =
+        tracker.handle_normalized_event({agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED,
+                                         agent_progress_operation_t::NONE,
+                                         QStringLiteral("openai"),
+                                         QStringLiteral("controller.final.completed"),
+                                         {},
+                                         {},
+                                         {}});
+    QVERIFY(final_completed.status_changed);
+    QCOMPARE(final_completed.status_text, QStringLiteral("Done"));
 }
 
-void tst_AgentProgress::rendersStructuredLogsInNonInteractiveMode()
+void tst_agent_progress_t::renders_structured_logs_in_non_interactive_mode()
 {
-    AgentProgressTracker tracker(QStringLiteral("copilot"), AgentStatusRenderMode::NonInteractive,
-                                 false);
+    agent_progress_tracker_t tracker(QStringLiteral("copilot"),
+                                     agent_status_render_mode_t::NON_INTERACTIVE, false);
 
-    const AgentProgressRenderResult result =
-        tracker.handleProviderRawEvent({ProviderRawEventKind::ToolStarted,
-                                        QStringLiteral("copilot"),
-                                        QStringLiteral("tool.execution_start"),
-                                        QStringLiteral("search_repo"),
-                                        {}});
-    QVERIFY(result.statusChanged);
-    QCOMPARE(result.statusText, QStringLiteral("Searching repository"));
-    QVERIFY(result.stableLogLine.isEmpty() == false);
+    const agent_progress_render_result_t result =
+        tracker.handle_provider_raw_event({provider_raw_event_kind_t::TOOL_STARTED,
+                                           QStringLiteral("copilot"),
+                                           QStringLiteral("tool.execution_start"),
+                                           QStringLiteral("search_repo"),
+                                           {}});
+    QVERIFY(result.status_changed);
+    QCOMPARE(result.status_text, QStringLiteral("Searching repository"));
+    QVERIFY(result.stable_log_line.isEmpty() == false);
 
-    const QJsonDocument doc = QJsonDocument::fromJson(result.stableLogLine.toUtf8());
+    const QJsonDocument doc = QJsonDocument::fromJson(result.stable_log_line.toUtf8());
     QVERIFY(doc.isObject());
     const QJsonObject root = doc.object();
     QCOMPARE(root.value(QStringLiteral("type")).toString(), QStringLiteral("agent_status"));
@@ -169,21 +177,21 @@ void tst_AgentProgress::rendersStructuredLogsInNonInteractiveMode()
     QCOMPARE(root.value(QStringLiteral("subject")).toString(), QStringLiteral("repository"));
 }
 
-void tst_AgentProgress::rendersErrors()
+void tst_agent_progress_t::renders_errors()
 {
-    AgentProgressTracker tracker(QStringLiteral("openai"), AgentStatusRenderMode::Interactive,
-                                 false);
+    agent_progress_tracker_t tracker(QStringLiteral("openai"),
+                                     agent_status_render_mode_t::INTERACTIVE, false);
 
-    const AgentProgressRenderResult result =
-        tracker.handleProviderRawEvent({ProviderRawEventKind::Error,
-                                        QStringLiteral("openai"),
-                                        QStringLiteral("response.error"),
-                                        {},
-                                        QStringLiteral("network failed")});
-    QVERIFY(result.statusChanged);
-    QCOMPARE(result.statusText, QStringLiteral("Error: network failed"));
+    const agent_progress_render_result_t result =
+        tracker.handle_provider_raw_event({provider_raw_event_kind_t::ERROR_EVENT,
+                                           QStringLiteral("openai"),
+                                           QStringLiteral("response.error"),
+                                           {},
+                                           QStringLiteral("network failed")});
+    QVERIFY(result.status_changed);
+    QCOMPARE(result.status_text, QStringLiteral("Error: network failed"));
 }
 
-QTEST_GUILESS_MAIN(tst_AgentProgress)
+QTEST_GUILESS_MAIN(tst_agent_progress_t)
 
 #include "tst_agent_progress.moc"

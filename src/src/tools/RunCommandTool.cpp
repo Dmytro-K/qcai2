@@ -11,7 +11,7 @@ static constexpr int kTimeoutMs = 30000;
 /**
  * Returns the JSON schema for run_command arguments.
  */
-QJsonObject RunCommandTool::argsSchema() const
+QJsonObject run_command_tool_t::args_schema() const
 {
     return QJsonObject{{"command", QJsonObject{{"type", "string"}, {"required", true}}}};
 }
@@ -22,7 +22,7 @@ QJsonObject RunCommandTool::argsSchema() const
  * @param workDir Project root used as the working directory.
  * @return Combined stdout/stderr or an error string.
  */
-QString RunCommandTool::execute(const QJsonObject &args, const QString &workDir)
+QString run_command_tool_t::execute(const QJsonObject &args, const QString &workDir)
 {
     const QString command = args.value("command").toString();
     if (command.isEmpty() == true)
@@ -30,7 +30,7 @@ QString RunCommandTool::execute(const QJsonObject &args, const QString &workDir)
         return QStringLiteral("Error: 'command' argument is required.");
     }
 
-    ProcessRunner runner;
+    process_runner_t runner;
 #ifdef Q_OS_WIN
     auto res = runner.run(QStringLiteral("cmd.exe"), {QStringLiteral("/C"), command}, workDir,
                           kTimeoutMs);
@@ -40,24 +40,24 @@ QString RunCommandTool::execute(const QJsonObject &args, const QString &workDir)
 #endif
 
     QString output;
-    if (res.stdOut.isEmpty() == false)
+    if (res.std_out.isEmpty() == false)
     {
-        output += res.stdOut;
+        output += res.std_out;
     }
-    if (res.stdErr.isEmpty() == false)
+    if (res.std_err.isEmpty() == false)
     {
         if (output.isEmpty() == false)
         {
             output += QStringLiteral("\n");
         }
-        output += QStringLiteral("[stderr]\n") + res.stdErr;
+        output += QStringLiteral("[stderr]\n") + res.std_err;
     }
 
     if (res.success == false)
     {
         return QStringLiteral("Command exited with code %1.\n%2")
-            .arg(res.exitCode)
-            .arg(output.isEmpty() ? res.errorString : output);
+            .arg(res.exit_code)
+            .arg(output.isEmpty() ? res.error_string : output);
     }
 
     return output.isEmpty() ? QStringLiteral("Command completed successfully (no output).")

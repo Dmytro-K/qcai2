@@ -1,4 +1,4 @@
-/*! Implements linked-files behavior extracted from AgentDockWidget. */
+/*! Implements linked-files behavior extracted from agent_dock_widget_t. */
 
 #include "AgentDockLinkedFilesController.h"
 
@@ -21,14 +21,15 @@ namespace qcai2
 namespace
 {
 
-QSize linkedFileItemSize(const QFontMetrics &metrics, const QString &text, int iconWidth)
+QSize linked_file_item_size(const QFontMetrics &metrics, const QString &text, int icon_width)
 {
-    return QSize(metrics.horizontalAdvance(text) + iconWidth + 26, qMax(metrics.height(), 16) + 8);
+    return QSize(metrics.horizontalAdvance(text) + icon_width + 26,
+                 qMax(metrics.height(), 16) + 8);
 }
 
-bool hasIgnoredLinkedPathPrefix(const QStringList &ignoredPrefixes, const QString &path)
+bool has_ignored_linked_path_prefix(const QStringList &ignored_prefixes, const QString &path)
 {
-    for (const QString &prefix : ignoredPrefixes)
+    for (const QString &prefix : ignored_prefixes)
     {
         if (!prefix.isEmpty() && path.startsWith(prefix))
         {
@@ -41,21 +42,22 @@ bool hasIgnoredLinkedPathPrefix(const QStringList &ignoredPrefixes, const QStrin
 
 }  // namespace
 
-AgentDockLinkedFilesController::AgentDockLinkedFilesController(AgentDockWidget &dock)
-    : m_dock(dock)
+agent_dock_linked_files_controller_t::agent_dock_linked_files_controller_t(
+    agent_dock_widget_t &dock)
+    : dock(dock)
 {
 }
 
-QString AgentDockLinkedFilesController::currentProjectDir() const
+QString agent_dock_linked_files_controller_t::current_project_dir() const
 {
-    if (auto *ctx = m_dock.m_controller->editorContext(); ((ctx != nullptr) == true))
+    if (auto *ctx = this->dock.controller->editor_context(); ((ctx != nullptr) == true))
     {
-        return ctx->capture().projectDir;
+        return ctx->capture().project_dir;
     }
     return {};
 }
 
-QString AgentDockLinkedFilesController::normalizeLinkedFilePath(const QString &path) const
+QString agent_dock_linked_files_controller_t::normalize_linked_file_path(const QString &path) const
 {
     const QString trimmed = path.trimmed();
     if (trimmed.isEmpty() == true)
@@ -64,35 +66,35 @@ QString AgentDockLinkedFilesController::normalizeLinkedFilePath(const QString &p
     }
 
     QFileInfo info(trimmed);
-    QString absolutePath = info.isAbsolute()
-                               ? info.absoluteFilePath()
-                               : QFileInfo(linkedFileAbsolutePath(trimmed)).absoluteFilePath();
-    if (absolutePath.isEmpty() == true)
+    QString absolute_path =
+        info.isAbsolute() ? info.absoluteFilePath()
+                          : QFileInfo(this->linked_file_absolute_path(trimmed)).absoluteFilePath();
+    if (absolute_path.isEmpty() == true)
     {
-        absolutePath = QFileInfo(trimmed).absoluteFilePath();
+        absolute_path = QFileInfo(trimmed).absoluteFilePath();
     }
 
-    const QFileInfo absoluteInfo(absolutePath);
-    if (((!absoluteInfo.exists() || !absoluteInfo.isFile()) == true))
+    const QFileInfo absolute_info(absolute_path);
+    if (((!absolute_info.exists() || !absolute_info.isFile()) == true))
     {
         return {};
     }
 
-    const QString projectDir = currentProjectDir();
-    if (projectDir.isEmpty() == false)
+    const QString project_dir = this->current_project_dir();
+    if (project_dir.isEmpty() == false)
     {
         const QString relative =
-            QDir(projectDir).relativeFilePath(absoluteInfo.absoluteFilePath());
+            QDir(project_dir).relativeFilePath(absolute_info.absoluteFilePath());
         if (((!relative.startsWith(QStringLiteral("../"))) == true))
         {
             return QDir::cleanPath(relative);
         }
     }
 
-    return QDir::cleanPath(absoluteInfo.absoluteFilePath());
+    return QDir::cleanPath(absolute_info.absoluteFilePath());
 }
 
-QString AgentDockLinkedFilesController::linkedFileAbsolutePath(const QString &path) const
+QString agent_dock_linked_files_controller_t::linked_file_absolute_path(const QString &path) const
 {
     const QString trimmed = path.trimmed();
     if (trimmed.isEmpty() == true)
@@ -106,63 +108,63 @@ QString AgentDockLinkedFilesController::linkedFileAbsolutePath(const QString &pa
         return QDir::cleanPath(info.absoluteFilePath());
     }
 
-    const QString projectDir = currentProjectDir();
-    if (projectDir.isEmpty() == true)
+    const QString project_dir = this->current_project_dir();
+    if (project_dir.isEmpty() == true)
     {
         return {};
     }
 
-    return QDir(projectDir).absoluteFilePath(trimmed);
+    return QDir(project_dir).absoluteFilePath(trimmed);
 }
 
-QStringList AgentDockLinkedFilesController::linkedFileCandidates() const
+QStringList agent_dock_linked_files_controller_t::linked_file_candidates() const
 {
-    const QString projectDir = currentProjectDir();
-    if (projectDir.isEmpty() == true)
+    const QString project_dir = this->current_project_dir();
+    if (project_dir.isEmpty() == true)
     {
         return {};
     }
 
-    if (((m_cachedLinkedFileRoot == projectDir && !m_cachedLinkedFileCandidates.isEmpty()) ==
-         true))
+    if ((this->cached_linked_file_root == project_dir &&
+         !this->cached_linked_file_candidates.isEmpty()) == true)
     {
-        return m_cachedLinkedFileCandidates;
+        return this->cached_linked_file_candidates;
     }
 
     QStringList candidates;
-    QDirIterator it(projectDir, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-    const QDir rootDir(projectDir);
+    QDirIterator it(project_dir, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    const QDir root_dir(project_dir);
     while (it.hasNext() == true)
     {
-        const QString absolutePath = it.next();
-        const QString relativePath = QDir::cleanPath(rootDir.relativeFilePath(absolutePath));
-        if (((relativePath.startsWith(QStringLiteral(".qcai2/")) ||
-              relativePath.startsWith(QStringLiteral(".git/"))) == true))
+        const QString absolute_path = it.next();
+        const QString relative_path = QDir::cleanPath(root_dir.relativeFilePath(absolute_path));
+        if (((relative_path.startsWith(QStringLiteral(".qcai2/")) ||
+              relative_path.startsWith(QStringLiteral(".git/"))) == true))
         {
             continue;
         }
-        if (hasIgnoredLinkedPathPrefix(m_ignoredLinkedFiles, relativePath))
+        if (has_ignored_linked_path_prefix(this->ignored_linked_file_paths, relative_path))
         {
             continue;
         }
-        candidates.append(relativePath);
+        candidates.append(relative_path);
     }
 
     candidates.sort(Qt::CaseInsensitive);
-    m_cachedLinkedFileRoot = projectDir;
-    m_cachedLinkedFileCandidates = candidates;
-    return m_cachedLinkedFileCandidates;
+    this->cached_linked_file_root = project_dir;
+    this->cached_linked_file_candidates = candidates;
+    return this->cached_linked_file_candidates;
 }
 
-QStringList AgentDockLinkedFilesController::linkedFilesFromGoalText() const
+QStringList agent_dock_linked_files_controller_t::linked_files_from_goal_text() const
 {
     QStringList files;
     static const QRegularExpression re(QStringLiteral(R"((?:^|\s)#([^\s#]+))"));
-    QRegularExpressionMatchIterator it = re.globalMatch(m_dock.m_goalEdit->toPlainText());
+    QRegularExpressionMatchIterator it = re.globalMatch(this->dock.goal_edit->toPlainText());
     while (it.hasNext() == true)
     {
         const QRegularExpressionMatch match = it.next();
-        const QString normalized = normalizeLinkedFilePath(match.captured(1));
+        const QString normalized = this->normalize_linked_file_path(match.captured(1));
         if (!normalized.isEmpty() && !files.contains(normalized))
         {
             files.append(normalized);
@@ -171,22 +173,24 @@ QStringList AgentDockLinkedFilesController::linkedFilesFromGoalText() const
     return files;
 }
 
-QString AgentDockLinkedFilesController::currentEditorLinkedFile() const
+QString agent_dock_linked_files_controller_t::current_editor_linked_file() const
 {
-    if (((m_dock.m_controller == nullptr || m_dock.m_controller->editorContext() == nullptr) ==
-         true))
+    if (((this->dock.controller == nullptr ||
+          this->dock.controller->editor_context() == nullptr) == true))
     {
         return {};
     }
 
-    return normalizeLinkedFilePath(m_dock.m_controller->editorContext()->capture().filePath);
+    return this->normalize_linked_file_path(
+        this->dock.controller->editor_context()->capture().file_path);
 }
 
-QString AgentDockLinkedFilesController::defaultLinkedFile() const
+QString agent_dock_linked_files_controller_t::default_linked_file() const
 {
-    const QString normalized = currentEditorLinkedFile();
-    if (((normalized.isEmpty() || hasIgnoredLinkedPathPrefix(m_ignoredLinkedFiles, normalized) ||
-          m_hiddenDefaultLinkedFiles.contains(normalized)) == true))
+    const QString normalized = this->current_editor_linked_file();
+    if (((normalized.isEmpty() ||
+          has_ignored_linked_path_prefix(this->ignored_linked_file_paths, normalized) ||
+          this->hidden_default_linked_files.contains(normalized)) == true))
     {
         return {};
     }
@@ -194,15 +198,15 @@ QString AgentDockLinkedFilesController::defaultLinkedFile() const
     return normalized;
 }
 
-QStringList AgentDockLinkedFilesController::effectiveLinkedFiles() const
+QStringList agent_dock_linked_files_controller_t::effective_linked_files() const
 {
-    QStringList files = m_manualLinkedFiles;
-    const QString defaultFile = defaultLinkedFile();
-    if (!defaultFile.isEmpty() && !files.contains(defaultFile))
+    QStringList files = this->manual_linked_file_paths;
+    const QString default_file = this->default_linked_file();
+    if (!default_file.isEmpty() && !files.contains(default_file))
     {
-        files.append(defaultFile);
+        files.append(default_file);
     }
-    for (const QString &path : linkedFilesFromGoalText())
+    for (const QString &path : this->linked_files_from_goal_text())
     {
         if (!files.contains(path))
         {
@@ -212,22 +216,22 @@ QStringList AgentDockLinkedFilesController::effectiveLinkedFiles() const
     return files;
 }
 
-void AgentDockLinkedFilesController::addLinkedFiles(const QStringList &paths)
+void agent_dock_linked_files_controller_t::add_linked_files(const QStringList &paths)
 {
     bool changed = false;
     for (const QString &path : paths)
     {
-        const QString normalized = normalizeLinkedFilePath(path);
+        const QString normalized = this->normalize_linked_file_path(path);
         if (normalized.isEmpty())
         {
             continue;
         }
-        changed = m_hiddenDefaultLinkedFiles.removeAll(normalized) > 0 || changed;
-        if (m_manualLinkedFiles.contains(normalized))
+        changed = this->hidden_default_linked_files.removeAll(normalized) > 0 || changed;
+        if (this->manual_linked_file_paths.contains(normalized))
         {
             continue;
         }
-        m_manualLinkedFiles.append(normalized);
+        this->manual_linked_file_paths.append(normalized);
         changed = true;
     }
 
@@ -236,122 +240,122 @@ void AgentDockLinkedFilesController::addLinkedFiles(const QStringList &paths)
         return;
     }
 
-    refreshUi();
-    m_dock.m_sessionController->saveChat();
+    this->refresh_ui();
+    this->dock.session_controller->save_chat();
 }
 
-void AgentDockLinkedFilesController::removeSelectedLinkedFiles()
+void agent_dock_linked_files_controller_t::remove_selected_linked_files()
 {
-    if (((m_dock.m_linkedFilesView == nullptr) == true))
+    if (((this->dock.linked_files_view == nullptr) == true))
     {
         return;
     }
 
-    const QList<QListWidgetItem *> selectedItems = m_dock.m_linkedFilesView->selectedItems();
-    if (selectedItems.isEmpty())
+    const QList<QListWidgetItem *> selected_items = this->dock.linked_files_view->selectedItems();
+    if (selected_items.isEmpty())
     {
         return;
     }
 
-    QString goalText = m_dock.m_goalEdit->toPlainText();
-    bool goalChanged = false;
-    bool manualChanged = false;
-    bool hiddenChanged = false;
-    const QString currentDefaultFile = currentEditorLinkedFile();
+    QString goal_text = this->dock.goal_edit->toPlainText();
+    bool goal_changed = false;
+    bool manual_changed = false;
+    bool hidden_changed = false;
+    const QString current_default_file = this->current_editor_linked_file();
 
-    for (QListWidgetItem *item : selectedItems)
+    for (QListWidgetItem *item : selected_items)
     {
         const QString path = item->data(Qt::UserRole).toString();
-        manualChanged = m_manualLinkedFiles.removeAll(path) > 0 || manualChanged;
-        if (path == currentDefaultFile && !m_hiddenDefaultLinkedFiles.contains(path))
+        manual_changed = this->manual_linked_file_paths.removeAll(path) > 0 || manual_changed;
+        if (path == current_default_file && !this->hidden_default_linked_files.contains(path))
         {
-            m_hiddenDefaultLinkedFiles.append(path);
-            hiddenChanged = true;
+            this->hidden_default_linked_files.append(path);
+            hidden_changed = true;
         }
 
-        const QRegularExpression tokenRe(
+        const QRegularExpression token_re(
             QStringLiteral(R"((^|\s)#%1(?=\s|$))").arg(QRegularExpression::escape(path)));
-        const QString updatedGoal = goalText.replace(tokenRe, QStringLiteral("\\1"));
-        goalChanged = goalChanged || (updatedGoal != goalText);
-        goalText = updatedGoal;
+        const QString updated_goal = goal_text.replace(token_re, QStringLiteral("\\1"));
+        goal_changed = goal_changed || (updated_goal != goal_text);
+        goal_text = updated_goal;
     }
 
-    if (goalChanged == true)
+    if (goal_changed == true)
     {
-        m_dock.m_goalEdit->setPlainText(goalText);
+        this->dock.goal_edit->setPlainText(goal_text);
     }
 
-    if (((manualChanged || goalChanged || hiddenChanged) == true))
+    if (((manual_changed || goal_changed || hidden_changed) == true))
     {
-        refreshUi();
-        m_dock.m_sessionController->saveChat();
+        this->refresh_ui();
+        this->dock.session_controller->save_chat();
     }
 }
 
-void AgentDockLinkedFilesController::refreshUi()
+void agent_dock_linked_files_controller_t::refresh_ui()
 {
-    if (((m_dock.m_linkedFilesView == nullptr) == true))
+    if (((this->dock.linked_files_view == nullptr) == true))
     {
         return;
     }
 
-    const QStringList linkedFiles = effectiveLinkedFiles();
-    m_dock.m_linkedFilesView->clear();
-    m_dock.m_linkedFilesView->setVisible(!linkedFiles.isEmpty());
+    const QStringList linked_files = this->effective_linked_files();
+    this->dock.linked_files_view->clear();
+    this->dock.linked_files_view->setVisible(!linked_files.isEmpty());
 
-    if (linkedFiles.isEmpty())
+    if (linked_files.isEmpty())
     {
-        m_dock.m_linkedFilesView->syncToContents();
+        this->dock.linked_files_view->sync_to_contents();
         return;
     }
 
-    static QFileIconProvider iconProvider;
-    const QFontMetrics metrics(m_dock.m_linkedFilesView->font());
-    const int iconWidth = m_dock.m_linkedFilesView->iconSize().width();
-    for (const QString &path : linkedFiles)
+    static QFileIconProvider icon_provider;
+    const QFontMetrics metrics(this->dock.linked_files_view->font());
+    const int icon_width = this->dock.linked_files_view->iconSize().width();
+    for (const QString &path : linked_files)
     {
-        const QString absolutePath = linkedFileAbsolutePath(path);
-        const QFileInfo fileInfo(absolutePath.isEmpty() ? path : absolutePath);
-        const QString label = fileInfo.fileName().isEmpty() ? path : fileInfo.fileName();
+        const QString absolute_path = this->linked_file_absolute_path(path);
+        const QFileInfo file_info(absolute_path.isEmpty() ? path : absolute_path);
+        const QString label = file_info.fileName().isEmpty() ? path : file_info.fileName();
         auto *item = new QListWidgetItem(label);
         item->setData(Qt::UserRole, path);
-        item->setToolTip(absolutePath);
-        item->setIcon(iconProvider.icon(fileInfo));
-        item->setSizeHint(linkedFileItemSize(metrics, label, iconWidth));
-        m_dock.m_linkedFilesView->addItem(item);
+        item->setToolTip(absolute_path);
+        item->setIcon(icon_provider.icon(file_info));
+        item->setSizeHint(linked_file_item_size(metrics, label, icon_width));
+        this->dock.linked_files_view->addItem(item);
     }
-    m_dock.m_linkedFilesView->syncToContents();
+    this->dock.linked_files_view->sync_to_contents();
 }
 
-QString AgentDockLinkedFilesController::linkedFilesPromptContext() const
+QString agent_dock_linked_files_controller_t::linked_files_prompt_context() const
 {
-    const QStringList linkedFiles = effectiveLinkedFiles();
-    if (linkedFiles.isEmpty())
+    const QStringList linked_files = this->effective_linked_files();
+    if (linked_files.isEmpty())
     {
         return {};
     }
 
     QString context = QStringLiteral("Linked files for this request:\n");
-    for (const QString &path : linkedFiles)
+    for (const QString &path : linked_files)
     {
         context += QStringLiteral("- %1\n").arg(path);
     }
 
     context += QStringLiteral("\nUse these linked files as explicit request context.\n");
 
-    static constexpr qsizetype kMaxTotalChars = 60000;
-    qsizetype usedChars = 0;
-    for (const QString &path : linkedFiles)
+    static constexpr qsizetype k_max_total_chars = 60000;
+    qsizetype used_chars = 0;
+    for (const QString &path : linked_files)
     {
-        const QString absolutePath = linkedFileAbsolutePath(path);
-        QFile file(absolutePath);
+        const QString absolute_path = this->linked_file_absolute_path(path);
+        QFile file(absolute_path);
         if (!file.open(QIODevice::ReadOnly))
         {
             continue;
         }
 
         QString content = QString::fromUtf8(file.readAll());
-        const qsizetype remaining = kMaxTotalChars - usedChars;
+        const qsizetype remaining = k_max_total_chars - used_chars;
         if (remaining <= 0)
         {
             break;
@@ -362,44 +366,44 @@ QString AgentDockLinkedFilesController::linkedFilesPromptContext() const
         }
 
         context += QStringLiteral("\nFile: %1\n~~~~text\n%2\n~~~~\n").arg(path, content);
-        usedChars += content.size();
+        used_chars += content.size();
     }
 
     return context.trimmed();
 }
 
-void AgentDockLinkedFilesController::clearState()
+void agent_dock_linked_files_controller_t::clear_state()
 {
-    m_manualLinkedFiles.clear();
-    m_ignoredLinkedFiles.clear();
-    m_hiddenDefaultLinkedFiles.clear();
-    invalidateCandidates();
+    this->manual_linked_file_paths.clear();
+    this->ignored_linked_file_paths.clear();
+    this->hidden_default_linked_files.clear();
+    this->invalidate_candidates();
 }
 
-const QStringList &AgentDockLinkedFilesController::manualLinkedFiles() const
+const QStringList &agent_dock_linked_files_controller_t::manual_linked_files() const
 {
-    return m_manualLinkedFiles;
+    return this->manual_linked_file_paths;
 }
 
-const QStringList &AgentDockLinkedFilesController::ignoredLinkedFiles() const
+const QStringList &agent_dock_linked_files_controller_t::ignored_linked_files() const
 {
-    return m_ignoredLinkedFiles;
+    return this->ignored_linked_file_paths;
 }
 
-void AgentDockLinkedFilesController::setManualLinkedFiles(const QStringList &paths)
+void agent_dock_linked_files_controller_t::set_manual_linked_files(const QStringList &paths)
 {
-    m_manualLinkedFiles = paths;
+    this->manual_linked_file_paths = paths;
 }
 
-void AgentDockLinkedFilesController::setIgnoredLinkedFiles(const QStringList &paths)
+void agent_dock_linked_files_controller_t::set_ignored_linked_files(const QStringList &paths)
 {
-    m_ignoredLinkedFiles = paths;
+    this->ignored_linked_file_paths = paths;
 }
 
-void AgentDockLinkedFilesController::invalidateCandidates()
+void agent_dock_linked_files_controller_t::invalidate_candidates()
 {
-    m_cachedLinkedFileRoot.clear();
-    m_cachedLinkedFileCandidates.clear();
+    this->cached_linked_file_root.clear();
+    this->cached_linked_file_candidates.clear();
 }
 
 }  // namespace qcai2

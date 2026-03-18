@@ -23,12 +23,12 @@ namespace qcai2
 namespace
 {
 
-constexpr int kDefaultPromptResultLimit = 15000;
-constexpr int kVerboseToolPromptResultLimit = 4000;
-constexpr int kProviderInactivityTimeoutMs = 75000;
-constexpr int kProviderThinkingInactivityTimeoutMs = 180000;
+constexpr int k_default_prompt_result_limit = 15000;
+constexpr int k_verbose_tool_prompt_result_limit = 4000;
+constexpr int k_provider_inactivity_timeout_ms = 75000;
+constexpr int k_provider_thinking_inactivity_timeout_ms = 180000;
 
-QString asIndentedCodeBlock(const QString &text)
+QString as_indented_code_block(const QString &text)
 {
     const QString normalized = text.isEmpty() ? QStringLiteral("(empty)") : text;
     QStringList lines = normalized.split(QLatin1Char('\n'));
@@ -39,18 +39,18 @@ QString asIndentedCodeBlock(const QString &text)
     return lines.join(QLatin1Char('\n'));
 }
 
-QString formatToolArgs(const QJsonObject &args)
+QString format_tool_args(const QJsonObject &args)
 {
     return QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)).trimmed();
 }
 
-QString formatToolExecutionLog(const QString &name, const QJsonObject &args)
+QString format_tool_execution_log(const QString &name, const QJsonObject &args)
 {
     return QStringLiteral("🔧 **Tool:** `%1`\n\n**Arguments**\n\n%2")
-        .arg(name, asIndentedCodeBlock(formatToolArgs(args)));
+        .arg(name, as_indented_code_block(format_tool_args(args)));
 }
 
-QString formatToolResultLog(const QString &result)
+QString format_tool_result_log(const QString &result)
 {
     static constexpr int kMaxLoggedResultLength = 500;
 
@@ -61,78 +61,78 @@ QString formatToolResultLog(const QString &result)
         preview += QStringLiteral("\n... [truncated, %1 chars total]").arg(result.size());
     }
 
-    return QStringLiteral("✅ **Result**\n\n%1").arg(asIndentedCodeBlock(preview.trimmed()));
+    return QStringLiteral("✅ **result_t**\n\n%1").arg(as_indented_code_block(preview.trimmed()));
 }
 
-int promptResultLimitForTool(const QString &name)
+int prompt_result_limit_for_tool(const QString &name)
 {
     if (name == QStringLiteral("show_compile_output") ||
         name == QStringLiteral("show_application_output") ||
         name == QStringLiteral("show_diagnostics"))
     {
-        return kVerboseToolPromptResultLimit;
+        return k_verbose_tool_prompt_result_limit;
     }
 
-    return kDefaultPromptResultLimit;
+    return k_default_prompt_result_limit;
 }
 
-bool isEnabledEffort(const QString &level)
+bool is_enabled_effort(const QString &level)
 {
     return level == QStringLiteral("low") || level == QStringLiteral("medium") ||
            level == QStringLiteral("high");
 }
 
-QString runModeLabel(AgentController::RunMode runMode)
+QString run_mode_label(agent_controller_t::run_mode_t run_mode)
 {
-    return runMode == AgentController::RunMode::Ask ? QStringLiteral("ask")
-                                                    : QStringLiteral("agent");
+    return run_mode == agent_controller_t::run_mode_t::ASK ? QStringLiteral("ask")
+                                                           : QStringLiteral("agent");
 }
 
-ContextRequestKind contextRequestKind(AgentController::RunMode runMode)
+context_request_kind_t context_request_kind(agent_controller_t::run_mode_t run_mode)
 {
-    return runMode == AgentController::RunMode::Ask ? ContextRequestKind::Ask
-                                                    : ContextRequestKind::AgentChat;
+    return run_mode == agent_controller_t::run_mode_t::ASK ? context_request_kind_t::ASK
+                                                           : context_request_kind_t::AGENT_CHAT;
 }
 
-ProviderUsage accumulateUsage(const ProviderUsage &lhs, const ProviderUsage &rhs)
+provider_usage_t accumulate_usage(const provider_usage_t &lhs, const provider_usage_t &rhs)
 {
-    ProviderUsage usage;
-    usage.inputTokens = (lhs.inputTokens >= 0 || rhs.inputTokens >= 0)
-                            ? qMax(0, qMax(lhs.inputTokens, 0) + qMax(rhs.inputTokens, 0))
-                            : -1;
-    usage.outputTokens = (lhs.outputTokens >= 0 || rhs.outputTokens >= 0)
-                             ? qMax(0, qMax(lhs.outputTokens, 0) + qMax(rhs.outputTokens, 0))
+    provider_usage_t usage;
+    usage.input_tokens = (lhs.input_tokens >= 0 || rhs.input_tokens >= 0)
+                             ? qMax(0, qMax(lhs.input_tokens, 0) + qMax(rhs.input_tokens, 0))
                              : -1;
-    usage.reasoningTokens =
-        (lhs.reasoningTokens >= 0 || rhs.reasoningTokens >= 0)
-            ? qMax(0, qMax(lhs.reasoningTokens, 0) + qMax(rhs.reasoningTokens, 0))
+    usage.output_tokens = (lhs.output_tokens >= 0 || rhs.output_tokens >= 0)
+                              ? qMax(0, qMax(lhs.output_tokens, 0) + qMax(rhs.output_tokens, 0))
+                              : -1;
+    usage.reasoning_tokens =
+        (lhs.reasoning_tokens >= 0 || rhs.reasoning_tokens >= 0)
+            ? qMax(0, qMax(lhs.reasoning_tokens, 0) + qMax(rhs.reasoning_tokens, 0))
             : -1;
-    usage.cachedInputTokens =
-        (lhs.cachedInputTokens >= 0 || rhs.cachedInputTokens >= 0)
-            ? qMax(0, qMax(lhs.cachedInputTokens, 0) + qMax(rhs.cachedInputTokens, 0))
+    usage.cached_input_tokens =
+        (lhs.cached_input_tokens >= 0 || rhs.cached_input_tokens >= 0)
+            ? qMax(0, qMax(lhs.cached_input_tokens, 0) + qMax(rhs.cached_input_tokens, 0))
             : -1;
-    usage.totalTokens =
-        (lhs.resolvedTotalTokens() >= 0 || rhs.resolvedTotalTokens() >= 0)
-            ? qMax(0, qMax(lhs.resolvedTotalTokens(), 0) + qMax(rhs.resolvedTotalTokens(), 0))
+    usage.total_tokens =
+        (lhs.resolved_total_tokens() >= 0 || rhs.resolved_total_tokens() >= 0)
+            ? qMax(0, qMax(lhs.resolved_total_tokens(), 0) + qMax(rhs.resolved_total_tokens(), 0))
             : -1;
     return usage;
 }
 
-QString artifactKindForTool(const QString &toolName)
+QString artifact_kind_for_tool(const QString &tool_name)
 {
-    if (toolName == QStringLiteral("run_build"))
+    if (tool_name == QStringLiteral("run_build"))
     {
         return QStringLiteral("build_log");
     }
-    if (toolName == QStringLiteral("run_tests"))
+    if (tool_name == QStringLiteral("run_tests"))
     {
         return QStringLiteral("test_result");
     }
-    if (toolName == QStringLiteral("git_diff") || toolName == QStringLiteral("apply_patch"))
+    if (tool_name == QStringLiteral("git_diff") || tool_name == QStringLiteral("apply_patch"))
     {
         return QStringLiteral("diff");
     }
-    if (toolName == QStringLiteral("read_file"))
+    if (tool_name == QStringLiteral("read_file"))
     {
         return QStringLiteral("file_snippet");
     }
@@ -141,53 +141,54 @@ QString artifactKindForTool(const QString &toolName)
 
 }  // namespace
 
-AgentController::AgentController(QObject *parent) : QObject(parent)
+agent_controller_t::agent_controller_t(QObject *parent) : QObject(parent)
 {
-    m_providerWatchdog.setSingleShot(true);
-    m_providerWatchdog.setInterval(kProviderInactivityTimeoutMs);
-    connect(&m_providerWatchdog, &QTimer::timeout, this,
-            &AgentController::handleProviderInactivityTimeout);
+    this->provider_watchdog.setSingleShot(true);
+    this->provider_watchdog.setInterval(k_provider_inactivity_timeout_ms);
+    connect(&this->provider_watchdog, &QTimer::timeout, this,
+            &agent_controller_t::handle_provider_inactivity_timeout);
 }
 
-void AgentController::setProvider(IAIProvider *provider)
+void agent_controller_t::set_provider(iai_provider_t *provider)
 {
-    m_provider = provider;
+    this->provider = provider;
 }
-void AgentController::setProviders(const QList<IAIProvider *> &providers)
+void agent_controller_t::set_providers(const QList<iai_provider_t *> &providers)
 {
-    m_allProviders = providers;
+    this->all_providers = providers;
 }
-void AgentController::setToolRegistry(ToolRegistry *registry)
+void agent_controller_t::set_tool_registry(tool_registry_t *registry)
 {
-    m_toolRegistry = registry;
+    this->tool_registry = registry;
 }
-void AgentController::setEditorContext(EditorContext *ctx)
+void agent_controller_t::set_editor_context(editor_context_t *ctx)
 {
-    m_editorContext = ctx;
+    this->context_provider = ctx;
 }
-void AgentController::setChatContextManager(ChatContextManager *manager)
+void agent_controller_t::set_chat_context_manager(chat_context_manager_t *manager)
 {
-    m_chatContextManager = manager;
+    this->chat_context_manager = manager;
 }
-void AgentController::setMcpToolManager(McpToolManager *manager)
+void agent_controller_t::set_mcp_tool_manager(mcp_tool_manager_t *manager)
 {
-    m_mcpToolManager = manager;
+    this->mcp_tool_manager = manager;
 }
-void AgentController::setSafetyPolicy(SafetyPolicy *policy)
+void agent_controller_t::set_safety_policy(safety_policy_t *policy)
 {
-    m_safetyPolicy = policy;
-}
-
-void AgentController::setRequestContext(const QString &context, const QStringList &linkedFiles)
-{
-    m_requestContext = context;
-    m_linkedFiles = linkedFiles;
+    this->safety_policy = policy;
 }
 
-QString AgentController::buildSystemPrompt() const
+void agent_controller_t::set_request_context(const QString &context,
+                                             const QStringList &linked_files)
+{
+    this->request_context = context;
+    this->linked_files = linked_files;
+}
+
+QString agent_controller_t::build_system_prompt() const
 {
     QString sys;
-    if (m_runMode == RunMode::Ask)
+    if (this->run_mode == run_mode_t::ASK)
     {
         sys += QStringLiteral(
             "You are an AI assistant inside Qt Creator. Answer the user's request directly using "
@@ -211,21 +212,21 @@ QString AgentController::buildSystemPrompt() const
     }
 
     // Available tools
-    if (m_runMode == RunMode::Agent && (m_toolRegistry != nullptr))
+    if (this->run_mode == run_mode_t::AGENT && (this->tool_registry != nullptr))
     {
-        QJsonDocument toolsDoc(m_toolRegistry->toolDescriptionsJson());
+        QJsonDocument toolsDoc(this->tool_registry->tool_descriptions_json());
         sys += QStringLiteral("Available tools:\n%1\n\n")
                    .arg(QString::fromUtf8(toolsDoc.toJson(QJsonDocument::Indented)));
     }
 
     // Editor context
-    if (m_editorContext != nullptr)
+    if (this->context_provider != nullptr)
     {
         sys += QStringLiteral("Current editor context:\n%1\n")
-                   .arg(m_editorContext->toPromptFragment());
+                   .arg(this->context_provider->to_prompt_fragment());
 
         // Include file contents from open editors
-        const QString files = m_editorContext->fileContentsFragment(30000);
+        const QString files = this->context_provider->file_contents_fragment(30000);
         if (!files.isEmpty())
         {
             sys += QStringLiteral("File contents (from open tabs):\n%1\n").arg(files);
@@ -233,13 +234,13 @@ QString AgentController::buildSystemPrompt() const
     }
 
     // Safety info
-    if (m_dryRun)
+    if (this->dry_run)
     {
         sys += QStringLiteral(
             "MODE: DRY-RUN. Do NOT apply patches; only produce diffs for preview.\n");
     }
 
-    if (m_runMode == RunMode::Agent)
+    if (this->run_mode == run_mode_t::AGENT)
     {
         sys += QStringLiteral(
             "\nFor simple/single-step tasks, skip planning and use tool_call or final directly. "
@@ -253,11 +254,11 @@ QString AgentController::buildSystemPrompt() const
     return sys;
 }
 
-void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
-                            const QString &modelName, const QString &reasoningEffort,
-                            const QString &thinkingLevel)
+void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run_mode,
+                               const QString &model_name, const QString &reasoning_effort,
+                               const QString &thinking_level)
 {
-    if (m_running)
+    if (this->running)
     {
         return;
     }
@@ -265,115 +266,115 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
     // Re-select and reconfigure provider from current settings
     auto &s = settings();
     s.load();
-    Logger::instance().setEnabled(s.debugLogging);
-    if (!m_allProviders.isEmpty())
+    logger_t::instance().set_enabled(s.debug_logging);
+    if (!this->all_providers.isEmpty())
     {
-        m_provider = nullptr;
+        this->provider = nullptr;
         QCAI_DEBUG("Agent", QStringLiteral("Selecting provider '%1' from %2 available")
                                 .arg(s.provider)
-                                .arg(m_allProviders.size()));
-        for (auto *p : m_allProviders)
+                                .arg(this->all_providers.size()));
+        for (auto *p : this->all_providers)
         {
             if (p->id() == s.provider)
             {
-                m_provider = p;
+                this->provider = p;
                 break;
             }
         }
-        if (m_provider == nullptr)
+        if (this->provider == nullptr)
         {
-            m_provider = m_allProviders.first();
+            this->provider = this->all_providers.first();
         }
 
         // Reconfigure the selected provider
         if (s.provider == QStringLiteral("openai"))
         {
-            m_provider->setBaseUrl(s.baseUrl);
-            m_provider->setApiKey(s.apiKey);
+            this->provider->set_base_url(s.base_url);
+            this->provider->set_api_key(s.api_key);
         }
         else if (s.provider == QStringLiteral("local"))
         {
-            m_provider->setBaseUrl(s.localBaseUrl);
-            m_provider->setApiKey(s.apiKey);
+            this->provider->set_base_url(s.local_base_url);
+            this->provider->set_api_key(s.api_key);
         }
         else if (s.provider == QStringLiteral("ollama"))
         {
-            m_provider->setBaseUrl(s.ollamaBaseUrl);
+            this->provider->set_base_url(s.ollama_base_url);
         }
     }
 
-    if (m_provider == nullptr)
+    if (this->provider == nullptr)
     {
-        emit errorOccurred(QStringLiteral("No AI provider configured."));
+        emit this->error_occurred(QStringLiteral("No AI provider configured."));
         return;
     }
 
     QStringList mcpRefreshMessages;
-    if (runMode == RunMode::Agent && m_mcpToolManager != nullptr)
+    if (run_mode == run_mode_t::AGENT && this->mcp_tool_manager != nullptr)
     {
-        QString projectDir;
-        if (m_editorContext != nullptr)
+        QString project_dir;
+        if (this->context_provider != nullptr)
         {
-            projectDir = m_editorContext->capture().projectDir;
+            project_dir = this->context_provider->capture().project_dir;
         }
-        mcpRefreshMessages = m_mcpToolManager->refreshForProject(projectDir);
+        mcpRefreshMessages = this->mcp_tool_manager->refresh_for_project(project_dir);
     }
 
-    m_running = true;
-    m_dryRun = dryRun;
-    m_iteration = 0;
-    m_toolCallCount = 0;
-    m_textRetries = 0;
-    m_modeRetries = 0;
-    m_goal = goal;
-    m_runMode = runMode;
-    m_modelName = modelName.trimmed().isEmpty() ? s.modelName : modelName.trimmed();
-    m_reasoningEffort =
-        reasoningEffort.trimmed().isEmpty() ? s.reasoningEffort : reasoningEffort.trimmed();
-    m_thinkingLevel =
-        thinkingLevel.trimmed().isEmpty() ? s.thinkingLevel : thinkingLevel.trimmed();
-    m_plan.clear();
-    m_accumulatedDiff.clear();
-    m_pendingApprovals.clear();
-    m_messages.clear();
-    m_runId.clear();
-    m_accumulatedUsage = {};
-    m_pendingProviderResponses.clear();
-    m_providerResponseDispatchScheduled = false;
-    m_pendingValidationToolName.clear();
-    m_pendingValidationLabel.clear();
-    m_progressTracker = std::make_unique<AgentProgressTracker>(
-        m_provider != nullptr ? m_provider->id() : QString(), AgentStatusRenderMode::Interactive,
-        settings().agentDebug);
+    this->running = true;
+    this->dry_run = dry_run;
+    this->current_iteration = 0;
+    this->current_tool_call_count = 0;
+    this->text_retries = 0;
+    this->mode_retries = 0;
+    this->goal = goal;
+    this->run_mode = run_mode;
+    this->model_name = model_name.trimmed().isEmpty() ? s.model_name : model_name.trimmed();
+    this->reasoning_effort =
+        reasoning_effort.trimmed().isEmpty() ? s.reasoning_effort : reasoning_effort.trimmed();
+    this->thinking_level =
+        thinking_level.trimmed().isEmpty() ? s.thinking_level : thinking_level.trimmed();
+    this->plan.clear();
+    this->final_diff_preview.clear();
+    this->pending_approvals.clear();
+    this->messages.clear();
+    this->run_id.clear();
+    this->accumulated_usage = {};
+    this->pending_provider_responses.clear();
+    this->provider_response_dispatch_scheduled = false;
+    this->pending_validation_tool_name.clear();
+    this->pending_validation_label.clear();
+    this->progress_tracker = std::make_unique<agent_progress_tracker_t>(
+        this->provider != nullptr ? this->provider->id() : QString(),
+        agent_status_render_mode_t::INTERACTIVE, settings().agent_debug);
 
     QCAI_INFO("Agent",
               QStringLiteral("Starting run — mode: %1, provider: %2, model: %3, reasoning: %4, "
                              "thinking: %5, dryRun: %6, goal: %7")
-                  .arg(runModeLabel(m_runMode), m_provider->id(), m_modelName, m_reasoningEffort,
-                       m_thinkingLevel, dryRun ? QStringLiteral("yes") : QStringLiteral("no"),
-                       goal.left(100)));
+                  .arg(run_mode_label(this->run_mode), this->provider->id(), this->model_name,
+                       this->reasoning_effort, this->thinking_level,
+                       dry_run ? QStringLiteral("yes") : QStringLiteral("no"), goal.left(100)));
 
     QStringList dynamicSystemMessages;
-    if (m_requestContext.trimmed().isEmpty() == false)
+    if (this->request_context.trimmed().isEmpty() == false)
     {
-        dynamicSystemMessages.append(m_requestContext.trimmed());
+        dynamicSystemMessages.append(this->request_context.trimmed());
     }
-    if (isEnabledEffort(m_thinkingLevel) == true)
+    if (is_enabled_effort(this->thinking_level) == true)
     {
         dynamicSystemMessages.append(
-            QStringLiteral("Use %1 thinking depth for this task.").arg(m_thinkingLevel));
+            QStringLiteral("Use %1 thinking depth for this task.").arg(this->thinking_level));
     }
 
     bool restoredPersistentContext = false;
-    if ((m_chatContextManager != nullptr) && (m_editorContext != nullptr))
+    if ((this->chat_context_manager != nullptr) && (this->context_provider != nullptr))
     {
-        const EditorContext::Snapshot snapshot = m_editorContext->capture();
-        QString workspaceRoot = snapshot.projectDir;
-        if (workspaceRoot.isEmpty() == true && snapshot.filePath.isEmpty() == false)
+        const editor_context_t::snapshot_t snapshot = this->context_provider->capture();
+        QString workspaceRoot = snapshot.project_dir;
+        if (workspaceRoot.isEmpty() == true && snapshot.file_path.isEmpty() == false)
         {
-            workspaceRoot = QFileInfo(snapshot.filePath).absolutePath();
+            workspaceRoot = QFileInfo(snapshot.file_path).absolutePath();
         }
-        QString workspaceId = snapshot.projectFilePath;
+        QString workspaceId = snapshot.project_file_path;
         if (workspaceId.isEmpty() == true)
         {
             workspaceId = workspaceRoot;
@@ -383,58 +384,61 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
         {
             QString contextError;
             const QString existingConversationId =
-                m_chatContextManager->activeWorkspaceId() == workspaceId
-                    ? m_chatContextManager->activeConversationId()
+                this->chat_context_manager->active_workspace_id() == workspaceId
+                    ? this->chat_context_manager->active_conversation_id()
                     : QString();
-            if (m_chatContextManager->setActiveWorkspace(
+            if (this->chat_context_manager->set_active_workspace(
                     workspaceId, workspaceRoot, existingConversationId, &contextError) == true)
             {
-                m_chatContextManager->syncWorkspaceState(snapshot, s, &contextError);
+                this->chat_context_manager->sync_workspace_state(snapshot, s, &contextError);
                 if (contextError.isEmpty() == true)
                 {
                     const QJsonObject runMetadata{
                         {QStringLiteral("goalPreview"), goal.left(200)},
-                        {QStringLiteral("projectFilePath"), snapshot.projectFilePath},
-                        {QStringLiteral("projectDir"), snapshot.projectDir},
-                        {QStringLiteral("linkedFileCount"), m_linkedFiles.size()},
-                        {QStringLiteral("mode"), runModeLabel(m_runMode)},
+                        {QStringLiteral("projectFilePath"), snapshot.project_file_path},
+                        {QStringLiteral("projectDir"), snapshot.project_dir},
+                        {QStringLiteral("linkedFileCount"), this->linked_files.size()},
+                        {QStringLiteral("mode"), run_mode_label(this->run_mode)},
                     };
-                    m_runId = m_chatContextManager->beginRun(
-                        contextRequestKind(m_runMode), m_provider->id(), m_modelName,
-                        m_reasoningEffort, m_thinkingLevel, m_dryRun, runMetadata, &contextError);
+                    this->run_id = this->chat_context_manager->begin_run(
+                        context_request_kind(this->run_mode), this->provider->id(),
+                        this->model_name, this->reasoning_effort, this->thinking_level,
+                        this->dry_run, runMetadata, &contextError);
                 }
 
                 if (contextError.isEmpty() == true &&
-                    m_requestContext.trimmed().isEmpty() == false)
+                    this->request_context.trimmed().isEmpty() == false)
                 {
                     const QJsonObject requestContextMetadata{
-                        {QStringLiteral("linkedFiles"), QJsonArray::fromStringList(m_linkedFiles)},
+                        {QStringLiteral("linkedFiles"),
+                         QJsonArray::fromStringList(this->linked_files)},
                     };
-                    m_chatContextManager->appendArtifact(
-                        m_runId, QStringLiteral("request_context"),
-                        QStringLiteral("request_context"), m_requestContext.trimmed(),
+                    this->chat_context_manager->append_artifact(
+                        this->run_id, QStringLiteral("request_context"),
+                        QStringLiteral("request_context"), this->request_context.trimmed(),
                         requestContextMetadata, &contextError);
                 }
 
                 if (contextError.isEmpty() == true)
                 {
                     const QJsonObject goalMetadata{
-                        {QStringLiteral("mode"), runModeLabel(m_runMode)},
-                        {QStringLiteral("linkedFileCount"), m_linkedFiles.size()},
+                        {QStringLiteral("mode"), run_mode_label(this->run_mode)},
+                        {QStringLiteral("linkedFileCount"), this->linked_files.size()},
                     };
-                    m_chatContextManager->appendUserMessage(m_runId, goal, QStringLiteral("goal"),
-                                                            goalMetadata, &contextError);
+                    this->chat_context_manager->append_user_message(
+                        this->run_id, goal, QStringLiteral("goal"), goalMetadata, &contextError);
                 }
 
                 if (contextError.isEmpty() == true)
                 {
-                    const ContextEnvelope envelope = m_chatContextManager->buildContextEnvelope(
-                        contextRequestKind(m_runMode), buildSystemPrompt(), dynamicSystemMessages,
-                        s.maxTokens, &contextError);
+                    const context_envelope_t envelope =
+                        this->chat_context_manager->build_context_envelope(
+                            context_request_kind(this->run_mode), this->build_system_prompt(),
+                            dynamicSystemMessages, s.max_tokens, &contextError);
                     if (contextError.isEmpty() == true &&
-                        envelope.providerMessages.isEmpty() == false)
+                        envelope.provider_messages.isEmpty() == false)
                     {
-                        m_messages = envelope.providerMessages;
+                        this->messages = envelope.provider_messages;
                         restoredPersistentContext = true;
                     }
                 }
@@ -442,776 +446,803 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
 
             if (contextError.isEmpty() == false)
             {
-                if ((m_chatContextManager != nullptr) && (m_runId.isEmpty() == false))
+                if ((this->chat_context_manager != nullptr) && (this->run_id.isEmpty() == false))
                 {
                     QString finishError;
-                    m_chatContextManager->finishRun(
-                        m_runId, QStringLiteral("error"), m_accumulatedUsage,
+                    this->chat_context_manager->finish_run(
+                        this->run_id, QStringLiteral("error"), this->accumulated_usage,
                         QJsonObject{{QStringLiteral("error"), contextError},
                                     {QStringLiteral("reason"),
                                      QStringLiteral("context-bootstrap-failed")}},
                         &finishError);
                 }
-                emit logMessage(
+                emit this->log_message(
                     QStringLiteral("⚠ Persistent chat context unavailable: %1").arg(contextError));
-                m_runId.clear();
+                this->run_id.clear();
             }
         }
     }
 
     if (restoredPersistentContext == false)
     {
-        m_messages.append({QStringLiteral("system"), buildSystemPrompt()});
+        this->messages.append({QStringLiteral("system"), this->build_system_prompt()});
 
         for (const QString &message : dynamicSystemMessages)
         {
-            m_messages.append({QStringLiteral("system"), message});
+            this->messages.append({QStringLiteral("system"), message});
         }
 
-        m_messages.append({QStringLiteral("user"), goal});
+        this->messages.append({QStringLiteral("user"), goal});
     }
 
-    emit logMessage(
+    emit this->log_message(
         QStringLiteral("%1 %2 started. Goal: %3")
-            .arg(m_runMode == RunMode::Ask ? QStringLiteral("💬") : QStringLiteral("▶"))
-            .arg(m_runMode == RunMode::Ask ? QStringLiteral("Ask mode") : QStringLiteral("Agent"))
+            .arg(this->run_mode == run_mode_t::ASK ? QStringLiteral("💬") : QStringLiteral("▶"))
+            .arg(this->run_mode == run_mode_t::ASK ? QStringLiteral("Ask mode")
+                                                   : QStringLiteral("Agent"))
             .arg(goal));
-    if (!m_linkedFiles.isEmpty())
+    if (!this->linked_files.isEmpty())
     {
-        emit logMessage(
-            QStringLiteral("📎 Linked files: %1").arg(m_linkedFiles.join(QStringLiteral(", "))));
+        emit this->log_message(QStringLiteral("📎 Linked files: %1")
+                                   .arg(this->linked_files.join(QStringLiteral(", "))));
     }
     for (const QString &message : std::as_const(mcpRefreshMessages))
     {
-        emit logMessage(message);
+        emit log_message(message);
     }
-    runNextIteration();
+    this->run_next_iteration();
 }
 
-void AgentController::stop()
+void agent_controller_t::stop()
 {
-    if (!m_running)
+    if (!this->running)
     {
         return;
     }
-    m_running = false;
+    this->running = false;
     QCAI_INFO("Agent", QStringLiteral("Agent stopped by user at iteration %1, tool calls: %2")
-                           .arg(m_iteration)
-                           .arg(m_toolCallCount));
-    if (m_provider != nullptr)
+                           .arg(this->current_iteration)
+                           .arg(this->current_tool_call_count));
+    if (this->provider != nullptr)
     {
-        m_provider->cancel();
+        this->provider->cancel();
     }
-    disarmProviderWatchdog();
-    emit logMessage(QStringLiteral("⏹ Agent stopped by user."));
-    finalizePersistentRun(QStringLiteral("stopped"),
-                          QJsonObject{{QStringLiteral("reason"), QStringLiteral("user-stop")}});
-    emit stopped(QStringLiteral("Stopped by user at iteration %1.").arg(m_iteration));
+    this->disarm_provider_watchdog();
+    emit this->log_message(QStringLiteral("⏹ Agent stopped by user."));
+    this->finalize_persistent_run(
+        QStringLiteral("stopped"),
+        QJsonObject{{QStringLiteral("reason"), QStringLiteral("user-stop")}});
+    emit this->stopped(
+        QStringLiteral("Stopped by user at iteration %1.").arg(this->current_iteration));
 }
 
-void AgentController::runNextIteration()
+void agent_controller_t::run_next_iteration()
 {
-    if (!m_running)
+    if (!this->running)
     {
         return;
     }
 
     // Check limits
-    const int maxIter =
-        (m_safetyPolicy != nullptr) ? m_safetyPolicy->maxIterations() : settings().maxIterations;
-    if (m_iteration >= maxIter)
+    const int maxIter = (this->safety_policy != nullptr) ? this->safety_policy->max_iterations()
+                                                         : settings().max_iterations;
+    if (this->current_iteration >= maxIter)
     {
-        m_running = false;
-        emit logMessage(QStringLiteral("⚠ Max iterations reached (%1).").arg(maxIter));
-        finalizePersistentRun(
+        this->running = false;
+        emit this->log_message(QStringLiteral("⚠ Max iterations reached (%1).").arg(maxIter));
+        this->finalize_persistent_run(
             QStringLiteral("error"),
             QJsonObject{{QStringLiteral("reason"), QStringLiteral("max-iterations")}});
-        emit stopped(QStringLiteral("Max iterations reached."));
+        emit this->stopped(QStringLiteral("Max iterations reached."));
         return;
     }
 
-    ++m_iteration;
-    emit iterationChanged(m_iteration);
-    emit logMessage(QStringLiteral("── Iteration %1 ──").arg(m_iteration));
+    ++this->current_iteration;
+    emit this->iteration_changed(this->current_iteration);
+    emit this->log_message(QStringLiteral("── Iteration %1 ──").arg(this->current_iteration));
 
     const auto &s = settings();
     QCAI_DEBUG("Agent",
                QStringLiteral("Iteration %1: sending %2 messages to %3 (model: %4, reasoning: %5, "
                               "thinking: %6, temp: %7)")
-                   .arg(m_iteration)
-                   .arg(m_messages.size())
-                   .arg(m_provider->id(), m_modelName)
-                   .arg(m_reasoningEffort)
-                   .arg(m_thinkingLevel)
+                   .arg(this->current_iteration)
+                   .arg(this->messages.size())
+                   .arg(this->provider->id(), this->model_name)
+                   .arg(this->reasoning_effort)
+                   .arg(this->thinking_level)
                    .arg(s.temperature));
 
-    m_waitingForProvider = true;
-    m_providerActivitySeen = false;
-    m_providerRequestTimer.start();
-    emit logMessage(QStringLiteral("⏳ Waiting for model response..."));
-    if (m_pendingValidationLabel.isEmpty() == false)
+    this->waiting_for_provider = true;
+    this->provider_activity_seen = false;
+    this->provider_request_timer.start();
+    emit this->log_message(QStringLiteral("⏳ Waiting for model response..."));
+    if (this->pending_validation_label.isEmpty() == false)
     {
-        handleNormalizedProgressEvent({AgentProgressEventKind::ValidationStarted,
-                                       AgentProgressOperation::None,
-                                       m_provider != nullptr ? m_provider->id() : QString(),
-                                       QStringLiteral("controller.validation.start"),
-                                       m_pendingValidationToolName,
-                                       m_pendingValidationLabel,
-                                       {}});
+        this->handle_normalized_progress_event(
+            {agent_progress_event_kind_t::VALIDATION_STARTED,
+             agent_progress_operation_t::NONE,
+             this->provider != nullptr ? this->provider->id() : QString(),
+             QStringLiteral("controller.validation.start"),
+             this->pending_validation_tool_name,
+             this->pending_validation_label,
+             {}});
     }
-    armProviderWatchdog();
+    this->arm_provider_watchdog();
 
     using namespace std::placeholders;
-    const QPointer<AgentController> controller(this);
-    const IAIProvider::CompletionCallback completionCallback =
-        std::bind(&AgentController::dispatchProviderCompletion, controller, _1, _2, _3);
-    const IAIProvider::StreamCallback streamCallback =
-        std::bind(&AgentController::dispatchProviderStreamDelta, controller, _1);
-    const IAIProvider::ProgressCallback progressCallback =
-        std::bind(&AgentController::dispatchProviderProgress, controller, _1);
+    const QPointer<agent_controller_t> controller(this);
+    const iai_provider_t::completion_callback_t completion_callback =
+        std::bind(&agent_controller_t::dispatch_provider_completion, controller, _1, _2, _3);
+    const iai_provider_t::stream_callback_t stream_callback =
+        std::bind(&agent_controller_t::dispatch_provider_stream_delta, controller, _1);
+    const iai_provider_t::progress_callback_t progress_callback =
+        std::bind(&agent_controller_t::dispatch_provider_progress, controller, _1);
 
-    m_provider->complete(m_messages, m_modelName, s.temperature, s.maxTokens, m_reasoningEffort,
-                         completionCallback, streamCallback, progressCallback);
+    this->provider->complete(this->messages, this->model_name, s.temperature, s.max_tokens,
+                             this->reasoning_effort, completion_callback, stream_callback,
+                             progress_callback);
 }
 
-void AgentController::handleResponse(const QString &response, const QString &error,
-                                     const ProviderUsage &usage)
+void agent_controller_t::handle_response(const QString &response, const QString &error,
+                                         const provider_usage_t &usage)
 {
-    if (!m_running)
+    if (!this->running)
     {
         return;
     }
 
-    disarmProviderWatchdog();
-    const qint64 requestDurationMs =
-        (m_providerRequestTimer.isValid() == true) ? m_providerRequestTimer.elapsed() : -1;
+    this->disarm_provider_watchdog();
+    const qint64 requestDurationMs = (this->provider_request_timer.isValid() == true)
+                                         ? this->provider_request_timer.elapsed()
+                                         : -1;
 
-    if (m_pendingValidationLabel.isEmpty() == false)
+    if (this->pending_validation_label.isEmpty() == false)
     {
-        handleNormalizedProgressEvent({AgentProgressEventKind::ValidationCompleted,
-                                       AgentProgressOperation::None,
-                                       m_provider != nullptr ? m_provider->id() : QString(),
-                                       QStringLiteral("controller.validation.completed"),
-                                       m_pendingValidationToolName,
-                                       m_pendingValidationLabel,
-                                       {}});
-        m_pendingValidationToolName.clear();
-        m_pendingValidationLabel.clear();
+        this->handle_normalized_progress_event(
+            {agent_progress_event_kind_t::VALIDATION_COMPLETED,
+             agent_progress_operation_t::NONE,
+             this->provider != nullptr ? this->provider->id() : QString(),
+             QStringLiteral("controller.validation.completed"),
+             this->pending_validation_tool_name,
+             this->pending_validation_label,
+             {}});
+        this->pending_validation_tool_name.clear();
+        this->pending_validation_label.clear();
     }
 
     if (!error.isEmpty())
     {
-        handleNormalizedProgressEvent({AgentProgressEventKind::Error,
-                                       AgentProgressOperation::None,
-                                       m_provider != nullptr ? m_provider->id() : QString(),
-                                       QStringLiteral("controller.provider.error"),
-                                       {},
-                                       {},
-                                       error});
+        this->handle_normalized_progress_event(
+            {agent_progress_event_kind_t::ERROR,
+             agent_progress_operation_t::NONE,
+             this->provider != nullptr ? this->provider->id() : QString(),
+             QStringLiteral("controller.provider.error"),
+             {},
+             {},
+             error});
         QCAI_ERROR("Agent", QStringLiteral("Provider error: %1").arg(error));
-        emit logMessage(QStringLiteral("❌ Provider error: %1").arg(error));
-        emit errorOccurred(error);
-        m_running = false;
-        finalizePersistentRun(QStringLiteral("error"),
-                              QJsonObject{{QStringLiteral("error"), error}});
-        emit stopped(QStringLiteral("Provider error."));
+        emit this->log_message(QStringLiteral("❌ Provider error: %1").arg(error));
+        emit this->error_occurred(error);
+        this->running = false;
+        this->finalize_persistent_run(QStringLiteral("error"),
+                                      QJsonObject{{QStringLiteral("error"), error}});
+        emit this->stopped(QStringLiteral("Provider error."));
         return;
     }
 
-    if ((usage.hasAny() == true) || (requestDurationMs >= 0))
+    if ((usage.has_any() == true) || (requestDurationMs >= 0))
     {
-        m_accumulatedUsage = accumulateUsage(m_accumulatedUsage, usage);
-        emit providerUsageAvailable(usage, requestDurationMs);
+        this->accumulated_usage = accumulate_usage(this->accumulated_usage, usage);
+        emit this->provider_usage_available(usage, requestDurationMs);
     }
 
     // Add assistant message to history
-    appendAssistantHistoryMessage(response, QStringLiteral("model_response"),
-                                  QJsonObject{{QStringLiteral("iteration"), m_iteration}});
+    this->append_assistant_history_message(
+        response, QStringLiteral("model_response"),
+        QJsonObject{{QStringLiteral("iteration"), this->current_iteration}});
 
     // Parse response
-    AgentResponse parsed = AgentResponse::parse(response);
+    agent_response_t parsed = agent_response_t::parse(response);
     QCAI_DEBUG("Agent", QStringLiteral("Parsed response type: %1, length: %2")
                             .arg(static_cast<int>(parsed.type))
                             .arg(response.length()));
 
     // Reset text retry counter on valid JSON
-    if (parsed.type != ResponseType::Text && parsed.type != ResponseType::Error)
+    if (parsed.type != response_type_t::TEXT && parsed.type != response_type_t::ERROR)
     {
-        m_textRetries = 0;
+        this->text_retries = 0;
     }
 
-    if (m_runMode == RunMode::Ask && parsed.type != ResponseType::Final &&
-        parsed.type != ResponseType::Text && parsed.type != ResponseType::Error)
+    if (this->run_mode == run_mode_t::ASK && parsed.type != response_type_t::FINAL &&
+        parsed.type != response_type_t::TEXT && parsed.type != response_type_t::ERROR)
     {
-        if (m_modeRetries >= 1)
+        if (this->mode_retries >= 1)
         {
-            emit logMessage(QStringLiteral("⚠ Ask mode received a non-final response twice."));
-            m_running = false;
-            finalizePersistentRun(QStringLiteral("error"),
-                                  QJsonObject{{QStringLiteral("reason"),
-                                               QStringLiteral("ask-mode-non-final-response")}});
-            emit stopped(QStringLiteral("Ask mode received an unsupported response."));
+            emit this->log_message(
+                QStringLiteral("⚠ Ask mode received a non-final response twice."));
+            this->running = false;
+            this->finalize_persistent_run(
+                QStringLiteral("error"),
+                QJsonObject{
+                    {QStringLiteral("reason"), QStringLiteral("ask-mode-non-final-response")}});
+            emit this->stopped(QStringLiteral("Ask mode received an unsupported response."));
             return;
         }
 
-        ++m_modeRetries;
-        emit logMessage(QStringLiteral("ℹ Ask mode requested a direct final response."));
-        appendControllerUserMessage(
+        ++this->mode_retries;
+        emit this->log_message(QStringLiteral("ℹ Ask mode requested a direct final response."));
+        this->append_controller_user_message(
             QStringLiteral(
                 "Ask mode is enabled. Reply with one JSON object of type \"final\" only. "
                 "Do not plan, call tools, or ask for approval."),
             QStringLiteral("controller_mode_correction"));
-        runNextIteration();
+        this->run_next_iteration();
         return;
     }
 
     switch (parsed.type)
     {
-        case ResponseType::Plan:
-            m_plan = parsed.steps;
-            emit planUpdated(m_plan);
-            emit logMessage(
-                QStringLiteral("📋 Plan with %1 step(s) received.").arg(m_plan.size()));
+        case response_type_t::PLAN:
+            this->plan = parsed.steps;
+            emit this->plan_updated(this->plan);
+            emit this->log_message(
+                QStringLiteral("📋 Plan with %1 step(s) received.").arg(this->plan.size()));
             // Ask model to start executing the plan
-            appendControllerUserMessage(
+            this->append_controller_user_message(
                 QStringLiteral("Good plan. Now execute step 1 using the available tools."),
                 QStringLiteral("controller_plan_ack"));
-            runNextIteration();
+            this->run_next_iteration();
             break;
 
-        case ResponseType::ToolCall:
-            executeTool(parsed.toolName, parsed.toolArgs);
+        case response_type_t::TOOL_CALL:
+            this->execute_tool(parsed.tool_name, parsed.tool_args);
             break;
 
-        case ResponseType::Final:
-            handleNormalizedProgressEvent({AgentProgressEventKind::FinalAnswerStarted,
-                                           AgentProgressOperation::None,
-                                           m_provider != nullptr ? m_provider->id() : QString(),
-                                           QStringLiteral("controller.final.start"),
-                                           {},
-                                           {},
-                                           {}});
-            emit logMessage(QStringLiteral("✅ Agent finished: %1").arg(parsed.summary));
+        case response_type_t::FINAL:
+            this->handle_normalized_progress_event(
+                {agent_progress_event_kind_t::FINAL_ANSWER_STARTED,
+                 agent_progress_operation_t::NONE,
+                 this->provider != nullptr ? this->provider->id() : QString(),
+                 QStringLiteral("controller.final.start"),
+                 {},
+                 {},
+                 {}});
+            emit this->log_message(QStringLiteral("✅ Agent finished: %1").arg(parsed.summary));
             if (!parsed.diff.isEmpty())
             {
                 // Strip "=== NEW FILE:" blocks — only show unified diff of modified files
-                auto nf = Diff::extractAndCreateNewFiles(parsed.diff, QString(), /*dryRun=*/true);
-                const QString cleanDiff = nf.remainingDiff.trimmed();
-                m_accumulatedDiff = Diff::normalize(cleanDiff);
-                if (!m_accumulatedDiff.isEmpty())
+                auto nf =
+                    Diff::extract_and_create_new_files(parsed.diff, QString(), /*dryRun=*/true);
+                const QString cleanDiff = nf.remaining_diff.trimmed();
+                this->final_diff_preview = Diff::normalize(cleanDiff);
+                if (!this->final_diff_preview.isEmpty())
                 {
-                    emit diffAvailable(m_accumulatedDiff);
+                    emit this->diff_available(this->final_diff_preview);
                 }
             }
-            m_running = false;
-            handleNormalizedProgressEvent({AgentProgressEventKind::FinalAnswerCompleted,
-                                           AgentProgressOperation::None,
-                                           m_provider != nullptr ? m_provider->id() : QString(),
-                                           QStringLiteral("controller.final.completed"),
-                                           {},
-                                           {},
-                                           parsed.summary});
-            finalizePersistentRun(
+            this->running = false;
+            this->handle_normalized_progress_event(
+                {agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED,
+                 agent_progress_operation_t::NONE,
+                 this->provider != nullptr ? this->provider->id() : QString(),
+                 QStringLiteral("controller.final.completed"),
+                 {},
+                 {},
+                 parsed.summary});
+            this->finalize_persistent_run(
                 QStringLiteral("completed"),
                 QJsonObject{{QStringLiteral("summary"), parsed.summary},
                             {QStringLiteral("responseType"), QStringLiteral("final")}});
-            emit stopped(parsed.summary);
+            emit this->stopped(parsed.summary);
             break;
 
-        case ResponseType::NeedApproval: {
-            PendingApproval pa;
-            pa.id = m_nextApprovalId++;
-            pa.toolName = parsed.approvalAction;
-            m_pendingApprovals.append(pa);
-            emit approvalRequested(pa.id, parsed.approvalAction, parsed.approvalReason,
-                                   parsed.approvalPreview);
-            emit logMessage(
-                QStringLiteral("⏸ Waiting for approval: %1").arg(parsed.approvalAction));
+        case response_type_t::NEED_APPROVAL: {
+            pending_approval_t pa;
+            pa.id = this->next_approval_id++;
+            pa.tool_name = parsed.approval_action;
+            this->pending_approvals.append(pa);
+            emit this->approval_requested(pa.id, parsed.approval_action, parsed.approval_reason,
+                                          parsed.approval_preview);
+            emit this->log_message(
+                QStringLiteral("⏸ Waiting for approval: %1").arg(parsed.approval_action));
             break;
         }
 
-        case ResponseType::Text:
-        case ResponseType::Error:
+        case response_type_t::TEXT:
+        case response_type_t::ERROR:
             // If model keeps responding with text, treat it as final answer
-            if (m_textRetries >= 1)
+            if (this->text_retries >= 1)
             {
-                handleNormalizedProgressEvent(
-                    {AgentProgressEventKind::FinalAnswerStarted,
-                     AgentProgressOperation::None,
-                     m_provider != nullptr ? m_provider->id() : QString(),
+                this->handle_normalized_progress_event(
+                    {agent_progress_event_kind_t::FINAL_ANSWER_STARTED,
+                     agent_progress_operation_t::NONE,
+                     this->provider != nullptr ? this->provider->id() : QString(),
                      QStringLiteral("controller.final.start"),
                      {},
                      {},
                      {}});
-                if (((settings().agentDebug) == true))
+                if (((settings().agent_debug) == true))
                 {
-                    emit logMessage(QStringLiteral("💬 %1").arg(response.left(1000)));
+                    emit this->log_message(QStringLiteral("💬 %1").arg(response.left(1000)));
                 }
                 else
                 {
-                    emit logMessage(
+                    emit this->log_message(
                         QStringLiteral("💬 Agent finished with unstructured response."));
                 }
-                m_running = false;
-                handleNormalizedProgressEvent(
-                    {AgentProgressEventKind::FinalAnswerCompleted,
-                     AgentProgressOperation::None,
-                     m_provider != nullptr ? m_provider->id() : QString(),
+                this->running = false;
+                this->handle_normalized_progress_event(
+                    {agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED,
+                     agent_progress_operation_t::NONE,
+                     this->provider != nullptr ? this->provider->id() : QString(),
                      QStringLiteral("controller.final.completed"),
                      {},
                      {},
                      QStringLiteral("Agent finished (text response).")});
-                finalizePersistentRun(
+                this->finalize_persistent_run(
                     QStringLiteral("completed"),
                     QJsonObject{{QStringLiteral("summary"),
                                  QStringLiteral("Agent finished (text response).")},
                                 {QStringLiteral("responseType"), QStringLiteral("text")}});
-                emit stopped(QStringLiteral("Agent finished (text response)."));
+                emit this->stopped(QStringLiteral("Agent finished (text response)."));
             }
             else
             {
-                ++m_textRetries;
-                emit logMessage(QStringLiteral("ℹ Raw text response, asking for JSON format."));
-                appendControllerUserMessage(
+                ++this->text_retries;
+                emit this->log_message(
+                    QStringLiteral("ℹ Raw text response, asking for JSON format."));
+                this->append_controller_user_message(
                     QStringLiteral("Please respond in the required JSON format (plan, tool_call, "
                                    "final, or need_approval)."),
                     QStringLiteral("controller_json_retry"));
-                runNextIteration();
+                this->run_next_iteration();
             }
             break;
     }
 }
 
-void AgentController::executeTool(const QString &name, const QJsonObject &args)
+void agent_controller_t::execute_tool(const QString &name, const QJsonObject &args)
 {
-    if (!m_running)
+    if (!this->running)
     {
         return;
     }
 
-    const int maxCalls =
-        (m_safetyPolicy != nullptr) ? m_safetyPolicy->maxToolCalls() : settings().maxToolCalls;
-    if (m_toolCallCount >= maxCalls)
+    const int maxCalls = (this->safety_policy != nullptr) ? this->safety_policy->max_tool_calls()
+                                                          : settings().max_tool_calls;
+    if (this->current_tool_call_count >= maxCalls)
     {
-        m_running = false;
-        emit logMessage(QStringLiteral("⚠ Max tool calls reached (%1).").arg(maxCalls));
-        finalizePersistentRun(
+        this->running = false;
+        emit this->log_message(QStringLiteral("⚠ Max tool calls reached (%1).").arg(maxCalls));
+        this->finalize_persistent_run(
             QStringLiteral("error"),
             QJsonObject{{QStringLiteral("reason"), QStringLiteral("max-tool-calls")}});
-        emit stopped(QStringLiteral("Max tool calls reached."));
+        emit this->stopped(QStringLiteral("Max tool calls reached."));
         return;
     }
 
-    ITool *tool = (m_toolRegistry != nullptr) ? m_toolRegistry->tool(name) : nullptr;
+    i_tool_t *tool = (this->tool_registry != nullptr) ? this->tool_registry->tool(name) : nullptr;
     if (tool == nullptr)
     {
-        appendControllerUserMessage(
+        this->append_controller_user_message(
             QStringLiteral("Error: unknown tool '%1'. Use one of the available tools.").arg(name),
             QStringLiteral("controller_unknown_tool"),
             QJsonObject{{QStringLiteral("tool"), name}});
-        runNextIteration();
+        this->run_next_iteration();
         return;
     }
 
     // Check if approval is required
-    if (tool->requiresApproval() && !m_dryRun)
+    if (tool->requires_approval() && !this->dry_run)
     {
-        QString reason = (m_safetyPolicy != nullptr) ? m_safetyPolicy->requiresApproval(name)
-                                                     : QStringLiteral("Tool requires approval.");
+        QString reason = (this->safety_policy != nullptr)
+                             ? this->safety_policy->requires_approval(name)
+                             : QStringLiteral("Tool requires approval.");
 
         if (!reason.isEmpty())
         {
-            PendingApproval pa;
-            pa.id = m_nextApprovalId++;
-            pa.toolName = name;
-            pa.toolArgs = args;
-            m_pendingApprovals.append(pa);
-            emit approvalRequested(
+            pending_approval_t pa;
+            pa.id = this->next_approval_id++;
+            pa.tool_name = name;
+            pa.tool_args = args;
+            this->pending_approvals.append(pa);
+            emit this->approval_requested(
                 pa.id, name, reason,
                 QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)));
-            emit logMessage(QStringLiteral("⏸ Approval required for '%1': %2").arg(name, reason));
+            emit this->log_message(
+                QStringLiteral("⏸ Approval required for '%1': %2").arg(name, reason));
             return;
         }
     }
 
     // Execute
-    ++m_toolCallCount;
-    const AgentProgressOperation operation = classifyToolOperation(name);
-    const QString progressLabel = progressLabelForTool(name, operation);
-    handleNormalizedProgressEvent({AgentProgressEventKind::ToolStarted,
-                                   operation,
-                                   m_provider != nullptr ? m_provider->id() : QString(),
-                                   QStringLiteral("controller.tool.start"),
-                                   name,
-                                   progressLabel,
-                                   {}});
+    ++this->current_tool_call_count;
+    const agent_progress_operation_t operation = classify_tool_operation(name);
+    const QString progressLabel = progress_label_for_tool(name, operation);
+    this->handle_normalized_progress_event(
+        {agent_progress_event_kind_t::TOOL_STARTED,
+         operation,
+         this->provider != nullptr ? this->provider->id() : QString(),
+         QStringLiteral("controller.tool.start"),
+         name,
+         progressLabel,
+         {}});
     const bool suppressReadFileLog = (name == QStringLiteral("read_file"));
     if (!suppressReadFileLog)
     {
-        emit logMessage(formatToolExecutionLog(name, args));
+        emit this->log_message(format_tool_execution_log(name, args));
     }
     QCAI_DEBUG(
         "Agent",
         QStringLiteral("Tool call #%1: %2, args: %3")
-            .arg(m_toolCallCount)
+            .arg(this->current_tool_call_count)
             .arg(name,
                  QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Compact)).left(200)));
 
     // Get workDir from editor context
     QString workDir;
-    if (m_editorContext != nullptr)
+    if (this->context_provider != nullptr)
     {
-        auto snap = m_editorContext->capture();
-        workDir = snap.projectDir;
+        auto snap = this->context_provider->capture();
+        workDir = snap.project_dir;
     }
 
     QString result = tool->execute(args, workDir);
-    if (m_chatContextManager != nullptr)
+    if (this->chat_context_manager != nullptr)
     {
         QString contextError;
         const QJsonObject artifactMetadata{
             {QStringLiteral("tool"), name},
             {QStringLiteral("args"), args},
-            {QStringLiteral("iteration"), m_iteration},
-            {QStringLiteral("toolCallCount"), m_toolCallCount},
+            {QStringLiteral("iteration"), this->current_iteration},
+            {QStringLiteral("toolCallCount"), this->current_tool_call_count},
         };
-        if (m_chatContextManager->appendArtifact(m_runId, artifactKindForTool(name), name, result,
-                                                 artifactMetadata, &contextError) == false &&
+        if (this->chat_context_manager->append_artifact(this->run_id, artifact_kind_for_tool(name),
+                                                        name, result, artifactMetadata,
+                                                        &contextError) == false &&
             contextError.isEmpty() == false)
         {
-            emit logMessage(
+            emit this->log_message(
                 QStringLiteral("⚠ Failed to persist tool output context: %1").arg(contextError));
         }
     }
     if (!suppressReadFileLog)
     {
-        emit logMessage(formatToolResultLog(result));
+        emit this->log_message(format_tool_result_log(result));
     }
-    handleNormalizedProgressEvent({AgentProgressEventKind::ToolCompleted,
-                                   operation,
-                                   m_provider != nullptr ? m_provider->id() : QString(),
-                                   QStringLiteral("controller.tool.completed"),
-                                   name,
-                                   progressLabel,
-                                   {}});
-    m_pendingValidationToolName = name;
-    m_pendingValidationLabel = progressLabel;
+    this->handle_normalized_progress_event(
+        {agent_progress_event_kind_t::TOOL_COMPLETED,
+         operation,
+         this->provider != nullptr ? this->provider->id() : QString(),
+         QStringLiteral("controller.tool.completed"),
+         name,
+         progressLabel,
+         {}});
+    this->pending_validation_tool_name = name;
+    this->pending_validation_label = progressLabel;
     QCAI_DEBUG("Agent",
                QStringLiteral("Tool '%1' result length: %2").arg(name).arg(result.length()));
 
     // Feed result back to LLM
-    const int maxResultLen = promptResultLimitForTool(name);
+    const int maxResultLen = prompt_result_limit_for_tool(name);
     const QString truncatedResult =
         result.length() > maxResultLen
             ? result.left(maxResultLen) +
                   QStringLiteral("\n... [truncated, %1 chars total]").arg(result.length())
             : result;
-    appendControllerUserMessage(
+    this->append_controller_user_message(
         QStringLiteral("Tool '%1' returned:\n%2\n\nContinue with the next step.")
             .arg(name, truncatedResult),
         QStringLiteral("tool_result"),
         QJsonObject{{QStringLiteral("tool"), name},
                     {QStringLiteral("truncated"), result.length() > maxResultLen}});
-    runNextIteration();
+    this->run_next_iteration();
 }
 
-void AgentController::armProviderWatchdog()
+void agent_controller_t::arm_provider_watchdog()
 {
-    if (m_running && m_waitingForProvider)
+    if (this->running && this->waiting_for_provider)
     {
-        const bool thinkingEnabled = !m_thinkingLevel.isEmpty() &&
-                                     m_thinkingLevel != QStringLiteral("off") &&
-                                     m_thinkingLevel != QStringLiteral("none");
-        const int timeoutMs =
-            thinkingEnabled ? kProviderThinkingInactivityTimeoutMs : kProviderInactivityTimeoutMs;
-        m_providerWatchdog.setInterval(timeoutMs);
-        m_providerWatchdog.start();
+        const bool thinkingEnabled = !this->thinking_level.isEmpty() &&
+                                     this->thinking_level != QStringLiteral("off") &&
+                                     this->thinking_level != QStringLiteral("none");
+        const int timeoutMs = thinkingEnabled ? k_provider_thinking_inactivity_timeout_ms
+                                              : k_provider_inactivity_timeout_ms;
+        this->provider_watchdog.setInterval(timeoutMs);
+        this->provider_watchdog.start();
     }
 }
 
-void AgentController::disarmProviderWatchdog()
+void agent_controller_t::disarm_provider_watchdog()
 {
-    m_providerWatchdog.stop();
-    m_waitingForProvider = false;
-    m_providerActivitySeen = false;
+    this->provider_watchdog.stop();
+    this->waiting_for_provider = false;
+    this->provider_activity_seen = false;
 }
 
-void AgentController::handleProviderInactivityTimeout()
+void agent_controller_t::handle_provider_inactivity_timeout()
 {
-    if (!m_running || !m_waitingForProvider)
+    if (!this->running || !this->waiting_for_provider)
     {
         return;
     }
 
-    const int actualTimeoutMs = m_providerWatchdog.interval();
+    const int actualTimeoutMs = this->provider_watchdog.interval();
     QCAI_ERROR("Agent", QStringLiteral("Provider response timed out after %1 ms of inactivity")
                             .arg(actualTimeoutMs));
-    handleNormalizedProgressEvent({AgentProgressEventKind::Error,
-                                   AgentProgressOperation::None,
-                                   m_provider != nullptr ? m_provider->id() : QString(),
-                                   QStringLiteral("controller.provider.timeout"),
-                                   {},
-                                   {},
-                                   QStringLiteral("Provider response timed out.")});
-    if (m_provider != nullptr)
+    this->handle_normalized_progress_event(
+        {agent_progress_event_kind_t::ERROR,
+         agent_progress_operation_t::NONE,
+         this->provider != nullptr ? this->provider->id() : QString(),
+         QStringLiteral("controller.provider.timeout"),
+         {},
+         {},
+         QStringLiteral("Provider response timed out.")});
+    if (this->provider != nullptr)
     {
-        m_provider->cancel();
+        this->provider->cancel();
     }
 
-    emit logMessage(
+    emit this->log_message(
         QStringLiteral("⌛ Provider response timed out after %1 seconds of inactivity.")
             .arg(actualTimeoutMs / 1000));
-    emit errorOccurred(QStringLiteral("Provider response timed out."));
-    m_running = false;
-    disarmProviderWatchdog();
-    finalizePersistentRun(
+    emit this->error_occurred(QStringLiteral("Provider response timed out."));
+    this->running = false;
+    this->disarm_provider_watchdog();
+    this->finalize_persistent_run(
         QStringLiteral("error"),
         QJsonObject{{QStringLiteral("reason"), QStringLiteral("provider-timeout")}});
-    emit stopped(QStringLiteral("Provider response timed out."));
+    emit this->stopped(QStringLiteral("Provider response timed out."));
 }
 
-void AgentController::appendControllerUserMessage(const QString &content, const QString &source,
-                                                  const QJsonObject &metadata)
+void agent_controller_t::append_controller_user_message(const QString &content,
+                                                        const QString &source,
+                                                        const QJsonObject &metadata)
 {
-    m_messages.append({QStringLiteral("user"), content});
-    if (m_chatContextManager != nullptr)
+    this->messages.append({QStringLiteral("user"), content});
+    if (this->chat_context_manager != nullptr)
     {
         QString contextError;
-        if (m_chatContextManager->appendUserMessage(m_runId, content, source, metadata,
-                                                    &contextError) == false &&
+        if (this->chat_context_manager->append_user_message(this->run_id, content, source,
+                                                            metadata, &contextError) == false &&
             contextError.isEmpty() == false)
         {
-            emit logMessage(
+            emit this->log_message(
                 QStringLiteral("⚠ Failed to persist chat history: %1").arg(contextError));
         }
     }
 }
 
-void AgentController::appendAssistantHistoryMessage(const QString &content, const QString &source,
-                                                    const QJsonObject &metadata)
+void agent_controller_t::append_assistant_history_message(const QString &content,
+                                                          const QString &source,
+                                                          const QJsonObject &metadata)
 {
-    m_messages.append({QStringLiteral("assistant"), content});
-    if (m_chatContextManager != nullptr)
+    this->messages.append({QStringLiteral("assistant"), content});
+    if (this->chat_context_manager != nullptr)
     {
         QString contextError;
-        if (m_chatContextManager->appendAssistantMessage(m_runId, content, source, metadata,
-                                                         &contextError) == false &&
+        if (this->chat_context_manager->append_assistant_message(
+                this->run_id, content, source, metadata, &contextError) == false &&
             contextError.isEmpty() == false)
         {
-            emit logMessage(
+            emit this->log_message(
                 QStringLiteral("⚠ Failed to persist assistant history: %1").arg(contextError));
         }
     }
 }
 
-void AgentController::finalizePersistentRun(const QString &status, const QJsonObject &metadata)
+void agent_controller_t::finalize_persistent_run(const QString &status,
+                                                 const QJsonObject &metadata)
 {
-    if (m_chatContextManager == nullptr || m_runId.isEmpty() == true)
+    if (this->chat_context_manager == nullptr || this->run_id.isEmpty() == true)
     {
         return;
     }
 
     QString artifactError;
-    if (m_accumulatedDiff.isEmpty() == false)
+    if (this->final_diff_preview.isEmpty() == false)
     {
-        m_chatContextManager->appendArtifact(
-            m_runId, QStringLiteral("diff"), QStringLiteral("final_diff"), m_accumulatedDiff,
-            QJsonObject{{QStringLiteral("status"), status}}, &artifactError);
+        this->chat_context_manager->append_artifact(
+            this->run_id, QStringLiteral("diff"), QStringLiteral("final_diff"),
+            this->final_diff_preview, QJsonObject{{QStringLiteral("status"), status}},
+            &artifactError);
     }
     QString finishError;
-    m_chatContextManager->finishRun(m_runId, status, m_accumulatedUsage, metadata, &finishError);
+    this->chat_context_manager->finish_run(this->run_id, status, this->accumulated_usage, metadata,
+                                           &finishError);
 
     if (artifactError.isEmpty() == false)
     {
-        emit logMessage(
+        emit this->log_message(
             QStringLiteral("⚠ Failed to persist final diff artifact: %1").arg(artifactError));
     }
     if (finishError.isEmpty() == false)
     {
-        emit logMessage(
+        emit this->log_message(
             QStringLiteral("⚠ Failed to finalize persistent chat context: %1").arg(finishError));
     }
 
-    m_runId.clear();
+    this->run_id.clear();
 }
 
-void AgentController::dispatchProviderCompletion(QPointer<AgentController> controller,
-                                                 const QString &response, const QString &error,
-                                                 const ProviderUsage &usage)
+void agent_controller_t::dispatch_provider_completion(QPointer<agent_controller_t> controller,
+                                                      const QString &response,
+                                                      const QString &error,
+                                                      const provider_usage_t &usage)
 {
     if (controller.isNull() == true)
     {
         return;
     }
 
-    controller->enqueueProviderResponse(response, error, usage);
+    controller->enqueue_provider_response(response, error, usage);
 }
 
-void AgentController::dispatchProviderStreamDelta(QPointer<AgentController> controller,
-                                                  const QString &delta)
+void agent_controller_t::dispatch_provider_stream_delta(QPointer<agent_controller_t> controller,
+                                                        const QString &delta)
 {
     if (controller.isNull() == true)
     {
         return;
     }
 
-    controller->handleProviderStreamDelta(delta);
+    controller->handle_provider_stream_delta(delta);
 }
 
-void AgentController::dispatchProviderProgress(QPointer<AgentController> controller,
-                                               const ProviderRawEvent &event)
+void agent_controller_t::dispatch_provider_progress(QPointer<agent_controller_t> controller,
+                                                    const provider_raw_event_t &event)
 {
     if (controller.isNull() == true)
     {
         return;
     }
 
-    controller->handleProviderProgressEvent(event);
+    controller->handle_provider_progress_event(event);
 }
 
-void AgentController::enqueueProviderResponse(const QString &response, const QString &error,
-                                              const ProviderUsage &usage)
+void agent_controller_t::enqueue_provider_response(const QString &response, const QString &error,
+                                                   const provider_usage_t &usage)
 {
-    m_pendingProviderResponses.append({response, error, usage});
-    if (m_providerResponseDispatchScheduled == true)
+    this->pending_provider_responses.append({response, error, usage});
+    if (this->provider_response_dispatch_scheduled == true)
     {
         return;
     }
 
-    m_providerResponseDispatchScheduled = true;
-    QTimer::singleShot(0, this, &AgentController::drainQueuedProviderResponses);
+    this->provider_response_dispatch_scheduled = true;
+    QTimer::singleShot(0, this, &agent_controller_t::drain_queued_provider_responses);
 }
 
-void AgentController::drainQueuedProviderResponses()
+void agent_controller_t::drain_queued_provider_responses()
 {
-    m_providerResponseDispatchScheduled = false;
+    this->provider_response_dispatch_scheduled = false;
 
-    while (m_pendingProviderResponses.isEmpty() == false)
+    while (this->pending_provider_responses.isEmpty() == false)
     {
-        const PendingProviderResponse pending = m_pendingProviderResponses.takeFirst();
-        handleResponse(pending.response, pending.error, pending.usage);
+        const pending_provider_response_t pending = this->pending_provider_responses.takeFirst();
+        this->handle_response(pending.response, pending.error, pending.usage);
     }
 }
 
-void AgentController::handleProviderStreamDelta(const QString &delta)
+void agent_controller_t::handle_provider_stream_delta(const QString &delta)
 {
     if (delta.isEmpty() == true)
     {
         return;
     }
 
-    if (m_providerActivitySeen == false)
+    if (this->provider_activity_seen == false)
     {
-        m_providerActivitySeen = true;
-        emit logMessage(QStringLiteral("✍ Model response in progress..."));
+        this->provider_activity_seen = true;
+        emit this->log_message(QStringLiteral("✍ Model response in progress..."));
     }
-    armProviderWatchdog();
-    emit streamingToken(delta);
+    this->arm_provider_watchdog();
+    emit this->streaming_token(delta);
 }
 
-void AgentController::handleProviderProgressEvent(const ProviderRawEvent &event)
+void agent_controller_t::handle_provider_progress_event(const provider_raw_event_t &event)
 {
-    if (m_progressTracker == nullptr)
+    if (this->progress_tracker == nullptr)
     {
         return;
     }
 
-    applyProgressRenderResult(m_progressTracker->handleProviderRawEvent(event));
+    this->apply_progress_render_result(this->progress_tracker->handle_provider_raw_event(event));
 }
 
-void AgentController::handleNormalizedProgressEvent(const AgentProgressEvent &event)
+void agent_controller_t::handle_normalized_progress_event(const agent_progress_event_t &event)
 {
-    if (m_progressTracker == nullptr)
+    if (this->progress_tracker == nullptr)
     {
         return;
     }
 
-    applyProgressRenderResult(m_progressTracker->handleNormalizedEvent(event));
+    this->apply_progress_render_result(this->progress_tracker->handle_normalized_event(event));
 }
 
-void AgentController::applyProgressRenderResult(const AgentProgressRenderResult &result)
+void agent_controller_t::apply_progress_render_result(const agent_progress_render_result_t &result)
 {
-    if (result.statusChanged == true && result.statusText.isEmpty() == false)
+    if (result.status_changed == true && result.status_text.isEmpty() == false)
     {
-        emit statusChanged(result.statusText);
+        emit this->status_changed(result.status_text);
     }
-    if (result.stableLogLine.isEmpty() == false)
+    if (result.stable_log_line.isEmpty() == false)
     {
-        emit logMessage(result.stableLogLine);
+        emit this->log_message(result.stable_log_line);
     }
-    for (const QString &line : result.debugLines)
+    for (const QString &line : result.debug_lines)
     {
         QCAI_DEBUG("Progress", line);
     }
 }
 
-void AgentController::approveAction(int approvalId)
+void agent_controller_t::approve_action(int approvalId)
 {
-    for (int i = 0; i < m_pendingApprovals.size(); ++i)
+    for (int i = 0; i < this->pending_approvals.size(); ++i)
     {
-        if (((m_pendingApprovals[i].id == approvalId) == true))
+        if (((this->pending_approvals[i].id == approvalId) == true))
         {
-            auto pa = m_pendingApprovals.takeAt(i);
-            emit logMessage(QStringLiteral("✅ Approved: %1").arg(pa.toolName));
+            auto pa = this->pending_approvals.takeAt(i);
+            emit this->log_message(QStringLiteral("✅ Approved: %1").arg(pa.tool_name));
 
-            if (!pa.toolName.isEmpty() && (m_toolRegistry != nullptr))
+            if (!pa.tool_name.isEmpty() && (this->tool_registry != nullptr))
             {
-                ITool *tool = m_toolRegistry->tool(pa.toolName);
+                i_tool_t *tool = this->tool_registry->tool(pa.tool_name);
                 if (tool != nullptr)
                 {
-                    ++m_toolCallCount;
+                    ++this->current_tool_call_count;
                     QString workDir;
-                    if (m_editorContext != nullptr)
+                    if (this->context_provider != nullptr)
                     {
-                        workDir = m_editorContext->capture().projectDir;
+                        workDir = this->context_provider->capture().project_dir;
                     }
-                    QString result = tool->execute(pa.toolArgs, workDir);
-                    if (m_chatContextManager != nullptr)
+                    QString result = tool->execute(pa.tool_args, workDir);
+                    if (this->chat_context_manager != nullptr)
                     {
                         QString contextError;
                         const QJsonObject artifactMetadata{
-                            {QStringLiteral("tool"), pa.toolName},
-                            {QStringLiteral("args"), pa.toolArgs},
+                            {QStringLiteral("tool"), pa.tool_name},
+                            {QStringLiteral("args"), pa.tool_args},
                             {QStringLiteral("approved"), true},
                         };
-                        if (m_chatContextManager->appendArtifact(
-                                m_runId, artifactKindForTool(pa.toolName), pa.toolName, result,
-                                artifactMetadata, &contextError) == false &&
+                        if (this->chat_context_manager->append_artifact(
+                                this->run_id, artifact_kind_for_tool(pa.tool_name), pa.tool_name,
+                                result, artifactMetadata, &contextError) == false &&
                             contextError.isEmpty() == false)
                         {
-                            emit logMessage(
+                            emit this->log_message(
                                 QStringLiteral("⚠ Failed to persist approved tool output: %1")
                                     .arg(contextError));
                         }
                     }
-                    appendControllerUserMessage(
-                        QStringLiteral("Approved and executed '%1'. Result:\n%2\n\nContinue.")
-                            .arg(pa.toolName, result),
+                    this->append_controller_user_message(
+                        QStringLiteral("Approved and executed '%1'. result_t:\n%2\n\nContinue.")
+                            .arg(pa.tool_name, result),
                         QStringLiteral("approved_tool_result"),
-                        QJsonObject{{QStringLiteral("tool"), pa.toolName}});
+                        QJsonObject{{QStringLiteral("tool"), pa.tool_name}});
                 }
             }
-            runNextIteration();
+            this->run_next_iteration();
             return;
         }
     }
 }
 
-void AgentController::denyAction(int approvalId)
+void agent_controller_t::deny_action(int approvalId)
 {
-    for (int i = 0; i < m_pendingApprovals.size(); ++i)
+    for (int i = 0; i < this->pending_approvals.size(); ++i)
     {
-        if (((m_pendingApprovals[i].id == approvalId) == true))
+        if (((this->pending_approvals[i].id == approvalId) == true))
         {
-            auto pa = m_pendingApprovals.takeAt(i);
-            emit logMessage(QStringLiteral("❌ Denied: %1").arg(pa.toolName));
-            appendControllerUserMessage(
+            auto pa = this->pending_approvals.takeAt(i);
+            emit this->log_message(QStringLiteral("❌ Denied: %1").arg(pa.tool_name));
+            this->append_controller_user_message(
                 QStringLiteral("The user denied the action '%1'. Find an alternative approach or "
                                "finish.")
-                    .arg(pa.toolName),
+                    .arg(pa.tool_name),
                 QStringLiteral("approval_denied"),
-                QJsonObject{{QStringLiteral("tool"), pa.toolName}});
-            runNextIteration();
+                QJsonObject{{QStringLiteral("tool"), pa.tool_name}});
+            this->run_next_iteration();
             return;
         }
     }

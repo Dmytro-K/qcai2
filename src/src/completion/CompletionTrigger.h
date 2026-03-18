@@ -13,12 +13,12 @@ class TextEditorWidget;
 namespace Qcai2
 {
 
-class AiCompletionProvider;
+class ai_completion_provider_t;
 
 /**
  * Debounces editor changes and auto-triggers AI completion when typing pauses.
  */
-class CompletionTrigger : public QObject
+class completion_trigger_t : public QObject
 {
     Q_OBJECT
 public:
@@ -27,7 +27,7 @@ public:
      * @param provider Non-owning completion provider invoked after the debounce delay.
      * @param parent Owning QObject.
      */
-    explicit CompletionTrigger(AiCompletionProvider *provider, QObject *parent = nullptr);
+    explicit completion_trigger_t(ai_completion_provider_t *provider, QObject *parent = nullptr);
 
     /**
      * Starts monitoring an editor for completion triggers.
@@ -50,23 +50,22 @@ private:
     int wordLengthAtCursor(TextEditor::TextEditorWidget *editor) const;
 
     /** Non-owning provider used to invoke completion. */
-    AiCompletionProvider *m_provider;
+    ai_completion_provider_t *provider;
 
     /** Shared debounce timer for delayed auto-trigger requests. */
-    QTimer m_timer;
+    QTimer timer;
 
     /** Startup guard used to suppress triggers during initial editor loading. */
-    QElapsedTimer m_startupTimer;
+    QElapsedTimer startupTimer;
 
     /** Editor waiting for the current debounce timeout. */
-    TextEditor::TextEditorWidget *m_pendingEditor = nullptr;
+    TextEditor::TextEditorWidget *pendingEditor = nullptr;
 
     /** Editors already connected to change notifications. */
-    QSet<TextEditor::TextEditorWidget *> m_attached;
+    QSet<TextEditor::TextEditorWidget *> attached;
 
     /** Editors that have emitted their first post-attach contentsChanged signal. */
-    QSet<TextEditor::TextEditorWidget *> m_initialized;
-
+    QSet<TextEditor::TextEditorWidget *> initialized;
 };
 
 }  // namespace Qcai2

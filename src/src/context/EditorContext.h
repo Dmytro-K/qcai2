@@ -9,148 +9,46 @@
 namespace qcai2
 {
 
-/**
- * Captures active editor, project, and build information for prompt generation.
- */
-class EditorContext : public QObject
+class editor_context_t : public QObject
 {
     Q_OBJECT
 public:
-    /**
-     * Creates a context provider bound to the current Qt Creator session.
-     * @param parent Parent QObject that owns this instance.
-     */
-    explicit EditorContext(QObject *parent = nullptr);
+    explicit editor_context_t(QObject *parent = nullptr);
 
-    /**
-     * Snapshot of the current editor, project, and build state.
-     */
-    struct Snapshot
+    struct snapshot_t
     {
-        /**
-         * Active document path, or empty when no editor is focused.
-         */
-        QString filePath;
-
-        /**
-         * Current text selection from the active editor.
-         */
-        QString selectedText;
-
-        /**
-         * 1-based cursor line in the active editor.
-         */
-        int cursorLine = -1;
-
-        /**
-         * 1-based cursor column in the active editor.
-         */
-        int cursorColumn = -1;
-
-        /**
-         * Paths for all open documents.
-         */
-        QStringList openFiles;
-
-        /**
-         * Selected or startup project display name.
-         */
-        QString projectName;
-
-        /**
-         * Selected or startup project directory.
-         */
-        QString projectDir;
-
-        /**
-         * Project file path reported by Qt Creator.
-         */
-        QString projectFilePath;
-
-        /**
-         * Active build directory, when available.
-         */
-        QString buildDir;
-
-        /**
-         * Active build type such as Debug or Release.
-         */
-        QString buildType;
-
-        /**
-         * Active kit name.
-         */
-        QString kitName;
-
-        /**
-         * Active C++ compiler display name.
-         */
-        QString compilerName;
-
-        /**
-         * Active C++ compiler executable path.
-         */
-        QString compilerPath;
-
-        /**
-         * Active target display name.
-         */
-        QString targetName;
-
+        QString file_path;
+        QString selected_text;
+        int cursor_line = -1;
+        int cursor_column = -1;
+        QStringList open_files;
+        QString project_name;
+        QString project_dir;
+        QString project_file_path;
+        QString build_dir;
+        QString build_type;
+        QString kit_name;
+        QString compiler_name;
+        QString compiler_path;
+        QString target_name;
     };
 
-    /**
-     * Lightweight description of one open Qt Creator project.
-     */
-    struct ProjectInfo
+    struct project_info_t
     {
-        /** User-visible project name. */
-        QString projectName;
-
-        /** Absolute project root directory. */
-        QString projectDir;
-
-        /** Absolute project file path reported by Qt Creator. */
-        QString projectFilePath;
-
+        QString project_name;
+        QString project_dir;
+        QString project_file_path;
     };
 
-    /**
-     * Returns a fresh snapshot of the current editor state.
-     */
-    Snapshot capture() const;
-
-    /**
-     * Lists the projects currently open in Qt Creator.
-     */
-    QList<ProjectInfo> openProjects() const;
-
-    /**
-     * Overrides the project used for prompt and tool context.
-     * @param projectFilePath Absolute project file path for the selected project.
-     */
-    void setSelectedProjectFilePath(const QString &projectFilePath);
-
-    /**
-     * Returns the currently selected project file path override.
-     */
-    QString selectedProjectFilePath() const;
-
-    /**
-     * Returns a compact text fragment suitable for the system prompt.
-     */
-    QString toPromptFragment() const;
-
-    /**
-     * Returns in-memory file contents for prompt context.
-     * @param maxChars Maximum number of characters to include.
-     */
-    QString fileContentsFragment(int maxChars = 60000) const;
+    snapshot_t capture() const;
+    QList<project_info_t> open_projects() const;
+    void set_selected_project_file_path(const QString &project_file_path);
+    QString selected_project_file_path() const;
+    QString to_prompt_fragment() const;
+    QString file_contents_fragment(int max_chars = 60000) const;
 
 private:
-    /** Project file path chosen in the dock widget, or empty to follow startupProject(). */
-    QString m_selectedProjectFilePath;
-
+    QString active_project_file_path;
 };
 
 }  // namespace qcai2

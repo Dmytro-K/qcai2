@@ -13,6 +13,6 @@ namespace qcai2
  * The handler records a stack trace, writes a crash log, and re-raises the
  * original signal so the default platform behavior still occurs.
  */
-void installCrashHandler();
+void install_crash_handler();
 
 }  // namespace qcai2

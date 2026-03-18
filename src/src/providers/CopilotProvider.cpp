@@ -118,7 +118,7 @@ QString installedSidecarScriptPath()
  * Returns the directory shown in sidecar installation guidance messages.
  * @param scriptPath Sidecar script path selected by the caller.
  */
-QString sidecarInstallHintDir(const QString &scriptPath = {})
+QString sidecar_install_hint_dir(const QString &scriptPath = {})
 {
     if (scriptPath.isEmpty() == false)
     {
@@ -140,27 +140,27 @@ QString sidecarInstallHintDir(const QString &scriptPath = {})
  * Creates a Copilot provider with deferred sidecar startup.
  * @param parent Parent QObject that owns this instance.
  */
-CopilotProvider::CopilotProvider(QObject *parent) : QObject(parent)
+copilot_provider_t::copilot_provider_t(QObject *parent) : QObject(parent)
 {
 }
 
 /**
  * Stops the sidecar process before the provider is destroyed.
  */
-CopilotProvider::~CopilotProvider()
+copilot_provider_t::~copilot_provider_t()
 {
-    stopSidecar();
+    stop_sidecar();
 }
 
 /**
  * Returns the first sidecar script path that exists on disk.
  */
-QString CopilotProvider::findSidecarScript() const
+QString copilot_provider_t::find_sidecar_script() const
 {
     // Try configured path first
-    if (((!m_sidecarPath.isEmpty() && QFileInfo::exists(m_sidecarPath)) == true))
+    if (((!this->sidecar_path.isEmpty() && QFileInfo::exists(this->sidecar_path)) == true))
     {
-        return m_sidecarPath;
+        return this->sidecar_path;
     }
 
     // Look relative to the plugin binary location
@@ -191,40 +191,40 @@ QString CopilotProvider::findSidecarScript() const
 /**
  * Starts the sidecar process on demand and hooks up its signal handlers.
  */
-bool CopilotProvider::ensureSidecar()
+bool copilot_provider_t::ensure_sidecar()
 {
-    if ((((m_process != nullptr) && m_process->state() == QProcess::Running) == true))
+    if ((((this->process != nullptr) && this->process->state() == QProcess::Running) == true))
     {
         return true;
     }
 
-    const QString script = findSidecarScript();
+    const QString script = this->find_sidecar_script();
     if (script.isEmpty() == true)
     {
         return false;
     }
 
     QCAI_INFO("Copilot",
-              QStringLiteral("Starting sidecar: node=%1 script=%2").arg(m_nodePath, script));
+              QStringLiteral("Starting sidecar: node=%1 script=%2").arg(this->node_path, script));
 
-    m_process = new QProcess(this);
-    m_process->setProcessChannelMode(QProcess::SeparateChannels);
+    this->process = new QProcess(this);
+    this->process->setProcessChannelMode(QProcess::SeparateChannels);
 
     // Set working directory to sidecar dir (so node_modules are found)
-    m_process->setWorkingDirectory(QFileInfo(script).absolutePath());
+    this->process->setWorkingDirectory(QFileInfo(script).absolutePath());
 
-    connect(m_process, &QProcess::readyReadStandardOutput, this,
-            &CopilotProvider::handleSidecarOutput);
+    connect(this->process, &QProcess::readyReadStandardOutput, this,
+            &copilot_provider_t::handle_sidecar_output);
 
-    connect(m_process, &QProcess::readyReadStandardError, this, [this]() {
-        const QString err = QString::fromUtf8(m_process->readAllStandardError());
-        m_lastStderr += err;
+    connect(this->process, &QProcess::readyReadStandardError, this, [this]() {
+        const QString err = QString::fromUtf8(this->process->readAllStandardError());
+        this->last_stderr += err;
         QCAI_DEBUG("Copilot/stderr", err.trimmed());
     });
 
-    connect(m_process, &QProcess::finished, this, [this](int exitCode, QProcess::ExitStatus) {
+    connect(this->process, &QProcess::finished, this, [this](int exitCode, QProcess::ExitStatus) {
         QCAI_WARN("Copilot", QStringLiteral("Sidecar exited with code %1").arg(exitCode));
-        QString detail = m_lastStderr.trimmed();
+        QString detail = this->last_stderr.trimmed();
         if (detail.isEmpty() == true)
         {
             detail = QStringLiteral("exit code %1").arg(exitCode);
@@ -233,14 +233,14 @@ bool CopilotProvider::ensureSidecar()
             QStringLiteral("Copilot sidecar stopped: %1\n"
                            "Re-run 'cmake --install' or run 'npm install' in %2 so "
                            "'@github/copilot-sdk' is available.")
-                .arg(detail, sidecarInstallHintDir(m_process->workingDirectory()));
+                .arg(detail, sidecar_install_hint_dir(this->process->workingDirectory()));
         // Fail all pending callbacks (copy first to avoid re-entrancy invalidation)
-        const auto pendingCallbacks = m_pending;
-        const auto pendingModelListCallbacks = m_modelListCallbacks;
-        m_pending.clear();
-        m_streamCallbacks.clear();
-        m_progressCallbacks.clear();
-        m_modelListCallbacks.clear();
+        const auto pendingCallbacks = this->pending;
+        const auto pendingModelListCallbacks = this->model_list_callbacks;
+        this->pending.clear();
+        this->stream_callbacks.clear();
+        this->progress_callbacks.clear();
+        this->model_list_callbacks.clear();
         for (auto it = pendingCallbacks.begin(); it != pendingCallbacks.end(); ++it)
         {
             it.value()({}, errMsg, {});
@@ -250,18 +250,18 @@ bool CopilotProvider::ensureSidecar()
         {
             it.value()({}, errMsg);
         }
-        m_clientStarted = false;
-        m_lastStderr.clear();
-        m_process->deleteLater();
-        m_process = nullptr;
+        this->client_started = false;
+        this->last_stderr.clear();
+        this->process->deleteLater();
+        this->process = nullptr;
     });
 
-    m_process->start(m_nodePath, {script});
-    if (m_process->waitForStarted(5000) == false)
+    this->process->start(this->node_path, {script});
+    if (this->process->waitForStarted(5000) == false)
     {
         QCAI_ERROR("Copilot", QStringLiteral("Failed to start sidecar process"));
-        delete m_process;
-        m_process = nullptr;
+        delete this->process;
+        this->process = nullptr;
         return false;
     }
 
@@ -272,9 +272,9 @@ bool CopilotProvider::ensureSidecar()
  * Writes one compact JSON request line to the running sidecar process.
  * @param req Request payload to send to the sidecar.
  */
-void CopilotProvider::sendRequest(const QJsonObject &req)
+void copilot_provider_t::send_request(const QJsonObject &req)
 {
-    if (((m_process == nullptr) == true))
+    if (((this->process == nullptr) == true))
     {
         return;
     }
@@ -286,7 +286,7 @@ void CopilotProvider::sendRequest(const QJsonObject &req)
     data.replace('\r', QByteArray());
     data.append('\n');
 
-    const qint64 written = m_process->write(data);
+    const qint64 written = this->process->write(data);
     if (written != data.size())
     {
         QCAI_ERROR("Copilot", QStringLiteral("Pipe write failed: wrote %1 of %2 bytes")
@@ -295,7 +295,7 @@ void CopilotProvider::sendRequest(const QJsonObject &req)
         return;
     }
     // Flush to ensure data reaches the sidecar pipe immediately
-    if (m_process->waitForBytesWritten(3000) == false)
+    if (this->process->waitForBytesWritten(3000) == false)
     {
         QCAI_WARN("Copilot", QStringLiteral("Pipe flush timed out (%1 bytes)").arg(data.size()));
     }
@@ -304,26 +304,26 @@ void CopilotProvider::sendRequest(const QJsonObject &req)
 /**
  * Consumes JSON Lines output from the sidecar and dispatches callbacks.
  */
-void CopilotProvider::handleSidecarOutput()
+void copilot_provider_t::handle_sidecar_output()
 {
-    if (((m_process == nullptr) == true))
+    if (((this->process == nullptr) == true))
     {
         return;
     }
 
-    m_readBuffer.append(m_process->readAllStandardOutput());
+    this->read_buffer.append(this->process->readAllStandardOutput());
 
     // Process complete lines
     while (true == true)
     {
-        qsizetype idx = m_readBuffer.indexOf('\n');
+        qsizetype idx = this->read_buffer.indexOf('\n');
         if (idx < 0)
         {
             break;
         }
 
-        QByteArray line = m_readBuffer.left(idx).trimmed();
-        m_readBuffer.remove(0, idx + 1);
+        QByteArray line = this->read_buffer.left(idx).trimmed();
+        this->read_buffer.remove(0, idx + 1);
 
         if (line.isEmpty() == true)
         {
@@ -348,16 +348,16 @@ void CopilotProvider::handleSidecarOutput()
             if (((res.value(QStringLiteral("status")).toString() == QStringLiteral("ready")) ==
                  true))
             {
-                m_clientStarted = true;
+                this->client_started = true;
             }
             continue;
         }
 
-        auto modelListIt = m_modelListCallbacks.find(id);
-        if (((modelListIt != m_modelListCallbacks.end()) == true))
+        auto modelListIt = this->model_list_callbacks.find(id);
+        if (((modelListIt != this->model_list_callbacks.end()) == true))
         {
-            ModelListCallback cb = modelListIt.value();
-            m_modelListCallbacks.erase(modelListIt);
+            model_list_callback_t cb = modelListIt.value();
+            this->model_list_callbacks.erase(modelListIt);
 
             if (((obj.contains(QStringLiteral("error"))) == true))
             {
@@ -392,53 +392,53 @@ void CopilotProvider::handleSidecarOutput()
             continue;
         }
 
-        auto it = m_pending.find(id);
-        if (((it == m_pending.end()) == true))
+        auto it = this->pending.find(id);
+        if (((it == this->pending.end()) == true))
         {
             continue;
         }
 
         if (((obj.contains(QStringLiteral("progress"))) == true))
         {
-            auto progressIt = m_progressCallbacks.find(id);
-            if (((progressIt != m_progressCallbacks.end()) == true))
+            auto progressIt = this->progress_callbacks.find(id);
+            if (((progressIt != this->progress_callbacks.end()) == true))
             {
                 const QJsonObject progress = obj.value(QStringLiteral("progress")).toObject();
                 QString toolName = progress.value(QStringLiteral("toolName")).toString();
                 QString message = progress.value(QStringLiteral("message")).toString();
                 const QString kind = progress.value(QStringLiteral("kind")).toString();
 
-                ProviderRawEventKind rawKind = ProviderRawEventKind::RequestStarted;
+                provider_raw_event_kind_t rawKind = provider_raw_event_kind_t::REQUEST_STARTED;
                 if (kind == QStringLiteral("reasoning_delta"))
                 {
-                    rawKind = ProviderRawEventKind::ReasoningDelta;
+                    rawKind = provider_raw_event_kind_t::REASONING_DELTA;
                 }
                 else if (kind == QStringLiteral("message_delta"))
                 {
-                    rawKind = ProviderRawEventKind::MessageDelta;
+                    rawKind = provider_raw_event_kind_t::MESSAGE_DELTA;
                 }
                 else if (kind == QStringLiteral("tool_started"))
                 {
-                    rawKind = ProviderRawEventKind::ToolStarted;
+                    rawKind = provider_raw_event_kind_t::TOOL_STARTED;
                 }
                 else if (kind == QStringLiteral("tool_completed"))
                 {
-                    rawKind = ProviderRawEventKind::ToolCompleted;
+                    rawKind = provider_raw_event_kind_t::TOOL_COMPLETED;
                 }
                 else if (kind == QStringLiteral("response_completed"))
                 {
-                    rawKind = ProviderRawEventKind::ResponseCompleted;
+                    rawKind = provider_raw_event_kind_t::RESPONSE_COMPLETED;
                 }
                 else if (kind == QStringLiteral("idle"))
                 {
-                    rawKind = ProviderRawEventKind::Idle;
+                    rawKind = provider_raw_event_kind_t::IDLE;
                 }
                 else if (kind == QStringLiteral("error"))
                 {
-                    rawKind = ProviderRawEventKind::Error;
+                    rawKind = provider_raw_event_kind_t::ERROR_EVENT;
                 }
 
-                progressIt.value()(ProviderRawEvent{
+                progressIt.value()(provider_raw_event_t{
                     rawKind, this->id(), progress.value(QStringLiteral("rawType")).toString(),
                     toolName, message});
             }
@@ -448,24 +448,24 @@ void CopilotProvider::handleSidecarOutput()
         // Handle streaming delta
         if (((obj.contains(QStringLiteral("stream_delta"))) == true))
         {
-            auto sit = m_streamCallbacks.find(id);
-            if (((sit != m_streamCallbacks.end()) == true))
+            auto sit = this->stream_callbacks.find(id);
+            if (((sit != this->stream_callbacks.end()) == true))
             {
                 sit.value()(obj.value(QStringLiteral("stream_delta")).toString());
             }
             continue;  // don't remove from pending yet
         }
 
-        CompletionCallback cb = it.value();
-        m_pending.erase(it);
-        m_progressCallbacks.remove(id);
+        completion_callback_t cb = it.value();
+        this->pending.erase(it);
+        this->progress_callbacks.remove(id);
 
         // Signal stream end
-        auto sit = m_streamCallbacks.find(id);
-        if (((sit != m_streamCallbacks.end()) == true))
+        auto sit = this->stream_callbacks.find(id);
+        if (((sit != this->stream_callbacks.end()) == true))
         {
             sit.value()({});  // empty = stream finished
-            m_streamCallbacks.erase(sit);
+            this->stream_callbacks.erase(sit);
         }
 
         if (((obj.contains(QStringLiteral("error"))) == true))
@@ -478,7 +478,7 @@ void CopilotProvider::handleSidecarOutput()
         else
         {
             QJsonObject result = obj.value(QStringLiteral("result")).toObject();
-            const ProviderUsage usage = providerUsageFromResponseObject(result);
+            const provider_usage_t usage = provider_usage_from_response_object(result);
             QCAI_DEBUG("Copilot",
                        QStringLiteral("Request #%1 complete, %2 chars")
                            .arg(id)
@@ -493,60 +493,61 @@ void CopilotProvider::handleSidecarOutput()
  * @param messages Conversation history forwarded to the sidecar.
  * @param model Copilot model identifier.
  * @param temperature Sampling temperature.
- * @param maxTokens Maximum completion token count.
- * @param reasoningEffort Optional reasoning hint forwarded to the sidecar.
+ * @param max_tokens Maximum completion token count.
+ * @param reasoning_effort Optional reasoning hint forwarded to the sidecar.
  * @param callback Receives the final response text or an error.
- * @param streamCallback Receives streamed deltas; an empty string ends the stream.
+ * @param stream_callback Receives streamed deltas; an empty string ends the stream.
  */
-void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString &model,
-                               double temperature, int maxTokens, const QString &reasoningEffort,
-                               CompletionCallback callback, StreamCallback streamCallback,
-                               ProgressCallback progressCallback)
+void copilot_provider_t::complete(const QList<chat_message_t> &messages, const QString &model,
+                                  double temperature, int max_tokens,
+                                  const QString &reasoning_effort, completion_callback_t callback,
+                                  stream_callback_t stream_callback,
+                                  progress_callback_t progress_callback)
 {
-    if (ensureSidecar() == false)
+    if (this->ensure_sidecar() == false)
     {
-        const QString sidecarDir = sidecarInstallHintDir();
+        const QString sidecar_dir = sidecar_install_hint_dir();
         callback({},
                  QStringLiteral("Failed to start Copilot sidecar.\n"
                                 "1) Ensure Node.js is installed and available in PATH.\n"
                                 "2) Re-run 'cmake --install' or run 'npm install' in: %1\n"
                                 "3) Run 'copilot /login' to authenticate.")
-                     .arg(sidecarDir),
+                     .arg(sidecar_dir),
                  {});
         return;
     }
 
     // Send "start" if not yet initialized
-    if (m_clientStarted == false)
+    if (this->client_started == false)
     {
         QJsonObject startReq;
         startReq[QStringLiteral("id")] = 0;
         startReq[QStringLiteral("method")] = QStringLiteral("start");
-        sendRequest(startReq);
-        m_clientStarted = true;  // optimistic; errors will come back
+        this->send_request(startReq);
+        this->client_started = true;  // optimistic; errors will come back
     }
 
     // Build messages JSON array
     QJsonArray msgArr;
     for (const auto &m : messages)
     {
-        msgArr.append(m.toJson());
+        msgArr.append(m.to_json());
     }
 
     QJsonObject params;
     params[QStringLiteral("messages")] = msgArr;
     params[QStringLiteral("model")] = model;
     params[QStringLiteral("temperature")] = temperature;
-    params[QStringLiteral("maxTokens")] = maxTokens;
+    params[QStringLiteral("max_tokens")] = max_tokens;
     // Always use streaming mode — non-streaming sendAndWait has long delays
     params[QStringLiteral("streaming")] = true;
-    params[QStringLiteral("completionTimeoutSec")] = settings().copilotCompletionTimeoutSec;
-    if (!reasoningEffort.isEmpty() && reasoningEffort != QStringLiteral("off"))
+    params[QStringLiteral("completionTimeoutSec")] = settings().copilot_completion_timeout_sec;
+    if (!reasoning_effort.isEmpty() && reasoning_effort != QStringLiteral("off"))
     {
-        params[QStringLiteral("reasoningEffort")] = reasoningEffort;
+        params[QStringLiteral("reasoning_effort")] = reasoning_effort;
     }
 
-    int id = m_nextId++;
+    int id = this->next_id++;
     QJsonObject req;
     req[QStringLiteral("id")] = id;
     req[QStringLiteral("method")] = QStringLiteral("complete");
@@ -560,91 +561,91 @@ void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString
             .arg(id)
             .arg(model)
             .arg(messages.size())
-            .arg(streamCallback ? QStringLiteral("yes") : QStringLiteral("no"))
+            .arg(stream_callback ? QStringLiteral("yes") : QStringLiteral("no"))
             .arg(payloadSize)
-            .arg(settings().copilotCompletionTimeoutSec > 0
-                     ? QStringLiteral("%1s").arg(settings().copilotCompletionTimeoutSec)
+            .arg(settings().copilot_completion_timeout_sec > 0
+                     ? QStringLiteral("%1s").arg(settings().copilot_completion_timeout_sec)
                      : QStringLiteral("none")));
 
-    m_pending.insert(id, callback);
-    if (streamCallback)
+    this->pending.insert(id, callback);
+    if (stream_callback)
     {
-        m_streamCallbacks.insert(id, streamCallback);
+        this->stream_callbacks.insert(id, stream_callback);
     }
-    if (progressCallback)
+    if (progress_callback)
     {
-        m_progressCallbacks.insert(id, progressCallback);
+        this->progress_callbacks.insert(id, progress_callback);
     }
-    sendRequest(req);
+    this->send_request(req);
 }
 
 /**
  * Requests the list of models exposed by the sidecar.
  * @param callback Receives available model ids or an error string.
  */
-void CopilotProvider::listModels(const ModelListCallback &callback)
+void copilot_provider_t::list_models(const model_list_callback_t &callback)
 {
-    if (!ensureSidecar())
+    if (!this->ensure_sidecar())
     {
-        const QString sidecarDir = sidecarInstallHintDir();
+        const QString sidecar_dir = sidecar_install_hint_dir();
         callback({}, QStringLiteral("Failed to start Copilot sidecar.\n"
                                     "1) Ensure Node.js is installed and available in PATH.\n"
                                     "2) Re-run 'cmake --install' or run 'npm install' in: %1\n"
                                     "3) Run 'copilot /login' to authenticate.")
-                         .arg(sidecarDir));
+                         .arg(sidecar_dir));
         return;
     }
 
-    if (!m_clientStarted)
+    if (!this->client_started)
     {
         QJsonObject startReq;
         startReq[QStringLiteral("id")] = 0;
         startReq[QStringLiteral("method")] = QStringLiteral("start");
-        sendRequest(startReq);
-        m_clientStarted = true;
+        this->send_request(startReq);
+        this->client_started = true;
     }
 
-    const int id = m_nextId++;
+    const int id = this->next_id++;
     QCAI_DEBUG("Copilot", QStringLiteral("Requesting available models (request #%1)").arg(id));
     QJsonObject req;
     req[QStringLiteral("id")] = id;
     req[QStringLiteral("method")] = QStringLiteral("list_models");
 
-    m_modelListCallbacks.insert(id, callback);
-    sendRequest(req);
+    this->model_list_callbacks.insert(id, callback);
+    this->send_request(req);
 }
 
 /**
  * Cancels all queued provider callbacks and forwards cancel to the sidecar.
  */
-void CopilotProvider::cancel()
+void copilot_provider_t::cancel()
 {
     // Fail all pending callbacks on the plugin side (copy first for re-entrancy safety)
-    const auto pendingCallbacks = m_pending;
-    m_pending.clear();
-    m_streamCallbacks.clear();
-    m_progressCallbacks.clear();
+    const auto pendingCallbacks = this->pending;
+    this->pending.clear();
+    this->stream_callbacks.clear();
+    this->progress_callbacks.clear();
     for (auto it = pendingCallbacks.begin(); it != pendingCallbacks.end(); ++it)
     {
         it.value()({}, QStringLiteral("Cancelled"), {});
     }
 
     // Tell sidecar to cancel too (drop queued/active requests)
-    if ((m_process != nullptr) && m_process->state() == QProcess::Running)
+    if ((this->process != nullptr) && this->process->state() == QProcess::Running)
     {
         QJsonObject req;
-        req[QStringLiteral("id")] = m_nextId++;
+        req[QStringLiteral("id")] = this->next_id++;
         req[QStringLiteral("method")] = QStringLiteral("cancel");
-        sendRequest(req);
+        this->send_request(req);
     }
 }
 
 /**
  * Stops the sidecar process and clears all pending provider state.
  */
-void CopilotProvider::stopSidecar()
+void copilot_provider_t::stop_sidecar()
 {
-    if (m_process == nullptr)
+    if (this->process == nullptr)
     {
         return;
     }
@@ -653,19 +654,19 @@ void CopilotProvider::stopSidecar()
     QJsonObject req;
     req[QStringLiteral("id")] = 0;
     req[QStringLiteral("method")] = QStringLiteral("stop");
-    sendRequest(req);
+    this->send_request(req);
 
-    m_process->waitForFinished(3000);
-    if ((m_process != nullptr) && m_process->state() == QProcess::Running)
+    this->process->waitForFinished(3000);
+    if ((this->process != nullptr) && this->process->state() == QProcess::Running)
     {
-        m_process->kill();
-        m_process->waitForFinished(1000);
+        this->process->kill();
+        this->process->waitForFinished(1000);
     }
-    delete m_process;
-    m_process = nullptr;
-    m_clientStarted = false;
-    m_pending.clear();
-    m_modelListCallbacks.clear();
+    delete this->process;
+    this->process = nullptr;
+    this->client_started = false;
+    this->pending.clear();
+    this->model_list_callbacks.clear();
 }
 
 }  // namespace qcai2

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>AgentDockWidget</class>
- <widget class="QWidget" name="AgentDockWidget">
+ <class>agent_dock_widget_t</class>
+ <widget class="QWidget" name="agent_dock_widget_t">
   <property name="geometry">
    <rect>
     <x>0</x>

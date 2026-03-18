@@ -34,31 +34,31 @@ namespace
 #error "QCAI2_CURRENT_BUILD_SUFFIX must be provided by CMake."
 #endif
 
-constexpr auto kGlobalRevisionKey = "settingsRevision";
+constexpr auto k_global_revision_key = "settingsRevision";
 
-constexpr auto kProjectRevisionKey = "storageRevision";
+constexpr auto k_project_revision_key = "storageRevision";
 
-constexpr auto kCurrentVersion = QCAI2_CURRENT_VERSION;
-constexpr auto kCurrentBuildSuffix = QCAI2_CURRENT_BUILD_SUFFIX;
+constexpr auto k_current_version = QCAI2_CURRENT_VERSION;
+constexpr auto k_current_build_suffix = QCAI2_CURRENT_BUILD_SUFFIX;
 
-struct ArchiveEntryData
+struct archive_entry_data_t
 {
     QString path;
     QByteArray data;
 };
 
-struct ArchiveWriteContext
+struct archive_write_context_t
 {
     QFile file;
 };
 
-Revision currentRevisionImpl()
+revision_t current_revision_impl()
 {
-    return parseRevision(QString::fromLatin1(kCurrentVersion),
-                         QString::fromLatin1(kCurrentBuildSuffix));
+    return parse_revision(QString::fromLatin1(k_current_version),
+                          QString::fromLatin1(k_current_build_suffix));
 }
 
-int compare(const Revision &lhs, const Revision &rhs)
+int compare(const revision_t &lhs, const revision_t &rhs)
 {
     if (((lhs.major != rhs.major) == true))
     {
@@ -79,7 +79,7 @@ int compare(const Revision &lhs, const Revision &rhs)
     return 0;
 }
 
-QString readTextFile(const QString &path, bool *exists = nullptr, QString *error = nullptr)
+QString read_text_file(const QString &path, bool *exists = nullptr, QString *error = nullptr)
 {
     QFile file(path);
     if (file.exists() == false)
@@ -111,23 +111,23 @@ QString readTextFile(const QString &path, bool *exists = nullptr, QString *error
     return QString::fromUtf8(file.readAll());
 }
 
-QString siblingFilePath(const QString &storagePath, const QString &suffix)
+QString sibling_file_path(const QString &storage_path, const QString &suffix)
 {
-    const QFileInfo storageInfo(storagePath);
-    return storageInfo.dir().filePath(storageInfo.completeBaseName() + suffix);
+    const QFileInfo storage_info(storage_path);
+    return storage_info.dir().filePath(storage_info.completeBaseName() + suffix);
 }
 
-QString revisionLabel(const Revision &revision)
+QString revision_label(const revision_t &revision)
 {
-    return revision.valid ? revision.revisionString() : QStringLiteral("unversioned");
+    return revision.valid ? revision.revision_string() : QStringLiteral("unversioned");
 }
 
-QString iso8601BasicTimestampUtc()
+QString iso8601_basic_timestamp_utc()
 {
     return QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd'T'HHmmss'Z'"));
 }
 
-bool checkArchiveResult(struct archive *archiveHandle, int result, QString *error)
+bool check_archive_result(struct archive *archive_handle, int result, QString *error)
 {
     if (((result == ARCHIVE_OK) == true))
     {
@@ -137,20 +137,20 @@ bool checkArchiveResult(struct archive *archiveHandle, int result, QString *erro
     if (((error != nullptr) == true))
     {
         *error = QStringLiteral("libarchive error: %1")
-                     .arg(QString::fromUtf8(archive_error_string(archiveHandle)));
+                     .arg(QString::fromUtf8(archive_error_string(archive_handle)));
     }
     return false;
 }
 
-void setArchiveQtError(struct archive *archiveHandle, const QString &message)
+void set_archive_qt_error(struct archive *archive_handle, const QString &message)
 {
-    const QByteArray utf8Message = message.toUtf8();
-    archive_set_error(archiveHandle, EIO, "%s", utf8Message.constData());
+    const QByteArray utf8_message = message.toUtf8();
+    archive_set_error(archive_handle, EIO, "%s", utf8_message.constData());
 }
 
-int archiveOpenCallback(struct archive *archiveHandle, void *clientData)
+int archive_open_callback(struct archive *archive_handle, void *client_data)
 {
-    auto *context = static_cast<ArchiveWriteContext *>(clientData);
+    auto *context = static_cast<archive_write_context_t *>(client_data);
     if (context->file.isOpen())
     {
         return ARCHIVE_OK;
@@ -158,35 +158,35 @@ int archiveOpenCallback(struct archive *archiveHandle, void *clientData)
 
     if (((!context->file.open(QIODevice::WriteOnly)) == true))
     {
-        setArchiveQtError(archiveHandle,
-                          QStringLiteral("Failed to open %1 for writing: %2")
-                              .arg(context->file.fileName(), context->file.errorString()));
+        set_archive_qt_error(archive_handle,
+                             QStringLiteral("Failed to open %1 for writing: %2")
+                                 .arg(context->file.fileName(), context->file.errorString()));
         return ARCHIVE_FATAL;
     }
 
     return ARCHIVE_OK;
 }
 
-la_ssize_t archiveWriteCallback(struct archive *archiveHandle, void *clientData,
-                                const void *buffer, size_t length)
+la_ssize_t archive_write_callback(struct archive *archive_handle, void *client_data,
+                                  const void *buffer, size_t length)
 {
-    auto *context = static_cast<ArchiveWriteContext *>(clientData);
+    auto *context = static_cast<archive_write_context_t *>(client_data);
     const qint64 written =
         context->file.write(static_cast<const char *>(buffer), static_cast<qint64>(length));
     if (written < 0 || static_cast<size_t>(written) != length)
     {
-        setArchiveQtError(archiveHandle,
-                          QStringLiteral("Failed to write %1: %2")
-                              .arg(context->file.fileName(), context->file.errorString()));
+        set_archive_qt_error(archive_handle,
+                             QStringLiteral("Failed to write %1: %2")
+                                 .arg(context->file.fileName(), context->file.errorString()));
         return -1;
     }
 
     return static_cast<la_ssize_t>(written);
 }
 
-int archiveCloseCallback(struct archive *archiveHandle, void *clientData)
+int archive_close_callback(struct archive *archive_handle, void *client_data)
 {
-    auto *context = static_cast<ArchiveWriteContext *>(clientData);
+    auto *context = static_cast<archive_write_context_t *>(client_data);
     if (((!context->file.isOpen()) == true))
     {
         return ARCHIVE_OK;
@@ -194,9 +194,9 @@ int archiveCloseCallback(struct archive *archiveHandle, void *clientData)
 
     if (((!context->file.flush()) == true))
     {
-        setArchiveQtError(archiveHandle,
-                          QStringLiteral("Failed to flush %1: %2")
-                              .arg(context->file.fileName(), context->file.errorString()));
+        set_archive_qt_error(archive_handle,
+                             QStringLiteral("Failed to flush %1: %2")
+                                 .arg(context->file.fileName(), context->file.errorString()));
         context->file.close();
         return ARCHIVE_FATAL;
     }
@@ -205,11 +205,11 @@ int archiveCloseCallback(struct archive *archiveHandle, void *clientData)
     return ARCHIVE_OK;
 }
 
-bool createTarXzArchive(const QString &archivePath, const QList<ArchiveEntryData> &entries,
-                        QString *error)
+bool create_tar_xz_archive(const QString &archive_path, const QList<archive_entry_data_t> &entries,
+                           QString *error)
 {
-    struct archive *archiveHandle = archive_write_new();
-    if (((archiveHandle == nullptr) == true))
+    struct archive *archive_handle = archive_write_new();
+    if (((archive_handle == nullptr) == true))
     {
         if (((error != nullptr) == true))
         {
@@ -218,17 +218,17 @@ bool createTarXzArchive(const QString &archivePath, const QList<ArchiveEntryData
         return false;
     }
 
-    ArchiveWriteContext context{QFile(archivePath)};
+    archive_write_context_t context{QFile(archive_path)};
     bool ok =
-        checkArchiveResult(archiveHandle, archive_write_add_filter_xz(archiveHandle), error) &&
-        checkArchiveResult(archiveHandle, archive_write_set_format_pax_restricted(archiveHandle),
-                           error) &&
-        checkArchiveResult(archiveHandle,
-                           archive_write_open(archiveHandle, &context, archiveOpenCallback,
-                                              archiveWriteCallback, archiveCloseCallback),
-                           error);
+        check_archive_result(archive_handle, archive_write_add_filter_xz(archive_handle), error) &&
+        check_archive_result(archive_handle,
+                             archive_write_set_format_pax_restricted(archive_handle), error) &&
+        check_archive_result(archive_handle,
+                             archive_write_open(archive_handle, &context, archive_open_callback,
+                                                archive_write_callback, archive_close_callback),
+                             error);
 
-    for (const ArchiveEntryData &entryData : entries)
+    for (const archive_entry_data_t &entry_data : entries)
     {
         if (!ok)
         {
@@ -236,26 +236,27 @@ bool createTarXzArchive(const QString &archivePath, const QList<ArchiveEntryData
         }
 
         struct archive_entry *entry = archive_entry_new();
-        const QByteArray encodedEntryPath = QFile::encodeName(entryData.path);
-        archive_entry_copy_pathname(entry, encodedEntryPath.constData());
+        const QByteArray encoded_entry_path = QFile::encodeName(entry_data.path);
+        archive_entry_copy_pathname(entry, encoded_entry_path.constData());
         archive_entry_set_filetype(entry, AE_IFREG);
         archive_entry_set_perm(entry, 0644);
-        archive_entry_set_size(entry, entryData.data.size());
+        archive_entry_set_size(entry, entry_data.data.size());
         archive_entry_set_mtime(entry, QDateTime::currentSecsSinceEpoch(), 0);
 
-        ok = checkArchiveResult(archiveHandle, archive_write_header(archiveHandle, entry), error);
-        if (ok && !entryData.data.isEmpty())
+        ok = check_archive_result(archive_handle, archive_write_header(archive_handle, entry),
+                                  error);
+        if (ok && !entry_data.data.isEmpty())
         {
-            const size_t dataSize = static_cast<size_t>(entryData.data.size());
+            const size_t data_size = static_cast<size_t>(entry_data.data.size());
             const la_ssize_t written =
-                archive_write_data(archiveHandle, entryData.data.constData(), dataSize);
-            if (written < 0 || static_cast<size_t>(written) != dataSize)
+                archive_write_data(archive_handle, entry_data.data.constData(), data_size);
+            if (written < 0 || static_cast<size_t>(written) != data_size)
             {
                 if (error != nullptr)
                 {
                     *error = QStringLiteral("Failed to write archive entry %1: %2")
-                                 .arg(entryData.path,
-                                      QString::fromUtf8(archive_error_string(archiveHandle)));
+                                 .arg(entry_data.path,
+                                      QString::fromUtf8(archive_error_string(archive_handle)));
                 }
                 ok = false;
             }
@@ -264,18 +265,18 @@ bool createTarXzArchive(const QString &archivePath, const QList<ArchiveEntryData
         archive_entry_free(entry);
     }
 
-    const bool closeOk =
-        ok && checkArchiveResult(archiveHandle, archive_write_close(archiveHandle), error);
-    const int freeResult = archive_write_free(archiveHandle);
-    bool freeOk = freeResult == ARCHIVE_OK;
-    if (((!freeOk && (error != nullptr)) == true))
+    const bool close_ok =
+        ok && check_archive_result(archive_handle, archive_write_close(archive_handle), error);
+    const int free_result = archive_write_free(archive_handle);
+    bool free_ok = free_result == ARCHIVE_OK;
+    if (((!free_ok && (error != nullptr)) == true))
     {
-        *error = QStringLiteral("Failed to finalize archive %1").arg(archivePath);
+        *error = QStringLiteral("Failed to finalize archive %1").arg(archive_path);
     }
-    return ok && closeOk && freeOk;
+    return ok && close_ok && free_ok;
 }
 
-QString ensureGlobalBackupDir()
+QString ensure_global_backup_dir()
 {
     QString base = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (base.isEmpty() == true)
@@ -285,7 +286,7 @@ QString ensureGlobalBackupDir()
     return QDir(base).filePath(QStringLiteral("qcai2_buk"));
 }
 
-QString globalStructuredSettingsPath()
+QString global_structured_settings_path()
 {
     QString base = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (base.isEmpty() == true)
@@ -295,47 +296,47 @@ QString globalStructuredSettingsPath()
     return QDir(base).filePath(QStringLiteral("settings.json"));
 }
 
-QString ensureProjectBackupDir(const QString &storagePath)
+QString ensure_project_backup_dir(const QString &storage_path)
 {
-    QDir contextDir = QFileInfo(storagePath).dir();
-    if (contextDir.cdUp() == true)
+    QDir context_dir = QFileInfo(storage_path).dir();
+    if (context_dir.cdUp() == true)
     {
-        return contextDir.filePath(QStringLiteral(".qcai2_buk"));
+        return context_dir.filePath(QStringLiteral(".qcai2_buk"));
     }
-    return contextDir.filePath(QStringLiteral(".qcai2_buk"));
+    return context_dir.filePath(QStringLiteral(".qcai2_buk"));
 }
 
-bool ensureDirExists(const QString &dirPath, QString *error)
+bool ensure_dir_exists(const QString &dir_path, QString *error)
 {
-    if (((QDir().mkpath(dirPath)) == true))
+    if (((QDir().mkpath(dir_path)) == true))
     {
         return true;
     }
     if (((error != nullptr) == true))
     {
-        *error = QStringLiteral("Failed to create backup directory %1").arg(dirPath);
+        *error = QStringLiteral("Failed to create backup directory %1").arg(dir_path);
     }
     return false;
 }
 
-QByteArray manifestJson(const QString &kind, const QString &createdAt,
-                        const Revision &fromRevision, const Revision &toRevision,
-                        const QString &sourceId)
+QByteArray manifest_json(const QString &kind, const QString &created_at,
+                         const revision_t &from_revision, const revision_t &to_revision,
+                         const QString &source_id)
 {
     const QJsonObject manifest{
         {QStringLiteral("kind"), kind},
-        {QStringLiteral("createdAt"), createdAt},
-        {QStringLiteral("fromRevision"), revisionLabel(fromRevision)},
-        {QStringLiteral("toRevision"), revisionLabel(toRevision)},
-        {QStringLiteral("source"), sourceId},
+        {QStringLiteral("createdAt"), created_at},
+        {QStringLiteral("fromRevision"), revision_label(from_revision)},
+        {QStringLiteral("toRevision"), revision_label(to_revision)},
+        {QStringLiteral("source"), source_id},
     };
     return QJsonDocument(manifest).toJson(QJsonDocument::Indented);
 }
 
-bool appendFileIfExists(QList<ArchiveEntryData> &entries, const QString &archiveName,
-                        const QString &diskPath, QString *error);
+bool append_file_if_exists(QList<archive_entry_data_t> &entries, const QString &archive_name,
+                           const QString &disk_path, QString *error);
 
-QJsonObject settingsSnapshot(QSettings &settings)
+QJsonObject settings_snapshot(QSettings &settings)
 {
     QJsonObject snapshot;
     const QStringList keys = settings.allKeys();
@@ -346,45 +347,47 @@ QJsonObject settingsSnapshot(QSettings &settings)
     return snapshot;
 }
 
-bool createGlobalSettingsBackup(QSettings &settings, const Revision &fromRevision,
-                                const Revision &toRevision, QString *error)
+bool create_global_settings_backup(QSettings &settings, const revision_t &from_revision,
+                                   const revision_t &to_revision, QString *error)
 {
-    const QString backupDir = ensureGlobalBackupDir();
-    if (ensureDirExists(backupDir, error) == false)
+    const QString backup_dir = ensure_global_backup_dir();
+    if (ensure_dir_exists(backup_dir, error) == false)
     {
         return false;
     }
 
-    const QString timestamp = iso8601BasicTimestampUtc();
-    const QString archivePath = QDir(backupDir).filePath(
-        QStringLiteral("global-settings__%1__%2_to_%3.tar.xz")
-            .arg(timestamp, revisionLabel(fromRevision), revisionLabel(toRevision)));
+    const QString timestamp = iso8601_basic_timestamp_utc();
+    const QString archive_path =
+        QDir(backup_dir)
+            .filePath(
+                QStringLiteral("global-settings__%1__%2_to_%3.tar.xz")
+                    .arg(timestamp, revision_label(from_revision), revision_label(to_revision)));
 
-    QList<ArchiveEntryData> entries;
+    QList<archive_entry_data_t> entries;
     entries.append({QStringLiteral("settings.json"),
-                    QJsonDocument(settingsSnapshot(settings)).toJson(QJsonDocument::Indented)});
-    if (((!appendFileIfExists(entries, QStringLiteral("structured-settings.json"),
-                              globalStructuredSettingsPath(), error)) == true))
+                    QJsonDocument(settings_snapshot(settings)).toJson(QJsonDocument::Indented)});
+    if (((!append_file_if_exists(entries, QStringLiteral("structured-settings.json"),
+                                 global_structured_settings_path(), error)) == true))
     {
         return false;
     }
     entries.append({QStringLiteral("manifest.json"),
-                    manifestJson(QStringLiteral("global-settings"), timestamp, fromRevision,
-                                 toRevision, QStringLiteral("QSettings/qcai2"))});
-    return createTarXzArchive(archivePath, entries, error);
+                    manifest_json(QStringLiteral("global-settings"), timestamp, from_revision,
+                                  to_revision, QStringLiteral("QSettings/qcai2"))});
+    return create_tar_xz_archive(archive_path, entries, error);
 }
 
-bool appendFileIfExists(QList<ArchiveEntryData> &entries, const QString &archiveName,
-                        const QString &diskPath, QString *error)
+bool append_file_if_exists(QList<archive_entry_data_t> &entries, const QString &archive_name,
+                           const QString &disk_path, QString *error)
 {
     bool exists = false;
-    QString readError;
-    const QString text = readTextFile(diskPath, &exists, &readError);
-    if (readError.isEmpty() == false)
+    QString read_error;
+    const QString text = read_text_file(disk_path, &exists, &read_error);
+    if (read_error.isEmpty() == false)
     {
         if (((error != nullptr) == true))
         {
-            *error = readError;
+            *error = read_error;
         }
         return false;
     }
@@ -392,63 +395,65 @@ bool appendFileIfExists(QList<ArchiveEntryData> &entries, const QString &archive
     {
         return true;
     }
-    entries.append({archiveName, text.toUtf8()});
+    entries.append({archive_name, text.toUtf8()});
     return true;
 }
 
-bool createProjectStateBackup(const QString &storagePath, const QJsonObject &root,
-                              const Revision &fromRevision, const Revision &toRevision,
-                              QString *error)
+bool create_project_state_backup(const QString &storage_path, const QJsonObject &root,
+                                 const revision_t &from_revision, const revision_t &to_revision,
+                                 QString *error)
 {
-    const QString backupDir = ensureProjectBackupDir(storagePath);
-    if (ensureDirExists(backupDir, error) == false)
+    const QString backup_dir = ensure_project_backup_dir(storage_path);
+    if (ensure_dir_exists(backup_dir, error) == false)
     {
         return false;
     }
 
-    const QFileInfo storageInfo(storagePath);
-    const QString timestamp = iso8601BasicTimestampUtc();
-    const QString archivePath =
-        QDir(backupDir).filePath(QStringLiteral("%1__%2__%3_to_%4.tar.xz")
-                                     .arg(storageInfo.completeBaseName(), timestamp,
-                                          revisionLabel(fromRevision), revisionLabel(toRevision)));
+    const QFileInfo storage_info(storage_path);
+    const QString timestamp = iso8601_basic_timestamp_utc();
+    const QString archive_path =
+        QDir(backup_dir)
+            .filePath(QStringLiteral("%1__%2__%3_to_%4.tar.xz")
+                          .arg(storage_info.completeBaseName(), timestamp,
+                               revision_label(from_revision), revision_label(to_revision)));
 
-    QList<ArchiveEntryData> entries;
-    entries.append({storageInfo.fileName(), QJsonDocument(root).toJson(QJsonDocument::Indented)});
-    if (!appendFileIfExists(entries, QFileInfo(projectGoalFilePath(storagePath)).fileName(),
-                            projectGoalFilePath(storagePath), error))
+    QList<archive_entry_data_t> entries;
+    entries.append({storage_info.fileName(), QJsonDocument(root).toJson(QJsonDocument::Indented)});
+    if (!append_file_if_exists(entries, QFileInfo(project_goal_file_path(storage_path)).fileName(),
+                               project_goal_file_path(storage_path), error))
     {
         return false;
     }
-    if (!appendFileIfExists(entries, QFileInfo(projectActionsLogFilePath(storagePath)).fileName(),
-                            projectActionsLogFilePath(storagePath), error))
+    if (!append_file_if_exists(entries,
+                               QFileInfo(project_actions_log_file_path(storage_path)).fileName(),
+                               project_actions_log_file_path(storage_path), error))
     {
         return false;
     }
-    entries.append(
-        {QStringLiteral("manifest.json"), manifestJson(QStringLiteral("project-state"), timestamp,
-                                                       fromRevision, toRevision, storagePath)});
-    return createTarXzArchive(archivePath, entries, error);
+    entries.append({QStringLiteral("manifest.json"),
+                    manifest_json(QStringLiteral("project-state"), timestamp, from_revision,
+                                  to_revision, storage_path)});
+    return create_tar_xz_archive(archive_path, entries, error);
 }
 
-Revision storedGlobalRevision(QSettings &settings)
+revision_t stored_global_revision(QSettings &settings)
 {
-    return parseRevision(settings.value(kGlobalRevisionKey).toString());
+    return parse_revision(settings.value(k_global_revision_key).toString());
 }
 
-Revision storedProjectRevision(const QJsonObject &root)
+revision_t stored_project_revision(const QJsonObject &root)
 {
-    return parseRevision(root.value(QLatin1StringView(kProjectRevisionKey)).toString());
+    return parse_revision(root.value(QLatin1StringView(k_project_revision_key)).toString());
 }
 
-bool saveProjectRoot(const QString &storagePath, const QJsonObject &root, QString *error)
+bool save_project_root(const QString &storage_path, const QJsonObject &root, QString *error)
 {
-    QSaveFile file(storagePath);
+    QSaveFile file(storage_path);
     if (file.open(QIODevice::WriteOnly) == false)
     {
         if (((error != nullptr) == true))
         {
-            *error = QStringLiteral("Failed to open %1 for writing").arg(storagePath);
+            *error = QStringLiteral("Failed to open %1 for writing").arg(storage_path);
         }
         return false;
     }
@@ -458,7 +463,7 @@ bool saveProjectRoot(const QString &storagePath, const QJsonObject &root, QStrin
     {
         if (((error != nullptr) == true))
         {
-            *error = QStringLiteral("Failed to commit %1").arg(storagePath);
+            *error = QStringLiteral("Failed to commit %1").arg(storage_path);
         }
         return false;
     }
@@ -468,7 +473,7 @@ bool saveProjectRoot(const QString &storagePath, const QJsonObject &root, QStrin
 
 }  // namespace
 
-QString Revision::versionString() const
+QString revision_t::version_string() const
 {
     if (valid == false)
     {
@@ -477,7 +482,7 @@ QString Revision::versionString() const
     return QStringLiteral("%1.%2.%3").arg(major).arg(minor).arg(patch);
 }
 
-QString Revision::buildSuffixString() const
+QString revision_t::build_suffix_string() const
 {
     if (valid == false)
     {
@@ -486,95 +491,95 @@ QString Revision::buildSuffixString() const
     return QStringLiteral("-%1").arg(build, 3, 10, QLatin1Char('0'));
 }
 
-QString Revision::revisionString() const
+QString revision_t::revision_string() const
 {
     if (valid == false)
     {
         return {};
     }
-    return versionString() + buildSuffixString();
+    return this->version_string() + this->build_suffix_string();
 }
 
-Revision currentRevision()
+revision_t current_revision()
 {
-    return currentRevisionImpl();
+    return current_revision_impl();
 }
 
-QString currentVersionString()
+QString current_version_string()
 {
-    return QString::fromLatin1(kCurrentVersion);
+    return QString::fromLatin1(k_current_version);
 }
 
-QString currentBuildSuffix()
+QString current_build_suffix()
 {
-    return QString::fromLatin1(kCurrentBuildSuffix);
+    return QString::fromLatin1(k_current_build_suffix);
 }
 
-QString currentRevisionString()
+QString current_revision_string()
 {
-    return currentRevision().revisionString();
+    return current_revision().revision_string();
 }
 
-QString globalBackupDirPath()
+QString global_backup_dir_path()
 {
-    return ensureGlobalBackupDir();
+    return ensure_global_backup_dir();
 }
 
-QString globalStructuredSettingsFilePath()
+QString global_structured_settings_file_path()
 {
-    return globalStructuredSettingsPath();
+    return global_structured_settings_path();
 }
 
-QString projectBackupDirPath(const QString &storagePath)
+QString project_backup_dir_path(const QString &storage_path)
 {
-    return ensureProjectBackupDir(storagePath);
+    return ensure_project_backup_dir(storage_path);
 }
 
-Revision parseRevision(const QString &version, const QString &buildSuffix)
+revision_t parse_revision(const QString &version, const QString &build_suffix)
 {
-    static const QRegularExpression versionOnlyRe(
+    static const QRegularExpression version_only_re(
         QStringLiteral(R"(^\s*(\d+)\.(\d+)\.(\d+)\s*$)"));
-    static const QRegularExpression revisionRe(
+    static const QRegularExpression revision_re(
         QStringLiteral(R"(^\s*(\d+)\.(\d+)\.(\d+)-(\d+)\s*$)"));
-    static const QRegularExpression buildRe(QStringLiteral(R"(^\s*-?(\d+)\s*$)"));
+    static const QRegularExpression build_re(QStringLiteral(R"(^\s*-?(\d+)\s*$)"));
 
-    if (((version.trimmed().isEmpty() && buildSuffix.trimmed().isEmpty()) == true))
+    if (((version.trimmed().isEmpty() && build_suffix.trimmed().isEmpty()) == true))
     {
         return {};
     }
 
-    if (((buildSuffix.trimmed().isEmpty()) == true))
+    if (((build_suffix.trimmed().isEmpty()) == true))
     {
-        const auto revisionMatch = revisionRe.match(version);
-        if (revisionMatch.hasMatch())
+        const auto revision_match = revision_re.match(version);
+        if (revision_match.hasMatch())
         {
-            return {revisionMatch.captured(1).toInt(), revisionMatch.captured(2).toInt(),
-                    revisionMatch.captured(3).toInt(), revisionMatch.captured(4).toInt(), true};
+            return {revision_match.captured(1).toInt(), revision_match.captured(2).toInt(),
+                    revision_match.captured(3).toInt(), revision_match.captured(4).toInt(), true};
         }
     }
 
-    const auto versionMatch = versionOnlyRe.match(version);
-    if (((!versionMatch.hasMatch()) == true))
+    const auto version_match = version_only_re.match(version);
+    if (((!version_match.hasMatch()) == true))
     {
         return {};
     }
 
     int build = 0;
-    if (((!buildSuffix.trimmed().isEmpty()) == true))
+    if (((!build_suffix.trimmed().isEmpty()) == true))
     {
-        const auto buildMatch = buildRe.match(buildSuffix);
-        if (((!buildMatch.hasMatch()) == true))
+        const auto build_match = build_re.match(build_suffix);
+        if (((!build_match.hasMatch()) == true))
         {
             return {};
         }
-        build = buildMatch.captured(1).toInt();
+        build = build_match.captured(1).toInt();
     }
 
-    return {versionMatch.captured(1).toInt(), versionMatch.captured(2).toInt(),
-            versionMatch.captured(3).toInt(), build, true};
+    return {version_match.captured(1).toInt(), version_match.captured(2).toInt(),
+            version_match.captured(3).toInt(), build, true};
 }
 
-bool isOlder(const Revision &lhs, const Revision &rhs)
+bool is_older(const revision_t &lhs, const revision_t &rhs)
 {
     if (lhs.valid == false)
     {
@@ -587,43 +592,43 @@ bool isOlder(const Revision &lhs, const Revision &rhs)
     return compare(lhs, rhs) < 0;
 }
 
-void stampGlobalSettings(QSettings &settings)
+void stamp_global_settings(QSettings &settings)
 {
-    settings.setValue(kGlobalRevisionKey, currentRevisionString());
+    settings.setValue(k_global_revision_key, current_revision_string());
 }
 
-bool migrateGlobalSettings(QSettings &settings, QString *error)
+bool migrate_global_settings(QSettings &settings, QString *error)
 {
-    const Revision stored = storedGlobalRevision(settings);
-    const Revision current = currentRevision();
+    const revision_t stored = stored_global_revision(settings);
+    const revision_t current = current_revision();
     bool changed = false;
 
-    if ((!stored.valid || stored.revisionString() != current.revisionString()) &&
+    if ((!stored.valid || stored.revision_string() != current.revision_string()) &&
         !settings.allKeys().isEmpty())
     {
-        if (createGlobalSettingsBackup(settings, stored, current, error) == false)
+        if (create_global_settings_backup(settings, stored, current, error) == false)
         {
             return false;
         }
     }
 
-    const Revision migration_0_0_4_001 =
-        parseRevision(QStringLiteral("0.0.4"), QStringLiteral("-001"));
-    if (isOlder(stored, migration_0_0_4_001) == true)
+    const revision_t migration_0_0_4_001 =
+        parse_revision(QStringLiteral("0.0.4"), QStringLiteral("-001"));
+    if (is_older(stored, migration_0_0_4_001) == true)
     {
-        changed = migrateGlobalSettingsTo_0_0_4_001(settings) || changed;
+        changed = migrate_global_settings_to_0_0_4_001(settings) || changed;
     }
 
-    const Revision migration_0_0_5_003 =
-        parseRevision(QStringLiteral("0.0.5"), QStringLiteral("-003"));
-    if (isOlder(stored, migration_0_0_5_003) == true)
+    const revision_t migration_0_0_5_003 =
+        parse_revision(QStringLiteral("0.0.5"), QStringLiteral("-003"));
+    if (is_older(stored, migration_0_0_5_003) == true)
     {
-        changed = migrateGlobalSettingsTo_0_0_5_003(settings) || changed;
+        changed = migrate_global_settings_to_0_0_5_003(settings) || changed;
     }
 
-    if (((!stored.valid || stored.revisionString() != current.revisionString()) == true))
+    if (((!stored.valid || stored.revision_string() != current.revision_string()) == true))
     {
-        stampGlobalSettings(settings);
+        stamp_global_settings(settings);
         changed = true;
     }
 
@@ -631,14 +636,14 @@ bool migrateGlobalSettings(QSettings &settings, QString *error)
     return true;
 }
 
-void stampProjectState(QJsonObject &root)
+void stamp_project_state(QJsonObject &root)
 {
-    root[QStringLiteral("storageRevision")] = currentRevisionString();
+    root[QStringLiteral("storageRevision")] = current_revision_string();
 }
 
-bool migrateProjectState(const QString &storagePath, QString *error)
+bool migrate_project_state(const QString &storage_path, QString *error)
 {
-    QFile file(storagePath);
+    QFile file(storage_path);
     if (file.exists() == false)
     {
         return true;
@@ -647,65 +652,65 @@ bool migrateProjectState(const QString &storagePath, QString *error)
     {
         if (((error != nullptr) == true))
         {
-            *error = QStringLiteral("Failed to open %1 for reading").arg(storagePath);
+            *error = QStringLiteral("Failed to open %1 for reading").arg(storage_path);
         }
         return false;
     }
 
-    const QByteArray rawState = file.readAll();
+    const QByteArray raw_state = file.readAll();
     file.close();
 
-    const QJsonDocument doc = QJsonDocument::fromJson(rawState);
+    const QJsonDocument doc = QJsonDocument::fromJson(raw_state);
     if (doc.isObject() == false)
     {
         if (((error != nullptr) == true))
         {
-            *error = QStringLiteral("Invalid project context JSON: %1").arg(storagePath);
+            *error = QStringLiteral("Invalid project context JSON: %1").arg(storage_path);
         }
         return false;
     }
 
     QJsonObject root = doc.object();
-    const Revision stored = storedProjectRevision(root);
-    const Revision current = currentRevision();
+    const revision_t stored = stored_project_revision(root);
+    const revision_t current = current_revision();
     bool changed = false;
 
-    if (((!stored.valid || stored.revisionString() != current.revisionString()) == true))
+    if (((!stored.valid || stored.revision_string() != current.revision_string()) == true))
     {
-        if (createProjectStateBackup(storagePath, root, stored, current, error) == false)
+        if (create_project_state_backup(storage_path, root, stored, current, error) == false)
         {
             return false;
         }
     }
 
-    const Revision migration_0_0_4_001 =
-        parseRevision(QStringLiteral("0.0.4"), QStringLiteral("-001"));
-    if (isOlder(stored, migration_0_0_4_001) == true)
+    const revision_t migration_0_0_4_001 =
+        parse_revision(QStringLiteral("0.0.4"), QStringLiteral("-001"));
+    if (is_older(stored, migration_0_0_4_001) == true)
     {
-        if (migrateProjectStateTo_0_0_4_001(storagePath, root, error) == false)
+        if (migrate_project_state_to_0_0_4_001(storage_path, root, error) == false)
         {
             return false;
         }
         changed = true;
     }
 
-    const Revision migration_0_0_5_002 =
-        parseRevision(QStringLiteral("0.0.5"), QStringLiteral("-002"));
-    if (isOlder(stored, migration_0_0_5_002) == true)
+    const revision_t migration_0_0_5_002 =
+        parse_revision(QStringLiteral("0.0.5"), QStringLiteral("-002"));
+    if (is_older(stored, migration_0_0_5_002) == true)
     {
-        changed = migrateProjectStateTo_0_0_5_002(root) || changed;
+        changed = migrate_project_state_to_0_0_5_002(root) || changed;
     }
 
-    const Revision migration_0_0_5_003 =
-        parseRevision(QStringLiteral("0.0.5"), QStringLiteral("-003"));
-    if (isOlder(stored, migration_0_0_5_003) == true)
+    const revision_t migration_0_0_5_003 =
+        parse_revision(QStringLiteral("0.0.5"), QStringLiteral("-003"));
+    if (is_older(stored, migration_0_0_5_003) == true)
     {
-        changed = migrateProjectStateTo_0_0_5_003(root) || changed;
+        changed = migrate_project_state_to_0_0_5_003(root) || changed;
     }
 
-    if (((!stored.valid || stored.revisionString() != current.revisionString()) == true))
+    if (((!stored.valid || stored.revision_string() != current.revision_string()) == true))
     {
-        stampProjectState(root);
+        stamp_project_state(root);
         changed = true;
     }
 
@@ -714,17 +719,17 @@ bool migrateProjectState(const QString &storagePath, QString *error)
         return true;
     }
 
-    return saveProjectRoot(storagePath, root, error);
+    return save_project_root(storage_path, root, error);
 }
 
-QString projectGoalFilePath(const QString &storagePath)
+QString project_goal_file_path(const QString &storage_path)
 {
-    return siblingFilePath(storagePath, QStringLiteral(".goal.txt"));
+    return sibling_file_path(storage_path, QStringLiteral(".goal.txt"));
 }
 
-QString projectActionsLogFilePath(const QString &storagePath)
+QString project_actions_log_file_path(const QString &storage_path)
 {
-    return siblingFilePath(storagePath, QStringLiteral(".actions-log.md"));
+    return sibling_file_path(storage_path, QStringLiteral(".actions-log.md"));
 }
 
 }  // namespace qcai2::Migration

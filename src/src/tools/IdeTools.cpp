@@ -13,7 +13,7 @@ namespace qcai2
 /**
  * Returns the JSON schema for open_file_at_location arguments.
  */
-QJsonObject OpenFileAtLocationTool::argsSchema() const
+QJsonObject open_file_at_location_tool_t::args_schema() const
 {
     return QJsonObject{{"path", QJsonObject{{"type", "string"}, {"required", true}}},
                        {"line", QJsonObject{{"type", "integer"}}},
@@ -26,22 +26,22 @@ QJsonObject OpenFileAtLocationTool::argsSchema() const
  * @param workDir Project root used for sandbox validation.
  * @return A short success message or an error string.
  */
-QString OpenFileAtLocationTool::execute(const QJsonObject &args, const QString &workDir)
+QString open_file_at_location_tool_t::execute(const QJsonObject &args, const QString &work_dir)
 {
-    const QString relPath = args.value("path").toString();
-    if (relPath.isEmpty() == true)
+    const QString rel_path = args.value("path").toString();
+    if (rel_path.isEmpty() == true)
     {
         return QStringLiteral("Error: 'path' argument is required.");
     }
 
-    const QString absPath = QDir(workDir).absoluteFilePath(relPath);
-    if (QFileInfo::exists(absPath) == false)
+    const QString abs_path = QDir(work_dir).absoluteFilePath(rel_path);
+    if (QFileInfo::exists(abs_path) == false)
     {
-        return QStringLiteral("Error: file does not exist: %1").arg(absPath);
+        return QStringLiteral("Error: file does not exist: %1").arg(abs_path);
     }
 
     // Sandbox check
-    if (((!QFileInfo(absPath).canonicalFilePath().startsWith(QDir(workDir).canonicalPath())) ==
+    if (((!QFileInfo(abs_path).canonicalFilePath().startsWith(QDir(work_dir).canonicalPath())) ==
          true))
     {
         return QStringLiteral("Error: path is outside the project directory.");
@@ -50,13 +50,13 @@ QString OpenFileAtLocationTool::execute(const QJsonObject &args, const QString &
     int line = args.value("line").toInt(0);
     int column = args.value("column").toInt(0);
 
-    Utils::Link link(Utils::FilePath::fromString(absPath), line, column);
+    Utils::Link link(Utils::FilePath::fromString(abs_path), line, column);
     // EditorManager::openEditorAt must be called on the main thread
     QMetaObject::invokeMethod(
         Core::EditorManager::instance(), [link]() { Core::EditorManager::openEditorAt(link); },
         Qt::QueuedConnection);
 
-    return QStringLiteral("Opened %1 at line %2.").arg(relPath).arg(line);
+    return QStringLiteral("Opened %1 at line %2.").arg(rel_path).arg(line);
 }
 
 }  // namespace qcai2

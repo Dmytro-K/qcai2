@@ -21,8 +21,8 @@ namespace qcai2::Diff
  * @param errorMsg Receives stderr or process error text on failure.
  * @return True when the patch command exits with code zero.
  */
-static bool runPatchCmd(const QString &unifiedDiff, const QString &workDir,
-                        const QStringList &extraArgs, QString &errorMsg);
+static bool run_patch_cmd(const QString &unifiedDiff, const QString &workDir,
+                          const QStringList &extraArgs, QString &errorMsg);
 
 QString normalize(const QString &unifiedDiff)
 {
@@ -88,9 +88,9 @@ QString normalize(const QString &unifiedDiff)
     return lines.join('\n');
 }
 
-ValidationResult validate(const QString &unifiedDiff, int maxLines, int maxFiles)
+validation_result_t validate(const QString &unifiedDiff, int maxLines, int maxFiles)
 {
-    ValidationResult r;
+    validation_result_t r;
     const QString normalizedDiff = normalize(unifiedDiff);
     if (((normalizedDiff.trimmed().isEmpty()) == true))
     {
@@ -130,20 +130,20 @@ ValidationResult validate(const QString &unifiedDiff, int maxLines, int maxFiles
         }
     }
 
-    r.linesChanged = changedLines;
-    r.filesChanged = static_cast<int>(files.size());
+    r.lines_changed = changedLines;
+    r.files_changed = static_cast<int>(files.size());
 
-    if (((r.filesChanged > maxFiles) == true))
+    if (((r.files_changed > maxFiles) == true))
     {
         r.error = QStringLiteral("Too many files changed: %1 (max %2)")
-                      .arg(r.filesChanged)
+                      .arg(r.files_changed)
                       .arg(maxFiles);
         return r;
     }
-    if (((r.linesChanged > maxLines) == true))
+    if (((r.lines_changed > maxLines) == true))
     {
         r.error = QStringLiteral("Too many lines changed: %1 (max %2)")
-                      .arg(r.linesChanged)
+                      .arg(r.lines_changed)
                       .arg(maxLines);
         return r;
     }
@@ -157,23 +157,24 @@ ValidationResult validate(const QString &unifiedDiff, int maxLines, int maxFiles
     return r;
 }
 
-static bool runPatchCmd(const QString &unifiedDiff, const QString &workDir,
-                        const QStringList &extraArgs, QString &errorMsg)
+static bool run_patch_cmd(const QString &unifiedDiff, const QString &workDir,
+                          const QStringList &extraArgs, QString &errorMsg)
 {
-    ProcessRunner runner;
+    process_runner_t runner;
     QStringList args = {"-p1"};
     args.append(extraArgs);
 
     auto result = runner.run(QStringLiteral("patch"), args, workDir, 15000, unifiedDiff);
     if (((!result.success) == true))
     {
-        errorMsg = result.stdErr.isEmpty() ? result.errorString : result.stdErr;
+        errorMsg = result.std_err.isEmpty() ? result.error_string : result.std_err;
         return false;
     }
     return true;
 }
 
-bool applyPatch(const QString &unifiedDiff, const QString &workDir, bool dryRun, QString &errorMsg)
+bool apply_patch(const QString &unifiedDiff, const QString &workDir, bool dryRun,
+                 QString &errorMsg)
 {
     const QString normalizedDiff = normalize(unifiedDiff);
     QStringList extra;
@@ -181,18 +182,18 @@ bool applyPatch(const QString &unifiedDiff, const QString &workDir, bool dryRun,
     {
         extra << QStringLiteral("--dry-run");
     }
-    return runPatchCmd(normalizedDiff, workDir, extra, errorMsg);
+    return run_patch_cmd(normalizedDiff, workDir, extra, errorMsg);
 }
 
-bool revertPatch(const QString &unifiedDiff, const QString &workDir, QString &errorMsg)
+bool revert_patch(const QString &unifiedDiff, const QString &workDir, QString &errorMsg)
 {
-    return runPatchCmd(normalize(unifiedDiff), workDir, {QStringLiteral("-R")}, errorMsg);
+    return run_patch_cmd(normalize(unifiedDiff), workDir, {QStringLiteral("-R")}, errorMsg);
 }
 
-NewFileResult extractAndCreateNewFiles(const QString &patchText, const QString &workDir,
-                                       bool dryRun)
+new_file_result_t extract_and_create_new_files(const QString &patchText, const QString &workDir,
+                                               bool dryRun)
 {
-    NewFileResult result;
+    new_file_result_t result;
 
     static const QRegularExpression newFileHeader(R"(^=== NEW FILE:\s*(.+?)\s*===$)");
 
@@ -265,10 +266,10 @@ NewFileResult extractAndCreateNewFiles(const QString &patchText, const QString &
             f.write(content.toUtf8());
         }
 
-        result.createdFiles.append(relPath);
+        result.created_files.append(relPath);
     }
 
-    result.remainingDiff = diffLines.join('\n');
+    result.remaining_diff = diffLines.join('\n');
     return result;
 }
 

@@ -13,7 +13,7 @@ using namespace qcai2;
 /**
  * @brief Verifies parsing and dispatch of dock-local slash commands.
  */
-class SlashCommandRegistryTest : public QObject
+class slash_command_registry_test_t : public QObject
 {
     Q_OBJECT
 
@@ -21,173 +21,175 @@ private slots:
     /**
      * @brief Exposes registered commands as `/`-prefixed completion items.
      */
-    void commandNames_returnsSlashPrefixedNames();
+    void command_names_returns_slash_prefixed_names();
 
     /**
      * @brief Leaves regular prompts untouched so they still go to the agent.
      */
-    void dispatch_nonSlashInput_isIgnored();
+    void dispatch_non_slash_input_is_ignored();
 
     /**
      * @brief Reports an actionable error when the slash command is not registered.
      */
-    void dispatch_unknownCommand_reportsError();
+    void dispatch_unknown_command_reports_error();
 
     /**
      * @brief Executes `/hello` and writes its output through the log callback.
      */
-    void dispatch_hello_logsHelloWorld();
+    void dispatch_hello_logs_hello_world();
 
     /**
      * @brief Allows test-only commands to auto-register through DECLARE_COMMAND.
      */
-    void dispatch_macroDeclaredCommand_isRegistered();
+    void dispatch_macro_declared_command_is_registered();
 
     /**
      * @brief Offers popup completions for slash commands at the beginning of the goal.
      */
-    void completionSession_leadingSlash_returnsMatchingCommands();
+    void completion_session_leading_slash_returns_matching_commands();
 
     /**
      * @brief Does not activate slash completions when `/` appears later in the goal.
      */
-    void completionSession_nonLeadingSlash_isIgnored();
+    void completion_session_non_leading_slash_is_ignored();
 
     /**
      * @brief Colors the leading slash command token with the link color.
      */
-    void highlightSpans_leadingSlashCommand_isBlue();
+    void highlight_spans_leading_slash_command_is_blue();
 
     /**
      * @brief Offers popup completions for # file references.
      */
-    void fileCompletion_hashPrefix_returnsMatchingFiles();
+    void file_completion_hash_prefix_returns_matching_files();
 
     /**
      * @brief Orders case-sensitive # file matches before case-insensitive ones.
      */
-    void fileCompletion_caseSensitiveMatches_areOrderedFirst();
+    void file_completion_case_sensitive_matches_are_ordered_first();
 
     /**
      * @brief Highlights # file references with a dedicated color.
      */
-    void fileHighlight_hashReference_isColored();
+    void file_highlight_hash_reference_is_colored();
 };
 
-void macroTestCommand(const SlashCommandInvocation &invocation, const SlashCommandContext &context)
+void macro_test_command(const slash_command_invocation_t &invocation,
+                        const slash_command_context_t &context)
 {
     Q_UNUSED(invocation);
 
-    if (context.logMessage)
+    if (context.log_message)
     {
-        context.logMessage(QStringLiteral("Macro test"));
+        context.log_message(QStringLiteral("Macro test"));
     }
 }
 
-DECLARE_COMMAND(macro_test, "Auto-registered test command.", macroTestCommand)
+DECLARE_COMMAND(macro_test, "Auto-registered test command.", macro_test_command)
 
-void SlashCommandRegistryTest::commandNames_returnsSlashPrefixedNames()
+void slash_command_registry_test_t::command_names_returns_slash_prefixed_names()
 {
-    SlashCommandRegistry registry;
+    slash_command_registry_t registry;
 
-    QCOMPARE(registry.commandNames(),
+    QCOMPARE(registry.command_names(),
              QStringList({QStringLiteral("/hello"), QStringLiteral("/macro_test")}));
 }
 
-void SlashCommandRegistryTest::dispatch_nonSlashInput_isIgnored()
+void slash_command_registry_test_t::dispatch_non_slash_input_is_ignored()
 {
-    SlashCommandRegistry registry;
+    slash_command_registry_t registry;
 
-    const SlashCommandDispatchResult result =
-        registry.dispatch(QStringLiteral("explain this file"), SlashCommandContext{});
+    const slash_command_dispatch_result_t result =
+        registry.dispatch(QStringLiteral("explain this file"), slash_command_context_t{});
 
-    QVERIFY(!result.isSlashCommand);
+    QVERIFY(!result.is_slash_command);
     QVERIFY(!result.executed);
-    QVERIFY(result.errorMessage.isEmpty());
+    QVERIFY(result.error_message.isEmpty());
 }
 
-void SlashCommandRegistryTest::dispatch_unknownCommand_reportsError()
+void slash_command_registry_test_t::dispatch_unknown_command_reports_error()
 {
-    SlashCommandRegistry registry;
+    slash_command_registry_t registry;
 
-    const SlashCommandDispatchResult result =
-        registry.dispatch(QStringLiteral("/missing something"), SlashCommandContext{});
+    const slash_command_dispatch_result_t result =
+        registry.dispatch(QStringLiteral("/missing something"), slash_command_context_t{});
 
-    QVERIFY(result.isSlashCommand);
+    QVERIFY(result.is_slash_command);
     QVERIFY(!result.executed);
-    QCOMPARE(result.commandName, QStringLiteral("missing"));
-    QCOMPARE(result.errorMessage, QStringLiteral("❌ Unknown slash command: /missing"));
+    QCOMPARE(result.command_name, QStringLiteral("missing"));
+    QCOMPARE(result.error_message, QStringLiteral("❌ Unknown slash command: /missing"));
 }
 
-void SlashCommandRegistryTest::dispatch_hello_logsHelloWorld()
+void slash_command_registry_test_t::dispatch_hello_logs_hello_world()
 {
-    SlashCommandRegistry registry;
-    QStringList logEntries;
+    slash_command_registry_t registry;
+    QStringList log_entries;
 
-    const SlashCommandDispatchResult result = registry.dispatch(
-        QStringLiteral("/hello"), SlashCommandContext{[&logEntries](const QString &message) {
-            logEntries.append(message);
+    const slash_command_dispatch_result_t result = registry.dispatch(
+        QStringLiteral("/hello"), slash_command_context_t{[&log_entries](const QString &message) {
+            log_entries.append(message);
         }});
 
-    QVERIFY(result.isSlashCommand);
+    QVERIFY(result.is_slash_command);
     QVERIFY(result.executed);
-    QCOMPARE(result.commandName, QStringLiteral("hello"));
-    QCOMPARE(logEntries, QStringList{QStringLiteral("Hello World")});
+    QCOMPARE(result.command_name, QStringLiteral("hello"));
+    QCOMPARE(log_entries, QStringList{QStringLiteral("Hello World")});
 }
 
-void SlashCommandRegistryTest::dispatch_macroDeclaredCommand_isRegistered()
+void slash_command_registry_test_t::dispatch_macro_declared_command_is_registered()
 {
-    SlashCommandRegistry registry;
-    QStringList logEntries;
+    slash_command_registry_t registry;
+    QStringList log_entries;
 
-    const SlashCommandDispatchResult result = registry.dispatch(
-        QStringLiteral("/macro_test"), SlashCommandContext{[&logEntries](const QString &message) {
-            logEntries.append(message);
-        }});
+    const slash_command_dispatch_result_t result =
+        registry.dispatch(QStringLiteral("/macro_test"),
+                          slash_command_context_t{[&log_entries](const QString &message) {
+                              log_entries.append(message);
+                          }});
 
-    QVERIFY(result.isSlashCommand);
+    QVERIFY(result.is_slash_command);
     QVERIFY(result.executed);
-    QCOMPARE(result.commandName, QStringLiteral("macro_test"));
-    QCOMPARE(logEntries, QStringList{QStringLiteral("Macro test")});
+    QCOMPARE(result.command_name, QStringLiteral("macro_test"));
+    QCOMPARE(log_entries, QStringList{QStringLiteral("Macro test")});
 }
 
-void SlashCommandRegistryTest::completionSession_leadingSlash_returnsMatchingCommands()
+void slash_command_registry_test_t::completion_session_leading_slash_returns_matching_commands()
 {
-    SlashCommandRegistry registry;
-    SlashCommandGoalHandler handler(&registry);
+    slash_command_registry_t registry;
+    slash_command_goal_handler_t handler(&registry);
 
-    const GoalCompletionSession session =
-        handler.completionSession({QStringLiteral("   /he arg"), 6});
+    const goal_completion_session_t session =
+        handler.completion_session({QStringLiteral("   /he arg"), 6});
 
     QVERIFY(session.active);
-    QCOMPARE(session.replaceStart, 3);
-    QCOMPARE(session.replaceEnd, 6);
+    QCOMPARE(session.replace_start, 3);
+    QCOMPARE(session.replace_end, 6);
     QCOMPARE(session.prefix, QStringLiteral("/he"));
     QCOMPARE(session.items.size(), 1);
     QCOMPARE(session.items.first().label, QStringLiteral("/hello"));
-    QCOMPARE(session.items.first().insertText, QStringLiteral("/hello"));
+    QCOMPARE(session.items.first().insert_text, QStringLiteral("/hello"));
 }
 
-void SlashCommandRegistryTest::completionSession_nonLeadingSlash_isIgnored()
+void slash_command_registry_test_t::completion_session_non_leading_slash_is_ignored()
 {
-    SlashCommandRegistry registry;
-    SlashCommandGoalHandler handler(&registry);
+    slash_command_registry_t registry;
+    slash_command_goal_handler_t handler(&registry);
 
-    const GoalCompletionSession session =
-        handler.completionSession({QStringLiteral("say /he"), 7});
+    const goal_completion_session_t session =
+        handler.completion_session({QStringLiteral("say /he"), 7});
 
     QVERIFY(!session.active);
     QVERIFY(session.items.isEmpty());
 }
 
-void SlashCommandRegistryTest::highlightSpans_leadingSlashCommand_isBlue()
+void slash_command_registry_test_t::highlight_spans_leading_slash_command_is_blue()
 {
-    SlashCommandRegistry registry;
-    SlashCommandGoalHandler handler(&registry);
+    slash_command_registry_t registry;
+    slash_command_goal_handler_t handler(&registry);
     const QPalette palette;
 
-    const QList<GoalHighlightSpan> spans =
-        handler.highlightSpans(QStringLiteral("  /hello world"), palette);
+    const QList<goal_highlight_span_t> spans =
+        handler.highlight_spans(QStringLiteral("  /hello world"), palette);
 
     QCOMPARE(spans.size(), 1);
     QCOMPARE(spans.first().start, 2);
@@ -195,32 +197,32 @@ void SlashCommandRegistryTest::highlightSpans_leadingSlashCommand_isBlue()
     QCOMPARE(spans.first().format.foreground().color(), palette.color(QPalette::Link));
 }
 
-void SlashCommandRegistryTest::fileCompletion_hashPrefix_returnsMatchingFiles()
+void slash_command_registry_test_t::file_completion_hash_prefix_returns_matching_files()
 {
-    FileReferenceGoalHandler handler(
+    file_reference_goal_handler_t handler(
         []() { return QStringList{QStringLiteral("src/main.cpp"), QStringLiteral("README.md")}; });
 
-    const GoalCompletionSession session =
-        handler.completionSession({QStringLiteral("Check #sr now"), 9});
+    const goal_completion_session_t session =
+        handler.completion_session({QStringLiteral("Check #sr now"), 9});
 
     QVERIFY(session.active);
-    QCOMPARE(session.replaceStart, 6);
-    QCOMPARE(session.replaceEnd, 9);
+    QCOMPARE(session.replace_start, 6);
+    QCOMPARE(session.replace_end, 9);
     QCOMPARE(session.prefix, QStringLiteral("#sr"));
     QCOMPARE(session.items.size(), 1);
     QCOMPARE(session.items.first().label, QStringLiteral("#src/main.cpp"));
-    QCOMPARE(session.items.first().insertText, QStringLiteral("#src/main.cpp"));
+    QCOMPARE(session.items.first().insert_text, QStringLiteral("#src/main.cpp"));
 }
 
-void SlashCommandRegistryTest::fileCompletion_caseSensitiveMatches_areOrderedFirst()
+void slash_command_registry_test_t::file_completion_case_sensitive_matches_are_ordered_first()
 {
-    FileReferenceGoalHandler handler([]() {
+    file_reference_goal_handler_t handler([]() {
         return QStringList{QStringLiteral("src/Main.cpp"), QStringLiteral("Src/main.cpp"),
                            QStringLiteral("src/main.cpp")};
     });
 
-    const GoalCompletionSession session =
-        handler.completionSession({QStringLiteral("Check #Ma now"), 9});
+    const goal_completion_session_t session =
+        handler.completion_session({QStringLiteral("Check #Ma now"), 9});
 
     QVERIFY(session.active);
     QCOMPARE(session.items.size(), 3);
@@ -229,13 +231,13 @@ void SlashCommandRegistryTest::fileCompletion_caseSensitiveMatches_areOrderedFir
     QCOMPARE(session.items.at(2).label, QStringLiteral("#src/main.cpp"));
 }
 
-void SlashCommandRegistryTest::fileHighlight_hashReference_isColored()
+void slash_command_registry_test_t::file_highlight_hash_reference_is_colored()
 {
-    FileReferenceGoalHandler handler([]() { return QStringList{}; });
+    file_reference_goal_handler_t handler([]() { return QStringList{}; });
     const QPalette palette;
 
-    const QList<GoalHighlightSpan> spans =
-        handler.highlightSpans(QStringLiteral("Use #src/main.cpp please"), palette);
+    const QList<goal_highlight_span_t> spans =
+        handler.highlight_spans(QStringLiteral("Use #src/main.cpp please"), palette);
 
     QCOMPARE(spans.size(), 1);
     QCOMPARE(spans.first().start, 4);
@@ -243,6 +245,6 @@ void SlashCommandRegistryTest::fileHighlight_hashReference_isColored()
     QVERIFY(spans.first().format.foreground().color().isValid());
 }
 
-QTEST_APPLESS_MAIN(SlashCommandRegistryTest)
+QTEST_APPLESS_MAIN(slash_command_registry_test_t)
 
 #include "tst_slash_commands.moc"

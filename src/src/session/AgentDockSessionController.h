@@ -1,4 +1,4 @@
-/*! Declares project-session persistence used by AgentDockWidget. */
+/*! Declares project-session persistence used by agent_dock_widget_t. */
 #pragma once
 
 #include <qtmcp/ServerDefinition.h>
@@ -14,45 +14,45 @@ class QTimer;
 namespace qcai2
 {
 
-class AgentDockWidget;
-class ChatContextManager;
+class agent_dock_widget_t;
+class chat_context_manager_t;
 
-class AgentDockSessionController
+class agent_dock_session_controller_t
 {
 public:
-    explicit AgentDockSessionController(AgentDockWidget &dock,
-                                        ChatContextManager *chatContextManager);
-    ~AgentDockSessionController();
+    explicit agent_dock_session_controller_t(agent_dock_widget_t &dock,
+                                             chat_context_manager_t *chat_context_manager);
+    ~agent_dock_session_controller_t();
 
-    void saveChat();
-    void restoreChat();
-    void refreshProjectSelector();
-    void switchProjectContext(const QString &projectFilePath);
-    void startNewConversation();
+    void save_chat();
+    void restore_chat();
+    void refresh_project_selector();
+    void switch_project_context(const QString &project_file_path);
+    void start_new_conversation();
 
-    QString currentProjectFilePath() const;
-    QString currentProjectStorageFilePath() const;
-    QString legacyProjectStorageFilePath() const;
-    QStringList currentSessionWatchPaths() const;
-    QString currentProjectDir() const;
-    const qtmcp::ServerDefinitions &projectMcpServers() const;
+    QString current_project_file_path() const;
+    QString current_project_storage_file_path() const;
+    QString legacy_project_storage_file_path() const;
+    QStringList current_session_watch_paths() const;
+    QString current_project_dir() const;
+    const qtmcp::server_definitions_t &project_mcp_servers() const;
 
-    void applyProjectUiDefaults();
-    void migrateLegacySessionFiles();
-    void updateSessionFileWatcher();
-    void reloadSessionFromDisk();
+    void apply_project_ui_defaults();
+    void migrate_legacy_session_files();
+    void update_session_file_watcher();
+    void reload_session_from_disk();
 
 private:
-    QString projectDirForPath(const QString &projectFilePath) const;
+    QString project_dir_for_path(const QString &project_file_path) const;
 
-    AgentDockWidget &m_dock;
-    ChatContextManager *m_chatContextManager = nullptr;
-    QString m_activeProjectFilePath;
-    QString m_activeConversationId;
-    qtmcp::ServerDefinitions m_projectMcpServers;
-    std::unique_ptr<QFileSystemWatcher> m_sessionFileWatcher;
-    std::unique_ptr<QTimer> m_sessionReloadTimer;
-    bool m_sessionStoragePresent = false;
+    agent_dock_widget_t &dock;
+    chat_context_manager_t *chat_context_manager = nullptr;
+    QString active_project_file_path;
+    QString active_conversation_id;
+    qtmcp::server_definitions_t current_project_mcp_servers;
+    std::unique_ptr<QFileSystemWatcher> session_file_watcher;
+    std::unique_ptr<QTimer> session_reload_timer;
+    bool session_storage_present = false;
 };
 
 }  // namespace qcai2

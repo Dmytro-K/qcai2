@@ -10,30 +10,31 @@
 namespace qcai2
 {
 
-enum class AgentStatusRenderMode : std::uint8_t
+enum class agent_status_render_mode_t : std::uint8_t
 {
-    Interactive,
-    NonInteractive
+    INTERACTIVE,
+    NON_INTERACTIVE
 };
 
-struct AgentStatusRenderUpdate
+struct agent_status_render_update_t
 {
-    bool statusChanged = false;
-    QString statusText;
-    QString stableLogLine;
+    bool status_changed = false;
+    QString status_text;
+    QString stable_log_line;
 };
 
-class AgentStatusRenderer
+class agent_status_renderer_t
 {
 public:
-    explicit AgentStatusRenderer(AgentStatusRenderMode mode = AgentStatusRenderMode::Interactive);
+    explicit agent_status_renderer_t(
+        agent_status_render_mode_t mode = agent_status_render_mode_t::INTERACTIVE);
 
-    AgentStatusRenderUpdate render(const AgentStatusSnapshot &status);
-    QString currentText() const;
+    agent_status_render_update_t render(const agent_status_snapshot_t &status);
+    QString current_text() const;
 
 private:
-    AgentStatusRenderMode m_mode = AgentStatusRenderMode::Interactive;
-    QString m_lastRenderedText;
+    agent_status_render_mode_t mode = agent_status_render_mode_t::INTERACTIVE;
+    QString last_rendered_text;
 };
 
 }  // namespace qcai2

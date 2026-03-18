@@ -205,16 +205,16 @@ bool jsonRequestIdMatches(const QJsonValue &id, qint64 expectedId)
     return false;
 }
 
-qtmcp::ServerDefinitions loadProjectServerDefinitions(const QString &projectDir,
-                                                      QStringList *messages)
+qtmcp::server_definitions_t load_project_server_definitions(const QString &project_dir,
+                                                            QStringList *messages)
 {
-    qtmcp::ServerDefinitions definitions;
-    if (((projectDir.trimmed().isEmpty()) == true))
+    qtmcp::server_definitions_t definitions;
+    if (((project_dir.trimmed().isEmpty()) == true))
     {
         return definitions;
     }
 
-    const QString storagePath = QDir(projectDir).filePath(QStringLiteral(".qcai2/session.json"));
+    const QString storagePath = QDir(project_dir).filePath(QStringLiteral(".qcai2/session.json"));
     if (QFileInfo::exists(storagePath) == false)
     {
         return definitions;
@@ -260,7 +260,7 @@ qtmcp::ServerDefinitions loadProjectServerDefinitions(const QString &projectDir,
     }
 
     QString error;
-    if (!qtmcp::serverDefinitionsFromJson(mcpServersValue.toObject(), &definitions, &error))
+    if (!qtmcp::server_definitions_from_json(mcpServersValue.toObject(), &definitions, &error))
     {
         if (messages != nullptr)
         {
@@ -304,14 +304,14 @@ QString expandEnvironmentPlaceholders(const QString &value, const QString &serve
     return resolved;
 }
 
-QString extraFieldString(const QJsonObject &extraFields, const QString &name)
+QString extraFieldString(const QJsonObject &extra_fields, const QString &name)
 {
-    return extraFields.value(name).toString().trimmed();
+    return extra_fields.value(name).toString().trimmed();
 }
 
-bool extraFieldBool(const QJsonObject &extraFields, const QString &name, bool fallback)
+bool extraFieldBool(const QJsonObject &extra_fields, const QString &name, bool fallback)
 {
-    const QJsonValue value = extraFields.value(name);
+    const QJsonValue value = extra_fields.value(name);
     if (value.isBool())
     {
         return value.toBool();
@@ -319,10 +319,10 @@ bool extraFieldBool(const QJsonObject &extraFields, const QString &name, bool fa
     return fallback;
 }
 
-QStringList extraFieldStringList(const QJsonObject &extraFields, const QString &name)
+QStringList extraFieldStringList(const QJsonObject &extra_fields, const QString &name)
 {
     QStringList values;
-    const QJsonValue value = extraFields.value(name);
+    const QJsonValue value = extra_fields.value(name);
     if (value.isString())
     {
         const QStringList parts =
@@ -353,7 +353,7 @@ QStringList extraFieldStringList(const QJsonObject &extraFields, const QString &
     return values;
 }
 
-struct RpcResult
+struct rpc_result_t
 {
     bool finished = false;
     bool protocolError = false;
@@ -363,7 +363,7 @@ struct RpcResult
     QJsonValue errorData;
 };
 
-struct RemoteTool
+struct remote_tool_t
 {
     QString serverName;
     QString toolName;
@@ -372,68 +372,69 @@ struct RemoteTool
     QJsonObject inputSchema;
 };
 
-struct ServerSession
+struct server_session_t
 {
     QString serverName;
-    qtmcp::ServerDefinition definition;
-    std::unique_ptr<qtmcp::Client> client;
+    qtmcp::server_definition_t definition;
+    std::unique_ptr<qtmcp::client_t> client;
     QString negotiatedProtocolVersion;
     QJsonObject capabilities;
-    QMap<QString, RemoteTool> toolsByExposedName;
+    QMap<QString, remote_tool_t> toolsByExposedName;
     QStringList recentLogLines;
 };
 
-class McpDynamicTool final : public ITool
+class mcp_dynamic_tool_t final : public i_tool_t
 {
 public:
-    McpDynamicTool(McpToolManager *manager, RemoteTool metadata)
-        : m_manager(manager), m_metadata(std::move(metadata))
+    mcp_dynamic_tool_t(mcp_tool_manager_t *manager, remote_tool_t metadata)
+        : manager(manager), metadata(std::move(metadata))
     {
     }
 
     QString name() const override
     {
-        return m_metadata.exposedName;
+        return this->metadata.exposedName;
     }
 
     QString description() const override
     {
-        if (m_metadata.description.trimmed().isEmpty())
+        if (this->metadata.description.trimmed().isEmpty())
         {
             return QStringLiteral("Remote MCP tool `%1` from server `%2`.")
-                .arg(m_metadata.toolName, m_metadata.serverName);
+                .arg(this->metadata.toolName, this->metadata.serverName);
         }
 
         return QStringLiteral("Remote MCP tool `%1` from server `%2`: %3")
-            .arg(m_metadata.toolName, m_metadata.serverName, m_metadata.description.trimmed());
+            .arg(this->metadata.toolName, this->metadata.serverName,
+                 this->metadata.description.trimmed());
     }
 
-    QJsonObject argsSchema() const override
+    QJsonObject args_schema() const override
     {
-        return m_metadata.inputSchema.isEmpty() ? QJsonObject{{"type", "object"}}
-                                                : m_metadata.inputSchema;
+        return this->metadata.inputSchema.isEmpty() ? QJsonObject{{"type", "object"}}
+                                                    : this->metadata.inputSchema;
     }
 
     QString execute(const QJsonObject &args, const QString &) override
     {
-        if (m_manager == nullptr)
+        if (this->manager == nullptr)
         {
             return QStringLiteral("Error: MCP runtime manager is unavailable.");
         }
-        return m_manager->executeTool(m_metadata.exposedName, args);
+        return this->manager->execute_tool(this->metadata.exposedName, args);
     }
 
 private:
-    QPointer<McpToolManager> m_manager;
-    RemoteTool m_metadata;
+    QPointer<mcp_tool_manager_t> manager;
+    remote_tool_t metadata;
 };
 
 }  // namespace
 
-class McpToolManager::Impl
+class mcp_tool_manager_t::impl_t
 {
 public:
-    explicit Impl(ToolRegistry *toolRegistry) : registry(toolRegistry)
+    explicit impl_t(tool_registry_t *toolRegistry) : registry(toolRegistry)
     {
     }
 
@@ -443,7 +444,7 @@ public:
         {
             for (const QString &toolName : std::as_const(registeredToolNames))
             {
-                registry->unregisterTool(toolName);
+                registry->unregister_tool(toolName);
             }
         }
 
@@ -459,7 +460,7 @@ public:
         sessions.clear();
     }
 
-    static bool waitForConnection(qtmcp::Client *client, int timeoutMs, QString *error)
+    static bool waitForConnection(qtmcp::client_t *client, int timeoutMs, QString *error)
     {
         if (client == nullptr)
         {
@@ -469,7 +470,7 @@ public:
             }
             return false;
         }
-        if (client->isConnected())
+        if (client->is_connected())
         {
             return true;
         }
@@ -482,17 +483,18 @@ public:
         QString failure;
 
         const auto connectedConnection =
-            QObject::connect(client, &qtmcp::Client::connected, &loop, [&]() {
+            QObject::connect(client, &qtmcp::client_t::connected, &loop, [&]() {
                 connected = true;
                 loop.quit();
             });
-        const auto errorConnection = QObject::connect(
-            client, &qtmcp::Client::transportErrorOccurred, &loop, [&](const QString &message) {
-                failure = message;
-                loop.quit();
-            });
+        const auto errorConnection =
+            QObject::connect(client, &qtmcp::client_t::transport_error_occurred, &loop,
+                             [&](const QString &message) {
+                                 failure = message;
+                                 loop.quit();
+                             });
         const auto disconnectedConnection =
-            QObject::connect(client, &qtmcp::Client::disconnected, &loop, [&]() {
+            QObject::connect(client, &qtmcp::client_t::disconnected, &loop, [&]() {
                 if (!connected)
                 {
                     failure = QStringLiteral("MCP server disconnected during startup.");
@@ -503,7 +505,7 @@ public:
 
         timer.start(timeoutMs);
         client->start();
-        if ((connected == false) && failure.isEmpty() && (client->isConnected() == false))
+        if ((connected == false) && failure.isEmpty() && (client->is_connected() == false))
         {
             loop.exec();
         }
@@ -528,10 +530,10 @@ public:
         return false;
     }
 
-    static RpcResult sendRequestSync(qtmcp::Client *client, const QString &method,
-                                     const QJsonValue &params, int timeoutMs)
+    static rpc_result_t sendRequestSync(qtmcp::client_t *client, const QString &method,
+                                        const QJsonValue &params, int timeoutMs)
     {
-        RpcResult rpcResult;
+        rpc_result_t rpcResult;
         if (client == nullptr)
         {
             rpcResult.protocolError = true;
@@ -539,7 +541,7 @@ public:
             return rpcResult;
         }
 
-        const qint64 requestId = client->sendRequest(method, params);
+        const qint64 requestId = client->send_request(method, params);
         if (requestId <= 0)
         {
             rpcResult.protocolError = true;
@@ -553,7 +555,7 @@ public:
         timer.setSingleShot(true);
 
         const auto responseConnection =
-            QObject::connect(client, &qtmcp::Client::responseReceived, &loop,
+            QObject::connect(client, &qtmcp::client_t::response_received, &loop,
                              [&](const QJsonValue &id, const QJsonValue &result) {
                                  if (!jsonRequestIdMatches(id, requestId))
                                  {
@@ -564,7 +566,7 @@ public:
                                  loop.quit();
                              });
         const auto errorResponseConnection = QObject::connect(
-            client, &qtmcp::Client::errorResponseReceived, &loop,
+            client, &qtmcp::client_t::error_response_received, &loop,
             [&](const QJsonValue &id, int code, const QString &message, const QJsonValue &data) {
                 if (!jsonRequestIdMatches(id, requestId))
                 {
@@ -577,14 +579,15 @@ public:
                 rpcResult.errorData = data;
                 loop.quit();
             });
-        const auto transportErrorConnection = QObject::connect(
-            client, &qtmcp::Client::transportErrorOccurred, &loop, [&](const QString &message) {
-                rpcResult.protocolError = true;
-                rpcResult.errorMessage = message;
-                loop.quit();
-            });
+        const auto transportErrorConnection =
+            QObject::connect(client, &qtmcp::client_t::transport_error_occurred, &loop,
+                             [&](const QString &message) {
+                                 rpcResult.protocolError = true;
+                                 rpcResult.errorMessage = message;
+                                 loop.quit();
+                             });
         const auto disconnectedConnection =
-            QObject::connect(client, &qtmcp::Client::disconnected, &loop, [&]() {
+            QObject::connect(client, &qtmcp::client_t::disconnected, &loop, [&]() {
                 if (!rpcResult.finished)
                 {
                     rpcResult.protocolError = true;
@@ -615,7 +618,7 @@ public:
         return rpcResult;
     }
 
-    static QString formatRpcError(const RpcResult &rpcResult)
+    static QString formatRpcError(const rpc_result_t &rpcResult)
     {
         QString message = rpcResult.errorMessage.trimmed();
         if (message.isEmpty())
@@ -655,7 +658,7 @@ public:
         return combined.trimmed();
     }
 
-    static QString recentLogsSuffix(const ServerSession &session)
+    static QString recentLogsSuffix(const server_session_t &session)
     {
         if (session.recentLogLines.isEmpty())
         {
@@ -666,27 +669,27 @@ public:
             .arg(session.recentLogLines.join(QLatin1Char('\n')));
     }
 
-    ToolRegistry *registry = nullptr;
-    QMap<QString, std::shared_ptr<ServerSession>> sessions;
+    tool_registry_t *registry = nullptr;
+    QMap<QString, std::shared_ptr<server_session_t>> sessions;
     QStringList registeredToolNames;
 };
 
-McpToolManager::McpToolManager(ToolRegistry *toolRegistry, QObject *parent)
-    : QObject(parent), m_impl(std::make_unique<Impl>(toolRegistry))
+mcp_tool_manager_t::mcp_tool_manager_t(tool_registry_t *toolRegistry, QObject *parent)
+    : QObject(parent), impl(std::make_unique<impl_t>(toolRegistry))
 {
 }
 
-McpToolManager::~McpToolManager() = default;
+mcp_tool_manager_t::~mcp_tool_manager_t() = default;
 
-QStringList McpToolManager::refreshForProject(const QString &projectDir)
+QStringList mcp_tool_manager_t::refresh_for_project(const QString &project_dir)
 {
     QStringList messages;
 
-    m_impl->clearDynamicTools();
+    this->impl->clearDynamicTools();
 
-    qtmcp::ServerDefinitions mergedDefinitions = settings().mcpServers;
-    const qtmcp::ServerDefinitions projectDefinitions =
-        loadProjectServerDefinitions(projectDir, &messages);
+    qtmcp::server_definitions_t mergedDefinitions = settings().mcp_servers;
+    const qtmcp::server_definitions_t projectDefinitions =
+        load_project_server_definitions(project_dir, &messages);
     for (auto it = projectDefinitions.begin(); it != projectDefinitions.end(); ++it)
     {
         mergedDefinitions.insert(it.key(), it.value());
@@ -699,7 +702,7 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
     for (auto defIt = mergedDefinitions.begin(); defIt != mergedDefinitions.end(); ++defIt)
     {
         const QString serverName = defIt.key();
-        const qtmcp::ServerDefinition &definition = defIt.value();
+        const qtmcp::server_definition_t &definition = defIt.value();
 
         if (!definition.enabled)
         {
@@ -737,36 +740,36 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             continue;
         }
 
-        auto session = std::make_shared<ServerSession>();
+        auto session = std::make_shared<server_session_t>();
         session->serverName = serverName;
         session->definition = definition;
-        session->client = std::make_unique<qtmcp::Client>();
+        session->client = std::make_unique<qtmcp::client_t>();
 
         const QProcessEnvironment processEnvironment = QProcessEnvironment::systemEnvironment();
-        QString protocolVersion;
+        QString protocol_version;
         if (definition.transport == QStringLiteral("stdio"))
         {
-            qtmcp::StdioTransportConfig transportConfig;
+            qtmcp::stdio_transport_config_t transportConfig;
             transportConfig.program = definition.command;
             transportConfig.arguments = definition.args;
-            transportConfig.workingDirectory = projectDir;
+            transportConfig.workingDirectory = project_dir;
             transportConfig.environment = processEnvironment;
             for (auto envIt = definition.env.begin(); envIt != definition.env.end(); ++envIt)
             {
                 transportConfig.environment.insert(envIt.key(), envIt.value());
             }
 
-            session->client->setTransport(
-                std::make_unique<qtmcp::StdioTransport>(std::move(transportConfig)));
-            protocolVersion = QString::fromLatin1(kMcpProtocolVersionStdio);
+            session->client->set_transport(
+                std::make_unique<qtmcp::stdio_transport_t>(std::move(transportConfig)));
+            protocol_version = QString::fromLatin1(kMcpProtocolVersionStdio);
         }
         else if (definition.transport == QStringLiteral("sse"))
         {
-            qtmcp::SseTransportConfig transportConfig;
+            qtmcp::sse_transport_config_t transportConfig;
             transportConfig.endpoint = QUrl(expandEnvironmentPlaceholders(
                 definition.url, serverName, QStringLiteral("the endpoint URL"), processEnvironment,
                 &messages));
-            transportConfig.requestTimeoutMs = definition.requestTimeoutMs;
+            transportConfig.request_timeout_ms = definition.request_timeout_ms;
             for (auto headerIt = definition.headers.begin(); headerIt != definition.headers.end();
                  ++headerIt)
             {
@@ -777,34 +780,34 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
                                         processEnvironment, &messages));
             }
 
-            session->client->setTransport(
-                std::make_unique<qtmcp::SseTransport>(std::move(transportConfig)));
-            protocolVersion = QString::fromLatin1(kMcpProtocolVersionSse);
+            session->client->set_transport(
+                std::make_unique<qtmcp::sse_transport_t>(std::move(transportConfig)));
+            protocol_version = QString::fromLatin1(kMcpProtocolVersionSse);
         }
         else
         {
-            qtmcp::HttpTransportConfig transportConfig;
+            qtmcp::http_transport_config_t transportConfig;
             transportConfig.endpoint = QUrl(expandEnvironmentPlaceholders(
                 definition.url, serverName, QStringLiteral("the endpoint URL"), processEnvironment,
                 &messages));
-            transportConfig.protocolVersion = QString::fromLatin1(kMcpProtocolVersionHttp);
-            transportConfig.requestTimeoutMs = definition.requestTimeoutMs;
-            transportConfig.oauthEnabled =
-                extraFieldBool(definition.extraFields, QStringLiteral("oauthEnabled"),
+            transportConfig.protocol_version = QString::fromLatin1(kMcpProtocolVersionHttp);
+            transportConfig.request_timeout_ms = definition.request_timeout_ms;
+            transportConfig.oauth_enabled =
+                extraFieldBool(definition.extra_fields, QStringLiteral("oauthEnabled"),
                                definition.headers.isEmpty());
-            transportConfig.oauthClientId =
-                extraFieldString(definition.extraFields, QStringLiteral("oauthClientId"));
-            transportConfig.oauthClientSecret = expandEnvironmentPlaceholders(
-                extraFieldString(definition.extraFields, QStringLiteral("oauthClientSecret")),
+            transportConfig.oauth_client_id =
+                extraFieldString(definition.extra_fields, QStringLiteral("oauthClientId"));
+            transportConfig.oauth_client_secret = expandEnvironmentPlaceholders(
+                extraFieldString(definition.extra_fields, QStringLiteral("oauthClientSecret")),
                 serverName, QStringLiteral("oauthClientSecret"), processEnvironment, &messages);
-            transportConfig.oauthClientName =
-                extraFieldString(definition.extraFields, QStringLiteral("oauthClientName"));
-            if (transportConfig.oauthClientName.isEmpty())
+            transportConfig.oauth_client_name =
+                extraFieldString(definition.extra_fields, QStringLiteral("oauthClientName"));
+            if (transportConfig.oauth_client_name.isEmpty())
             {
-                transportConfig.oauthClientName = QStringLiteral("qcai2");
+                transportConfig.oauth_client_name = QStringLiteral("qcai2");
             }
-            transportConfig.oauthScopes =
-                extraFieldStringList(definition.extraFields, QStringLiteral("oauthScopes"));
+            transportConfig.oauth_scopes =
+                extraFieldStringList(definition.extra_fields, QStringLiteral("oauthScopes"));
             for (auto headerIt = definition.headers.begin(); headerIt != definition.headers.end();
                  ++headerIt)
             {
@@ -815,11 +818,11 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
                                         processEnvironment, &messages));
             }
 
-            session->client->setTransport(
-                std::make_unique<qtmcp::HttpTransport>(std::move(transportConfig)));
-            protocolVersion = QString::fromLatin1(kMcpProtocolVersionHttp);
+            session->client->set_transport(
+                std::make_unique<qtmcp::http_transport_t>(std::move(transportConfig)));
+            protocol_version = QString::fromLatin1(kMcpProtocolVersionHttp);
         }
-        QObject::connect(session->client.get(), &qtmcp::Client::transportLogMessage, this,
+        QObject::connect(session->client.get(), &qtmcp::client_t::transport_log_message, this,
                          [serverName, sessionPtr = session.get()](const QString &message) {
                              const QString trimmed = message.trimmed();
                              if (!trimmed.isEmpty())
@@ -834,8 +837,8 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
                          });
 
         QString startupError;
-        if (!Impl::waitForConnection(session->client.get(), definition.startupTimeoutMs,
-                                     &startupError))
+        if (!impl_t::waitForConnection(session->client.get(), definition.startup_timeout_ms,
+                                       &startupError))
         {
             messages.append(
                 QStringLiteral("⚠ MCP: failed to start `%1`: %2").arg(serverName, startupError));
@@ -843,19 +846,19 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
         }
 
         const QJsonObject initializeParams{
-            {QStringLiteral("protocolVersion"), protocolVersion},
+            {QStringLiteral("protocolVersion"), protocol_version},
             {QStringLiteral("capabilities"), QJsonObject{}},
             {QStringLiteral("clientInfo"),
              QJsonObject{{QStringLiteral("name"), QStringLiteral("qcai2")},
-                         {QStringLiteral("version"), Migration::currentRevisionString()}}}};
-        const RpcResult initializeResult =
-            Impl::sendRequestSync(session->client.get(), QStringLiteral("initialize"),
-                                  initializeParams, definition.requestTimeoutMs);
+                         {QStringLiteral("version"), Migration::current_revision_string()}}}};
+        const rpc_result_t initializeResult =
+            impl_t::sendRequestSync(session->client.get(), QStringLiteral("initialize"),
+                                    initializeParams, definition.request_timeout_ms);
         if (initializeResult.protocolError)
         {
             messages.append(QStringLiteral("⚠ MCP: initialize failed for `%1`: %2")
-                                .arg(serverName, Impl::formatRpcError(initializeResult) +
-                                                     Impl::recentLogsSuffix(*session)));
+                                .arg(serverName, impl_t::formatRpcError(initializeResult) +
+                                                     impl_t::recentLogsSuffix(*session)));
             session->client->stop();
             continue;
         }
@@ -880,7 +883,7 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             continue;
         }
 
-        session->client->sendNotification(QStringLiteral("notifications/initialized"));
+        session->client->send_notification(QStringLiteral("notifications/initialized"));
 
         QJsonArray collectedTools;
         QString nextCursor;
@@ -894,15 +897,15 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
                 listParams.insert(QStringLiteral("cursor"), nextCursor);
             }
 
-            const RpcResult listResult =
-                Impl::sendRequestSync(session->client.get(), QStringLiteral("tools/list"),
-                                      listParams.isEmpty() ? QJsonValue() : QJsonValue(listParams),
-                                      definition.requestTimeoutMs);
+            const rpc_result_t listResult = impl_t::sendRequestSync(
+                session->client.get(), QStringLiteral("tools/list"),
+                listParams.isEmpty() ? QJsonValue() : QJsonValue(listParams),
+                definition.request_timeout_ms);
             if (listResult.protocolError)
             {
                 messages.append(QStringLiteral("⚠ MCP: tools/list failed for `%1`: %2")
-                                    .arg(serverName, Impl::formatRpcError(listResult) +
-                                                         Impl::recentLogsSuffix(*session)));
+                                    .arg(serverName, impl_t::formatRpcError(listResult) +
+                                                         impl_t::recentLogsSuffix(*session)));
                 collectedTools = {};
                 break;
             }
@@ -967,7 +970,7 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
                 continue;
             }
 
-            RemoteTool remoteTool;
+            remote_tool_t remoteTool;
             remoteTool.serverName = serverName;
             remoteTool.toolName = toolName;
             remoteTool.description = toolObject.value(QStringLiteral("description")).toString();
@@ -976,10 +979,11 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
             usedExposedNames.insert(remoteTool.exposedName);
 
             session->toolsByExposedName.insert(remoteTool.exposedName, remoteTool);
-            if (m_impl->registry != nullptr)
+            if (this->impl->registry != nullptr)
             {
-                m_impl->registry->registerTool(std::make_shared<McpDynamicTool>(this, remoteTool));
-                m_impl->registeredToolNames.append(remoteTool.exposedName);
+                this->impl->registry->register_tool(
+                    std::make_shared<mcp_dynamic_tool_t>(this, remoteTool));
+                this->impl->registeredToolNames.append(remoteTool.exposedName);
             }
             ++registeredForServer;
         }
@@ -997,7 +1001,7 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
                             .arg(serverName)
                             .arg(registeredForServer));
         loadedToolCount += registeredForServer;
-        m_impl->sessions.insert(serverName, session);
+        this->impl->sessions.insert(serverName, session);
     }
 
     if (enabledServerCount > 0 && loadedToolCount == 0)
@@ -1010,9 +1014,10 @@ QStringList McpToolManager::refreshForProject(const QString &projectDir)
     return messages;
 }
 
-QString McpToolManager::executeTool(const QString &exposedToolName, const QJsonObject &args) const
+QString mcp_tool_manager_t::execute_tool(const QString &exposedToolName,
+                                         const QJsonObject &args) const
 {
-    for (auto sessionIt = m_impl->sessions.begin(); sessionIt != m_impl->sessions.end();
+    for (auto sessionIt = this->impl->sessions.begin(); sessionIt != this->impl->sessions.end();
          ++sessionIt)
     {
         const auto toolIt = sessionIt.value()->toolsByExposedName.find(exposedToolName);
@@ -1021,17 +1026,18 @@ QString McpToolManager::executeTool(const QString &exposedToolName, const QJsonO
             continue;
         }
 
-        const RemoteTool &remoteTool = toolIt.value();
-        const RpcResult callResult =
-            Impl::sendRequestSync(sessionIt.value()->client.get(), QStringLiteral("tools/call"),
-                                  QJsonObject{{QStringLiteral("name"), remoteTool.toolName},
-                                              {QStringLiteral("arguments"), args}},
-                                  sessionIt.value()->definition.requestTimeoutMs);
+        const remote_tool_t &remoteTool = toolIt.value();
+        const rpc_result_t callResult =
+            impl_t::sendRequestSync(sessionIt.value()->client.get(), QStringLiteral("tools/call"),
+                                    QJsonObject{{QStringLiteral("name"), remoteTool.toolName},
+                                                {QStringLiteral("arguments"), args}},
+                                    sessionIt.value()->definition.request_timeout_ms);
 
         if (callResult.protocolError)
         {
             return QStringLiteral("Error: MCP tool `%1` on server `%2` failed: %3")
-                .arg(remoteTool.toolName, remoteTool.serverName, Impl::formatRpcError(callResult));
+                .arg(remoteTool.toolName, remoteTool.serverName,
+                     impl_t::formatRpcError(callResult));
         }
 
         if (!callResult.result.isObject())
@@ -1042,7 +1048,7 @@ QString McpToolManager::executeTool(const QString &exposedToolName, const QJsonO
         }
 
         const QJsonObject resultObject = callResult.result.toObject();
-        const QString flattened = Impl::flattenCallResult(resultObject);
+        const QString flattened = impl_t::flattenCallResult(resultObject);
         const bool isError = resultObject.value(QStringLiteral("isError")).toBool(false);
 
         if (isError)

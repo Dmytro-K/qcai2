@@ -50,6 +50,14 @@ if (ready)
 - Keep pointer alignment consistent with the formatter (`Type *name`).
 - Prefer scoped, strongly typed helpers over loose global utilities.
 
+## Naming and Member Access
+
+- Do not use the `m_` prefix for class fields.
+- Use `snake_case` for fields, variables, functions, and methods.
+- Use `snake_case_t` for classes, structs, enums, aliases, and other types.
+- Use `UPPER_CASE` with underscores between words for enum values and `#define` constants.
+- Inside member functions, access fields and methods through `this->...`.
+
 ## Error Handling
 
 - Surface errors explicitly; do not swallow failures silently.

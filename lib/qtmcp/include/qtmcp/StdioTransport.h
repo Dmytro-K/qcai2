@@ -12,7 +12,7 @@ class QProcess;
 namespace qtmcp
 {
 
-struct StdioTransportConfig
+struct stdio_transport_config_t
 {
     QString program;
     QStringList arguments;
@@ -20,32 +20,32 @@ struct StdioTransportConfig
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
 };
 
-class StdioTransport final : public Transport
+class stdio_transport_t final : public transport_t
 {
     Q_OBJECT
 
 public:
-    explicit StdioTransport(StdioTransportConfig config, QObject *parent = nullptr);
-    ~StdioTransport() override;
+    explicit stdio_transport_t(stdio_transport_config_t config, QObject *parent = nullptr);
+    ~stdio_transport_t() override;
 
-    QString transportName() const override;
-    State state() const override;
-    const StdioTransportConfig &config() const;
+    QString transport_name() const override;
+    state_t state() const override;
+    const stdio_transport_config_t &config() const;
 
     void start() override;
     void stop() override;
-    bool sendMessage(const QJsonObject &message) override;
+    bool send_message(const QJsonObject &message) override;
 
 private:
-    void setState(State state);
-    void consumeStdout();
-    void consumeStderr();
-    void processBufferedMessages();
+    void set_state(state_t state);
+    void consume_stdout();
+    void consume_stderr();
+    void process_buffered_messages();
 
-    StdioTransportConfig m_config;
-    QProcess *m_process = nullptr;
-    QByteArray m_stdoutBuffer;
-    State m_state = State::Disconnected;
+    stdio_transport_config_t transport_config;
+    QProcess *process = nullptr;
+    QByteArray stdout_buffer;
+    state_t transport_state = state_t::DISCONNECTED;
 };
 
 }  // namespace qtmcp

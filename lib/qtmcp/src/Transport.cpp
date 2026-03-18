@@ -5,10 +5,10 @@
 namespace qtmcp
 {
 
-Transport::Transport(QObject *parent) : QObject(parent)
+transport_t::transport_t(QObject *parent) : QObject(parent)
 {
 }
 
-Transport::~Transport() = default;
+transport_t::~transport_t() = default;
 
 }  // namespace qtmcp

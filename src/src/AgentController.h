@@ -21,91 +21,91 @@
 namespace qcai2
 {
 
-class McpToolManager;
-class ChatContextManager;
+class mcp_tool_manager_t;
+class chat_context_manager_t;
 
 /**
  * Coordinates one agent run from planning through tool execution and completion.
  */
-class AgentController : public QObject
+class agent_controller_t : public QObject
 {
     Q_OBJECT
 public:
     /**
      * High-level run mode selected in the dock widget.
      */
-    enum class RunMode : std::uint8_t
+    enum class run_mode_t : std::uint8_t
     {
-        Ask,
-        Agent
+        ASK,
+        AGENT
     };
 
     /**
      * Creates a controller with no configured provider or tools.
      * @param parent Parent QObject that owns this instance.
      */
-    explicit AgentController(QObject *parent = nullptr);
+    explicit agent_controller_t(QObject *parent = nullptr);
 
     /**
      * Sets the provider used when no dynamic provider selection is needed.
      * @param provider Provider instance to use.
      */
-    void setProvider(IAIProvider *provider);
+    void set_provider(iai_provider_t *provider);
 
     /**
      * Sets the provider list used to reselect the active backend at start time.
      * @param providers Provider instances available for selection.
      */
-    void setProviders(const QList<IAIProvider *> &providers);
+    void set_providers(const QList<iai_provider_t *> &providers);
 
     /**
      * Sets the registry of tools that may be executed by the model.
      * @param registry Tool registry exposed to the agent.
      */
-    void setToolRegistry(ToolRegistry *registry);
+    void set_tool_registry(tool_registry_t *registry);
 
     /**
      * Sets the editor context used to build prompts and locate the project.
      * @param ctx Editor context used for prompt generation.
      */
-    void setEditorContext(EditorContext *ctx);
+    void set_editor_context(editor_context_t *ctx);
 
     /**
      * Sets the persistent chat context manager used for long-lived history.
      * @param manager Shared context manager instance.
      */
-    void setChatContextManager(ChatContextManager *manager);
+    void set_chat_context_manager(chat_context_manager_t *manager);
 
     /**
      * Sets the MCP runtime bridge used to expose configured MCP tools.
      * @param manager Runtime MCP tool manager.
      */
-    void setMcpToolManager(McpToolManager *manager);
+    void set_mcp_tool_manager(mcp_tool_manager_t *manager);
 
     /**
      * Sets the safety policy that caps iterations, tool calls, and approvals.
      * @param policy Safety policy used to gate agent actions.
      */
-    void setSafetyPolicy(SafetyPolicy *policy);
+    void set_safety_policy(safety_policy_t *policy);
 
     /**
      * Sets extra request-specific context, such as linked files, for the next run.
      * @param context Additional prompt context supplied alongside the goal.
-     * @param linkedFiles Display names of linked files for logging.
+     * @param linked_files Display names of linked files for logging.
      */
-    void setRequestContext(const QString &context, const QStringList &linkedFiles = {});
+    void set_request_context(const QString &context, const QStringList &linked_files = {});
 
     /**
      * Starts a new run for the requested goal.
      * @param goal User task description.
-     * @param dryRun True to forbid live patch application.
-     * @param runMode Ask for direct answers or Agent for autonomous tool use.
-     * @param modelName Model selected in the dock widget.
-     * @param reasoningEffort Reasoning effort selected in the dock widget.
-     * @param thinkingLevel Thinking depth selected in the dock widget.
+     * @param dry_run True to forbid live patch application.
+     * @param run_mode Ask for direct answers or Agent for autonomous tool use.
+     * @param model_name Model selected in the dock widget.
+     * @param reasoning_effort Reasoning effort selected in the dock widget.
+     * @param thinking_level Thinking depth selected in the dock widget.
      */
-    void start(const QString &goal, bool dryRun, RunMode runMode, const QString &modelName,
-               const QString &reasoningEffort, const QString &thinkingLevel);
+    void start(const QString &goal, bool dry_run, run_mode_t run_mode, const QString &model_name,
+               const QString &reasoning_effort, const QString &thinking_level);
 
     /**
      * Stops the active run and cancels any in-flight provider request.
@@ -116,20 +116,20 @@ public:
      * Executes a previously approved tool request.
      * @param approvalId Pending approval id.
      */
-    void approveAction(int approvalId);
+    void approve_action(int approval_id);
 
     /**
      * Rejects a pending tool request and asks the model to adapt.
      * @param approvalId Pending approval id.
      */
-    void denyAction(int approvalId);
+    void deny_action(int approval_id);
 
     /**
      * Returns true while a run is active.
      */
-    bool isRunning() const
+    bool is_running() const
     {
-        return m_running;
+        return this->running;
     }
 
     /**
@@ -137,39 +137,39 @@ public:
      */
     int iteration() const
     {
-        return m_iteration;
+        return this->current_iteration;
     }
 
     /**
      * Returns how many tools have executed in the active run.
      */
-    int toolCallCount() const
+    int tool_call_count() const
     {
-        return m_toolCallCount;
+        return this->current_tool_call_count;
     }
 
     /**
      * Returns the editor context currently used for prompt generation.
      */
-    EditorContext *editorContext() const
+    editor_context_t *editor_context() const
     {
-        return m_editorContext;
+        return this->context_provider;
     }
 
     /**
      * Returns the final diff preview accumulated for the UI.
      */
-    QString accumulatedDiff() const
+    QString accumulated_diff() const
     {
-        return m_accumulatedDiff;
+        return this->final_diff_preview;
     }
 
     /**
      * Returns the most recent plan supplied by the model.
      */
-    QList<PlanStep> currentPlan() const
+    QList<plan_step_t> current_plan() const
     {
-        return m_plan;
+        return this->plan;
     }
 
 signals:
@@ -177,38 +177,38 @@ signals:
      * Emits user-visible log output for the dock widget.
      * @param msg Log message text.
      */
-    void logMessage(const QString &msg);
+    void log_message(const QString &msg);
 
     /**
      * Streams partial provider output while a response is in flight.
      * @param token Streamed token text.
      */
-    void streamingToken(const QString &token);
+    void streaming_token(const QString &token);
 
     /**
      * Publishes provider token-usage counters for one completed model request.
      * @param usage Usage counters returned by the provider.
      * @param durationMs Wall-clock duration of the completed request in milliseconds.
      */
-    void providerUsageAvailable(const ProviderUsage &usage, qint64 durationMs);
+    void provider_usage_available(const provider_usage_t &usage, qint64 duration_ms);
 
     /**
      * Publishes the latest human-friendly live progress status.
      * @param status User-visible status text.
      */
-    void statusChanged(const QString &status);
+    void status_changed(const QString &status);
 
     /**
      * Publishes the latest multi-step plan returned by the model.
      * @param steps Plan steps to display.
      */
-    void planUpdated(const QList<PlanStep> &steps);
+    void plan_updated(const QList<plan_step_t> &steps);
 
     /**
      * Publishes the final unified diff preview, if any.
      * @param diff Unified diff text.
      */
-    void diffAvailable(const QString &diff);
+    void diff_available(const QString &diff);
 
     /**
      * Requests user approval before executing a guarded tool in live mode.
@@ -217,14 +217,14 @@ signals:
      * @param reason Reason the approval is required.
      * @param preview Preview text shown with the approval request.
      */
-    void approvalRequested(int id, const QString &action, const QString &reason,
-                           const QString &preview);
+    void approval_requested(int id, const QString &action, const QString &reason,
+                            const QString &preview);
 
     /**
      * Reports the 1-based iteration count after it increments.
      * @param iteration Current iteration number.
      */
-    void iterationChanged(int iteration);
+    void iteration_changed(int iteration);
 
     /**
      * Signals that the run finished or was stopped, with a short summary.
@@ -236,13 +236,13 @@ signals:
      * Signals a provider or controller error that ended the run.
      * @param error Error text.
      */
-    void errorOccurred(const QString &error);
+    void error_occurred(const QString &error);
 
 private:
     /**
      * Sends the current conversation to the provider for the next step.
      */
-    void runNextIteration();
+    void run_next_iteration();
 
     /**
      * Parses one provider response and dispatches the next controller action.
@@ -250,229 +250,230 @@ private:
      * @param error Error text.
      * @param usage Provider token-usage counters when available.
      */
-    void handleResponse(const QString &response, const QString &error, const ProviderUsage &usage);
+    void handle_response(const QString &response, const QString &error,
+                         const provider_usage_t &usage);
 
     /**
      * Runs a tool call, handling approvals, limits, and result truncation.
      * @param name Name value.
      * @param args Tool arguments.
      */
-    void executeTool(const QString &name, const QJsonObject &args);
+    void execute_tool(const QString &name, const QJsonObject &args);
 
     /**
      * Builds the system prompt from tools, editor context, and safety mode.
      */
-    QString buildSystemPrompt() const;
+    QString build_system_prompt() const;
 
     /**
      * Arms the inactivity watchdog for an in-flight provider request.
      */
-    void armProviderWatchdog();
+    void arm_provider_watchdog();
 
     /**
      * Stops the inactivity watchdog after a provider request completes.
      */
-    void disarmProviderWatchdog();
+    void disarm_provider_watchdog();
 
     /**
      * Aborts the current run when the provider stays inactive for too long.
      */
-    void handleProviderInactivityTimeout();
+    void handle_provider_inactivity_timeout();
 
     /**
      * Persists one controller-authored user message in both prompt state and chat history.
      */
-    void appendControllerUserMessage(const QString &content, const QString &source,
-                                     const QJsonObject &metadata = {});
+    void append_controller_user_message(const QString &content, const QString &source,
+                                        const QJsonObject &metadata = {});
 
     /**
      * Persists one assistant response in both prompt state and chat history.
      */
-    void appendAssistantHistoryMessage(const QString &content, const QString &source,
-                                       const QJsonObject &metadata = {});
+    void append_assistant_history_message(const QString &content, const QString &source,
+                                          const QJsonObject &metadata = {});
 
     /**
      * Finalizes the current persistent run record, if any.
      */
-    void finalizePersistentRun(const QString &status, const QJsonObject &metadata = {});
+    void finalize_persistent_run(const QString &status, const QJsonObject &metadata = {});
 
     /**
      * Routes one raw provider progress event through the tracker.
      */
-    void handleProviderProgressEvent(const ProviderRawEvent &event);
+    void handle_provider_progress_event(const provider_raw_event_t &event);
 
     /**
      * Routes one controller-generated normalized progress event through the tracker.
      */
-    void handleNormalizedProgressEvent(const AgentProgressEvent &event);
+    void handle_normalized_progress_event(const agent_progress_event_t &event);
 
     /**
      * Applies one tracker render result to UI-facing signals and debug logs.
      */
-    void applyProgressRenderResult(const AgentProgressRenderResult &result);
+    void apply_progress_render_result(const agent_progress_render_result_t &result);
 
     /**
      * Dispatches one provider completion callback safely back to the controller.
      */
-    static void dispatchProviderCompletion(QPointer<AgentController> controller,
-                                           const QString &response, const QString &error,
-                                           const ProviderUsage &usage);
+    static void dispatch_provider_completion(QPointer<agent_controller_t> controller,
+                                             const QString &response, const QString &error,
+                                             const provider_usage_t &usage);
 
     /**
      * Dispatches one provider stream delta safely back to the controller.
      */
-    static void dispatchProviderStreamDelta(QPointer<AgentController> controller,
-                                            const QString &delta);
+    static void dispatch_provider_stream_delta(QPointer<agent_controller_t> controller,
+                                               const QString &delta);
 
     /**
      * Dispatches one provider progress event safely back to the controller.
      */
-    static void dispatchProviderProgress(QPointer<AgentController> controller,
-                                         const ProviderRawEvent &event);
+    static void dispatch_provider_progress(QPointer<agent_controller_t> controller,
+                                           const provider_raw_event_t &event);
 
     /**
      * Queues one provider response for deferred processing on the next event-loop turn.
      */
-    void enqueueProviderResponse(const QString &response, const QString &error,
-                                 const ProviderUsage &usage);
+    void enqueue_provider_response(const QString &response, const QString &error,
+                                   const provider_usage_t &usage);
 
     /**
      * Drains all deferred provider responses.
      */
-    void drainQueuedProviderResponses();
+    void drain_queued_provider_responses();
 
     /**
      * Processes one streamed provider delta.
      */
-    void handleProviderStreamDelta(const QString &delta);
+    void handle_provider_stream_delta(const QString &delta);
 
     /** Active provider used for the current run. */
-    IAIProvider *m_provider = nullptr;
+    iai_provider_t *provider = nullptr;
 
     /** All configured providers available for reselection at start time. */
-    QList<IAIProvider *> m_allProviders;
+    QList<iai_provider_t *> all_providers;
 
     /** Registered tools exposed to the model. */
-    ToolRegistry *m_toolRegistry = nullptr;
+    tool_registry_t *tool_registry = nullptr;
 
     /** Editor and project snapshot provider. */
-    EditorContext *m_editorContext = nullptr;
+    editor_context_t *context_provider = nullptr;
 
     /** Persistent chat context manager shared across runs and workspaces. */
-    ChatContextManager *m_chatContextManager = nullptr;
+    chat_context_manager_t *chat_context_manager = nullptr;
 
     /** Runtime bridge that injects configured MCP tools before agent runs. */
-    McpToolManager *m_mcpToolManager = nullptr;
+    mcp_tool_manager_t *mcp_tool_manager = nullptr;
 
     /** Limits for iterations, tool calls, and approval handling. */
-    SafetyPolicy *m_safetyPolicy = nullptr;
+    safety_policy_t *safety_policy = nullptr;
 
     /** True while the controller is processing a run. */
-    bool m_running = false;
+    bool running = false;
 
     /** True when live patch application is disabled. */
-    bool m_dryRun = true;
+    bool dry_run = true;
 
     /** Completed iteration count for the active run. */
-    int m_iteration = 0;
+    int current_iteration = 0;
 
     /** Executed tool call count for the active run. */
-    int m_toolCallCount = 0;
+    int current_tool_call_count = 0;
 
     /** Consecutive unstructured responses seen without valid JSON. */
-    int m_textRetries = 0;
+    int text_retries = 0;
 
     /** User goal for the current run. */
-    QString m_goal;
+    QString goal;
 
     /** Extra request-specific prompt context prepared by the dock widget. */
-    QString m_requestContext;
+    QString request_context;
 
     /** Linked file labels associated with the pending request. */
-    QStringList m_linkedFiles;
+    QStringList linked_files;
 
     /** Selected interaction mode for the current run. */
-    RunMode m_runMode = RunMode::Agent;
+    run_mode_t run_mode = run_mode_t::AGENT;
 
     /** Selected model for the current run. */
-    QString m_modelName;
+    QString model_name;
 
     /** Selected reasoning effort for the current run. */
-    QString m_reasoningEffort;
+    QString reasoning_effort;
 
     /** Selected thinking depth for the current run. */
-    QString m_thinkingLevel;
+    QString thinking_level;
 
     /** Ask-mode retries after the model returns an autonomous response. */
-    int m_modeRetries = 0;
+    int mode_retries = 0;
 
     /** Conversation history replayed to the provider every iteration. */
-    QList<ChatMessage> m_messages;
+    QList<chat_message_t> messages;
 
     /** Persistent run id backing the current controller run. */
-    QString m_runId;
+    QString run_id;
 
     /** Accumulated provider usage across all model requests in the current run. */
-    ProviderUsage m_accumulatedUsage;
+    provider_usage_t accumulated_usage;
 
     /** Tracker that normalizes provider/controller activity into user-facing statuses. */
-    std::unique_ptr<AgentProgressTracker> m_progressTracker;
+    std::unique_ptr<agent_progress_tracker_t> progress_tracker;
 
     /** Provider responses deferred to avoid re-entrancy while callbacks are in flight. */
-    struct PendingProviderResponse
+    struct pending_provider_response_t
     {
         QString response;
         QString error;
-        ProviderUsage usage;
+        provider_usage_t usage;
     };
 
     /** Deferred provider responses waiting for queued handling. */
-    QList<PendingProviderResponse> m_pendingProviderResponses;
+    QList<pending_provider_response_t> pending_provider_responses;
 
     /** True while a deferred provider-response drain is already scheduled. */
-    bool m_providerResponseDispatchScheduled = false;
+    bool provider_response_dispatch_scheduled = false;
 
     /** Tool currently awaiting model-side validation after it completed. */
-    QString m_pendingValidationToolName;
+    QString pending_validation_tool_name;
 
     /** Human-friendly label for the tool currently awaiting validation. */
-    QString m_pendingValidationLabel;
+    QString pending_validation_label;
 
     /** Measures elapsed time for the in-flight provider request. */
-    QElapsedTimer m_providerRequestTimer;
+    QElapsedTimer provider_request_timer;
 
     /** Most recent multi-step plan returned by the model. */
-    QList<PlanStep> m_plan;
+    QList<plan_step_t> plan;
 
     /** Final diff preview accumulated across responses. */
-    QString m_accumulatedDiff;
+    QString final_diff_preview;
 
     /** Pending tool execution waiting for an explicit user decision. */
-    struct PendingApproval
+    struct pending_approval_t
     {
         /** Stable identifier emitted to the UI. */
         int id;
 
         /** Tool name requested by the model. */
-        QString toolName;
+        QString tool_name;
 
         /** Tool arguments to replay after approval. */
-        QJsonObject toolArgs;
+        QJsonObject tool_args;
     };
     /** Queue of tool calls waiting for user approval. */
-    QList<PendingApproval> m_pendingApprovals;
+    QList<pending_approval_t> pending_approvals;
 
     /** Next approval identifier emitted to the UI. */
-    int m_nextApprovalId = 1;
+    int next_approval_id = 1;
 
     /** Kills agent runs that stall waiting for a provider response. */
-    QTimer m_providerWatchdog;
+    QTimer provider_watchdog;
 
     /** True while a provider request is currently in flight. */
-    bool m_waitingForProvider = false;
+    bool waiting_for_provider = false;
 
     /** Tracks whether the current request has produced any visible activity yet. */
-    bool m_providerActivitySeen = false;
+    bool provider_activity_seen = false;
 };
 
 }  // namespace qcai2

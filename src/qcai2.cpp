@@ -50,17 +50,17 @@ public:
         // depends on have passed their initialize() phase.
 
         // If you need access to command line arguments or to report errors, use the
-        //    Utils::Result<> IPlugin::initialize(const QStringList &arguments)
+        //    Utils::result_t<> IPlugin::initialize(const QStringList &arguments)
         // overload.
 
         ActionContainer *menu = ActionManager::createMenu(Constants::MENU_ID);
-        menu->menu()->setTitle(Tr::tr("Qcai2"));
+        menu->menu()->setTitle(tr_t::tr("Qcai2"));
         ActionManager::actionContainer(Core::Constants::M_TOOLS)->addMenu(menu);
 
         ActionBuilder(this, Constants::ACTION_ID)
             .addToContainer(Constants::MENU_ID)
-            .setText(Tr::tr("Qcai2 Action"))
-            .setDefaultKeySequence(Tr::tr("Ctrl+Alt+Meta+A"))
+            .setText(tr_t::tr("Qcai2 Action"))
+            .setDefaultKeySequence(tr_t::tr("Ctrl+Alt+Meta+A"))
             .addOnTriggered(this, &Qcai2Plugin::triggerAction);
     }
 
@@ -92,10 +92,9 @@ private:
      */
     void triggerAction()
     {
-        QMessageBox::information(ICore::dialogParent(), Tr::tr("Action Triggered"),
-                                 Tr::tr("This is an action from Qcai2."));
+        QMessageBox::information(ICore::dialogParent(), tr_t::tr("Action Triggered"),
+                                 tr_t::tr("This is an action from Qcai2."));
     }
-
 };
 
 }  // namespace Qcai2::Internal
