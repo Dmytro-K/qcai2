@@ -18,6 +18,8 @@
 #include <QTextCursor>
 #include <QTextDocument>
 
+#include <functional>
+
 namespace qcai2
 {
 
@@ -27,6 +29,11 @@ static const int kDebounceMs = 500;
 
 GhostTextManager::GhostTextManager(QObject *parent) : QObject(parent)
 {
+}
+
+GhostTextManager::~GhostTextManager()
+{
+    *m_alive = false;
 }
 
 void GhostTextManager::setEnabled(bool enabled)
@@ -163,54 +170,69 @@ void GhostTextManager::requestCompletion(TextEditor::TextEditorWidget *editor)
 
     QCAI_DEBUG("GhostText", QStringLiteral("Requesting completion at pos %1").arg(pos));
 
-    auto alive = m_alive;
-    m_provider->complete(
-        messages, model, 0.0, 128, settings().completionReasoningEffort,
-        [editor, pos, alive](const QString &response, const QString &error,
-                             const ProviderUsage & /*usage*/) {
-            if (((!*alive) == true))
-            {
-                return;
-            }
-            if (error.isEmpty() == false)
-            {
-                QCAI_WARN("GhostText", QStringLiteral("Error: %1").arg(error));
-                return;
-            }
+    using namespace std::placeholders;
+    const auto alive = m_alive;
+    const QPointer<TextEditor::TextEditorWidget> editorGuard(editor);
+    const IAIProvider::CompletionCallback completionCallback = std::bind(
+        &GhostTextManager::dispatchCompletionResponse, this, editorGuard, pos, alive, _1, _2, _3);
+    m_provider->complete(messages, model, 0.0, 128, settings().completionReasoningEffort,
+                         completionCallback);
+}
 
-            const QString completion = cleanCompletion(response);
-            if (completion.isEmpty() == true)
-            {
-                return;
-            }
+void GhostTextManager::dispatchCompletionResponse(GhostTextManager *manager,
+                                                  QPointer<TextEditor::TextEditorWidget> editor,
+                                                  int pos, const std::shared_ptr<bool> &alive,
+                                                  const QString &response, const QString &error,
+                                                  const ProviderUsage &usage)
+{
+    Q_UNUSED(usage);
 
-            // Verify cursor hasn't moved
-            if (editor->textCursor().position() != pos)
-            {
-                return;
-            }
+    if ((*alive == false) || (editor.isNull() == true))
+    {
+        return;
+    }
 
-            QTextCursor tc = editor->textCursor();
-            const int line = tc.blockNumber() + 1;  // 1-based
-            const int col = tc.positionInBlock();   // 0-based
+    manager->handleCompletionResponse(editor.data(), pos, response, error);
+}
 
-            // Build full replacement text: prefix (existing text before cursor) + completion +
-            // suffix (rest of line)
-            const QString lineText = tc.block().text();
-            const QString linePrefix = lineText.left(col);
-            const QString lineSuffix = lineText.mid(col);
-            const QString replacementText = linePrefix + completion + lineSuffix;
+void GhostTextManager::handleCompletionResponse(TextEditor::TextEditorWidget *editor, int pos,
+                                                const QString &response, const QString &error)
+{
+    if (error.isEmpty() == false)
+    {
+        QCAI_WARN("GhostText", QStringLiteral("Error: %1").arg(error));
+        return;
+    }
 
-            Utils::Text::Position textPos{line, col};
-            Utils::Text::Range range{textPos, textPos};
-            TextEditor::TextSuggestion::Data data{range, textPos, replacementText};
+    const QString completion = cleanCompletion(response);
+    if (completion.isEmpty() == true)
+    {
+        return;
+    }
 
-            editor->insertSuggestion(
-                std::make_unique<TextEditor::TextSuggestion>(data, editor->document()));
+    if (editor->textCursor().position() != pos)
+    {
+        return;
+    }
 
-            QCAI_DEBUG("GhostText",
-                       QStringLiteral("Showing suggestion: %1 chars").arg(completion.length()));
-        });
+    QTextCursor tc = editor->textCursor();
+    const int line = tc.blockNumber() + 1;
+    const int col = tc.positionInBlock();
+
+    const QString lineText = tc.block().text();
+    const QString linePrefix = lineText.left(col);
+    const QString lineSuffix = lineText.mid(col);
+    const QString replacementText = linePrefix + completion + lineSuffix;
+
+    Utils::Text::Position textPos{line, col};
+    Utils::Text::Range range{textPos, textPos};
+    TextEditor::TextSuggestion::Data data{range, textPos, replacementText};
+
+    editor->insertSuggestion(
+        std::make_unique<TextEditor::TextSuggestion>(data, editor->document()));
+
+    QCAI_DEBUG("GhostText",
+               QStringLiteral("Showing suggestion: %1 chars").arg(completion.length()));
 }
 
 QString GhostTextManager::cleanCompletion(const QString &raw)

@@ -10,6 +10,7 @@ namespace qcai2
 
 class IAIProvider;
 class ChatContextManager;
+struct ProviderUsage;
 
 /**
  * Runs an asynchronous AI completion request for a single assist session.
@@ -49,6 +50,19 @@ protected:
     TextEditor::IAssistProposal *perform() override;
 
 private:
+    /**
+     * Safely dispatches an async provider completion back to the processor.
+     */
+    static void dispatchCompletionResponse(AiCompletionProcessor *processor, int pos,
+                                           const std::shared_ptr<bool> &alive,
+                                           const QString &response, const QString &error,
+                                           const ProviderUsage &usage);
+
+    /**
+     * Processes one async completion response.
+     */
+    void handleCompletionResponse(int pos, const QString &response, const QString &error);
+
     /** Non-owning AI backend used for completion requests. */
     IAIProvider *m_provider;
 

@@ -15,6 +15,8 @@
 
 #include <QTextDocument>
 
+#include <functional>
+
 namespace qcai2
 {
 
@@ -114,93 +116,103 @@ TextEditor::IAssistProposal *AiCompletionProcessor::perform()
                    .arg(prefix.length())
                    .arg(suffix.length()));
 
-    // Async: send request, deliver proposal when ready
-    auto alive = m_alive;  // capture shared_ptr for safe use-after-free check
-    m_provider->complete(
-        messages, m_model, 0.0, 128, settings().completionReasoningEffort,
-        [this, pos, alive](const QString &response, const QString &error,
-                           const ProviderUsage & /*usage*/) {
-            if (!*alive)
-            {
-                return;  // processor was destroyed, bail out
-            }
-
-            m_running = false;
-
-            if (m_cancelled || !error.isEmpty() || response.trimmed().isEmpty())
-            {
-                if (!error.isEmpty())
-                {
-                    QCAI_WARN("Completion", QStringLiteral("Completion error: %1").arg(error));
-                }
-                else if (m_cancelled)
-                {
-                    QCAI_DEBUG("Completion", QStringLiteral("Completion cancelled"));
-                }
-                setAsyncProposalAvailable(nullptr);
-                return;
-            }
-
-            // Clean up response — remove markdown fences if the model added them
-            QString completion = response.trimmed();
-            if (completion.startsWith(QStringLiteral("```")))
-            {
-                qsizetype firstNl = completion.indexOf(QLatin1Char('\n'));
-                if (firstNl >= 0)
-                {
-                    completion = completion.mid(firstNl + 1);
-                }
-                if (completion.endsWith(QStringLiteral("```")))
-                {
-                    completion.chop(3);
-                }
-                completion = completion.trimmed();
-            }
-
-            if (completion.isEmpty())
-            {
-                setAsyncProposalAvailable(nullptr);
-                return;
-            }
-
-            // Split into individual line suggestions
-            QList<TextEditor::AssistProposalItemInterface *> items;
-
-            // Full completion as primary item
-            auto *item = new TextEditor::AssistProposalItem;
-            // Show first line as label, full text as detail
-            const qsizetype nlPos = completion.indexOf(QLatin1Char('\n'));
-            if (nlPos > 0)
-            {
-                item->setText(completion.left(nlPos));
-                item->setDetail(completion);
-            }
-            else
-            {
-                item->setText(completion);
-                item->setDetail(QStringLiteral("AI completion"));
-            }
-            item->setData(completion);
-            items.append(item);
-
-            // If multi-line, also offer just the first line
-            if (nlPos > 0)
-            {
-                auto *lineItem = new TextEditor::AssistProposalItem;
-                lineItem->setText(completion.left(nlPos));
-                lineItem->setDetail(QStringLiteral("AI (first line)"));
-                lineItem->setData(completion.left(nlPos));
-                items.append(lineItem);
-            }
-
-            auto *proposal = new TextEditor::GenericProposal(pos, items);
-            QCAI_DEBUG("Completion", QStringLiteral("Completion ready: %1 items, %2 chars")
-                                         .arg(items.size())
-                                         .arg(completion.length()));
-            setAsyncProposalAvailable(proposal);
-        });
+    using namespace std::placeholders;
+    const auto alive = m_alive;
+    const IAIProvider::CompletionCallback completionCallback = std::bind(
+        &AiCompletionProcessor::dispatchCompletionResponse, this, pos, alive, _1, _2, _3);
+    m_provider->complete(messages, m_model, 0.0, 128, settings().completionReasoningEffort,
+                         completionCallback);
 
     return nullptr;  // async — proposal delivered via setAsyncProposalAvailable
+}
+
+void AiCompletionProcessor::dispatchCompletionResponse(AiCompletionProcessor *processor, int pos,
+                                                       const std::shared_ptr<bool> &alive,
+                                                       const QString &response,
+                                                       const QString &error,
+                                                       const ProviderUsage &usage)
+{
+    Q_UNUSED(usage);
+
+    if (*alive == false)
+    {
+        return;
+    }
+
+    processor->handleCompletionResponse(pos, response, error);
+}
+
+void AiCompletionProcessor::handleCompletionResponse(int pos, const QString &response,
+                                                     const QString &error)
+{
+    m_running = false;
+
+    if (m_cancelled || !error.isEmpty() || response.trimmed().isEmpty())
+    {
+        if (!error.isEmpty())
+        {
+            QCAI_WARN("Completion", QStringLiteral("Completion error: %1").arg(error));
+        }
+        else if (m_cancelled)
+        {
+            QCAI_DEBUG("Completion", QStringLiteral("Completion cancelled"));
+        }
+        setAsyncProposalAvailable(nullptr);
+        return;
+    }
+
+    QString completion = response.trimmed();
+    if (completion.startsWith(QStringLiteral("```")))
+    {
+        const qsizetype firstNl = completion.indexOf(QLatin1Char('\n'));
+        if (firstNl >= 0)
+        {
+            completion = completion.mid(firstNl + 1);
+        }
+        if (completion.endsWith(QStringLiteral("```")))
+        {
+            completion.chop(3);
+        }
+        completion = completion.trimmed();
+    }
+
+    if (completion.isEmpty() == true)
+    {
+        setAsyncProposalAvailable(nullptr);
+        return;
+    }
+
+    QList<TextEditor::AssistProposalItemInterface *> items;
+
+    auto *item = new TextEditor::AssistProposalItem;
+    const qsizetype nlPos = completion.indexOf(QLatin1Char('\n'));
+    if (nlPos > 0)
+    {
+        item->setText(completion.left(nlPos));
+        item->setDetail(completion);
+    }
+    else
+    {
+        item->setText(completion);
+        item->setDetail(QStringLiteral("AI completion"));
+    }
+    item->setData(completion);
+    items.append(item);
+
+    if (nlPos > 0)
+    {
+        auto *lineItem = new TextEditor::AssistProposalItem;
+        lineItem->setText(completion.left(nlPos));
+        lineItem->setDetail(QStringLiteral("AI (first line)"));
+        lineItem->setData(completion.left(nlPos));
+        items.append(lineItem);
+    }
+
+    auto *proposal = new TextEditor::GenericProposal(pos, items);
+    QCAI_DEBUG("Completion", QStringLiteral("Completion ready: %1 items, %2 chars")
+                                 .arg(items.size())
+                                 .arg(completion.length()));
+    setAsyncProposalAvailable(proposal);
 }
 
 }  // namespace qcai2

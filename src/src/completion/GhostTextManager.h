@@ -2,6 +2,7 @@
 
 #include <QHash>
 #include <QObject>
+#include <QPointer>
 #include <QTimer>
 #include <memory>
 
@@ -15,6 +16,7 @@ namespace qcai2
 
 class IAIProvider;
 class ChatContextManager;
+struct ProviderUsage;
 
 /**
  * Manages debounced inline ghost-text suggestions for attached editors.
@@ -28,6 +30,11 @@ public:
      * @param parent Owning QObject.
      */
     explicit GhostTextManager(QObject *parent = nullptr);
+
+    /**
+     * Marks outstanding async callbacks as stale on destruction.
+     */
+    ~GhostTextManager() override;
 
     /**
      * Sets the shared AI provider.
@@ -78,6 +85,21 @@ public:
     void attachToEditor(TextEditor::TextEditorWidget *editor);
 
 private:
+    /**
+     * Safely dispatches one async completion response back to the manager.
+     */
+    static void dispatchCompletionResponse(GhostTextManager *manager,
+                                           QPointer<TextEditor::TextEditorWidget> editor, int pos,
+                                           const std::shared_ptr<bool> &alive,
+                                           const QString &response, const QString &error,
+                                           const ProviderUsage &usage);
+
+    /**
+     * Processes one ghost-text completion response.
+     */
+    void handleCompletionResponse(TextEditor::TextEditorWidget *editor, int pos,
+                                  const QString &response, const QString &error);
+
     /**
      * Handles editor content changes and restarts the debounce timer.
      * @param editor Editor whose contents changed.

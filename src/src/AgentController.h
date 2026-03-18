@@ -14,6 +14,7 @@
 #include <QJsonObject>
 #include <QList>
 #include <QObject>
+#include <QPointer>
 #include <QString>
 #include <QTimer>
 
@@ -310,6 +311,41 @@ private:
      */
     void applyProgressRenderResult(const AgentProgressRenderResult &result);
 
+    /**
+     * Dispatches one provider completion callback safely back to the controller.
+     */
+    static void dispatchProviderCompletion(QPointer<AgentController> controller,
+                                           const QString &response, const QString &error,
+                                           const ProviderUsage &usage);
+
+    /**
+     * Dispatches one provider stream delta safely back to the controller.
+     */
+    static void dispatchProviderStreamDelta(QPointer<AgentController> controller,
+                                            const QString &delta);
+
+    /**
+     * Dispatches one provider progress event safely back to the controller.
+     */
+    static void dispatchProviderProgress(QPointer<AgentController> controller,
+                                         const ProviderRawEvent &event);
+
+    /**
+     * Queues one provider response for deferred processing on the next event-loop turn.
+     */
+    void enqueueProviderResponse(const QString &response, const QString &error,
+                                 const ProviderUsage &usage);
+
+    /**
+     * Drains all deferred provider responses.
+     */
+    void drainQueuedProviderResponses();
+
+    /**
+     * Processes one streamed provider delta.
+     */
+    void handleProviderStreamDelta(const QString &delta);
+
     /** Active provider used for the current run. */
     IAIProvider *m_provider = nullptr;
 
@@ -381,6 +417,20 @@ private:
 
     /** Tracker that normalizes provider/controller activity into user-facing statuses. */
     std::unique_ptr<AgentProgressTracker> m_progressTracker;
+
+    /** Provider responses deferred to avoid re-entrancy while callbacks are in flight. */
+    struct PendingProviderResponse
+    {
+        QString response;
+        QString error;
+        ProviderUsage usage;
+    };
+
+    /** Deferred provider responses waiting for queued handling. */
+    QList<PendingProviderResponse> m_pendingProviderResponses;
+
+    /** True while a deferred provider-response drain is already scheduled. */
+    bool m_providerResponseDispatchScheduled = false;
 
     /** Tool currently awaiting model-side validation after it completed. */
     QString m_pendingValidationToolName;

@@ -14,6 +14,7 @@
 #include <QJsonDocument>
 #include <QTimer>
 
+#include <functional>
 #include <utility>
 
 namespace qcai2
@@ -337,6 +338,8 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
     m_messages.clear();
     m_runId.clear();
     m_accumulatedUsage = {};
+    m_pendingProviderResponses.clear();
+    m_providerResponseDispatchScheduled = false;
     m_pendingValidationToolName.clear();
     m_pendingValidationLabel.clear();
     m_progressTracker = std::make_unique<AgentProgressTracker>(
@@ -558,26 +561,17 @@ void AgentController::runNextIteration()
     }
     armProviderWatchdog();
 
-    m_provider->complete(
-        m_messages, m_modelName, s.temperature, s.maxTokens, m_reasoningEffort,
-        [this](const QString &response, const QString &error, const ProviderUsage &usage) {
-            QTimer::singleShot(0, this, [this, response, error, usage]() {
-                handleResponse(response, error, usage);
-            });
-        },
-        [this](const QString &delta) {
-            if (!delta.isEmpty())
-            {
-                if (!m_providerActivitySeen)
-                {
-                    m_providerActivitySeen = true;
-                    emit logMessage(QStringLiteral("✍ Model response in progress..."));
-                }
-                armProviderWatchdog();
-                emit streamingToken(delta);
-            }
-        },
-        [this](const ProviderRawEvent &event) { handleProviderProgressEvent(event); });
+    using namespace std::placeholders;
+    const QPointer<AgentController> controller(this);
+    const IAIProvider::CompletionCallback completionCallback =
+        std::bind(&AgentController::dispatchProviderCompletion, controller, _1, _2, _3);
+    const IAIProvider::StreamCallback streamCallback =
+        std::bind(&AgentController::dispatchProviderStreamDelta, controller, _1);
+    const IAIProvider::ProgressCallback progressCallback =
+        std::bind(&AgentController::dispatchProviderProgress, controller, _1);
+
+    m_provider->complete(m_messages, m_modelName, s.temperature, s.maxTokens, m_reasoningEffort,
+                         completionCallback, streamCallback, progressCallback);
 }
 
 void AgentController::handleResponse(const QString &response, const QString &error,
@@ -1039,6 +1033,80 @@ void AgentController::finalizePersistentRun(const QString &status, const QJsonOb
     }
 
     m_runId.clear();
+}
+
+void AgentController::dispatchProviderCompletion(QPointer<AgentController> controller,
+                                                 const QString &response, const QString &error,
+                                                 const ProviderUsage &usage)
+{
+    if (controller.isNull() == true)
+    {
+        return;
+    }
+
+    controller->enqueueProviderResponse(response, error, usage);
+}
+
+void AgentController::dispatchProviderStreamDelta(QPointer<AgentController> controller,
+                                                  const QString &delta)
+{
+    if (controller.isNull() == true)
+    {
+        return;
+    }
+
+    controller->handleProviderStreamDelta(delta);
+}
+
+void AgentController::dispatchProviderProgress(QPointer<AgentController> controller,
+                                               const ProviderRawEvent &event)
+{
+    if (controller.isNull() == true)
+    {
+        return;
+    }
+
+    controller->handleProviderProgressEvent(event);
+}
+
+void AgentController::enqueueProviderResponse(const QString &response, const QString &error,
+                                              const ProviderUsage &usage)
+{
+    m_pendingProviderResponses.append({response, error, usage});
+    if (m_providerResponseDispatchScheduled == true)
+    {
+        return;
+    }
+
+    m_providerResponseDispatchScheduled = true;
+    QTimer::singleShot(0, this, &AgentController::drainQueuedProviderResponses);
+}
+
+void AgentController::drainQueuedProviderResponses()
+{
+    m_providerResponseDispatchScheduled = false;
+
+    while (m_pendingProviderResponses.isEmpty() == false)
+    {
+        const PendingProviderResponse pending = m_pendingProviderResponses.takeFirst();
+        handleResponse(pending.response, pending.error, pending.usage);
+    }
+}
+
+void AgentController::handleProviderStreamDelta(const QString &delta)
+{
+    if (delta.isEmpty() == true)
+    {
+        return;
+    }
+
+    if (m_providerActivitySeen == false)
+    {
+        m_providerActivitySeen = true;
+        emit logMessage(QStringLiteral("✍ Model response in progress..."));
+    }
+    armProviderWatchdog();
+    emit streamingToken(delta);
 }
 
 void AgentController::handleProviderProgressEvent(const ProviderRawEvent &event)
