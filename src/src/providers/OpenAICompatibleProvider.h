@@ -50,7 +50,8 @@ public:
      */
     void complete(const QList<ChatMessage> &messages, const QString &model, double temperature,
                   int maxTokens, const QString &reasoningEffort, CompletionCallback callback,
-                  StreamCallback streamCallback = nullptr) override;
+                  StreamCallback streamCallback = nullptr,
+                  ProgressCallback progressCallback = nullptr) override;
 
     /**
      * Aborts the active network reply, if any.
@@ -113,7 +114,6 @@ private:
 
     /** Usage counters captured from the current streaming response. */
     ProviderUsage m_streamUsage;
-
 };
 
 }  // namespace qcai2

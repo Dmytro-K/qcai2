@@ -630,6 +630,8 @@ AgentDockWidget::AgentDockWidget(AgentController *controller,
     connect(m_controller, &AgentController::logMessage, this, &AgentDockWidget::onLogMessage);
     connect(m_controller, &AgentController::providerUsageAvailable, this,
             &AgentDockWidget::onProviderUsageAvailable);
+    connect(m_controller, &AgentController::statusChanged, this,
+            [this](const QString &status) { m_statusLabel->setText(status); });
     connect(m_controller, &AgentController::streamingToken, this, [this](const QString &token) {
         m_streamingMarkdown += token;
         if (!m_isStreaming)
@@ -1350,9 +1352,6 @@ void AgentDockWidget::onApprovalRequested(int id, const QString &action, const Q
 
 void AgentDockWidget::onIterationChanged(int iteration)
 {
-    m_statusLabel->setText(QStringLiteral("Iteration %1 / Tool calls: %2")
-                               .arg(iteration)
-                               .arg(m_controller->toolCallCount()));
     onLogMessage(QStringLiteral("🔄 Iteration %1 / Tool calls: %2")
                      .arg(iteration)
                      .arg(m_controller->toolCallCount()));
@@ -1361,7 +1360,11 @@ void AgentDockWidget::onIterationChanged(int iteration)
 void AgentDockWidget::onStopped(const QString &summary)
 {
     updateRunState(false);
-    m_statusLabel->setText(QStringLiteral("Done: %1").arg(summary.left(80)));
+    if (m_statusLabel->text().isEmpty() == true || m_statusLabel->text() == tr("Ready") ||
+        m_statusLabel->text() == tr("Running..."))
+    {
+        m_statusLabel->setText(QStringLiteral("Done: %1").arg(summary.left(80)));
+    }
     m_sessionController->saveChat();
 }
 

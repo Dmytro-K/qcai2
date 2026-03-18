@@ -51,7 +51,8 @@ public:
      */
     void complete(const QList<ChatMessage> &messages, const QString &model, double temperature,
                   int maxTokens, const QString &reasoningEffort, CompletionCallback callback,
-                  StreamCallback streamCallback = nullptr) override;
+                  StreamCallback streamCallback = nullptr,
+                  ProgressCallback progressCallback = nullptr) override;
 
     /**
      * Aborts the active HTTP request, if any.
@@ -124,7 +125,6 @@ private:
 
     /** Additional request headers forwarded to the backend. */
     QMap<QString, QString> m_customHeaders;
-
 };
 
 }  // namespace qcai2

@@ -5,6 +5,7 @@
 ### Added
 
 - Added `/compact` slash command to compress the relevant conversation context into a short structured summary for future steps.
+- Added progress status
 
 ## [0.0.6] - 2026-03-15
 

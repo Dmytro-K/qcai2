@@ -63,6 +63,27 @@ target_link_libraries(tst_qcai2_provider_usage PRIVATE
 )
 add_test(NAME qcai2_provider_usage COMMAND tst_qcai2_provider_usage)
 
+add_executable(tst_qcai2_agent_progress
+    tst_agent_progress.cpp
+    ../src/progress/AgentProgress.cpp
+    ../src/progress/ProviderProgressAdapter.cpp
+    ../src/progress/AgentStatus.cpp
+    ../src/progress/AgentStatusFormatter.cpp
+    ../src/progress/AgentStatusRenderer.cpp
+    ../src/progress/AgentProgressTracker.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_agent_progress)
+
+target_include_directories(tst_qcai2_agent_progress PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_agent_progress PRIVATE
+    Qt::Core
+    Qt::Test
+)
+add_test(NAME qcai2_agent_progress COMMAND tst_qcai2_agent_progress)
+
 add_executable(tst_qcai2_chat_context
     tst_chat_context.cpp
     ../src/context/ChatContext.h

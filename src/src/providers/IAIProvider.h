@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../models/AgentMessages.h"
+#include "../progress/AgentProgress.h"
 #include "ProviderUsage.h"
 
 #include <QList>
@@ -44,8 +45,14 @@ public:
      * @param error Error text.
      * @param usage Provider token-usage counters when available.
      */
-    using CompletionCallback =
-        std::function<void(const QString &response, const QString &error, const ProviderUsage &usage)>;
+    using CompletionCallback = std::function<void(const QString &response, const QString &error,
+                                                  const ProviderUsage &usage)>;
+
+    /**
+     * Receives provider-specific safe raw progress events.
+     * @param event Safe provider event metadata exposed for progress tracking.
+     */
+    using ProgressCallback = std::function<void(const ProviderRawEvent &event)>;
 
     /**
      * Starts a completion request.
@@ -56,11 +63,12 @@ public:
      * @param reasoningEffort Optional reasoning hint for providers that support it.
      * @param callback Called once with the full response or an error.
      * @param streamCallback Called for streamed deltas when streaming is available.
+     * @param progressCallback Called for provider-specific safe raw progress events.
      */
     virtual void complete(const QList<ChatMessage> &messages, const QString &model,
                           double temperature, int maxTokens, const QString &reasoningEffort,
-                          CompletionCallback callback,
-                          StreamCallback streamCallback = nullptr) = 0;
+                          CompletionCallback callback, StreamCallback streamCallback = nullptr,
+                          ProgressCallback progressCallback = nullptr) = 0;
 
     /**
      * Cancels any in-flight request owned by the provider.
@@ -78,7 +86,6 @@ public:
      * @param key API key or access token.
      */
     virtual void setApiKey(const QString &key) = 0;
-
 };
 
 }  // namespace qcai2

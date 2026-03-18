@@ -29,6 +29,10 @@ function sendError(id, message) {
     send({ id, error: message });
 }
 
+function sendProgress(id, kind, rawType, extra = {}) {
+    send({ id, progress: { kind, rawType, ...extra } });
+}
+
 function firstNonNull(...values) {
     for (const value of values) {
         if (typeof value === "number" && Number.isFinite(value)) {
@@ -122,6 +126,7 @@ async function handleComplete(id, params) {
 
     const state = { cancelled: false, session: null };
     activeRequests.set(id, state);
+    sendProgress(id, "request_started", "request.started");
 
     let session = null;
     try {
@@ -154,8 +159,27 @@ async function handleComplete(id, params) {
             if (event.id) seenEventIds.add(event.id);
             const delta = event.data?.deltaContent || "";
             if (delta && streaming) {
+                sendProgress(id, "message_delta", "assistant.message_delta", { message: delta });
                 send({ id, stream_delta: delta });
             }
+        });
+        const unsubscribeToolStart = session.on("tool.execution_start", (event) => {
+            if (state.cancelled) return;
+            const toolName = event.data?.toolName || event.data?.tool?.name || event.data?.name || "";
+            sendProgress(id, "tool_started", "tool.execution_start", { toolName });
+        });
+        const unsubscribeToolComplete = session.on("tool.execution_complete", (event) => {
+            if (state.cancelled) return;
+            const toolName = event.data?.toolName || event.data?.tool?.name || event.data?.name || "";
+            sendProgress(id, "tool_completed", "tool.execution_complete", { toolName });
+        });
+        const unsubscribeIdle = session.on("session.idle", () => {
+            if (state.cancelled) return;
+            sendProgress(id, "idle", "session.idle");
+        });
+        const unsubscribeSessionError = session.on("session.error", (event) => {
+            if (state.cancelled) return;
+            sendProgress(id, "error", "session.error", { message: event.data?.message || "" });
         });
         const unsubscribeUsage = session.on("assistant.usage", (event) => {
             if (state.cancelled) return;
@@ -170,6 +194,10 @@ async function handleComplete(id, params) {
             ? await session.sendAndWait({ prompt }, completionTimeoutSec * 1000)
             : await session.sendAndWait({ prompt });
         unsubscribe();
+        unsubscribeToolStart();
+        unsubscribeToolComplete();
+        unsubscribeIdle();
+        unsubscribeSessionError();
         unsubscribeUsage();
 
         if (!state.cancelled) {
@@ -178,6 +206,7 @@ async function handleComplete(id, params) {
                 response?.data?.usage || response?.usage || response?.usageMetadata || null,
             );
             log(`Request #${id} done: ${content.length} chars`);
+            sendProgress(id, "response_completed", "response.completed");
             sendResult(id, usage ? { content, usage } : { content });
         } else {
             log(`Request #${id} done but was cancelled`);
@@ -185,6 +214,7 @@ async function handleComplete(id, params) {
     } catch (e) {
         if (!state.cancelled) {
             log(`Request #${id} error: ${e.message}`);
+            sendProgress(id, "error", "response.error", { message: e.message });
             sendError(id, `Completion error: ${e.message}`);
         }
     } finally {

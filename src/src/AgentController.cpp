@@ -337,6 +337,11 @@ void AgentController::start(const QString &goal, bool dryRun, RunMode runMode,
     m_messages.clear();
     m_runId.clear();
     m_accumulatedUsage = {};
+    m_pendingValidationToolName.clear();
+    m_pendingValidationLabel.clear();
+    m_progressTracker = std::make_unique<AgentProgressTracker>(
+        m_provider != nullptr ? m_provider->id() : QString(), AgentStatusRenderMode::Interactive,
+        settings().agentDebug);
 
     QCAI_INFO("Agent",
               QStringLiteral("Starting run — mode: %1, provider: %2, model: %3, reasoning: %4, "
@@ -541,6 +546,16 @@ void AgentController::runNextIteration()
     m_providerActivitySeen = false;
     m_providerRequestTimer.start();
     emit logMessage(QStringLiteral("⏳ Waiting for model response..."));
+    if (m_pendingValidationLabel.isEmpty() == false)
+    {
+        handleNormalizedProgressEvent({AgentProgressEventKind::ValidationStarted,
+                                       AgentProgressOperation::None,
+                                       m_provider != nullptr ? m_provider->id() : QString(),
+                                       QStringLiteral("controller.validation.start"),
+                                       m_pendingValidationToolName,
+                                       m_pendingValidationLabel,
+                                       {}});
+    }
     armProviderWatchdog();
 
     m_provider->complete(
@@ -561,7 +576,8 @@ void AgentController::runNextIteration()
                 armProviderWatchdog();
                 emit streamingToken(delta);
             }
-        });
+        },
+        [this](const ProviderRawEvent &event) { handleProviderProgressEvent(event); });
 }
 
 void AgentController::handleResponse(const QString &response, const QString &error,
@@ -576,8 +592,28 @@ void AgentController::handleResponse(const QString &response, const QString &err
     const qint64 requestDurationMs =
         (m_providerRequestTimer.isValid() == true) ? m_providerRequestTimer.elapsed() : -1;
 
+    if (m_pendingValidationLabel.isEmpty() == false)
+    {
+        handleNormalizedProgressEvent({AgentProgressEventKind::ValidationCompleted,
+                                       AgentProgressOperation::None,
+                                       m_provider != nullptr ? m_provider->id() : QString(),
+                                       QStringLiteral("controller.validation.completed"),
+                                       m_pendingValidationToolName,
+                                       m_pendingValidationLabel,
+                                       {}});
+        m_pendingValidationToolName.clear();
+        m_pendingValidationLabel.clear();
+    }
+
     if (!error.isEmpty())
     {
+        handleNormalizedProgressEvent({AgentProgressEventKind::Error,
+                                       AgentProgressOperation::None,
+                                       m_provider != nullptr ? m_provider->id() : QString(),
+                                       QStringLiteral("controller.provider.error"),
+                                       {},
+                                       {},
+                                       error});
         QCAI_ERROR("Agent", QStringLiteral("Provider error: %1").arg(error));
         emit logMessage(QStringLiteral("❌ Provider error: %1").arg(error));
         emit errorOccurred(error);
@@ -654,6 +690,13 @@ void AgentController::handleResponse(const QString &response, const QString &err
             break;
 
         case ResponseType::Final:
+            handleNormalizedProgressEvent({AgentProgressEventKind::FinalAnswerStarted,
+                                           AgentProgressOperation::None,
+                                           m_provider != nullptr ? m_provider->id() : QString(),
+                                           QStringLiteral("controller.final.start"),
+                                           {},
+                                           {},
+                                           {}});
             emit logMessage(QStringLiteral("✅ Agent finished: %1").arg(parsed.summary));
             if (!parsed.diff.isEmpty())
             {
@@ -667,6 +710,13 @@ void AgentController::handleResponse(const QString &response, const QString &err
                 }
             }
             m_running = false;
+            handleNormalizedProgressEvent({AgentProgressEventKind::FinalAnswerCompleted,
+                                           AgentProgressOperation::None,
+                                           m_provider != nullptr ? m_provider->id() : QString(),
+                                           QStringLiteral("controller.final.completed"),
+                                           {},
+                                           {},
+                                           parsed.summary});
             finalizePersistentRun(
                 QStringLiteral("completed"),
                 QJsonObject{{QStringLiteral("summary"), parsed.summary},
@@ -691,6 +741,14 @@ void AgentController::handleResponse(const QString &response, const QString &err
             // If model keeps responding with text, treat it as final answer
             if (m_textRetries >= 1)
             {
+                handleNormalizedProgressEvent(
+                    {AgentProgressEventKind::FinalAnswerStarted,
+                     AgentProgressOperation::None,
+                     m_provider != nullptr ? m_provider->id() : QString(),
+                     QStringLiteral("controller.final.start"),
+                     {},
+                     {},
+                     {}});
                 if (((settings().agentDebug) == true))
                 {
                     emit logMessage(QStringLiteral("💬 %1").arg(response.left(1000)));
@@ -701,6 +759,14 @@ void AgentController::handleResponse(const QString &response, const QString &err
                         QStringLiteral("💬 Agent finished with unstructured response."));
                 }
                 m_running = false;
+                handleNormalizedProgressEvent(
+                    {AgentProgressEventKind::FinalAnswerCompleted,
+                     AgentProgressOperation::None,
+                     m_provider != nullptr ? m_provider->id() : QString(),
+                     QStringLiteral("controller.final.completed"),
+                     {},
+                     {},
+                     QStringLiteral("Agent finished (text response).")});
                 finalizePersistentRun(
                     QStringLiteral("completed"),
                     QJsonObject{{QStringLiteral("summary"),
@@ -776,6 +842,15 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
 
     // Execute
     ++m_toolCallCount;
+    const AgentProgressOperation operation = classifyToolOperation(name);
+    const QString progressLabel = progressLabelForTool(name, operation);
+    handleNormalizedProgressEvent({AgentProgressEventKind::ToolStarted,
+                                   operation,
+                                   m_provider != nullptr ? m_provider->id() : QString(),
+                                   QStringLiteral("controller.tool.start"),
+                                   name,
+                                   progressLabel,
+                                   {}});
     const bool suppressReadFileLog = (name == QStringLiteral("read_file"));
     if (!suppressReadFileLog)
     {
@@ -818,6 +893,15 @@ void AgentController::executeTool(const QString &name, const QJsonObject &args)
     {
         emit logMessage(formatToolResultLog(result));
     }
+    handleNormalizedProgressEvent({AgentProgressEventKind::ToolCompleted,
+                                   operation,
+                                   m_provider != nullptr ? m_provider->id() : QString(),
+                                   QStringLiteral("controller.tool.completed"),
+                                   name,
+                                   progressLabel,
+                                   {}});
+    m_pendingValidationToolName = name;
+    m_pendingValidationLabel = progressLabel;
     QCAI_DEBUG("Agent",
                QStringLiteral("Tool '%1' result length: %2").arg(name).arg(result.length()));
 
@@ -868,6 +952,13 @@ void AgentController::handleProviderInactivityTimeout()
     const int actualTimeoutMs = m_providerWatchdog.interval();
     QCAI_ERROR("Agent", QStringLiteral("Provider response timed out after %1 ms of inactivity")
                             .arg(actualTimeoutMs));
+    handleNormalizedProgressEvent({AgentProgressEventKind::Error,
+                                   AgentProgressOperation::None,
+                                   m_provider != nullptr ? m_provider->id() : QString(),
+                                   QStringLiteral("controller.provider.timeout"),
+                                   {},
+                                   {},
+                                   QStringLiteral("Provider response timed out.")});
     if (m_provider != nullptr)
     {
         m_provider->cancel();
@@ -948,6 +1039,42 @@ void AgentController::finalizePersistentRun(const QString &status, const QJsonOb
     }
 
     m_runId.clear();
+}
+
+void AgentController::handleProviderProgressEvent(const ProviderRawEvent &event)
+{
+    if (m_progressTracker == nullptr)
+    {
+        return;
+    }
+
+    applyProgressRenderResult(m_progressTracker->handleProviderRawEvent(event));
+}
+
+void AgentController::handleNormalizedProgressEvent(const AgentProgressEvent &event)
+{
+    if (m_progressTracker == nullptr)
+    {
+        return;
+    }
+
+    applyProgressRenderResult(m_progressTracker->handleNormalizedEvent(event));
+}
+
+void AgentController::applyProgressRenderResult(const AgentProgressRenderResult &result)
+{
+    if (result.statusChanged == true && result.statusText.isEmpty() == false)
+    {
+        emit statusChanged(result.statusText);
+    }
+    if (result.stableLogLine.isEmpty() == false)
+    {
+        emit logMessage(result.stableLogLine);
+    }
+    for (const QString &line : result.debugLines)
+    {
+        QCAI_DEBUG("Progress", line);
+    }
 }
 
 void AgentController::approveAction(int approvalId)

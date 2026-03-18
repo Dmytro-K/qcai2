@@ -239,6 +239,7 @@ bool CopilotProvider::ensureSidecar()
         const auto pendingModelListCallbacks = m_modelListCallbacks;
         m_pending.clear();
         m_streamCallbacks.clear();
+        m_progressCallbacks.clear();
         m_modelListCallbacks.clear();
         for (auto it = pendingCallbacks.begin(); it != pendingCallbacks.end(); ++it)
         {
@@ -397,6 +398,53 @@ void CopilotProvider::handleSidecarOutput()
             continue;
         }
 
+        if (((obj.contains(QStringLiteral("progress"))) == true))
+        {
+            auto progressIt = m_progressCallbacks.find(id);
+            if (((progressIt != m_progressCallbacks.end()) == true))
+            {
+                const QJsonObject progress = obj.value(QStringLiteral("progress")).toObject();
+                QString toolName = progress.value(QStringLiteral("toolName")).toString();
+                QString message = progress.value(QStringLiteral("message")).toString();
+                const QString kind = progress.value(QStringLiteral("kind")).toString();
+
+                ProviderRawEventKind rawKind = ProviderRawEventKind::RequestStarted;
+                if (kind == QStringLiteral("reasoning_delta"))
+                {
+                    rawKind = ProviderRawEventKind::ReasoningDelta;
+                }
+                else if (kind == QStringLiteral("message_delta"))
+                {
+                    rawKind = ProviderRawEventKind::MessageDelta;
+                }
+                else if (kind == QStringLiteral("tool_started"))
+                {
+                    rawKind = ProviderRawEventKind::ToolStarted;
+                }
+                else if (kind == QStringLiteral("tool_completed"))
+                {
+                    rawKind = ProviderRawEventKind::ToolCompleted;
+                }
+                else if (kind == QStringLiteral("response_completed"))
+                {
+                    rawKind = ProviderRawEventKind::ResponseCompleted;
+                }
+                else if (kind == QStringLiteral("idle"))
+                {
+                    rawKind = ProviderRawEventKind::Idle;
+                }
+                else if (kind == QStringLiteral("error"))
+                {
+                    rawKind = ProviderRawEventKind::Error;
+                }
+
+                progressIt.value()(ProviderRawEvent{
+                    rawKind, this->id(), progress.value(QStringLiteral("rawType")).toString(),
+                    toolName, message});
+            }
+            continue;
+        }
+
         // Handle streaming delta
         if (((obj.contains(QStringLiteral("stream_delta"))) == true))
         {
@@ -410,6 +458,7 @@ void CopilotProvider::handleSidecarOutput()
 
         CompletionCallback cb = it.value();
         m_pending.erase(it);
+        m_progressCallbacks.remove(id);
 
         // Signal stream end
         auto sit = m_streamCallbacks.find(id);
@@ -451,7 +500,8 @@ void CopilotProvider::handleSidecarOutput()
  */
 void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString &model,
                                double temperature, int maxTokens, const QString &reasoningEffort,
-                               CompletionCallback callback, StreamCallback streamCallback)
+                               CompletionCallback callback, StreamCallback streamCallback,
+                               ProgressCallback progressCallback)
 {
     if (ensureSidecar() == false)
     {
@@ -521,6 +571,10 @@ void CopilotProvider::complete(const QList<ChatMessage> &messages, const QString
     {
         m_streamCallbacks.insert(id, streamCallback);
     }
+    if (progressCallback)
+    {
+        m_progressCallbacks.insert(id, progressCallback);
+    }
     sendRequest(req);
 }
 
@@ -569,6 +623,7 @@ void CopilotProvider::cancel()
     const auto pendingCallbacks = m_pending;
     m_pending.clear();
     m_streamCallbacks.clear();
+    m_progressCallbacks.clear();
     for (auto it = pendingCallbacks.begin(); it != pendingCallbacks.end(); ++it)
     {
         it.value()({}, QStringLiteral("Cancelled"), {});

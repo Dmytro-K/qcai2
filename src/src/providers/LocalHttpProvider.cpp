@@ -21,8 +21,18 @@ LocalHttpProvider::LocalHttpProvider(QObject *parent) : QObject(parent)
 
 void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QString &model,
                                  double temperature, int maxTokens, const QString &reasoningEffort,
-                                 CompletionCallback callback, StreamCallback /*streamCallback*/)
+                                 CompletionCallback callback, StreamCallback /*streamCallback*/,
+                                 ProgressCallback progressCallback)
 {
+    if (progressCallback != nullptr)
+    {
+        progressCallback({ProviderRawEventKind::RequestStarted,
+                          id(),
+                          QStringLiteral("request.started"),
+                          {},
+                          {}});
+    }
+
     QJsonObject body;
 
     if (m_simpleMode == true)
@@ -90,7 +100,7 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
 
     m_currentReply = m_nam.post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
 
-    connect(m_currentReply, &QNetworkReply::finished, this, [this, callback]() {
+    connect(m_currentReply, &QNetworkReply::finished, this, [this, callback, progressCallback]() {
         QNetworkReply *reply = m_currentReply;
         m_currentReply = nullptr;
         if (((reply == nullptr) == true))
@@ -102,6 +112,14 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
         if (((reply->error() != QNetworkReply::NoError) == true))
         {
             const auto errBody = QString::fromUtf8(reply->readAll());
+            if (progressCallback != nullptr)
+            {
+                progressCallback({ProviderRawEventKind::Error,
+                                  id(),
+                                  QStringLiteral("response.error"),
+                                  {},
+                                  reply->errorString()});
+            }
             QCAI_ERROR("LocalHTTP", QStringLiteral("HTTP error: %1 — %2")
                                         .arg(reply->errorString(), errBody.left(300)));
             callback({}, QStringLiteral("HTTP error: %1 — %2").arg(reply->errorString(), errBody),
@@ -145,6 +163,14 @@ void LocalHttpProvider::complete(const QList<ChatMessage> &messages, const QStri
             return;
         }
 
+        if (progressCallback != nullptr)
+        {
+            progressCallback({ProviderRawEventKind::ResponseCompleted,
+                              id(),
+                              QStringLiteral("response.completed"),
+                              {},
+                              {}});
+        }
         callback(content, {}, usage);
         QCAI_DEBUG("LocalHTTP",
                    QStringLiteral("Response received, %1 chars").arg(content.length()));

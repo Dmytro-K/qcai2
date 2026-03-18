@@ -57,7 +57,8 @@ public:
      */
     void complete(const QList<ChatMessage> &messages, const QString &model, double temperature,
                   int maxTokens, const QString &reasoningEffort, CompletionCallback callback,
-                  StreamCallback streamCallback = nullptr) override;
+                  StreamCallback streamCallback = nullptr,
+                  ProgressCallback progressCallback = nullptr) override;
 
     /**
      * Receives the model list or an error returned by the sidecar.
@@ -70,7 +71,7 @@ public:
      * Requests the available Copilot models from the sidecar.
      * @param callback Callback invoked with the final result.
      */
-    void listModels(const ModelListCallback& callback);
+    void listModels(const ModelListCallback &callback);
 
     /**
      * Cancels queued or active requests on both plugin and sidecar sides.
@@ -161,6 +162,9 @@ private:
     /** Streaming callbacks keyed by request id. */
     QMap<int, StreamCallback> m_streamCallbacks;
 
+    /** Raw provider progress callbacks keyed by request id. */
+    QMap<int, ProgressCallback> m_progressCallbacks;
+
     /** Model-list callbacks keyed by request id. */
     QMap<int, ModelListCallback> m_modelListCallbacks;
 
@@ -169,7 +173,6 @@ private:
 
     /** Most recent stderr output collected from the sidecar. */
     QString m_lastStderr;
-
 };
 
 }  // namespace qcai2

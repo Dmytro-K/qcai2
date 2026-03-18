@@ -4,6 +4,8 @@
 
 #include "context/EditorContext.h"
 #include "models/AgentMessages.h"
+#include "progress/AgentProgress.h"
+#include "progress/AgentProgressTracker.h"
 #include "providers/IAIProvider.h"
 #include "safety/SafetyPolicy.h"
 #include "tools/ToolRegistry.h"
@@ -190,6 +192,12 @@ signals:
     void providerUsageAvailable(const ProviderUsage &usage, qint64 durationMs);
 
     /**
+     * Publishes the latest human-friendly live progress status.
+     * @param status User-visible status text.
+     */
+    void statusChanged(const QString &status);
+
+    /**
      * Publishes the latest multi-step plan returned by the model.
      * @param steps Plan steps to display.
      */
@@ -287,6 +295,21 @@ private:
      */
     void finalizePersistentRun(const QString &status, const QJsonObject &metadata = {});
 
+    /**
+     * Routes one raw provider progress event through the tracker.
+     */
+    void handleProviderProgressEvent(const ProviderRawEvent &event);
+
+    /**
+     * Routes one controller-generated normalized progress event through the tracker.
+     */
+    void handleNormalizedProgressEvent(const AgentProgressEvent &event);
+
+    /**
+     * Applies one tracker render result to UI-facing signals and debug logs.
+     */
+    void applyProgressRenderResult(const AgentProgressRenderResult &result);
+
     /** Active provider used for the current run. */
     IAIProvider *m_provider = nullptr;
 
@@ -355,6 +378,15 @@ private:
 
     /** Accumulated provider usage across all model requests in the current run. */
     ProviderUsage m_accumulatedUsage;
+
+    /** Tracker that normalizes provider/controller activity into user-facing statuses. */
+    std::unique_ptr<AgentProgressTracker> m_progressTracker;
+
+    /** Tool currently awaiting model-side validation after it completed. */
+    QString m_pendingValidationToolName;
+
+    /** Human-friendly label for the tool currently awaiting validation. */
+    QString m_pendingValidationLabel;
 
     /** Measures elapsed time for the in-flight provider request. */
     QElapsedTimer m_providerRequestTimer;
