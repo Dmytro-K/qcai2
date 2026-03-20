@@ -276,7 +276,7 @@ async function handleComplete(id, params) {
         streaming,
         reasoningEffort: reasoning_effort,
     } = params;
-    const requestedModel = model || "gpt-4.1";
+    const requestedModel = model || "gpt-5.4";
     const max_output_tokens = Number.isFinite(maxTokens)
         ? Math.max(1, Math.trunc(maxTokens))
         : (Number.isFinite(max_tokens) ? Math.max(1, Math.trunc(max_tokens)) : undefined);

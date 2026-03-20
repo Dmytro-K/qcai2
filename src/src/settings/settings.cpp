@@ -20,6 +20,8 @@ static const QLatin1String kGroup("qcai2");
 namespace
 {
 
+QString normalize_model_name(const QString &model);
+
 /**
  * Trims, deduplicates, and preserves model names for editable combo boxes.
  * @param models Candidate model names.
@@ -32,15 +34,41 @@ QStringList normalize_model_list(const QStringList &models)
 
     for (const QString &model : models)
     {
-        const QString trimmed = model.trimmed();
-        if (trimmed.isEmpty() || normalized.contains(trimmed))
+        const QString normalized_model = normalize_model_name(model);
+        if (normalized_model.isEmpty() || normalized.contains(normalized_model))
         {
             continue;
         }
-        normalized.append(trimmed);
+        normalized.append(normalized_model);
     }
 
     return normalized;
+}
+
+QString normalize_model_name(const QString &model)
+{
+    const QString trimmed = model.trimmed();
+    if (trimmed == QStringLiteral("claude-opus-4-6"))
+    {
+        return QStringLiteral("claude-opus-4.6");
+    }
+    if (trimmed == QStringLiteral("claude-sonnet-4-6"))
+    {
+        return QStringLiteral("claude-sonnet-4.6");
+    }
+    if (trimmed == QStringLiteral("claude-sonnet-4-5"))
+    {
+        return QStringLiteral("claude-sonnet-4.5");
+    }
+    if (trimmed == QStringLiteral("claude-haiku-4-5"))
+    {
+        return QStringLiteral("claude-haiku-4.5");
+    }
+    if (trimmed == QStringLiteral("gemini-3.1-pro"))
+    {
+        return QStringLiteral("gemini-3-pro-preview");
+    }
+    return trimmed;
 }
 
 QJsonObject mcpServerConnectionStatesToJson(const mcp_server_connection_states_t &states)
@@ -244,7 +272,7 @@ void settings_t::load()
     base_url = s.value("baseUrl", base_url).toString();
     // Note: apiKey is loaded but never logged
     api_key = s.value("apiKey", api_key).toString();
-    model_name = s.value("modelName", model_name).toString();
+    model_name = normalize_model_name(s.value("modelName", model_name).toString());
     thinking_level = s.value("thinkingLevel", thinking_level).toString();
     reasoning_effort = s.value("reasoningEffort", thinking_level).toString();
     temperature = s.value("temperature", temperature).toDouble();
@@ -259,7 +287,7 @@ void settings_t::load()
     ollama_model = s.value("ollamaModel", ollama_model).toString();
 
     copilot_token = s.value("copilotToken", copilot_token).toString();
-    copilot_model = s.value("copilotModel", copilot_model).toString();
+    copilot_model = normalize_model_name(s.value("copilotModel", copilot_model).toString());
     copilot_node_path = s.value("copilotNodePath", copilot_node_path).toString();
     copilot_sidecar_path = s.value("copilotSidecarPath", copilot_sidecar_path).toString();
     copilot_completion_timeout_sec =
@@ -281,7 +309,8 @@ void settings_t::load()
     agent_debug = s.value("agentDebug", agent_debug).toBool();
     completion_min_chars = s.value("completionMinChars", completion_min_chars).toInt();
     completion_delay_ms = s.value("completionDelayMs", completion_delay_ms).toInt();
-    completion_model = s.value("completionModel", completion_model).toString();
+    completion_model =
+        normalize_model_name(s.value("completionModel", completion_model).toString());
     completion_thinking_level =
         s.value("completionThinkingLevel", completion_thinking_level).toString();
     completion_reasoning_effort =
@@ -515,19 +544,29 @@ void model_catalog_t::set_copilot_models(const QStringList &models)
 QStringList model_catalog_t::default_copilot_models()
 {
     return {
-        QStringLiteral("gpt-5.4"),           QStringLiteral("gpt-5.4"),
-        QStringLiteral("gpt-5.3-codex"),     QStringLiteral("gpt-5.2-codex"),
-        QStringLiteral("gpt-5.2"),           QStringLiteral("gpt-5.1-codex-max"),
-        QStringLiteral("gpt-5.1-codex"),     QStringLiteral("gpt-5.1-codex-mini"),
-        QStringLiteral("gpt-5.1"),           QStringLiteral("gpt-5-mini"),
-        QStringLiteral("gpt-4.1"),           QStringLiteral("gpt-4o"),
-        QStringLiteral("o4-mini"),           QStringLiteral("o3"),
-        QStringLiteral("claude-opus-4.6"),   QStringLiteral("claude-opus-4.6-fast"),
-        QStringLiteral("claude-opus-4.5"),   QStringLiteral("claude-sonnet-4.6"),
-        QStringLiteral("claude-sonnet-4.5"), QStringLiteral("claude-sonnet-4"),
-        QStringLiteral("claude-haiku-4.5"),  QStringLiteral("gemini-3.1-pro"),
-        QStringLiteral("gemini-3-pro"),      QStringLiteral("gemini-3-flash"),
-        QStringLiteral("gemini-2.5-pro"),    QStringLiteral("grok-code-fast-1"),
+        QStringLiteral("gpt-5.4"),
+        QStringLiteral("gpt-5.4-mini"),
+        QStringLiteral("gpt-5.3-codex"),
+        QStringLiteral("gpt-5.2-codex"),
+        QStringLiteral("gpt-5.2"),
+        QStringLiteral("gpt-5.1-codex-max"),
+        QStringLiteral("gpt-5.1-codex"),
+        QStringLiteral("gpt-5.1-codex-mini"),
+        QStringLiteral("gpt-5.1"),
+        QStringLiteral("gpt-5-mini"),
+        QStringLiteral("gpt-4.1"),
+        QStringLiteral("o4-mini"),
+        QStringLiteral("o3"),
+        QStringLiteral("claude-opus-4.6"),
+        QStringLiteral("claude-opus-4.6-fast"),
+        QStringLiteral("claude-opus-4.5"),
+        QStringLiteral("claude-sonnet-4.6"),
+        QStringLiteral("claude-sonnet-4.5"),
+        QStringLiteral("claude-sonnet-4"),
+        QStringLiteral("claude-haiku-4.5"),
+        QStringLiteral("gemini-3-pro-preview"),
+        QStringLiteral("gemini-3-flash"),
+        QStringLiteral("gemini-2.5-pro"),
     };
 }
 

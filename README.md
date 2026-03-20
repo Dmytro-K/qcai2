@@ -148,12 +148,12 @@ Open **Edit → Preferences → Qcai2** in Qt Creator.
 - **Active provider**: `openai`, `copilot`, `local`, or `ollama`
 - **OpenAI-compatible defaults**:
   - Base URL: `https://api.openai.com`
-  - Agent model: `gpt-5.2`
+  - Agent model: `gpt-5.4`
   - Thinking level: `medium`
   - Temperature: `0.2`
   - Max tokens: `4096`
 - **GitHub Copilot defaults**:
-  - Copilot model: `gpt-4o`
+  - Copilot model: `gpt-5.4`
   - Optional custom Node path
   - Optional custom sidecar path
 - **Local HTTP defaults**:

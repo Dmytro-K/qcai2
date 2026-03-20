@@ -70,11 +70,19 @@ int bounded_int(qsizetype value)
 QStringList open_ai_agent_models()
 {
     return {
-        QStringLiteral("gpt-5.4"),           QStringLiteral("gpt-5.2"),
-        QStringLiteral("gpt-5.3-codex"),     QStringLiteral("gpt-5-mini"),
-        QStringLiteral("gpt-4.1"),           QStringLiteral("o3"),
-        QStringLiteral("o4-mini"),           QStringLiteral("claude-opus-4.6"),
-        QStringLiteral("claude-sonnet-4.6"), QStringLiteral("gemini-3-flash"),
+        QStringLiteral("gpt-5.4"),
+        QStringLiteral("gpt-5.4-mini"),
+        QStringLiteral("gpt-5.3-codex"),
+        QStringLiteral("gpt-5.2-codex"),
+        QStringLiteral("gpt-5-mini"),
+        QStringLiteral("gpt-4.1"),
+        QStringLiteral("o3"),
+        QStringLiteral("o4-mini"),
+        QStringLiteral("claude-opus-4.6"),
+        QStringLiteral("claude-sonnet-4.6"),
+        QStringLiteral("claude-haiku-4.5"),
+        QStringLiteral("gemini-3-pro-preview"),
+        QStringLiteral("gemini-3-flash"),
     };
 }
 

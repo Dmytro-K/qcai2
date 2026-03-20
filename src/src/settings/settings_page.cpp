@@ -202,11 +202,15 @@ public:
         // Model combo: editable, with presets
         this->modelCombo->addItems({
             // OpenAI — GPT-5 family
-            QStringLiteral("gpt-5.2"),
+            QStringLiteral("gpt-5.4"),
+            QStringLiteral("gpt-5.4-mini"),
+            QStringLiteral("gpt-5.3-codex"),
             QStringLiteral("gpt-5.2-codex"),
+            QStringLiteral("gpt-5.2"),
+            QStringLiteral("gpt-5.1-codex-max"),
             QStringLiteral("gpt-5.1"),
             QStringLiteral("gpt-5.1-codex"),
-            QStringLiteral("gpt-5"),
+            QStringLiteral("gpt-5.1-codex-mini"),
             QStringLiteral("gpt-5-mini"),
             // OpenAI — GPT-4.1
             QStringLiteral("gpt-4.1"),
@@ -215,17 +219,18 @@ public:
             // OpenAI — O-series reasoning
             QStringLiteral("o3"),
             QStringLiteral("o4-mini"),
-            // OpenAI — GPT-4o (legacy)
-            QStringLiteral("gpt-4o"),
-            QStringLiteral("gpt-4o-mini"),
             // Anthropic Claude
-            QStringLiteral("claude-opus-4-6"),
-            QStringLiteral("claude-sonnet-4-6"),
-            QStringLiteral("claude-sonnet-4-5"),
-            QStringLiteral("claude-haiku-4-5"),
+            QStringLiteral("claude-opus-4.6"),
+            QStringLiteral("claude-opus-4.6-fast"),
+            QStringLiteral("claude-opus-4.5"),
+            QStringLiteral("claude-sonnet-4.6"),
+            QStringLiteral("claude-sonnet-4.5"),
+            QStringLiteral("claude-sonnet-4"),
+            QStringLiteral("claude-haiku-4.5"),
             // Google Gemini
-            QStringLiteral("gemini-3-pro"),
+            QStringLiteral("gemini-3-pro-preview"),
             QStringLiteral("gemini-3-flash"),
+            QStringLiteral("gemini-2.5-pro"),
             QStringLiteral("gemini-2.5-flash"),
             QStringLiteral("gemini-2.5-flash-lite"),
             // DeepSeek
@@ -312,17 +317,23 @@ public:
 
         this->completionDelayMsSpin->setValue(s.completion_delay_ms);
 
-        this->completionModelCombo->addItem(tr_t::tr("(Same as agent model)"), QStringLiteral(""));
+        if (this->completionModelCombo->lineEdit() != nullptr)
+        {
+            this->completionModelCombo->lineEdit()->setPlaceholderText(
+                tr_t::tr("(Same as agent model)"));
+        }
         this->completionModelCombo->addItems({
             // Fast/small models suitable for completion
+            QStringLiteral("gpt-5.4-mini"),
+            QStringLiteral("gpt-5.3-codex"),
             QStringLiteral("gpt-4.1-nano"),
             QStringLiteral("gpt-4.1-mini"),
             QStringLiteral("gpt-5-mini"),
             QStringLiteral("gpt-5.1-codex-mini"),
             QStringLiteral("gpt-5.1-codex"),
             QStringLiteral("gpt-5.2-codex"),
-            QStringLiteral("claude-haiku-4-5"),
-            QStringLiteral("claude-sonnet-4-6"),
+            QStringLiteral("claude-haiku-4.5"),
+            QStringLiteral("claude-sonnet-4.6"),
             QStringLiteral("gemini-3-flash"),
             QStringLiteral("gemini-2.5-flash-lite"),
             QStringLiteral("gemini-2.5-flash"),
@@ -330,14 +341,7 @@ public:
             QStringLiteral("qwen2.5-coder-32b"),
             QStringLiteral("codellama"),
         });
-        if (s.completion_model.isEmpty())
-        {
-            this->completionModelCombo->setCurrentIndex(0);
-        }
-        else
-        {
-            this->completionModelCombo->setCurrentText(s.completion_model);
-        }
+        this->completionModelCombo->setCurrentText(s.completion_model.trimmed());
 
         populateEffortCombo(this->completionThinkingCombo);
         selectEffortValue(this->completionThinkingCombo, s.completion_thinking_level, 0);
@@ -390,6 +394,8 @@ public:
         installCheckSettingsDirtyTrigger(this->agentDebugCheck);
         // QDoubleSpinBox not supported by installCheckSettingsDirtyTrigger
         connect(this->tempSpin, &QDoubleSpinBox::valueChanged, Utils::checkSettingsDirty);
+        connect(this->completionModelCombo, &QComboBox::currentTextChanged,
+                Utils::checkSettingsDirty);
         connect(this->detailedRequestLoggingCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->mcpServersWidget, &mcp_servers_widget_t::changed, Utils::checkSettingsDirty);
     }
@@ -435,8 +441,7 @@ public:
         s.ai_completion_enabled = this->aiCompletionCheck->isChecked();
         s.completion_min_chars = this->completionMinCharsSpin->value();
         s.completion_delay_ms = this->completionDelayMsSpin->value();
-        const int cIdx = this->completionModelCombo->currentIndex();
-        s.completion_model = (cIdx == 0) ? QString() : this->completionModelCombo->currentText();
+        s.completion_model = this->completionModelCombo->currentText().trimmed();
         s.completion_thinking_level = this->completionThinkingCombo->currentData().toString();
         s.completion_reasoning_effort = this->completionReasoningCombo->currentData().toString();
         s.debug_logging = this->debugLoggingCheck->isChecked();
@@ -458,7 +463,6 @@ public:
 private:
     snapshot_t captureSnapshot() const
     {
-        const int cIdx = this->completionModelCombo->currentIndex();
         return {
             this->providerCombo->currentData().toString(),
             this->baseUrlCombo->currentText(),
@@ -486,7 +490,7 @@ private:
             this->aiCompletionCheck->isChecked(),
             this->completionMinCharsSpin->value(),
             this->completionDelayMsSpin->value(),
-            (cIdx == 0) ? QString() : this->completionModelCombo->currentText(),
+            this->completionModelCombo->currentText().trimmed(),
             this->completionThinkingCombo->currentData().toString(),
             this->completionReasoningCombo->currentData().toString(),
             this->debugLoggingCheck->isChecked(),
@@ -537,10 +541,7 @@ private:
         this->completionMinCharsSpin->setValue(snap.completion_min_chars);
         this->completionDelayMsSpin->setValue(snap.completion_delay_ms);
 
-        if (snap.completion_model.isEmpty())
-            this->completionModelCombo->setCurrentIndex(0);
-        else
-            this->completionModelCombo->setCurrentText(snap.completion_model);
+        this->completionModelCombo->setCurrentText(snap.completion_model.trimmed());
 
         selectEffortValue(this->completionThinkingCombo, snap.completion_thinking_level, 0);
         selectEffortValue(this->completionReasoningCombo, snap.completion_reasoning_effort, 0);

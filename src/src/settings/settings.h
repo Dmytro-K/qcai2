@@ -24,7 +24,7 @@ struct settings_t
     QString api_key;
 
     /** Default model used for agent requests. */
-    QString model_name = QStringLiteral("gpt-5.2");
+    QString model_name = QStringLiteral("gpt-5.4");
 
     /** Provider reasoning effort: off, low, medium, or high. */
     QString reasoning_effort = QStringLiteral("medium");
@@ -60,7 +60,7 @@ struct settings_t
     QString copilot_token;
 
     /** Default model exposed by the Copilot sidecar. */
-    QString copilot_model = QStringLiteral("gpt-4o");
+    QString copilot_model = QStringLiteral("gpt-5.4");
 
     /** Path to the Node.js executable used to launch the sidecar. */
     QString copilot_node_path;

@@ -116,11 +116,11 @@ qcai2/
 Current defaults from `Settings`:
 
 - `provider = openai`
-- `modelName = gpt-5.2`
+- `modelName = gpt-5.4`
 - `thinkingLevel = medium`
 - `temperature = 0.2`
 - `maxTokens = 4096`
-- `copilotModel = gpt-4o`
+- `copilotModel = gpt-5.4`
 - `localBaseUrl = http://localhost:8080`
 - `localEndpointPath = /v1/chat/completions`
 - `ollamaBaseUrl = http://localhost:11434`
