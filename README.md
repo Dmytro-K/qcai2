@@ -22,10 +22,13 @@
 - [ ] Per-project custom instructions (`.qcai2/rules.md`)
 - [ ] Conversation list UI
 - [ ] Semantic search over chat history
+- [ ] Semantic search over code
 - [ ] Multi-turn inline edit
 - [ ] Web search tool
 - [ ] Image/screenshot attachment
 - [ ] Multi-agent orchestration with delegated subtasks and parallel execution
+- [ ] Voice input
+- [ ] Voice output
 
 ## Repository layout
 
