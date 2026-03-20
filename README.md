@@ -5,19 +5,27 @@
 ## Features
 
 - [x] Autonomous agent loop (plan → act → observe → verify) with Ask and Agent modes
-- [x] Multiple LLM providers: OpenAI-compatible, GitHub Copilot, Ollama, custom local
+- [x] Multiple LLM providers: OpenAI-compatible, Anthropic API, GitHub Copilot, Ollama, custom local
 - [x] MCP support (stdio, HTTP/OAuth, SSE) with per-project and global server configs
 - [x] Diff review with per-line accept/reject and inline editor markers
 - [x] AI code completion with inline ghost-text suggestions
 - [x] Chat history, rolling summaries, and context budgeting
 - [x] Per-project sessions under `.qcai2/` with migration and auto-reload
 - [x] Safety: dry-run by default, approval gates, path sandboxing, command allowlisting
-- [x] `#file` references and `/command` slash commands with auto-completion
-- [ ] More tools: create_file, list_directory, run_command, find_symbol
-- [ ] More slash commands: /clear, /diff, /explain, /refactor, /test
-- [ ] Streaming markdown rendering
+- [x] `#file` references and slash commands with auto-completion
+- [x] Built-in tools for file creation, directory listing, command execution, symbol lookup, diagnostics, git, and IDE output access
+- [x] Slash commands including `/compact`, `/explain`, `/refactor`, and `/test`
+- [x] Live provider progress status, detailed per-request Markdown logs, and per-project usage statistics
+- [x] GitHub Copilot Premium request usage display
+- [x] Optional auto-compact based on prior context token usage
+- [ ] More slash commands: `/clear`, `/diff`
 - [ ] Per-project custom instructions (`.qcai2/rules.md`)
+- [ ] Conversation list UI
 - [ ] Semantic search over chat history
+- [ ] Multi-turn inline edit
+- [ ] Web search tool
+- [ ] Image/screenshot attachment
+- [ ] Multi-agent orchestration with delegated subtasks and parallel execution
 
 ## Repository layout
 
@@ -145,43 +153,62 @@ Open **Edit → Preferences → Qcai2** in Qt Creator.
 
 ### Providers tab
 
-- **Active provider**: `openai`, `copilot`, `local`, or `ollama`
-- **OpenAI-compatible defaults**:
-  - Base URL: `https://api.openai.com`
-  - Agent model: `gpt-5.4`
-  - Thinking level: `medium`
-  - Temperature: `0.2`
-  - Max tokens: `4096`
-- **GitHub Copilot defaults**:
-  - Copilot model: `gpt-5.4`
+- **Active provider**: `openai`, `anthropic`, `copilot`, `local`, or `ollama`
+- **Remote API (OpenAI-compatible / Anthropic)**:
+  - Shared settings: base URL, API key, model, reasoning effort, thinking, temperature, and max tokens
+  - Default base URL: `https://api.openai.com`
+  - Default agent model: `gpt-5.4`
+  - Default reasoning effort: `medium`
+  - Default thinking: `medium`
+  - Default temperature: `0.2`
+  - Default max tokens: `4096`
+  - Editable presets include OpenAI, Anthropic, Gemini, xAI, DeepSeek, Mistral, Groq, OpenRouter, Together, Fireworks, and local URLs
+- **GitHub Copilot (via sidecar)**:
+  - Model selector with runtime-populated presets
+  - Default model: `gpt-5.4`
   - Optional custom Node path
   - Optional custom sidecar path
-- **Local HTTP defaults**:
-  - Base URL: `http://localhost:8080`
-  - Endpoint: `/v1/chat/completions`
-  - Optional simplified prompt mode
+  - Completion timeout: `300 s` by default; `0` disables the timeout
+- **Local HTTP**:
+  - Default base URL: `http://localhost:8080`
+  - Default endpoint: `/v1/chat/completions`
   - Optional custom headers
-- **Ollama defaults**:
-  - Base URL: `http://localhost:11434`
-  - Model: `llama4`
+  - Optional simplified `"{prompt}"` mode
+- **Ollama**:
+  - Default base URL: `http://localhost:11434`
+  - Default model: `llama4`
+  - Editable model list with common local presets
+
+### MCP Servers tab
+
+- Configure global MCP server definitions used by the plugin.
+- Supports stdio servers plus HTTP/SSE transports with the project MCP client stack.
 
 ### Code Completion tab
 
 - Enabled by default
+- Completion model is optional; leave it empty to use the same model as the agent
 - Trigger threshold: `3` characters
-- Debounce delay: `500 ms`
-- Optional completion-specific model override
-- Completion thinking default: `off`
-- Completion reasoning effort default: `off`
+- Trigger delay: `500 ms`
+- Default completion thinking: `off`
+- Default completion reasoning effort: `off`
 
 ### Safety & Behavior tab
 
-- Dry-run enabled by default
-- Max iterations: `8`
-- Max tool calls: `25`
-- Max diff lines before approval: `300`
-- Max changed files before approval: `10`
-- Optional debug logging and raw agent JSON output
+- **Agent Limits**:
+  - Max iterations: `8`
+  - Max tool calls: `25`
+  - Max diff lines before approval: `300`
+  - Max changed files before approval: `10`
+- **Behavior**:
+  - Dry-run mode enabled by default
+  - Optional debug logging to the `Debug Log` tab
+  - Optional detailed per-request Markdown logging under the project `.qcai2/logs/` directory
+  - Optional `Agent Debug` mode that shows raw JSON payloads in chat
+- **Auto-compact**:
+  - Disabled by default
+  - When enabled, automatically runs `/compact` before the next request after the previous request exceeds the input-token threshold
+  - Default threshold: `8000` input tokens
 
 ## Safety model
 
