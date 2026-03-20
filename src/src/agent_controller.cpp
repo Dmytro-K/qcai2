@@ -117,30 +117,6 @@ context_request_kind_t context_request_kind(agent_controller_t::run_mode_t run_m
                                                            : context_request_kind_t::AGENT_CHAT;
 }
 
-provider_usage_t accumulate_usage(const provider_usage_t &lhs, const provider_usage_t &rhs)
-{
-    provider_usage_t usage;
-    usage.input_tokens = (lhs.input_tokens >= 0 || rhs.input_tokens >= 0)
-                             ? qMax(0, qMax(lhs.input_tokens, 0) + qMax(rhs.input_tokens, 0))
-                             : -1;
-    usage.output_tokens = (lhs.output_tokens >= 0 || rhs.output_tokens >= 0)
-                              ? qMax(0, qMax(lhs.output_tokens, 0) + qMax(rhs.output_tokens, 0))
-                              : -1;
-    usage.reasoning_tokens =
-        (lhs.reasoning_tokens >= 0 || rhs.reasoning_tokens >= 0)
-            ? qMax(0, qMax(lhs.reasoning_tokens, 0) + qMax(rhs.reasoning_tokens, 0))
-            : -1;
-    usage.cached_input_tokens =
-        (lhs.cached_input_tokens >= 0 || rhs.cached_input_tokens >= 0)
-            ? qMax(0, qMax(lhs.cached_input_tokens, 0) + qMax(rhs.cached_input_tokens, 0))
-            : -1;
-    usage.total_tokens =
-        (lhs.resolved_total_tokens() >= 0 || rhs.resolved_total_tokens() >= 0)
-            ? qMax(0, qMax(lhs.resolved_total_tokens(), 0) + qMax(rhs.resolved_total_tokens(), 0))
-            : -1;
-    return usage;
-}
-
 QString artifact_kind_for_tool(const QString &tool_name)
 {
     if (tool_name == QStringLiteral("run_build"))
@@ -696,7 +672,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
 
     if ((usage.has_any() == true) || (request_duration_ms >= 0))
     {
-        this->accumulated_usage = accumulate_usage(this->accumulated_usage, usage);
+        this->accumulated_usage = accumulate_provider_usage(this->accumulated_usage, usage);
         emit this->provider_usage_available(usage, request_duration_ms);
     }
 

@@ -194,6 +194,41 @@ QString provider_usage_markdown(const provider_usage_t &usage, qint64 duration_m
         .arg(summary.toHtmlEscaped());
 }
 
+QString format_request_count(int count)
+{
+    return count == 1 ? QStringLiteral("1 request")
+                      : QStringLiteral("%1 requests").arg(qMax(0, count));
+}
+
+QString format_usage_value_for_provider(const QString &provider_id, const provider_usage_t &usage,
+                                        int request_count)
+{
+    if (provider_id == QStringLiteral("copilot"))
+    {
+        if (usage.quota_remaining_percent >= 0.0)
+        {
+            QString text = QStringLiteral("Premium reqs: %1% remaining")
+                               .arg(usage.quota_remaining_percent, 0, 'f', 1);
+            if (usage.quota_used_requests >= 0 && usage.quota_total_requests > 0)
+            {
+                text += QStringLiteral(" (%1/%2)")
+                            .arg(usage.quota_used_requests)
+                            .arg(usage.quota_total_requests);
+            }
+            return text;
+        }
+        if (request_count <= 0)
+        {
+            return QStringLiteral("Copilot Premium requests usage: %1").arg(QObject::tr("—"));
+        }
+        return QStringLiteral("Copilot Premium requests usage: %1")
+            .arg(format_request_count(request_count));
+    }
+
+    const QString summary = format_provider_usage_summary(usage);
+    return summary.isEmpty() == true ? QStringLiteral("—") : summary;
+}
+
 class diff_highlighter_t final : public QSyntaxHighlighter
 {
 public:
@@ -845,6 +880,7 @@ void agent_dock_widget_t::clear_chat_state()
     this->applied_diff.clear();
     this->current_diff.clear();
     this->status_label->setText(tr("Ready"));
+    this->reset_usage_display();
     this->apply_patch_btn->setEnabled(false);
     this->revert_patch_btn->setEnabled(false);
     this->tabs->setCurrentWidget(this->plan_list);
@@ -857,6 +893,7 @@ void agent_dock_widget_t::setup_ui()
     this->ui->setupUi(this);
 
     this->status_label = this->ui->statusLabel;
+    this->usage_value_label = this->ui->usageValueLabel;
     this->project_combo = this->ui->projectCombo;
     auto *designer_goal_edit = this->ui->goalEdit;
     this->mode_combo = this->ui->modeCombo;
@@ -882,6 +919,7 @@ void agent_dock_widget_t::setup_ui()
     this->ui->contentSplitter->setStretchFactor(1, 1);
     this->ui->inputRow->setStretch(0, 1);
     this->ui->modeModelRow->setStretch(2, 1);
+    this->reset_usage_display();
 
     this->linked_files_view = new linked_files_list_widget_t(this);
     this->linked_files_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -1130,6 +1168,7 @@ void agent_dock_widget_t::on_run_clicked()
 
     const QString selected_model = this->model_combo->currentText().trimmed();
     const QString selected_mode = this->mode_combo->currentData().toString();
+    this->reset_usage_display(settings().provider, selected_model);
     this->controller->set_request_context(
         this->linked_files_controller->linked_files_prompt_context(),
         this->linked_files_controller->effective_linked_files());
@@ -1243,6 +1282,10 @@ void agent_dock_widget_t::on_log_message(const QString &msg)
 void agent_dock_widget_t::on_provider_usage_available(const provider_usage_t &usage,
                                                       qint64 duration_ms)
 {
+    this->displayed_usage = accumulate_provider_usage(this->displayed_usage, usage);
+    ++this->displayed_provider_request_count;
+    this->update_usage_display();
+
     const QString body = provider_usage_markdown(usage, duration_ms);
     if (body.isEmpty())
     {
@@ -1250,6 +1293,32 @@ void agent_dock_widget_t::on_provider_usage_available(const provider_usage_t &us
     }
 
     this->append_stamped_log_entry(body);
+}
+
+void agent_dock_widget_t::reset_usage_display(const QString &provider_id,
+                                              const QString &model_name)
+{
+    this->usage_provider_id = provider_id.trimmed();
+    this->usage_model_name = model_name.trimmed();
+    this->displayed_usage = {};
+    this->displayed_provider_request_count = 0;
+    // Only blank the label when resetting for a full chat clear (no provider specified).
+    // When called at run-start, keep showing the previous value until new data arrives.
+    if (provider_id.isEmpty())
+    {
+        this->update_usage_display();
+    }
+}
+
+void agent_dock_widget_t::update_usage_display()
+{
+    if (this->usage_value_label == nullptr)
+    {
+        return;
+    }
+
+    this->usage_value_label->setText(format_usage_value_for_provider(
+        this->usage_provider_id, this->displayed_usage, this->displayed_provider_request_count));
 }
 
 void agent_dock_widget_t::append_stamped_log_entry(const QString &body)

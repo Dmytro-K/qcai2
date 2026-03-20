@@ -187,6 +187,16 @@ private:
     QString current_log_markdown() const;
 
     /**
+     * Resets the bottom usage label for a new run or cleared chat state.
+     */
+    void reset_usage_display(const QString &provider_id = {}, const QString &model_name = {});
+
+    /**
+     * Refreshes the bottom usage value from the accumulated run usage state.
+     */
+    void update_usage_display();
+
+    /**
      * Clears the current in-memory chat, plan, diff, and approval state.
      */
     void clear_chat_state();
@@ -229,6 +239,7 @@ private:
     QPushButton *revert_patch_btn;
     QPushButton *copy_plan_btn;
     QLabel *status_label;
+    QLabel *usage_value_label;
 
     /** Full diff currently shown in the preview tab. */
     QString current_diff;
@@ -247,6 +258,14 @@ private:
 
     /** True while streaming tokens are being appended incrementally. */
     bool is_streaming = false;
+
+    /** Provider identifier and model name for the current run's usage display. */
+    QString usage_provider_id;
+    QString usage_model_name;
+
+    /** Accumulated usage and request count shown in the bottom usage row. */
+    provider_usage_t displayed_usage;
+    int displayed_provider_request_count = 0;
 
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> approval_items;

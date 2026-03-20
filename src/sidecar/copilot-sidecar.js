@@ -389,8 +389,31 @@ async function handleComplete(id, params) {
                 await updateReusableSessionDynamicContext(session, currentDynamicSystemContents);
             }
             log(`Request #${id} done: ${content.length} chars`);
+
+            // Fetch quota (non-blocking: ignore errors, don't delay response)
+            let quota = undefined;
+            try {
+                const quotaResult = await client.rpc.account.getQuota();
+                const snap = quotaResult?.quotaSnapshots?.premium_interactions;
+                if (snap && typeof snap.remainingPercentage === "number") {
+                    quota = {
+                        remaining_percentage: snap.remainingPercentage,
+                        used_requests: snap.usedRequests ?? -1,
+                        entitlement_requests: snap.entitlementRequests ?? -1,
+                        overage: snap.overage ?? 0,
+                        reset_date: snap.resetDate ?? null,
+                    };
+                    log(`Request #${id} quota: ${JSON.stringify(quota)}`);
+                }
+            } catch (qe) {
+                log(`Request #${id} quota fetch skipped: ${qe.message}`);
+            }
+
             sendProgress(id, "response_completed", "response.completed");
-            sendResult(id, usage ? { content, usage } : { content });
+            const result = { content };
+            if (usage) result.usage = usage;
+            if (quota) result.quota = quota;
+            sendResult(id, result);
         } else {
             log(`Request #${id} done but was cancelled`);
         }

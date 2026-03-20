@@ -99,6 +99,61 @@ provider_usage_t provider_usage_from_response_object(const QJsonObject &response
         {json::get_int(usage_object, QStringLiteral("cached_input_tokens"), -1),
          json::get_int(usage_object, QStringLiteral("input_tokens_details/cached_tokens"), -1),
          json::get_int(usage_object, QStringLiteral("prompt_tokens_details/cached_tokens"), -1)});
+
+    // Extract optional Copilot quota snapshot
+    const QJsonObject quota_obj = response_object.value(QStringLiteral("quota")).toObject();
+    if (!quota_obj.isEmpty())
+    {
+        const double pct = quota_obj.value(QStringLiteral("remaining_percentage")).toDouble(-1.0);
+        if (pct >= 0.0)
+        {
+            usage.quota_remaining_percent = pct;
+        }
+        const int used = quota_obj.value(QStringLiteral("used_requests")).toInt(-1);
+        if (used >= 0)
+        {
+            usage.quota_used_requests = used;
+        }
+        const int total = quota_obj.value(QStringLiteral("entitlement_requests")).toInt(-1);
+        if (total >= 0)
+        {
+            usage.quota_total_requests = total;
+        }
+    }
+
+    return usage;
+}
+
+provider_usage_t accumulate_provider_usage(const provider_usage_t &lhs,
+                                           const provider_usage_t &rhs)
+{
+    provider_usage_t usage;
+    usage.input_tokens = (lhs.input_tokens >= 0 || rhs.input_tokens >= 0)
+                             ? qMax(0, qMax(lhs.input_tokens, 0) + qMax(rhs.input_tokens, 0))
+                             : -1;
+    usage.output_tokens = (lhs.output_tokens >= 0 || rhs.output_tokens >= 0)
+                              ? qMax(0, qMax(lhs.output_tokens, 0) + qMax(rhs.output_tokens, 0))
+                              : -1;
+    usage.reasoning_tokens =
+        (lhs.reasoning_tokens >= 0 || rhs.reasoning_tokens >= 0)
+            ? qMax(0, qMax(lhs.reasoning_tokens, 0) + qMax(rhs.reasoning_tokens, 0))
+            : -1;
+    usage.cached_input_tokens =
+        (lhs.cached_input_tokens >= 0 || rhs.cached_input_tokens >= 0)
+            ? qMax(0, qMax(lhs.cached_input_tokens, 0) + qMax(rhs.cached_input_tokens, 0))
+            : -1;
+    usage.total_tokens =
+        (lhs.resolved_total_tokens() >= 0 || rhs.resolved_total_tokens() >= 0)
+            ? qMax(0, qMax(lhs.resolved_total_tokens(), 0) + qMax(rhs.resolved_total_tokens(), 0))
+            : -1;
+    // Quota is a point-in-time snapshot; keep the latest (rhs wins if available).
+    usage.quota_remaining_percent = rhs.quota_remaining_percent >= 0.0
+                                        ? rhs.quota_remaining_percent
+                                        : lhs.quota_remaining_percent;
+    usage.quota_used_requests =
+        rhs.quota_used_requests >= 0 ? rhs.quota_used_requests : lhs.quota_used_requests;
+    usage.quota_total_requests =
+        rhs.quota_total_requests >= 0 ? rhs.quota_total_requests : lhs.quota_total_requests;
     return usage;
 }
 

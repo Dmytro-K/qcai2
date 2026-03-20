@@ -9,6 +9,7 @@
 - Added Anthropic API provider
 - Added statistic
 - Added detailed debug log
+- Added GitHub Copilot Premium request usage show
 
 ### Changed
 
