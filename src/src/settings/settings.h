@@ -92,6 +92,9 @@ struct settings_t
     /** Enables plugin debug logging. */
     bool debug_logging = false;
 
+    /** Appends detailed per-request Markdown logs into the project `.qcai2/logs` folder. */
+    bool detailed_request_logging = false;
+
     /** Shows raw agent JSON payloads in chat when true. */
     bool agent_debug = false;
 

@@ -196,6 +196,26 @@ target_link_libraries(tst_qcai2_tool_registry PRIVATE
 )
 add_test(NAME qcai2_tool_registry COMMAND tst_qcai2_tool_registry)
 
+add_executable(tst_qcai2_request_detailed_log
+    tst_request_detailed_log.cpp
+    ../src/util/request_detailed_log.cpp
+    ../src/context/chat_context.cpp
+    ../src/models/agent_messages.cpp
+    ../src/providers/provider_usage.cpp
+    ../src/util/json.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_request_detailed_log)
+
+target_include_directories(tst_qcai2_request_detailed_log PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_request_detailed_log PRIVATE
+    Qt::Core
+    Qt::Test
+)
+add_test(NAME qcai2_request_detailed_log COMMAND tst_qcai2_request_detailed_log)
+
 add_executable(tst_qcai2_migration
     tst_migration.cpp
     ../src/util/migration.cpp

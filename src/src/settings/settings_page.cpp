@@ -113,6 +113,7 @@ class settings_widget_t : public Core::IOptionsPageWidget
         QString completion_thinking_level;
         QString completion_reasoning_effort;
         bool debug_logging = false;
+        bool detailed_request_logging = false;
         bool agent_debug = false;
         qtmcp::server_definitions_t mcp_servers;
 
@@ -157,6 +158,7 @@ public:
         this->completionThinkingCombo = this->ui->completionThinkingCombo;
         this->completionReasoningCombo = this->ui->completionReasoningCombo;
         this->debugLoggingCheck = this->ui->debugLoggingCheck;
+        this->detailedRequestLoggingCheck = this->ui->detailedRequestLoggingCheck;
         this->agentDebugCheck = this->ui->agentDebugCheck;
         this->mcpServersWidget = new mcp_servers_widget_t(this);
         this->mcpServersWidget->set_servers(s.mcp_servers);
@@ -338,6 +340,7 @@ public:
         selectEffortValue(this->completionReasoningCombo, s.completion_reasoning_effort, 0);
 
         this->debugLoggingCheck->setChecked(s.debug_logging);
+        this->detailedRequestLoggingCheck->setChecked(s.detailed_request_logging);
 
         this->agentDebugCheck->setChecked(s.agent_debug);
 
@@ -374,9 +377,11 @@ public:
         installCheckSettingsDirtyTrigger(this->completionThinkingCombo);
         installCheckSettingsDirtyTrigger(this->completionReasoningCombo);
         installCheckSettingsDirtyTrigger(this->debugLoggingCheck);
+        installCheckSettingsDirtyTrigger(this->detailedRequestLoggingCheck);
         installCheckSettingsDirtyTrigger(this->agentDebugCheck);
         // QDoubleSpinBox not supported by installCheckSettingsDirtyTrigger
         connect(this->tempSpin, &QDoubleSpinBox::valueChanged, Utils::checkSettingsDirty);
+        connect(this->detailedRequestLoggingCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->mcpServersWidget, &mcp_servers_widget_t::changed, Utils::checkSettingsDirty);
     }
 
@@ -424,6 +429,7 @@ public:
         s.completion_thinking_level = this->completionThinkingCombo->currentData().toString();
         s.completion_reasoning_effort = this->completionReasoningCombo->currentData().toString();
         s.debug_logging = this->debugLoggingCheck->isChecked();
+        s.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
         s.agent_debug = this->agentDebugCheck->isChecked();
         s.mcp_servers = this->mcpServersWidget->servers();
         s.save();
@@ -473,6 +479,7 @@ private:
             this->completionThinkingCombo->currentData().toString(),
             this->completionReasoningCombo->currentData().toString(),
             this->debugLoggingCheck->isChecked(),
+            this->detailedRequestLoggingCheck->isChecked(),
             this->agentDebugCheck->isChecked(),
             this->mcpServersWidget->servers(),
         };
@@ -524,6 +531,7 @@ private:
         selectEffortValue(this->completionReasoningCombo, snap.completion_reasoning_effort, 0);
 
         this->debugLoggingCheck->setChecked(snap.debug_logging);
+        this->detailedRequestLoggingCheck->setChecked(snap.detailed_request_logging);
         this->agentDebugCheck->setChecked(snap.agent_debug);
         this->mcpServersWidget->set_servers(snap.mcp_servers);
     }
@@ -554,6 +562,7 @@ private:
     QComboBox *completionThinkingCombo;
     QComboBox *completionReasoningCombo;
     QCheckBox *debugLoggingCheck;
+    QCheckBox *detailedRequestLoggingCheck;
     QCheckBox *agentDebugCheck;
     mcp_servers_widget_t *mcpServersWidget = nullptr;
 };

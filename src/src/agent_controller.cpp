@@ -8,6 +8,9 @@
 #include "settings/settings.h"
 #include "util/diff.h"
 #include "util/logger.h"
+#include "util/request_detailed_log.h"
+
+#include "context/chat_context.h"
 
 #include <QFileInfo>
 #include <QJsonArray>
@@ -86,6 +89,26 @@ QString run_mode_label(agent_controller_t::run_mode_t run_mode)
 {
     return run_mode == agent_controller_t::run_mode_t::ASK ? QStringLiteral("ask")
                                                            : QStringLiteral("agent");
+}
+
+QString response_type_label(response_type_t type)
+{
+    switch (type)
+    {
+        case response_type_t::PLAN:
+            return QStringLiteral("plan");
+        case response_type_t::TOOL_CALL:
+            return QStringLiteral("tool_call");
+        case response_type_t::FINAL:
+            return QStringLiteral("final");
+        case response_type_t::NEED_APPROVAL:
+            return QStringLiteral("need_approval");
+        case response_type_t::TEXT:
+            return QStringLiteral("text");
+        case response_type_t::ERROR:
+            return QStringLiteral("error");
+    }
+    return QStringLiteral("unknown");
 }
 
 context_request_kind_t context_request_kind(agent_controller_t::run_mode_t run_mode)
@@ -309,15 +332,28 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
         return;
     }
 
-    QStringList mcpRefreshMessages;
+    QStringList mcp_refresh_messages;
+    editor_context_t::snapshot_t context_snapshot;
+    QString workspace_root;
+    QString workspace_id;
+    if (this->context_provider != nullptr)
+    {
+        context_snapshot = this->context_provider->capture();
+        workspace_root = context_snapshot.project_dir;
+        if (workspace_root.isEmpty() == true && context_snapshot.file_path.isEmpty() == false)
+        {
+            workspace_root = QFileInfo(context_snapshot.file_path).absolutePath();
+        }
+        workspace_id = context_snapshot.project_file_path;
+        if (workspace_id.isEmpty() == true)
+        {
+            workspace_id = workspace_root;
+        }
+    }
     if (run_mode == run_mode_t::AGENT && this->mcp_tool_manager != nullptr)
     {
-        QString project_dir;
-        if (this->context_provider != nullptr)
-        {
-            project_dir = this->context_provider->capture().project_dir;
-        }
-        mcpRefreshMessages = this->mcp_tool_manager->refresh_for_project(project_dir);
+        mcp_refresh_messages =
+            this->mcp_tool_manager->refresh_for_project(context_snapshot.project_dir);
     }
 
     this->running = true;
@@ -346,6 +382,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
     this->progress_tracker = std::make_unique<agent_progress_tracker_t>(
         this->provider != nullptr ? this->provider->id() : QString(),
         agent_status_render_mode_t::INTERACTIVE, settings().agent_debug);
+    this->detailed_request_log.reset();
 
     QCAI_INFO("Agent",
               QStringLiteral("Starting run — mode: %1, provider: %2, model: %3, reasoning: %4, "
@@ -365,38 +402,36 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
             QStringLiteral("Use %1 thinking depth for this task.").arg(this->thinking_level));
     }
 
+    if (s.detailed_request_logging == true && workspace_root.isEmpty() == false)
+    {
+        this->detailed_request_log = std::make_unique<request_detailed_log_t>();
+        this->detailed_request_log->begin_request(
+            workspace_root, {}, this->goal, this->request_context.trimmed(), this->linked_files,
+            this->provider->id(), this->model_name, this->reasoning_effort, this->thinking_level,
+            run_mode_label(this->run_mode), this->dry_run, mcp_refresh_messages);
+    }
+
     bool restoredPersistentContext = false;
     if ((this->chat_context_manager != nullptr) && (this->context_provider != nullptr))
     {
-        const editor_context_t::snapshot_t snapshot = this->context_provider->capture();
-        QString workspaceRoot = snapshot.project_dir;
-        if (workspaceRoot.isEmpty() == true && snapshot.file_path.isEmpty() == false)
-        {
-            workspaceRoot = QFileInfo(snapshot.file_path).absolutePath();
-        }
-        QString workspaceId = snapshot.project_file_path;
-        if (workspaceId.isEmpty() == true)
-        {
-            workspaceId = workspaceRoot;
-        }
-
-        if (workspaceRoot.isEmpty() == false && workspaceId.isEmpty() == false)
+        if (workspace_root.isEmpty() == false && workspace_id.isEmpty() == false)
         {
             QString contextError;
             const QString existingConversationId =
-                this->chat_context_manager->active_workspace_id() == workspaceId
+                this->chat_context_manager->active_workspace_id() == workspace_id
                     ? this->chat_context_manager->active_conversation_id()
                     : QString();
             if (this->chat_context_manager->set_active_workspace(
-                    workspaceId, workspaceRoot, existingConversationId, &contextError) == true)
+                    workspace_id, workspace_root, existingConversationId, &contextError) == true)
             {
-                this->chat_context_manager->sync_workspace_state(snapshot, s, &contextError);
+                this->chat_context_manager->sync_workspace_state(context_snapshot, s,
+                                                                 &contextError);
                 if (contextError.isEmpty() == true)
                 {
                     const QJsonObject runMetadata{
                         {QStringLiteral("goalPreview"), goal.left(200)},
-                        {QStringLiteral("projectFilePath"), snapshot.project_file_path},
-                        {QStringLiteral("projectDir"), snapshot.project_dir},
+                        {QStringLiteral("projectFilePath"), context_snapshot.project_file_path},
+                        {QStringLiteral("projectDir"), context_snapshot.project_dir},
                         {QStringLiteral("linkedFileCount"), this->linked_files.size()},
                         {QStringLiteral("mode"), run_mode_label(this->run_mode)},
                     };
@@ -404,6 +439,10 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                         context_request_kind(this->run_mode), this->provider->id(),
                         this->model_name, this->reasoning_effort, this->thinking_level,
                         this->dry_run, runMetadata, &contextError);
+                    if (contextError.isEmpty() == true && this->detailed_request_log != nullptr)
+                    {
+                        this->detailed_request_log->set_run_id(this->run_id);
+                    }
                 }
 
                 if (contextError.isEmpty() == true &&
@@ -486,7 +525,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
         emit this->log_message(QStringLiteral("📎 Linked files: %1")
                                    .arg(this->linked_files.join(QStringLiteral(", "))));
     }
-    for (const QString &message : std::as_const(mcpRefreshMessages))
+    for (const QString &message : std::as_const(mcp_refresh_messages))
     {
         emit log_message(message);
     }
@@ -569,6 +608,22 @@ void agent_controller_t::run_next_iteration()
     }
     this->arm_provider_watchdog();
 
+    if (this->detailed_request_log != nullptr)
+    {
+        QList<request_log_input_part_t> input_parts;
+        input_parts.reserve(this->messages.size());
+        for (int i = 0; i < this->messages.size(); ++i)
+        {
+            const chat_message_t &message = this->messages.at(i);
+            input_parts.append({QStringLiteral("message[%1] %2").arg(i).arg(message.role),
+                                message.content, estimate_token_count(message.content)});
+        }
+        this->detailed_request_log->record_iteration_input(
+            this->current_iteration, this->provider->id(), this->model_name,
+            this->reasoning_effort, this->thinking_level, s.temperature, s.max_tokens,
+            input_parts);
+    }
+
     using namespace std::placeholders;
     const QPointer<agent_controller_t> controller(this);
     const iai_provider_t::completion_callback_t completion_callback =
@@ -592,9 +647,9 @@ void agent_controller_t::handle_response(const QString &response, const QString 
     }
 
     this->disarm_provider_watchdog();
-    const qint64 requestDurationMs = (this->provider_request_timer.isValid() == true)
-                                         ? this->provider_request_timer.elapsed()
-                                         : -1;
+    const qint64 request_duration_ms = (this->provider_request_timer.isValid() == true)
+                                           ? this->provider_request_timer.elapsed()
+                                           : -1;
 
     if (this->pending_validation_label.isEmpty() == false)
     {
@@ -612,6 +667,12 @@ void agent_controller_t::handle_response(const QString &response, const QString 
 
     if (!error.isEmpty())
     {
+        if (this->detailed_request_log != nullptr)
+        {
+            this->detailed_request_log->record_iteration_output(
+                this->current_iteration, response, error, QStringLiteral("provider_error"), {},
+                usage, request_duration_ms);
+        }
         this->handle_normalized_progress_event(
             {agent_progress_event_kind_t::ERROR,
              agent_progress_operation_t::NONE,
@@ -630,10 +691,10 @@ void agent_controller_t::handle_response(const QString &response, const QString 
         return;
     }
 
-    if ((usage.has_any() == true) || (requestDurationMs >= 0))
+    if ((usage.has_any() == true) || (request_duration_ms >= 0))
     {
         this->accumulated_usage = accumulate_usage(this->accumulated_usage, usage);
-        emit this->provider_usage_available(usage, requestDurationMs);
+        emit this->provider_usage_available(usage, request_duration_ms);
     }
 
     // Add assistant message to history
@@ -646,6 +707,12 @@ void agent_controller_t::handle_response(const QString &response, const QString 
     QCAI_DEBUG("Agent", QStringLiteral("Parsed response type: %1, length: %2")
                             .arg(static_cast<int>(parsed.type))
                             .arg(response.length()));
+    if (this->detailed_request_log != nullptr)
+    {
+        this->detailed_request_log->record_iteration_output(
+            this->current_iteration, response, {}, response_type_label(parsed.type),
+            parsed.summary, usage, request_duration_ms);
+    }
 
     // Reset text retry counter on valid JSON
     if (parsed.type != response_type_t::TEXT && parsed.type != response_type_t::ERROR)
@@ -888,6 +955,12 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
     }
 
     QString result = tool->execute(args, workDir);
+    if (this->detailed_request_log != nullptr)
+    {
+        this->detailed_request_log->record_tool_event({this->current_iteration, name, args, result,
+                                                       false, false, false,
+                                                       name.startsWith(QStringLiteral("mcp_"))});
+    }
     if (this->chat_context_manager != nullptr)
     {
         QString contextError;
@@ -1034,6 +1107,8 @@ void agent_controller_t::append_assistant_history_message(const QString &content
 void agent_controller_t::finalize_persistent_run(const QString &status,
                                                  const QJsonObject &metadata)
 {
+    this->finalize_detailed_request_log(status, metadata);
+
     if (this->chat_context_manager == nullptr || this->run_id.isEmpty() == true)
     {
         return;
@@ -1063,6 +1138,26 @@ void agent_controller_t::finalize_persistent_run(const QString &status,
     }
 
     this->run_id.clear();
+}
+
+void agent_controller_t::finalize_detailed_request_log(const QString &status,
+                                                       const QJsonObject &metadata)
+{
+    if (this->detailed_request_log == nullptr)
+    {
+        return;
+    }
+
+    this->detailed_request_log->finish_request(status, metadata, this->accumulated_usage,
+                                               this->final_diff_preview);
+    QString log_error;
+    if (this->detailed_request_log->append_to_project_log(&log_error) == false &&
+        log_error.isEmpty() == false)
+    {
+        emit this->log_message(
+            QStringLiteral("⚠ Failed to write detailed request log: %1").arg(log_error));
+    }
+    this->detailed_request_log.reset();
 }
 
 void agent_controller_t::dispatch_provider_completion(QPointer<agent_controller_t> controller,
@@ -1197,6 +1292,12 @@ void agent_controller_t::approve_action(int approvalId)
                         workDir = this->context_provider->capture().project_dir;
                     }
                     QString result = tool->execute(pa.tool_args, workDir);
+                    if (this->detailed_request_log != nullptr)
+                    {
+                        this->detailed_request_log->record_tool_event(
+                            {this->current_iteration, pa.tool_name, pa.tool_args, result, true,
+                             true, false, pa.tool_name.startsWith(QStringLiteral("mcp_"))});
+                    }
                     if (this->chat_context_manager != nullptr)
                     {
                         QString contextError;
@@ -1236,6 +1337,18 @@ void agent_controller_t::deny_action(int approvalId)
         {
             auto pa = this->pending_approvals.takeAt(i);
             emit this->log_message(QStringLiteral("❌ Denied: %1").arg(pa.tool_name));
+            if (this->detailed_request_log != nullptr)
+            {
+                this->detailed_request_log->record_tool_event(
+                    {this->current_iteration,
+                     pa.tool_name,
+                     pa.tool_args,
+                     {},
+                     true,
+                     false,
+                     true,
+                     pa.tool_name.startsWith(QStringLiteral("mcp_"))});
+            }
             this->append_controller_user_message(
                 QStringLiteral("The user denied the action '%1'. Find an alternative approach or "
                                "finish.")

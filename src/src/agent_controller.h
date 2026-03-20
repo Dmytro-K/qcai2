@@ -9,6 +9,7 @@
 #include "providers/iai_provider.h"
 #include "safety/safety_policy.h"
 #include "tools/tool_registry.h"
+#include "util/request_detailed_log.h"
 
 #include <QElapsedTimer>
 #include <QJsonObject>
@@ -17,6 +18,8 @@
 #include <QPointer>
 #include <QString>
 #include <QTimer>
+
+#include <memory>
 
 namespace qcai2
 {
@@ -298,6 +301,11 @@ private:
     void finalize_persistent_run(const QString &status, const QJsonObject &metadata = {});
 
     /**
+     * Appends one detailed request log entry when the feature is enabled.
+     */
+    void finalize_detailed_request_log(const QString &status, const QJsonObject &metadata);
+
+    /**
      * Routes one raw provider progress event through the tracker.
      */
     void handle_provider_progress_event(const provider_raw_event_t &event);
@@ -415,6 +423,9 @@ private:
 
     /** Accumulated provider usage across all model requests in the current run. */
     provider_usage_t accumulated_usage;
+
+    /** Optional per-request Markdown logger for the current run. */
+    std::unique_ptr<request_detailed_log_t> detailed_request_log;
 
     /** Tracker that normalizes provider/controller activity into user-facing statuses. */
     std::unique_ptr<agent_progress_tracker_t> progress_tracker;

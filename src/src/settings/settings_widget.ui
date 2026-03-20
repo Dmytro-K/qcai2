@@ -586,6 +586,13 @@
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="detailedRequestLoggingCheck">
+            <property name="text">
+             <string>Detailed request logging (per-project Markdown file)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="agentDebugCheck">
             <property name="text">
              <string>Agent Debug (show raw JSON in chat)</string>

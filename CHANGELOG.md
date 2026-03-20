@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.7] - 2026-03-18
+## [0.0.7] - 2026-03-20
 
 ### Added
 
@@ -8,6 +8,7 @@
 - Added progress status
 - Added Anthropic API provider
 - Added statistic
+- Added detailed debug log
 
 ## [0.0.6] - 2026-03-15
 

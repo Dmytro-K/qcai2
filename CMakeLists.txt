@@ -508,6 +508,8 @@ add_qtc_plugin(qcai2
     src/src/util/process_runner.cpp
     src/src/util/diff.h
     src/src/util/diff.cpp
+    src/src/util/request_detailed_log.h
+    src/src/util/request_detailed_log.cpp
     src/src/util/logger.h
     src/src/util/logger.cpp
     src/src/util/crash_handler.h

@@ -273,6 +273,8 @@ void settings_t::load()
     dry_run_default = s.value("dryRunDefault", dry_run_default).toBool();
     ai_completion_enabled = s.value("aiCompletionEnabled", ai_completion_enabled).toBool();
     debug_logging = s.value("debugLogging", debug_logging).toBool();
+    detailed_request_logging =
+        s.value("detailedRequestLogging", detailed_request_logging).toBool();
     agent_debug = s.value("agentDebug", agent_debug).toBool();
     completion_min_chars = s.value("completionMinChars", completion_min_chars).toInt();
     completion_delay_ms = s.value("completionDelayMs", completion_delay_ms).toInt();
@@ -358,6 +360,7 @@ void settings_t::save() const
     s.setValue("dryRunDefault", dry_run_default);
     s.setValue("aiCompletionEnabled", ai_completion_enabled);
     s.setValue("debugLogging", debug_logging);
+    s.setValue("detailedRequestLogging", detailed_request_logging);
     s.setValue("agentDebug", agent_debug);
     s.setValue("completionMinChars", completion_min_chars);
     s.setValue("completionDelayMs", completion_delay_ms);
