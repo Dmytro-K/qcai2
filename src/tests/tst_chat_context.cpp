@@ -98,10 +98,20 @@ void tst_chat_context_t::stores_artifacts_and_builds_envelope()
     bool has_memory_block = false;
     bool has_summary_block = false;
     bool has_artifact_block = false;
+    int memory_index = -1;
+    int summary_index = -1;
+    int artifact_index = -1;
+    int request_context_index = -1;
+    int system_message_index = 0;
     for (const chat_message_t &message : envelope.provider_messages)
     {
         if (message.role != QStringLiteral("system"))
         {
+            continue;
+        }
+        if (message.content == QStringLiteral("System prompt"))
+        {
+            ++system_message_index;
             continue;
         }
         has_memory_block = has_memory_block ||
@@ -110,11 +120,35 @@ void tst_chat_context_t::stores_artifacts_and_builds_envelope()
             has_summary_block || message.content.contains(QStringLiteral("Rolling summary"));
         has_artifact_block = has_artifact_block ||
                              message.content.contains(QStringLiteral("Relevant prior artifacts"));
+        if (memory_index < 0 &&
+            message.content.contains(QStringLiteral("Stable workspace memory:")))
+        {
+            memory_index = system_message_index;
+        }
+        if (summary_index < 0 && message.content.contains(QStringLiteral("Rolling summary")))
+        {
+            summary_index = system_message_index;
+        }
+        if (artifact_index < 0 &&
+            message.content.contains(QStringLiteral("Relevant prior artifacts")))
+        {
+            artifact_index = system_message_index;
+        }
+        if (request_context_index < 0 &&
+            message.content == QStringLiteral("Request-specific context"))
+        {
+            request_context_index = system_message_index;
+        }
+        ++system_message_index;
     }
 
     QVERIFY(has_memory_block);
     QVERIFY(has_summary_block);
     QVERIFY(has_artifact_block);
+    QVERIFY(memory_index >= 0);
+    QVERIFY(summary_index > memory_index);
+    QVERIFY(artifact_index > summary_index);
+    QVERIFY(request_context_index > artifact_index);
     QVERIFY(QFileInfo::exists(manager.database_path()));
     QVERIFY(QFileInfo(manager.database_path()).isDir());
     QVERIFY(

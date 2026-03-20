@@ -922,14 +922,6 @@ context_envelope_t chat_context_manager_t::build_context_envelope(
             chat_message_t{QStringLiteral("system"), system_instruction});
     }
 
-    for (const QString &message : dynamic_system_messages)
-    {
-        if (message.isEmpty() == false)
-        {
-            envelope.provider_messages.append(chat_message_t{QStringLiteral("system"), message});
-        }
-    }
-
     const QString memoryText =
         this->memory_block(envelope.memory_items, envelope.budget.memory_tokens);
     if (memoryText.isEmpty() == false)
@@ -949,6 +941,14 @@ context_envelope_t chat_context_manager_t::build_context_envelope(
     if (artifactText.isEmpty() == false)
     {
         envelope.provider_messages.append(chat_message_t{QStringLiteral("system"), artifactText});
+    }
+
+    for (const QString &message : dynamic_system_messages)
+    {
+        if (message.isEmpty() == false)
+        {
+            envelope.provider_messages.append(chat_message_t{QStringLiteral("system"), message});
+        }
     }
 
     for (const context_message_t &message : envelope.recent_messages)

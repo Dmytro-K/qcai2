@@ -35,11 +35,26 @@ QString anthropicErrorMessage(const QByteArray &data, const QString &fallback)
     return fallback;
 }
 
+QJsonObject anthropicTextBlock(const QString &text, bool cache_control = false)
+{
+    QJsonObject block{
+        {QStringLiteral("type"), QStringLiteral("text")},
+        {QStringLiteral("text"), text},
+    };
+    if (cache_control == true)
+    {
+        block.insert(QStringLiteral("cache_control"),
+                     QJsonObject{{QStringLiteral("type"), QStringLiteral("ephemeral")}});
+    }
+    return block;
+}
+
 QJsonArray anthropicMessagesFromChatMessages(const QList<chat_message_t> &messages,
-                                             QString *systemText)
+                                             QJsonArray *system_blocks)
 {
     QJsonArray anthropicMessages;
-    QStringList systemParts;
+    QJsonArray local_system_blocks;
+    int cacheable_system_block_count = 0;
 
     for (const chat_message_t &message : messages)
     {
@@ -50,23 +65,23 @@ QJsonArray anthropicMessagesFromChatMessages(const QList<chat_message_t> &messag
 
         if (message.role == QStringLiteral("system"))
         {
-            systemParts.append(message.content);
+            const bool cache_control = cacheable_system_block_count < 4;
+            local_system_blocks.append(anthropicTextBlock(message.content, cache_control));
+            ++cacheable_system_block_count;
             continue;
         }
 
         const QString role = (message.role == QStringLiteral("assistant"))
                                  ? QStringLiteral("assistant")
                                  : QStringLiteral("user");
-        anthropicMessages.append(
-            QJsonObject{{QStringLiteral("role"), role},
-                        {QStringLiteral("content"),
-                         QJsonArray{QJsonObject{{QStringLiteral("type"), QStringLiteral("text")},
-                                                {QStringLiteral("text"), message.content}}}}});
+        anthropicMessages.append(QJsonObject{
+            {QStringLiteral("role"), role},
+            {QStringLiteral("content"), QJsonArray{anthropicTextBlock(message.content)}}});
     }
 
-    if (systemText != nullptr)
+    if (system_blocks != nullptr)
     {
-        *systemText = systemParts.join(QStringLiteral("\n\n")).trimmed();
+        *system_blocks = local_system_blocks;
     }
 
     return anthropicMessages;
@@ -133,17 +148,18 @@ void anthropic_provider_t::complete(const QList<chat_message_t> &messages, const
                                                {}});
     }
 
-    QString systemText;
-    const QJsonArray anthropicMessages = anthropicMessagesFromChatMessages(messages, &systemText);
+    QJsonArray system_blocks;
+    const QJsonArray anthropicMessages =
+        anthropicMessagesFromChatMessages(messages, &system_blocks);
 
     QJsonObject body;
     body.insert(QStringLiteral("model"), model);
     body.insert(QStringLiteral("messages"), anthropicMessages);
     body.insert(QStringLiteral("max_tokens"), max_tokens);
     body.insert(QStringLiteral("temperature"), temperature);
-    if (systemText.isEmpty() == false)
+    if (system_blocks.isEmpty() == false)
     {
-        body.insert(QStringLiteral("system"), systemText);
+        body.insert(QStringLiteral("system"), system_blocks);
     }
 
     const bool streaming = (stream_callback != nullptr);

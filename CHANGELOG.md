@@ -10,6 +10,10 @@
 - Added statistic
 - Added detailed debug log
 
+### Changed
+
+- Improved cache locality for GitHub Copilot.
+
 ## [0.0.6] - 2026-03-15
 
 ### Added

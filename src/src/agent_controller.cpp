@@ -242,20 +242,6 @@ QString agent_controller_t::build_system_prompt() const
                    .arg(QString::fromUtf8(toolsDoc.toJson(QJsonDocument::Indented)));
     }
 
-    // Editor context
-    if (this->context_provider != nullptr)
-    {
-        sys += QStringLiteral("Current editor context:\n%1\n")
-                   .arg(this->context_provider->to_prompt_fragment());
-
-        // Include file contents from open editors
-        const QString files = this->context_provider->file_contents_fragment(30000);
-        if (!files.isEmpty())
-        {
-            sys += QStringLiteral("File contents (from open tabs):\n%1\n").arg(files);
-        }
-    }
-
     // Safety info
     if (this->dry_run)
     {
@@ -391,14 +377,31 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                        this->reasoning_effort, this->thinking_level,
                        dry_run ? QStringLiteral("yes") : QStringLiteral("no"), goal.left(100)));
 
-    QStringList dynamicSystemMessages;
+    QStringList dynamic_system_messages;
+    if (this->context_provider != nullptr)
+    {
+        const QString editor_context = this->context_provider->to_prompt_fragment().trimmed();
+        if (editor_context.isEmpty() == false)
+        {
+            dynamic_system_messages.append(
+                QStringLiteral("Current editor context:\n%1").arg(editor_context));
+        }
+
+        const QString open_file_contents =
+            this->context_provider->file_contents_fragment(30000).trimmed();
+        if (open_file_contents.isEmpty() == false)
+        {
+            dynamic_system_messages.append(
+                QStringLiteral("File contents (from open tabs):\n%1").arg(open_file_contents));
+        }
+    }
     if (this->request_context.trimmed().isEmpty() == false)
     {
-        dynamicSystemMessages.append(this->request_context.trimmed());
+        dynamic_system_messages.append(this->request_context.trimmed());
     }
     if (is_enabled_effort(this->thinking_level) == true)
     {
-        dynamicSystemMessages.append(
+        dynamic_system_messages.append(
             QStringLiteral("Use %1 thinking depth for this task.").arg(this->thinking_level));
     }
 
@@ -473,7 +476,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                     const context_envelope_t envelope =
                         this->chat_context_manager->build_context_envelope(
                             context_request_kind(this->run_mode), this->build_system_prompt(),
-                            dynamicSystemMessages, s.max_tokens, &contextError);
+                            dynamic_system_messages, s.max_tokens, &contextError);
                     if (contextError.isEmpty() == true &&
                         envelope.provider_messages.isEmpty() == false)
                     {
@@ -506,7 +509,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
     {
         this->messages.append({QStringLiteral("system"), this->build_system_prompt()});
 
-        for (const QString &message : dynamicSystemMessages)
+        for (const QString &message : dynamic_system_messages)
         {
             this->messages.append({QStringLiteral("system"), message});
         }
