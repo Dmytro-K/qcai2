@@ -271,6 +271,9 @@ void settings_t::load()
     max_changed_files = s.value("maxChangedFiles", max_changed_files).toInt();
 
     dry_run_default = s.value("dryRunDefault", dry_run_default).toBool();
+    auto_compact_enabled = s.value("autoCompactEnabled", auto_compact_enabled).toBool();
+    auto_compact_threshold_tokens =
+        s.value("autoCompactThresholdTokens", auto_compact_threshold_tokens).toInt();
     ai_completion_enabled = s.value("aiCompletionEnabled", ai_completion_enabled).toBool();
     debug_logging = s.value("debugLogging", debug_logging).toBool();
     detailed_request_logging =
@@ -358,6 +361,8 @@ void settings_t::save() const
     s.setValue("maxChangedFiles", max_changed_files);
 
     s.setValue("dryRunDefault", dry_run_default);
+    s.setValue("autoCompactEnabled", auto_compact_enabled);
+    s.setValue("autoCompactThresholdTokens", auto_compact_threshold_tokens);
     s.setValue("aiCompletionEnabled", ai_completion_enabled);
     s.setValue("debugLogging", debug_logging);
     s.setValue("detailedRequestLogging", detailed_request_logging);

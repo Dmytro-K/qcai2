@@ -86,6 +86,13 @@ struct settings_t
     /** Starts the agent in dry-run mode by default when true. */
     bool dry_run_default = true;
 
+    /** Automatically triggers /compact before the next request when the
+     *  previous request's input-token count exceeds the threshold. */
+    bool auto_compact_enabled = false;
+
+    /** Input-token threshold for auto-compact (ignored when auto_compact_enabled is false). */
+    int auto_compact_threshold_tokens = 8000;
+
     /** Enables AI completion features inside the editor. */
     bool ai_completion_enabled = true;
 

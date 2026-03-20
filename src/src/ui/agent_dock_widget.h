@@ -267,6 +267,11 @@ private:
     provider_usage_t displayed_usage;
     int displayed_provider_request_count = 0;
 
+    /** Auto-compact: original user goal queued to run after an auto-compact pass completes. */
+    QString deferred_run_goal;
+    /** Set to true after auto-compact finishes to skip re-triggering on the follow-up run. */
+    bool skip_auto_compact_once = false;
+
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> approval_items;
 

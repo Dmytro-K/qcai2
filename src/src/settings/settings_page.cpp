@@ -116,6 +116,8 @@ class settings_widget_t : public Core::IOptionsPageWidget
         bool detailed_request_logging = false;
         bool agent_debug = false;
         qtmcp::server_definitions_t mcp_servers;
+        bool auto_compact_enabled = false;
+        int auto_compact_threshold_tokens = 0;
 
         friend bool operator==(const snapshot_t &, const snapshot_t &) = default;
     };
@@ -151,6 +153,8 @@ public:
         this->maxDiffSpin = this->ui->maxDiffSpin;
         this->maxFilesSpin = this->ui->maxFilesSpin;
         this->dryRunCheck = this->ui->dryRunCheck;
+        this->autoCompactCheck = this->ui->autoCompactCheck;
+        this->autoCompactThresholdSpin = this->ui->autoCompactThresholdSpin;
         this->aiCompletionCheck = this->ui->aiCompletionCheck;
         this->completionMinCharsSpin = this->ui->completionMinCharsSpin;
         this->completionDelayMsSpin = this->ui->completionDelayMsSpin;
@@ -299,6 +303,8 @@ public:
         this->maxFilesSpin->setValue(s.max_changed_files);
 
         this->dryRunCheck->setChecked(s.dry_run_default);
+        this->autoCompactCheck->setChecked(s.auto_compact_enabled);
+        this->autoCompactThresholdSpin->setValue(s.auto_compact_threshold_tokens);
 
         this->aiCompletionCheck->setChecked(s.ai_completion_enabled);
 
@@ -370,6 +376,9 @@ public:
         installCheckSettingsDirtyTrigger(this->maxDiffSpin);
         installCheckSettingsDirtyTrigger(this->maxFilesSpin);
         installCheckSettingsDirtyTrigger(this->dryRunCheck);
+        installCheckSettingsDirtyTrigger(this->autoCompactCheck);
+        installCheckSettingsDirtyTrigger(this->autoCompactThresholdSpin);
+        connect(this->autoCompactCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->aiCompletionCheck);
         installCheckSettingsDirtyTrigger(this->completionMinCharsSpin);
         installCheckSettingsDirtyTrigger(this->completionDelayMsSpin);
@@ -421,6 +430,8 @@ public:
         s.max_changed_files = this->maxFilesSpin->value();
 
         s.dry_run_default = this->dryRunCheck->isChecked();
+        s.auto_compact_enabled = this->autoCompactCheck->isChecked();
+        s.auto_compact_threshold_tokens = this->autoCompactThresholdSpin->value();
         s.ai_completion_enabled = this->aiCompletionCheck->isChecked();
         s.completion_min_chars = this->completionMinCharsSpin->value();
         s.completion_delay_ms = this->completionDelayMsSpin->value();
@@ -482,6 +493,8 @@ private:
             this->detailedRequestLoggingCheck->isChecked(),
             this->agentDebugCheck->isChecked(),
             this->mcpServersWidget->servers(),
+            this->autoCompactCheck->isChecked(),
+            this->autoCompactThresholdSpin->value(),
         };
     }
 
@@ -518,6 +531,8 @@ private:
         this->maxFilesSpin->setValue(snap.max_changed_files);
 
         this->dryRunCheck->setChecked(snap.dry_run_default);
+        this->autoCompactCheck->setChecked(snap.auto_compact_enabled);
+        this->autoCompactThresholdSpin->setValue(snap.auto_compact_threshold_tokens);
         this->aiCompletionCheck->setChecked(snap.ai_completion_enabled);
         this->completionMinCharsSpin->setValue(snap.completion_min_chars);
         this->completionDelayMsSpin->setValue(snap.completion_delay_ms);
@@ -555,6 +570,8 @@ private:
     QComboBox *ollamaModelCombo;
     QSpinBox *maxIterSpin, *maxToolsSpin, *maxDiffSpin, *maxFilesSpin;
     QCheckBox *dryRunCheck;
+    QCheckBox *autoCompactCheck;
+    QSpinBox *autoCompactThresholdSpin;
     QCheckBox *aiCompletionCheck;
     QSpinBox *completionMinCharsSpin;
     QSpinBox *completionDelayMsSpin;

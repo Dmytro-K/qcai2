@@ -4,14 +4,13 @@
 
 #include "slash_command_registry.h"
 
+#include <QString>
+
 namespace qcai2
 {
 
-void compact_command(const slash_command_invocation_t &invocation,
-                     const slash_command_context_t &context)
+QString compact_prompt_text(const QString &focus)
 {
-    Q_UNUSED(context);
-
     QString prompt = QStringLiteral(
         "Збережи тільки інформацію, яка реально важлива для наступних кроків.\n"
         "\n"
@@ -68,15 +67,22 @@ void compact_command(const slash_command_invocation_t &invocation,
         "- Орієнтуйся на те, що цей compact буде використаний як контекст для "
         "наступних запитів агента.");
 
-    if (invocation.arguments.isEmpty() == false)
+    if (focus.isEmpty() == false)
     {
-        prompt += QStringLiteral("\n\nДодатковий фокус для compact: %1")
-                      .arg(invocation.arguments.trimmed());
+        prompt += QStringLiteral("\n\nДодатковий фокус для compact: %1").arg(focus.trimmed());
     }
+
+    return prompt;
+}
+
+void compact_command(const slash_command_invocation_t &invocation,
+                     const slash_command_context_t &context)
+{
+    Q_UNUSED(context);
 
     if (context.goal_override != nullptr)
     {
-        *context.goal_override = prompt;
+        *context.goal_override = compact_prompt_text(invocation.arguments);
     }
 }
 

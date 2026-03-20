@@ -3,6 +3,7 @@
 */
 
 #include "agent_dock_widget.h"
+#include "../commands/compact_command.h"
 #include "../goal/file_reference_goal_handler.h"
 #include "../goal/slash_command_goal_handler.h"
 #include "../linked_files/agent_dock_linked_files_controller.h"
@@ -880,6 +881,8 @@ void agent_dock_widget_t::clear_chat_state()
     this->applied_diff.clear();
     this->current_diff.clear();
     this->status_label->setText(tr("Ready"));
+    this->deferred_run_goal.clear();
+    this->skip_auto_compact_once = false;
     this->reset_usage_display();
     this->apply_patch_btn->setEnabled(false);
     this->revert_patch_btn->setEnabled(false);
@@ -1168,6 +1171,27 @@ void agent_dock_widget_t::on_run_clicked()
 
     const QString selected_model = this->model_combo->currentText().trimmed();
     const QString selected_mode = this->mode_combo->currentData().toString();
+
+    // Auto-compact: if enabled and the previous run's input-token count exceeded the
+    // threshold, run a compact pass first, then restart with the original goal.
+    const auto &s = settings();
+    const int prev_input_tokens = this->displayed_usage.input_tokens;
+    const bool auto_compact_needed = s.auto_compact_enabled && !this->skip_auto_compact_once &&
+                                     prev_input_tokens >= s.auto_compact_threshold_tokens &&
+                                     prev_input_tokens >= 0 && this->deferred_run_goal.isEmpty();
+    this->skip_auto_compact_once = false;
+
+    if (auto_compact_needed)
+    {
+        this->deferred_run_goal = goal;
+        goal = compact_prompt_text();
+        emit this->controller->log_message(
+            QStringLiteral("🗜 Auto-compact triggered (context: %1 tokens ≥ %2). "
+                           "Compacting before running your request…")
+                .arg(prev_input_tokens)
+                .arg(s.auto_compact_threshold_tokens));
+    }
+
     this->reset_usage_display(settings().provider, selected_model);
     this->controller->set_request_context(
         this->linked_files_controller->linked_files_prompt_context(),
@@ -1186,6 +1210,7 @@ void agent_dock_widget_t::on_run_clicked()
 
 void agent_dock_widget_t::on_stop_clicked()
 {
+    this->deferred_run_goal.clear();
     this->controller->stop();
     this->update_run_state(false);
 }
@@ -1471,6 +1496,21 @@ void agent_dock_widget_t::on_stopped(const QString &summary)
         this->status_label->setText(QStringLiteral("Done: %1").arg(summary.left(80)));
     }
     this->session_controller->save_chat();
+
+    // If a deferred goal was queued by auto-compact, launch it now.
+    if (!this->deferred_run_goal.isEmpty())
+    {
+        const QString goal = this->deferred_run_goal;
+        this->deferred_run_goal.clear();
+        this->skip_auto_compact_once = true;
+        QMetaObject::invokeMethod(
+            this,
+            [this, goal]() {
+                this->goal_edit->setPlainText(goal);
+                this->on_run_clicked();
+            },
+            Qt::QueuedConnection);
+    }
 }
 
 bool agent_dock_widget_t::eventFilter(QObject *obj, QEvent *event)

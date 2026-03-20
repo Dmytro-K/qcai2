@@ -4,16 +4,17 @@
 
 ### Added
 
-- Added `/compact` slash command to compress the relevant conversation context into a short structured summary for future steps.
+- Added `/compact` slash command to compress the relevant conversation context into a short structured summary for future steps
 - Added progress status
 - Added Anthropic API provider
 - Added statistic
 - Added detailed debug log
 - Added GitHub Copilot Premium request usage show
+- Added optional auto compact
 
 ### Changed
 
-- Improved cache locality for GitHub Copilot.
+- Improved cache locality
 
 ## [0.0.6] - 2026-03-15
 

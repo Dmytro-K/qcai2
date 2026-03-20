@@ -603,6 +603,65 @@
         </widget>
        </item>
        <item>
+        <widget class="QGroupBox" name="autoCompactGroup">
+         <property name="title">
+          <string>Auto-compact</string>
+         </property>
+         <layout class="QVBoxLayout" name="autoCompactLayout">
+          <item>
+           <widget class="QCheckBox" name="autoCompactCheck">
+            <property name="text">
+             <string>Auto-compact context when history exceeds token threshold</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="autoCompactThresholdRow">
+            <item>
+             <widget class="QLabel" name="autoCompactThresholdLabel">
+              <property name="text">
+               <string>Threshold (input tokens):</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="autoCompactThresholdSpin">
+              <property name="minimum">
+               <number>1000</number>
+              </property>
+              <property name="maximum">
+               <number>200000</number>
+              </property>
+              <property name="singleStep">
+               <number>1000</number>
+              </property>
+              <property name="value">
+               <number>8000</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="autoCompactThresholdSpacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeType">
+               <enum>QSizePolicy::Expanding</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
         <spacer name="safetyBottomSpacer">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
