@@ -19,6 +19,7 @@ class ghost_text_manager_t;
 class copilot_provider_t;
 class ide_output_capture_t;
 class clangd_service_t;
+class vector_search_service_t;
 
 namespace Internal
 {
@@ -121,6 +122,9 @@ private:
 
     /** Reusable ClangCodeModel/clangd bridge shared by tools and future features. */
     clangd_service_t *clangd_service = nullptr;
+
+    /** Provider-agnostic vector search service shared by future retrieval features. */
+    vector_search_service_t *vector_search_service = nullptr;
 
     /** Sidebar factory that hosts the AI Agent inside Qt Creator navigation panels. */
     ai_agent_navigation_widget_factory_t *navigation_widget_factory = nullptr;

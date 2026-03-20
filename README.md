@@ -19,6 +19,7 @@
 - [x] GitHub Copilot Premium request usage display
 - [x] Optional auto-compact based on prior context token usage
 - [x] Conversation list UI
+- [x] Optional Qdrant-backed vector search
 - [ ] More slash commands: `/clear`, `/diff`
 - [ ] Per-project custom instructions (`.qcai2/rules.md`)
 - [ ] Semantic search over chat history
@@ -67,6 +68,10 @@ If CMake cannot discover the package roots automatically, also pass `-DQt6_DIR=.
 Optional feature flags:
 
 - `-DFEATURE_CLANGD_ENABLE=OFF` builds without the Qt Creator `ClangCodeModel` dependency.
+- `-DFEATURE_QDRANT_ENABLE=OFF` builds without the Qdrant-backed vector search backend.
+
+When `FEATURE_QDRANT_ENABLE=ON`, the plugin also needs `zlib`, because the Qdrant
+integration uses the bundled `lib/qdrant_client` HTTP layer.
 
 ### Build
 

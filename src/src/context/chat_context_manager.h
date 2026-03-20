@@ -66,6 +66,12 @@ public:
     QString database_path() const;
     QString artifact_directory_path() const;
 
+signals:
+    void message_appended(const QString &workspace_id, const QString &workspace_root,
+                          const QString &conversation_id, const QString &message_id,
+                          const QString &role, const QString &source, const QString &content,
+                          const QString &created_at);
+
 private:
     bool ensure_store_open(QString *error = nullptr) const;
     bool ensure_conversation_available(QString *error = nullptr);

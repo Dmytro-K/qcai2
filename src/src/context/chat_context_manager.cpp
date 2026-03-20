@@ -1280,6 +1280,9 @@ bool chat_context_manager_t::append_message(const QString &run_id, const QString
 
     this->conversation.last_message_sequence = message.sequence;
     this->conversation.updated_at = message.created_at;
+    emit this->message_appended(this->workspace_id, this->workspace_root,
+                                this->conversation.conversation_id, message.message_id,
+                                message.role, message.source, message.content, message.created_at);
     return this->maybe_refresh_summary(error);
 }
 

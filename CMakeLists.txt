@@ -267,6 +267,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "${CMAKE_C_FLAGS_RELWITHDEBINFO_INIT}")
 
 option(FEATURE_CLANGD_ENABLE "Enable clangd / ClangCodeModel integration" ON)
+option(FEATURE_QDRANT_ENABLE "Enable Qdrant vector search integration" ON)
 
 set(QCAI2_QTCREATOR_COMPONENTS
     Core
@@ -278,6 +279,12 @@ if(FEATURE_CLANGD_ENABLE)
     set(QCAI2_ENABLE_CLANGD_VALUE 1)
 else()
     set(QCAI2_ENABLE_CLANGD_VALUE 0)
+endif()
+
+if(FEATURE_QDRANT_ENABLE)
+    set(QCAI2_FEATURE_QDRANT_ENABLE_VALUE 1)
+else()
+    set(QCAI2_FEATURE_QDRANT_ENABLE_VALUE 0)
 endif()
 
 find_package(QtCreator REQUIRED COMPONENTS ${QCAI2_QTCREATOR_COMPONENTS})
@@ -388,6 +395,29 @@ endif()
 # Enable tests by passing -DWITH_TESTS=ON to CMake.
 option(WITH_TESTS "Builds with tests" NO)
 
+add_subdirectory(lib/qtmcp)
+
+if(FEATURE_QDRANT_ENABLE)
+    find_package(ZLIB REQUIRED)
+
+    add_library(qcai2_qdrant_http STATIC
+        lib/qdrant_client/generated/client/qdrant_HttpRequest.cpp
+        lib/qdrant_client/generated/client/qdrant_HttpFileElement.cpp
+    )
+    set_target_properties(qcai2_qdrant_http PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_include_directories(qcai2_qdrant_http
+        PUBLIC
+            "${CMAKE_CURRENT_SOURCE_DIR}/lib/qdrant_client/generated/client"
+    )
+    target_link_libraries(qcai2_qdrant_http
+        PUBLIC
+            Qt::Core
+            Qt::Network
+        PRIVATE
+            ZLIB::ZLIB
+    )
+endif()
+
 if(WITH_TESTS)
   # Look for QtTest
   find_package(Qt6 REQUIRED COMPONENTS Test)
@@ -400,8 +430,6 @@ if(WITH_TESTS)
 
   add_subdirectory(src/tests)
 endif()
-
-add_subdirectory(lib/qtmcp)
 
 set(QCAI2_PLUGIN_DEPENDS
     QtCreator::Core
@@ -423,6 +451,22 @@ if(FEATURE_CLANGD_ENABLE)
     )
 endif()
 
+set(QCAI2_VECTOR_SEARCH_PLUGIN_SOURCES
+    src/src/vector_search/vector_search_backend.h
+    src/src/vector_search/vector_search_service.h
+    src/src/vector_search/vector_search_service.cpp
+    src/src/vector_search/text_embedder.h
+    src/src/vector_search/text_embedder.cpp
+    src/src/vector_search/vector_indexing_manager.h
+    src/src/vector_search/vector_indexing_manager.cpp
+)
+if(FEATURE_QDRANT_ENABLE)
+    list(APPEND QCAI2_VECTOR_SEARCH_PLUGIN_SOURCES
+        src/src/vector_search/qdrant/qdrant_vector_search_backend.h
+        src/src/vector_search/qdrant/qdrant_vector_search_backend.cpp
+    )
+endif()
+
 add_qtc_plugin(qcai2
   PLUGIN_PATH
     plugins/${IDE_VERSION}
@@ -431,6 +475,7 @@ add_qtc_plugin(qcai2
   DEPENDS
     Qt::Widgets
     Qt::Network
+    Qt::Concurrent
     QtCreator::ExtensionSystem
     QtCreator::Utils
   SOURCES
@@ -455,6 +500,7 @@ add_qtc_plugin(qcai2
     src/src/commands/compact_command.cpp
     src/src/commands/explain_command.cpp
     src/src/commands/refactor_command.cpp
+    src/src/commands/search_command.cpp
     src/src/commands/test_command.cpp
     src/src/goal/goal_special_handler.h
     src/src/goal/goal_text_edit.h
@@ -468,6 +514,7 @@ add_qtc_plugin(qcai2
     src/src/context/editor_context.h
     src/src/context/editor_context.cpp
     ${QCAI2_CLANGD_PLUGIN_SOURCES}
+    ${QCAI2_VECTOR_SEARCH_PLUGIN_SOURCES}
     src/src/context/chat_context.h
     src/src/context/chat_context.cpp
     src/src/context/chat_context_store.h
@@ -497,6 +544,8 @@ add_qtc_plugin(qcai2
     src/src/tools/create_file_tool.cpp
     src/src/tools/search_tools.h
     src/src/tools/search_tools.cpp
+    src/src/tools/vector_search_tools.h
+    src/src/tools/vector_search_tools.cpp
     src/src/tools/build_tools.h
     src/src/tools/build_tools.cpp
     src/src/tools/git_tools.h
@@ -566,6 +615,9 @@ add_qtc_plugin(qcai2
 
 qcai2_enable_linker_map(qcai2)
 target_link_libraries(qcai2 PRIVATE qcai2_libarchive qcai2_version_info qtmcp::qtmcp)
+if(FEATURE_QDRANT_ENABLE)
+    target_link_libraries(qcai2 PRIVATE qcai2_qdrant_http)
+endif()
 
 set(QCAI2_PLUGIN_INSTALL_DIR "plugins/${IDE_VERSION}")
 set(QCAI2_SIDECAR_INSTALL_DIR "${QCAI2_PLUGIN_INSTALL_DIR}/qcai2/sidecar")
@@ -576,6 +628,7 @@ target_compile_definitions(qcai2 PRIVATE
     QCAI2_QTCREATOR_IDE_VERSION="${IDE_VERSION}"
     QCAI2_INSTALLED_SIDECAR_RELATIVE_PATH="qcai2/sidecar/copilot-sidecar.js"
     QCAI2_ENABLE_CLANGD=${QCAI2_ENABLE_CLANGD_VALUE}
+    QCAI2_FEATURE_QDRANT_ENABLE=${QCAI2_FEATURE_QDRANT_ENABLE_VALUE}
 )
 
 # Install sidecar files alongside the plugin

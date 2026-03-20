@@ -113,18 +113,38 @@ add_executable(tst_qcai2_slash_commands
     tst_slash_commands.cpp
     ../src/commands/slash_command_registry.cpp
     ../src/commands/hello_command.cpp
+    ../src/commands/search_command.cpp
+    ../src/vector_search/vector_search_service.cpp
     ../src/goal/file_reference_goal_handler.cpp
     ../src/goal/slash_command_goal_handler.cpp
 )
+
+if(FEATURE_QDRANT_ENABLE)
+target_sources(tst_qcai2_slash_commands PRIVATE
+    ../src/vector_search/qdrant/qdrant_vector_search_backend.cpp
+)
+target_compile_definitions(tst_qcai2_slash_commands PRIVATE
+    QCAI2_FEATURE_QDRANT_ENABLE=1
+)
+target_link_libraries(tst_qcai2_slash_commands PRIVATE
+    qcai2_qdrant_http
+)
+else()
+target_compile_definitions(tst_qcai2_slash_commands PRIVATE
+    QCAI2_FEATURE_QDRANT_ENABLE=0
+)
+endif()
 
 qcai2_enable_linker_map(tst_qcai2_slash_commands)
 
 target_include_directories(tst_qcai2_slash_commands PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/lib/qtmcp/include"
 )
 target_link_libraries(tst_qcai2_slash_commands PRIVATE
     Qt::Core
     Qt::Gui
+    Qt::Network
     Qt::Test
 )
 add_test(NAME qcai2_slash_commands COMMAND tst_qcai2_slash_commands)
@@ -196,7 +216,7 @@ target_link_libraries(tst_qcai2_tool_registry PRIVATE
 )
 add_test(NAME qcai2_tool_registry COMMAND tst_qcai2_tool_registry)
 
-if(ENABLE_CLANGD)
+if(FEATURE_CLANGD_ENABLE)
 add_executable(tst_qcai2_clangd_tools
     tst_clangd_tools.cpp
     ../src/tools/clangd_tool_metadata.cpp
@@ -213,6 +233,76 @@ target_link_libraries(tst_qcai2_clangd_tools PRIVATE
 )
 add_test(NAME qcai2_clangd_tools COMMAND tst_qcai2_clangd_tools)
 endif()
+
+add_executable(tst_qcai2_vector_search
+    tst_vector_search.cpp
+    ../src/vector_search/vector_search_service.cpp
+)
+
+if(FEATURE_QDRANT_ENABLE)
+target_sources(tst_qcai2_vector_search PRIVATE
+    ../src/vector_search/qdrant/qdrant_vector_search_backend.cpp
+)
+target_compile_definitions(tst_qcai2_vector_search PRIVATE
+    QCAI2_FEATURE_QDRANT_ENABLE=1
+)
+target_link_libraries(tst_qcai2_vector_search PRIVATE
+    qcai2_qdrant_http
+)
+else()
+target_compile_definitions(tst_qcai2_vector_search PRIVATE
+    QCAI2_FEATURE_QDRANT_ENABLE=0
+)
+endif()
+
+qcai2_enable_linker_map(tst_qcai2_vector_search)
+
+target_include_directories(tst_qcai2_vector_search PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/lib/qtmcp/include"
+)
+target_link_libraries(tst_qcai2_vector_search PRIVATE
+    Qt::Core
+    Qt::Network
+    Qt::Test
+)
+add_test(NAME qcai2_vector_search COMMAND tst_qcai2_vector_search)
+
+add_executable(tst_qcai2_vector_search_tools
+    tst_vector_search_tools.cpp
+    ../src/tools/vector_search_tools.cpp
+    ../src/vector_search/text_embedder.cpp
+    ../src/vector_search/vector_search_service.cpp
+)
+
+if(FEATURE_QDRANT_ENABLE)
+target_sources(tst_qcai2_vector_search_tools PRIVATE
+    ../src/vector_search/qdrant/qdrant_vector_search_backend.cpp
+)
+target_compile_definitions(tst_qcai2_vector_search_tools PRIVATE
+    QCAI2_FEATURE_QDRANT_ENABLE=1
+)
+target_link_libraries(tst_qcai2_vector_search_tools PRIVATE
+    qcai2_qdrant_http
+)
+else()
+target_compile_definitions(tst_qcai2_vector_search_tools PRIVATE
+    QCAI2_FEATURE_QDRANT_ENABLE=0
+)
+endif()
+
+qcai2_enable_linker_map(tst_qcai2_vector_search_tools)
+
+target_include_directories(tst_qcai2_vector_search_tools PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/lib/qtmcp/include"
+)
+target_link_libraries(tst_qcai2_vector_search_tools PRIVATE
+    Qt::Core
+    Qt::Network
+    Qt::Test
+)
+add_test(NAME qcai2_vector_search_tools COMMAND tst_qcai2_vector_search_tools)
 
 add_executable(tst_qcai2_request_detailed_log
     tst_request_detailed_log.cpp

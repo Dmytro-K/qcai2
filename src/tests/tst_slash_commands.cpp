@@ -7,6 +7,10 @@
 #include "src/commands/slash_command_registry.h"
 #include "src/goal/file_reference_goal_handler.h"
 #include "src/goal/slash_command_goal_handler.h"
+#include "src/vector_search/vector_search_backend.h"
+#include "src/vector_search/vector_search_service.h"
+
+#include <memory>
 
 using namespace qcai2;
 
@@ -18,6 +22,8 @@ class slash_command_registry_test_t : public QObject
     Q_OBJECT
 
 private slots:
+    void cleanup();
+
     /**
      * @brief Exposes registered commands as `/`-prefixed completion items.
      */
@@ -37,6 +43,21 @@ private slots:
      * @brief Executes `/hello` and writes its output through the log callback.
      */
     void dispatch_hello_logs_hello_world();
+
+    /**
+     * @brief Requires a query argument for `/search`.
+     */
+    void dispatch_search_requires_query();
+
+    /**
+     * @brief Requires vector search availability before `/search` can run.
+     */
+    void dispatch_search_requires_available_vector_search();
+
+    /**
+     * @brief Redirects `/search` into an AI goal when vector search is available.
+     */
+    void dispatch_search_sets_goal_override();
 
     /**
      * @brief Allows test-only commands to auto-register through DECLARE_COMMAND.
@@ -87,12 +108,107 @@ void macro_test_command(const slash_command_invocation_t &invocation,
 
 DECLARE_COMMAND(macro_test, "Auto-registered test command.", macro_test_command)
 
+namespace
+{
+
+class fake_vector_search_backend_t final : public vector_search_backend_t
+{
+public:
+    QString backend_id() const override
+    {
+        return QStringLiteral("fake");
+    }
+
+    QString display_name() const override
+    {
+        return QStringLiteral("Fake Vector Backend");
+    }
+
+    bool is_configured() const override
+    {
+        return true;
+    }
+
+    QString configuration_summary() const override
+    {
+        return QStringLiteral("fake backend");
+    }
+
+    bool check_connection(QString *error = nullptr) const override
+    {
+        if (error != nullptr)
+        {
+            error->clear();
+        }
+        return true;
+    }
+
+    bool ensure_collection(int vector_dimensions, QString *error = nullptr) const override
+    {
+        Q_UNUSED(vector_dimensions);
+        if (error != nullptr)
+        {
+            error->clear();
+        }
+        return true;
+    }
+
+    bool upsert_points(const QJsonArray &points, int vector_dimensions,
+                       QString *error = nullptr) const override
+    {
+        Q_UNUSED(points);
+        Q_UNUSED(vector_dimensions);
+        if (error != nullptr)
+        {
+            error->clear();
+        }
+        return true;
+    }
+
+    bool delete_points(const QJsonObject &filter, QString *error = nullptr) const override
+    {
+        Q_UNUSED(filter);
+        if (error != nullptr)
+        {
+            error->clear();
+        }
+        return true;
+    }
+
+    QList<vector_search_match_t> search(const QList<float> &query_vector,
+                                        const QJsonObject &filter, int limit,
+                                        QString *error = nullptr) const override
+    {
+        Q_UNUSED(query_vector);
+        Q_UNUSED(filter);
+        Q_UNUSED(limit);
+        if (error != nullptr)
+        {
+            error->clear();
+        }
+        return {};
+    }
+};
+
+}  // namespace
+
+void slash_command_registry_test_t::cleanup()
+{
+    auto &service = vector_search_service();
+    service.set_enabled(false);
+    service.set_backend(std::unique_ptr<vector_search_backend_t>{});
+    QString error;
+    QVERIFY(!service.verify_connection(&error));
+    QVERIFY(error.isEmpty());
+}
+
 void slash_command_registry_test_t::command_names_returns_slash_prefixed_names()
 {
     slash_command_registry_t registry;
 
     QCOMPARE(registry.command_names(),
-             QStringList({QStringLiteral("/hello"), QStringLiteral("/macro_test")}));
+             QStringList({QStringLiteral("/hello"), QStringLiteral("/macro_test"),
+                          QStringLiteral("/search")}));
 }
 
 void slash_command_registry_test_t::dispatch_non_slash_input_is_ignored()
@@ -134,6 +250,76 @@ void slash_command_registry_test_t::dispatch_hello_logs_hello_world()
     QVERIFY(result.executed);
     QCOMPARE(result.command_name, QStringLiteral("hello"));
     QCOMPARE(log_entries, QStringList{QStringLiteral("Hello World")});
+}
+
+void slash_command_registry_test_t::dispatch_search_requires_query()
+{
+    slash_command_registry_t registry;
+    QStringList log_entries;
+
+    const slash_command_dispatch_result_t result = registry.dispatch(
+        QStringLiteral("/search"), slash_command_context_t{[&log_entries](const QString &message) {
+            log_entries.append(message);
+        }});
+
+    QVERIFY(result.is_slash_command);
+    QVERIFY(result.executed);
+    QCOMPARE(result.command_name, QStringLiteral("search"));
+    QVERIFY(result.goal_override.isEmpty());
+    QCOMPARE(log_entries, QStringList{QStringLiteral("❌ Usage: /search <query>")});
+}
+
+void slash_command_registry_test_t::dispatch_search_requires_available_vector_search()
+{
+    auto &service = vector_search_service();
+    service.set_enabled(false);
+    service.set_backend(std::unique_ptr<vector_search_backend_t>{});
+    QString error;
+    QVERIFY(!service.verify_connection(&error));
+    QVERIFY(error.isEmpty());
+
+    slash_command_registry_t registry;
+    QStringList log_entries;
+
+    const slash_command_dispatch_result_t result =
+        registry.dispatch(QStringLiteral("/search symbol lookup"),
+                          slash_command_context_t{[&log_entries](const QString &message) {
+                              log_entries.append(message);
+                          }});
+
+    QVERIFY(result.is_slash_command);
+    QVERIFY(result.executed);
+    QCOMPARE(result.command_name, QStringLiteral("search"));
+    QVERIFY(result.goal_override.isEmpty());
+    QCOMPARE(log_entries, QStringList{QStringLiteral(
+                              "❌ Vector search is unavailable: Vector search disabled.")});
+}
+
+void slash_command_registry_test_t::dispatch_search_sets_goal_override()
+{
+    auto &service = vector_search_service();
+    service.set_enabled(true);
+    service.set_backend(std::make_unique<fake_vector_search_backend_t>());
+    QString error;
+    QVERIFY(service.verify_connection(&error));
+    QVERIFY(error.isEmpty());
+
+    slash_command_registry_t registry;
+    QStringList log_entries;
+
+    const slash_command_dispatch_result_t result =
+        registry.dispatch(QStringLiteral("/search semantic embeddings"),
+                          slash_command_context_t{[&log_entries](const QString &message) {
+                              log_entries.append(message);
+                          }});
+
+    QVERIFY(result.is_slash_command);
+    QVERIFY(result.executed);
+    QCOMPARE(result.command_name, QStringLiteral("search"));
+    QVERIFY(log_entries.isEmpty());
+    QVERIFY(result.goal_override.contains(QStringLiteral("semantic embeddings")));
+    QVERIFY(result.goal_override.contains(QStringLiteral("vector search backend")));
+    QVERIFY(result.goal_override.contains(QStringLiteral("Fake Vector Backend")));
 }
 
 void slash_command_registry_test_t::dispatch_macro_declared_command_is_registered()

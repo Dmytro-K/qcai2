@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QThread>
 
 namespace qcai2
 {
@@ -119,6 +120,42 @@ struct settings_t
 
     /** Completion reasoning effort: off, low, medium, or high. */
     QString completion_reasoning_effort = QStringLiteral("off");
+
+    /** Enables vector search features when true. */
+    bool vector_search_enabled = false;
+
+    /** Selected vector search backend identifier. */
+    QString vector_search_provider = QStringLiteral("qdrant");
+
+    /** Base URL of the Qdrant HTTP API. */
+    QString qdrant_url = QStringLiteral("http://localhost:6333");
+
+    /** Optional Qdrant API key. */
+    QString qdrant_api_key;
+
+    /** Default Qdrant collection used by vector search. */
+    QString qdrant_collection_name = QStringLiteral("qcai2-symbols");
+
+    /** Automatically creates the configured Qdrant collection when it is missing. */
+    bool qdrant_auto_create_collection = true;
+
+    /** Optional CA certificate file used for Qdrant TLS validation. */
+    QString qdrant_ca_certificate_file;
+
+    /** Optional client certificate file used for Qdrant mTLS. */
+    QString qdrant_client_certificate_file;
+
+    /** Optional client private key file used for Qdrant mTLS. */
+    QString qdrant_client_key_file;
+
+    /** Allows self-signed server certificates for Qdrant when true. */
+    bool qdrant_allow_self_signed_server_certificate = false;
+
+    /** Qdrant request timeout in seconds. */
+    int qdrant_timeout_sec = 30;
+
+    /** Maximum number of worker threads used for full-workspace vector indexing. */
+    int vector_search_max_indexing_threads = qMax(1, QThread::idealThreadCount());
 
     /** Globally configured MCP servers keyed by logical server name. */
     qtmcp::server_definitions_t mcp_servers;

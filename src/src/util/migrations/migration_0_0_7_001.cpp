@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QSaveFile>
 #include <QUuid>
@@ -210,6 +211,62 @@ bool has_conversation_state_keys(const QJsonObject &root)
     return false;
 }
 
+QJsonArray normalized_string_array(const QJsonValue &value)
+{
+    QJsonArray normalized;
+    if (value.isArray() == false)
+    {
+        return normalized;
+    }
+
+    for (const QJsonValue &entry : value.toArray())
+    {
+        if (entry.isString() == false)
+        {
+            continue;
+        }
+
+        const QString string_value = entry.toString().trimmed();
+        if (string_value.isEmpty() == true)
+        {
+            continue;
+        }
+        normalized.append(string_value);
+    }
+    return normalized;
+}
+
+QJsonObject normalized_project_vector_search_object(const QJsonObject &root)
+{
+    QJsonObject vector_search_root;
+    const QJsonValue vector_search_value = root.value(QStringLiteral("vector_search"));
+    if (vector_search_value.isObject() == true)
+    {
+        vector_search_root = vector_search_value.toObject();
+    }
+
+    vector_search_root[QStringLiteral("exclude")] =
+        normalized_string_array(vector_search_root.value(QStringLiteral("exclude")));
+    return vector_search_root;
+}
+
+bool project_state_needs_vector_search_normalization(const QJsonObject &root)
+{
+    const QJsonValue vector_search_value = root.value(QStringLiteral("vector_search"));
+    if (vector_search_value.isObject() == false)
+    {
+        return true;
+    }
+
+    const QJsonObject vector_search_root = vector_search_value.toObject();
+    if (vector_search_root.value(QStringLiteral("exclude")).isArray() == false)
+    {
+        return true;
+    }
+
+    return vector_search_root != normalized_project_vector_search_object(root);
+}
+
 void copy_if_present(QJsonObject &target, const QJsonObject &source, const QString &key)
 {
     const QJsonValue value = source.value(key);
@@ -264,7 +321,8 @@ bool project_state_needs_migration_to_0_0_7_001(const QString &storage_path,
     const bool has_embedded_state = has_conversation_state_keys(root);
     const bool goal_exists = QFileInfo::exists(project_goal_file_path(storage_path));
     const bool log_exists = QFileInfo::exists(project_actions_log_file_path(storage_path));
-    return has_embedded_state || goal_exists || log_exists;
+    return has_embedded_state || goal_exists || log_exists ||
+           project_state_needs_vector_search_normalization(root);
 }
 
 bool normalize_conversation_log_storage_to_0_0_7_001(const QString &storage_path, QString *error)
@@ -441,6 +499,7 @@ bool migrate_project_state_to_0_0_7_001(const QString &storage_path, QJsonObject
     }
 
     remove_conversation_state_keys(root);
+    root[QStringLiteral("vector_search")] = normalized_project_vector_search_object(root);
     return true;
 }
 

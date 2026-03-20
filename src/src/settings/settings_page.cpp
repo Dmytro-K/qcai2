@@ -5,6 +5,9 @@
 #include "settings_page.h"
 #include "../../qcai2tr.h"
 #include "../util/logger.h"
+#include "../vector_search/text_embedder.h"
+#include "../vector_search/vector_indexing_manager.h"
+#include "../vector_search/vector_search_service.h"
 #include "mcp_servers_widget.h"
 #include "settings.h"
 #include "ui_settings_widget.h"
@@ -17,10 +20,13 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QFileDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSpinBox>
@@ -77,7 +83,23 @@ void selectEffortValue(QComboBox *combo, const QString &value, int fallbackIndex
     combo->setCurrentIndex(index >= 0 ? index : fallbackIndex);
 }
 
+void browse_for_existing_file(QWidget *parent, QLineEdit *line_edit, const QString &title)
+{
+    const QString selected_path =
+        QFileDialog::getOpenFileName(parent, title, line_edit->text().trimmed());
+    if (selected_path.isEmpty() == false)
+    {
+        line_edit->setText(selected_path);
+    }
+}
+
 }  // namespace
+
+#if QCAI2_FEATURE_QDRANT_ENABLE
+constexpr bool k_qdrant_support_enabled = true;
+#else
+constexpr bool k_qdrant_support_enabled = false;
+#endif
 
 class settings_widget_t : public Core::IOptionsPageWidget
 {
@@ -112,6 +134,18 @@ class settings_widget_t : public Core::IOptionsPageWidget
         QString completion_model;
         QString completion_thinking_level;
         QString completion_reasoning_effort;
+        bool vector_search_enabled = false;
+        QString vector_search_provider;
+        QString qdrant_url;
+        QString qdrant_api_key;
+        QString qdrant_collection_name;
+        bool qdrant_auto_create_collection = false;
+        QString qdrant_ca_certificate_file;
+        QString qdrant_client_certificate_file;
+        QString qdrant_client_key_file;
+        bool qdrant_allow_self_signed_server_certificate = false;
+        int qdrant_timeout_sec = 0;
+        int vector_search_max_indexing_threads = 0;
         bool debug_logging = false;
         bool detailed_request_logging = false;
         bool agent_debug = false;
@@ -161,12 +195,34 @@ public:
         this->completionModelCombo = this->ui->completionModelCombo;
         this->completionThinkingCombo = this->ui->completionThinkingCombo;
         this->completionReasoningCombo = this->ui->completionReasoningCombo;
+        this->vectorSearchEnabledCheck = this->ui->vectorSearchEnabledCheck;
+        this->vectorSearchProviderCombo = this->ui->vectorSearchProviderCombo;
+        this->vectorSearchStatusLabel = this->ui->vectorSearchStatusLabel;
+        this->qdrantGroup = this->ui->qdrantGroup;
+        this->qdrantUrlEdit = this->ui->qdrantUrlEdit;
+        this->qdrantApiKeyEdit = this->ui->qdrantApiKeyEdit;
+        this->qdrantCollectionEdit = this->ui->qdrantCollectionEdit;
+        this->qdrantAutoCreateCollectionCheck = this->ui->qdrantAutoCreateCollectionCheck;
+        this->qdrantCaCertificateEdit = this->ui->qdrantCaCertificateEdit;
+        this->qdrantCaCertificateBrowseButton = this->ui->qdrantCaCertificateBrowseButton;
+        this->qdrantClientCertificateEdit = this->ui->qdrantClientCertificateEdit;
+        this->qdrantClientCertificateBrowseButton = this->ui->qdrantClientCertificateBrowseButton;
+        this->qdrantClientKeyEdit = this->ui->qdrantClientKeyEdit;
+        this->qdrantClientKeyBrowseButton = this->ui->qdrantClientKeyBrowseButton;
+        this->qdrantAllowSelfSignedCheck = this->ui->qdrantAllowSelfSignedCheck;
+        this->qdrantTimeoutSpin = this->ui->qdrantTimeoutSpin;
+        this->vectorSearchMaxIndexingThreadsSpin = this->ui->vectorSearchMaxIndexingThreadsSpin;
+        this->qdrantTestConnectionButton = this->ui->qdrantTestConnectionButton;
         this->debugLoggingCheck = this->ui->debugLoggingCheck;
         this->detailedRequestLoggingCheck = this->ui->detailedRequestLoggingCheck;
         this->agentDebugCheck = this->ui->agentDebugCheck;
         this->mcpServersWidget = new mcp_servers_widget_t(this);
         this->mcpServersWidget->set_servers(s.mcp_servers);
-        this->ui->settingsTabs->insertTab(1, this->mcpServersWidget, tr_t::tr("MCP Servers"));
+        const int vector_search_tab_index =
+            this->ui->settingsTabs->indexOf(this->ui->vectorSearchTab);
+        this->ui->settingsTabs->insertTab(
+            vector_search_tab_index >= 0 ? vector_search_tab_index + 1 : 1, this->mcpServersWidget,
+            tr_t::tr("MCP Servers"));
 
         // Provider selection
         this->providerCombo->addItem(tr_t::tr("OpenAI-Compatible"), QStringLiteral("openai"));
@@ -349,6 +405,64 @@ public:
         populateEffortCombo(this->completionReasoningCombo);
         selectEffortValue(this->completionReasoningCombo, s.completion_reasoning_effort, 0);
 
+        this->vectorSearchEnabledCheck->setChecked(s.vector_search_enabled);
+        if (k_qdrant_support_enabled == true)
+        {
+            this->vectorSearchProviderCombo->addItem(tr_t::tr("Qdrant"), QStringLiteral("qdrant"));
+            this->vectorSearchStatusLabel->clear();
+            this->vectorSearchStatusLabel->hide();
+        }
+        else
+        {
+            this->vectorSearchProviderCombo->addItem(tr_t::tr("Qdrant (not built)"),
+                                                     QStringLiteral("qdrant"));
+            this->vectorSearchProviderCombo->setEnabled(false);
+            this->vectorSearchStatusLabel->setText(tr_t::tr(
+                "Qdrant support was disabled at build time (`FEATURE_QDRANT_ENABLE=OFF`)."));
+            this->vectorSearchStatusLabel->show();
+        }
+        const int vector_provider_index =
+            this->vectorSearchProviderCombo->findData(s.vector_search_provider);
+        this->vectorSearchProviderCombo->setCurrentIndex(
+            vector_provider_index >= 0 ? vector_provider_index : 0);
+        this->qdrantUrlEdit->setText(s.qdrant_url);
+        this->qdrantApiKeyEdit->setText(s.qdrant_api_key);
+        this->qdrantCollectionEdit->setText(s.qdrant_collection_name);
+        this->qdrantAutoCreateCollectionCheck->setChecked(s.qdrant_auto_create_collection);
+        this->qdrantCaCertificateEdit->setText(s.qdrant_ca_certificate_file);
+        this->qdrantClientCertificateEdit->setText(s.qdrant_client_certificate_file);
+        this->qdrantClientKeyEdit->setText(s.qdrant_client_key_file);
+        this->qdrantAllowSelfSignedCheck->setChecked(
+            s.qdrant_allow_self_signed_server_certificate);
+        this->qdrantTimeoutSpin->setValue(s.qdrant_timeout_sec);
+        this->vectorSearchMaxIndexingThreadsSpin->setValue(s.vector_search_max_indexing_threads);
+
+        QObject::connect(
+            this->qdrantCaCertificateBrowseButton, &QPushButton::clicked, this, [this]() {
+                browse_for_existing_file(this, this->qdrantCaCertificateEdit,
+                                         tr_t::tr("Select Qdrant CA certificate file"));
+            });
+        QObject::connect(
+            this->qdrantClientCertificateBrowseButton, &QPushButton::clicked, this, [this]() {
+                browse_for_existing_file(this, this->qdrantClientCertificateEdit,
+                                         tr_t::tr("Select Qdrant client certificate file"));
+            });
+        QObject::connect(this->qdrantClientKeyBrowseButton, &QPushButton::clicked, this, [this]() {
+            browse_for_existing_file(this, this->qdrantClientKeyEdit,
+                                     tr_t::tr("Select Qdrant client key file"));
+        });
+
+        this->refreshVectorSearchUiState();
+        this->refreshVectorSearchStatusFromService();
+        connect(this->vectorSearchEnabledCheck, &QCheckBox::toggled, this,
+                [this]() { this->refreshVectorSearchUiState(); });
+        connect(this->vectorSearchProviderCombo, qOverload<int>(&QComboBox::currentIndexChanged),
+                this, [this](int) { this->refreshVectorSearchUiState(); });
+        connect(this->qdrantTestConnectionButton, &QPushButton::clicked, this,
+                [this]() { this->testVectorSearchConnection(); });
+        connect(&vector_search_service(), &vector_search_service_t::availability_changed, this,
+                [this](bool, const QString &) { this->refreshVectorSearchStatusFromService(); });
+
         this->debugLoggingCheck->setChecked(s.debug_logging);
         this->detailedRequestLoggingCheck->setChecked(s.detailed_request_logging);
 
@@ -389,6 +503,18 @@ public:
         installCheckSettingsDirtyTrigger(this->completionModelCombo);
         installCheckSettingsDirtyTrigger(this->completionThinkingCombo);
         installCheckSettingsDirtyTrigger(this->completionReasoningCombo);
+        installCheckSettingsDirtyTrigger(this->vectorSearchEnabledCheck);
+        installCheckSettingsDirtyTrigger(this->vectorSearchProviderCombo);
+        installCheckSettingsDirtyTrigger(this->qdrantUrlEdit);
+        installCheckSettingsDirtyTrigger(this->qdrantApiKeyEdit);
+        installCheckSettingsDirtyTrigger(this->qdrantCollectionEdit);
+        installCheckSettingsDirtyTrigger(this->qdrantAutoCreateCollectionCheck);
+        installCheckSettingsDirtyTrigger(this->qdrantCaCertificateEdit);
+        installCheckSettingsDirtyTrigger(this->qdrantClientCertificateEdit);
+        installCheckSettingsDirtyTrigger(this->qdrantClientKeyEdit);
+        installCheckSettingsDirtyTrigger(this->qdrantAllowSelfSignedCheck);
+        installCheckSettingsDirtyTrigger(this->qdrantTimeoutSpin);
+        installCheckSettingsDirtyTrigger(this->vectorSearchMaxIndexingThreadsSpin);
         installCheckSettingsDirtyTrigger(this->debugLoggingCheck);
         installCheckSettingsDirtyTrigger(this->detailedRequestLoggingCheck);
         installCheckSettingsDirtyTrigger(this->agentDebugCheck);
@@ -397,6 +523,7 @@ public:
         connect(this->completionModelCombo, &QComboBox::currentTextChanged,
                 Utils::checkSettingsDirty);
         connect(this->detailedRequestLoggingCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
+        connect(this->vectorSearchEnabledCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->mcpServersWidget, &mcp_servers_widget_t::changed, Utils::checkSettingsDirty);
     }
 
@@ -408,6 +535,46 @@ public:
     void apply() override
     {
         auto &s = settings();
+        s = this->settingsFromUi();
+        s.debug_logging = this->debugLoggingCheck->isChecked();
+        s.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
+        s.agent_debug = this->agentDebugCheck->isChecked();
+        s.save();
+
+        logger_t::instance().set_enabled(s.debug_logging);
+        vector_search_service().apply_settings(s);
+        this->refreshVectorSearchStatusFromService();
+
+        QString error;
+        if ((s.vector_search_enabled == true) &&
+            ((vector_search_service().verify_connection(&error) == false) ||
+             (vector_search_service().ensure_collection(text_embedder_t::k_embedding_dimensions,
+                                                        &error) == false)))
+        {
+            QMessageBox::warning(
+                this, tr_t::tr("Vector Search"),
+                tr_t::tr("Qdrant server is not available: %1\n\n"
+                         "Vector search functionality is disabled until the connection succeeds.")
+                    .arg(error));
+            this->refreshVectorSearchStatusFromService();
+        }
+
+        vector_indexing_manager().refresh_from_settings();
+
+        this->snapshot = this->captureSnapshot();
+    }
+
+    void cancel() override
+    {
+        this->restoreSnapshot(this->snapshot);
+        vector_search_service().apply_settings(settings());
+        this->refreshVectorSearchStatusFromService();
+    }
+
+private:
+    settings_t settingsFromUi() const
+    {
+        settings_t s = settings();
         s.provider = this->providerCombo->currentData().toString();
         s.base_url = this->baseUrlCombo->currentText();
         s.api_key = this->apiKeyEdit->text();
@@ -416,25 +583,20 @@ public:
         s.thinking_level = this->thinkingCombo->currentData().toString();
         s.temperature = this->tempSpin->value();
         s.max_tokens = this->maxTokensSpin->value();
-
         s.copilot_model = this->copilotModelCombo->currentText();
         s.copilot_node_path = this->copilotNodeEdit->text();
         s.copilot_sidecar_path = this->copilotSidecarEdit->text();
         s.copilot_completion_timeout_sec = this->copilotCompletionTimeoutSpin->value();
-
         s.local_base_url = this->localUrlEdit->text();
         s.local_endpoint_path = this->localEndpointEdit->text();
         s.local_simple_mode = this->localSimpleCheck->isChecked();
         s.local_custom_headers = this->localHeadersEdit->text();
-
         s.ollama_base_url = this->ollamaUrlEdit->text();
         s.ollama_model = this->ollamaModelCombo->currentText();
-
         s.max_iterations = this->maxIterSpin->value();
         s.max_tool_calls = this->maxToolsSpin->value();
         s.max_diff_lines = this->maxDiffSpin->value();
         s.max_changed_files = this->maxFilesSpin->value();
-
         s.dry_run_default = this->dryRunCheck->isChecked();
         s.auto_compact_enabled = this->autoCompactCheck->isChecked();
         s.auto_compact_threshold_tokens = this->autoCompactThresholdSpin->value();
@@ -444,23 +606,107 @@ public:
         s.completion_model = this->completionModelCombo->currentText().trimmed();
         s.completion_thinking_level = this->completionThinkingCombo->currentData().toString();
         s.completion_reasoning_effort = this->completionReasoningCombo->currentData().toString();
+        s.vector_search_enabled = this->vectorSearchEnabledCheck->isChecked();
+        s.vector_search_provider = this->vectorSearchProviderCombo->currentData().toString();
+        s.qdrant_url = this->qdrantUrlEdit->text().trimmed();
+        s.qdrant_api_key = this->qdrantApiKeyEdit->text();
+        s.qdrant_collection_name = this->qdrantCollectionEdit->text().trimmed();
+        s.qdrant_auto_create_collection = this->qdrantAutoCreateCollectionCheck->isChecked();
+        s.qdrant_ca_certificate_file = this->qdrantCaCertificateEdit->text().trimmed();
+        s.qdrant_client_certificate_file = this->qdrantClientCertificateEdit->text().trimmed();
+        s.qdrant_client_key_file = this->qdrantClientKeyEdit->text().trimmed();
+        s.qdrant_allow_self_signed_server_certificate =
+            this->qdrantAllowSelfSignedCheck->isChecked();
+        s.qdrant_timeout_sec = this->qdrantTimeoutSpin->value();
+        s.vector_search_max_indexing_threads = this->vectorSearchMaxIndexingThreadsSpin->value();
         s.debug_logging = this->debugLoggingCheck->isChecked();
         s.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
         s.agent_debug = this->agentDebugCheck->isChecked();
         s.mcp_servers = this->mcpServersWidget->servers();
-        s.save();
-
-        logger_t::instance().set_enabled(s.debug_logging);
-
-        this->snapshot = this->captureSnapshot();
+        return s;
     }
 
-    void cancel() override
+    void refreshVectorSearchUiState()
     {
-        this->restoreSnapshot(this->snapshot);
+        const bool provider_available = k_qdrant_support_enabled;
+        const bool enabled = this->vectorSearchEnabledCheck->isChecked();
+        const bool qdrant_selected =
+            this->vectorSearchProviderCombo->currentData().toString() == QStringLiteral("qdrant");
+        this->vectorSearchProviderCombo->setEnabled(provider_available);
+        this->qdrantGroup->setEnabled(enabled && provider_available && qdrant_selected);
+        this->qdrantTestConnectionButton->setEnabled(enabled && provider_available &&
+                                                     qdrant_selected);
     }
 
-private:
+    void refreshVectorSearchStatusFromService()
+    {
+        const auto &service = vector_search_service();
+
+        if (k_qdrant_support_enabled == false)
+        {
+            this->vectorSearchStatusLabel->setText(tr_t::tr(
+                "Qdrant support was disabled at build time (`FEATURE_QDRANT_ENABLE=OFF`)."));
+            this->vectorSearchStatusLabel->show();
+            return;
+        }
+
+        if (this->vectorSearchEnabledCheck->isChecked() == false)
+        {
+            this->vectorSearchStatusLabel->setText(tr_t::tr("Vector search is disabled."));
+            this->vectorSearchStatusLabel->show();
+            return;
+        }
+
+        if (service.is_available() == true)
+        {
+            this->vectorSearchStatusLabel->setText(tr_t::tr("Qdrant connection is available."));
+        }
+        else if (service.last_error().isEmpty() == false)
+        {
+            this->vectorSearchStatusLabel->setText(
+                tr_t::tr("Qdrant connection failed: %1").arg(service.last_error()));
+        }
+        else
+        {
+            this->vectorSearchStatusLabel->setText(
+                tr_t::tr("Qdrant connection has not been verified yet."));
+        }
+        this->vectorSearchStatusLabel->show();
+    }
+
+    void testVectorSearchConnection()
+    {
+        const settings_t candidate = this->settingsFromUi();
+        vector_search_service().apply_settings(candidate);
+        QString error;
+        if (vector_search_service().verify_connection(&error) == true)
+        {
+            if (vector_search_service().ensure_collection(text_embedder_t::k_embedding_dimensions,
+                                                          &error) == false)
+            {
+                this->refreshVectorSearchStatusFromService();
+                QMessageBox::warning(
+                    this, tr_t::tr("Vector Search"),
+                    tr_t::tr(
+                        "Qdrant server is not available: %1\n\n"
+                        "Vector search functionality is disabled until the connection succeeds.")
+                        .arg(error));
+                return;
+            }
+            this->refreshVectorSearchStatusFromService();
+            QMessageBox::information(this, tr_t::tr("Vector Search"),
+                                     tr_t::tr("Qdrant connection succeeded."));
+            return;
+        }
+
+        this->refreshVectorSearchStatusFromService();
+        QMessageBox::warning(
+            this, tr_t::tr("Vector Search"),
+            tr_t::tr("Qdrant server is not available: %1\n\n"
+                     "Vector search functionality is disabled until the connection succeeds.")
+                .arg(error));
+    }
+
     snapshot_t captureSnapshot() const
     {
         return {
@@ -493,6 +739,18 @@ private:
             this->completionModelCombo->currentText().trimmed(),
             this->completionThinkingCombo->currentData().toString(),
             this->completionReasoningCombo->currentData().toString(),
+            this->vectorSearchEnabledCheck->isChecked(),
+            this->vectorSearchProviderCombo->currentData().toString(),
+            this->qdrantUrlEdit->text().trimmed(),
+            this->qdrantApiKeyEdit->text(),
+            this->qdrantCollectionEdit->text().trimmed(),
+            this->qdrantAutoCreateCollectionCheck->isChecked(),
+            this->qdrantCaCertificateEdit->text().trimmed(),
+            this->qdrantClientCertificateEdit->text().trimmed(),
+            this->qdrantClientKeyEdit->text().trimmed(),
+            this->qdrantAllowSelfSignedCheck->isChecked(),
+            this->qdrantTimeoutSpin->value(),
+            this->vectorSearchMaxIndexingThreadsSpin->value(),
             this->debugLoggingCheck->isChecked(),
             this->detailedRequestLoggingCheck->isChecked(),
             this->agentDebugCheck->isChecked(),
@@ -546,10 +804,30 @@ private:
         selectEffortValue(this->completionThinkingCombo, snap.completion_thinking_level, 0);
         selectEffortValue(this->completionReasoningCombo, snap.completion_reasoning_effort, 0);
 
+        this->vectorSearchEnabledCheck->setChecked(snap.vector_search_enabled);
+        const int vector_provider_index =
+            this->vectorSearchProviderCombo->findData(snap.vector_search_provider);
+        this->vectorSearchProviderCombo->setCurrentIndex(
+            vector_provider_index >= 0 ? vector_provider_index : 0);
+        this->qdrantUrlEdit->setText(snap.qdrant_url);
+        this->qdrantApiKeyEdit->setText(snap.qdrant_api_key);
+        this->qdrantCollectionEdit->setText(snap.qdrant_collection_name);
+        this->qdrantAutoCreateCollectionCheck->setChecked(snap.qdrant_auto_create_collection);
+        this->qdrantCaCertificateEdit->setText(snap.qdrant_ca_certificate_file);
+        this->qdrantClientCertificateEdit->setText(snap.qdrant_client_certificate_file);
+        this->qdrantClientKeyEdit->setText(snap.qdrant_client_key_file);
+        this->qdrantAllowSelfSignedCheck->setChecked(
+            snap.qdrant_allow_self_signed_server_certificate);
+        this->qdrantTimeoutSpin->setValue(snap.qdrant_timeout_sec);
+        this->vectorSearchMaxIndexingThreadsSpin->setValue(
+            snap.vector_search_max_indexing_threads);
+        this->refreshVectorSearchUiState();
+
         this->debugLoggingCheck->setChecked(snap.debug_logging);
         this->detailedRequestLoggingCheck->setChecked(snap.detailed_request_logging);
         this->agentDebugCheck->setChecked(snap.agent_debug);
         this->mcpServersWidget->set_servers(snap.mcp_servers);
+        this->refreshVectorSearchStatusFromService();
     }
 
     snapshot_t snapshot;
@@ -579,6 +857,24 @@ private:
     QComboBox *completionModelCombo;
     QComboBox *completionThinkingCombo;
     QComboBox *completionReasoningCombo;
+    QCheckBox *vectorSearchEnabledCheck;
+    QComboBox *vectorSearchProviderCombo;
+    QLabel *vectorSearchStatusLabel;
+    QGroupBox *qdrantGroup;
+    QLineEdit *qdrantUrlEdit;
+    QLineEdit *qdrantApiKeyEdit;
+    QLineEdit *qdrantCollectionEdit;
+    QCheckBox *qdrantAutoCreateCollectionCheck;
+    QLineEdit *qdrantCaCertificateEdit;
+    QPushButton *qdrantCaCertificateBrowseButton;
+    QLineEdit *qdrantClientCertificateEdit;
+    QPushButton *qdrantClientCertificateBrowseButton;
+    QLineEdit *qdrantClientKeyEdit;
+    QPushButton *qdrantClientKeyBrowseButton;
+    QCheckBox *qdrantAllowSelfSignedCheck;
+    QSpinBox *qdrantTimeoutSpin;
+    QSpinBox *vectorSearchMaxIndexingThreadsSpin;
+    QPushButton *qdrantTestConnectionButton;
     QCheckBox *debugLoggingCheck;
     QCheckBox *detailedRequestLoggingCheck;
     QCheckBox *agentDebugCheck;

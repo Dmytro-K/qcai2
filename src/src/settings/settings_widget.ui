@@ -365,11 +365,266 @@
         </widget>
        </item>
       </layout>
-     </widget>
-     <widget class="QWidget" name="completionTab">
-      <attribute name="title">
-       <string>Code Completion</string>
-      </attribute>
+      </widget>
+      <widget class="QWidget" name="vectorSearchTab">
+       <attribute name="title">
+        <string>Vector Search</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="vectorSearchLayout">
+        <item>
+         <widget class="QCheckBox" name="vectorSearchEnabledCheck">
+          <property name="text">
+           <string>Enable vector search integration</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QFormLayout" name="vectorSearchProviderLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="vectorSearchProviderLabel">
+            <property name="text">
+             <string>Backend:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="vectorSearchProviderCombo"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QLabel" name="vectorSearchStatusLabel">
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+          <property name="visible">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="qdrantGroup">
+          <property name="title">
+           <string>Qdrant</string>
+          </property>
+          <layout class="QFormLayout" name="qdrantLayout">
+           <item row="0" column="0">
+            <widget class="QLabel" name="qdrantUrlLabel">
+             <property name="text">
+              <string>URL:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLineEdit" name="qdrantUrlEdit">
+             <property name="placeholderText">
+              <string>http://localhost:6333</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="qdrantApiKeyLabel">
+             <property name="text">
+              <string>API key:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLineEdit" name="qdrantApiKeyEdit">
+             <property name="echoMode">
+              <enum>QLineEdit::Password</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="qdrantCollectionLabel">
+             <property name="text">
+              <string>Collection:</string>
+             </property>
+            </widget>
+           </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="qdrantCollectionEdit">
+              <property name="placeholderText">
+               <string>qcai2-symbols</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="qdrantCollectionBehaviorLabel">
+              <property name="text">
+               <string>Collection behavior:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QCheckBox" name="qdrantAutoCreateCollectionCheck">
+              <property name="text">
+               <string>Auto-create collection if it does not exist</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="qdrantCaCertificateLabel">
+              <property name="text">
+               <string>CA certificate file:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <layout class="QHBoxLayout" name="qdrantCaCertificateRowLayout">
+              <item>
+               <widget class="QLineEdit" name="qdrantCaCertificateEdit">
+                <property name="placeholderText">
+                 <string>/path/to/ca.pem</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="qdrantCaCertificateBrowseButton">
+                <property name="text">
+                 <string>Browse…</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item row="5" column="0">
+             <widget class="QLabel" name="qdrantClientCertificateLabel">
+              <property name="text">
+               <string>Client certificate file:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="1">
+             <layout class="QHBoxLayout" name="qdrantClientCertificateRowLayout">
+              <item>
+               <widget class="QLineEdit" name="qdrantClientCertificateEdit">
+                <property name="placeholderText">
+                 <string>/path/to/client.pem</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="qdrantClientCertificateBrowseButton">
+                <property name="text">
+                 <string>Browse…</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item row="6" column="0">
+             <widget class="QLabel" name="qdrantClientKeyLabel">
+              <property name="text">
+               <string>Client key file:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="1">
+             <layout class="QHBoxLayout" name="qdrantClientKeyRowLayout">
+              <item>
+               <widget class="QLineEdit" name="qdrantClientKeyEdit">
+                <property name="placeholderText">
+                 <string>/path/to/client.key</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="qdrantClientKeyBrowseButton">
+                <property name="text">
+                 <string>Browse…</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item row="7" column="0">
+             <widget class="QLabel" name="qdrantTlsLabel">
+              <property name="text">
+               <string>TLS:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="7" column="1">
+             <widget class="QCheckBox" name="qdrantAllowSelfSignedCheck">
+              <property name="text">
+               <string>Allow self-signed server certificate</string>
+              </property>
+             </widget>
+            </item>
+             <item row="8" column="0">
+              <widget class="QLabel" name="qdrantTimeoutLabel">
+               <property name="text">
+                <string>Timeout:</string>
+               </property>
+              </widget>
+             </item>
+              <item row="8" column="1">
+               <widget class="QSpinBox" name="qdrantTimeoutSpin">
+               <property name="minimum">
+                <number>1</number>
+               </property>
+             <property name="maximum">
+              <number>3600</number>
+             </property>
+             <property name="suffix">
+              <string> s</string>
+                </property>
+               </widget>
+              </item>
+             <item row="9" column="0">
+              <widget class="QLabel" name="vectorSearchMaxIndexingThreadsLabel">
+               <property name="text">
+                <string>Max indexing threads:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="1">
+              <widget class="QSpinBox" name="vectorSearchMaxIndexingThreadsSpin">
+               <property name="minimum">
+                <number>1</number>
+               </property>
+               <property name="maximum">
+                <number>256</number>
+               </property>
+               <property name="suffix">
+                <string> threads</string>
+               </property>
+              </widget>
+             </item>
+               <item row="10" column="1">
+                <widget class="QPushButton" name="qdrantTestConnectionButton">
+                <property name="text">
+                 <string>Test connection</string>
+                </property>
+              </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        <item>
+         <spacer name="vectorSearchBottomSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::Expanding</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="completionTab">
+       <attribute name="title">
+        <string>Code Completion</string>
+       </attribute>
       <layout class="QVBoxLayout" name="completionLayout">
        <item>
         <widget class="QCheckBox" name="aiCompletionCheck">

@@ -315,6 +315,26 @@ void settings_t::load()
         s.value("completionThinkingLevel", completion_thinking_level).toString();
     completion_reasoning_effort =
         s.value("completionReasoningEffort", completion_reasoning_effort).toString();
+    vector_search_enabled = s.value("vectorSearchEnabled", vector_search_enabled).toBool();
+    vector_search_provider =
+        s.value("vectorSearchProvider", vector_search_provider).toString().trimmed();
+    qdrant_url = s.value("qdrantUrl", qdrant_url).toString();
+    qdrant_api_key = s.value("qdrantApiKey", qdrant_api_key).toString();
+    qdrant_collection_name = s.value("qdrantCollectionName", qdrant_collection_name).toString();
+    qdrant_auto_create_collection =
+        s.value("qdrantAutoCreateCollection", qdrant_auto_create_collection).toBool();
+    qdrant_ca_certificate_file =
+        s.value("qdrantCaCertificateFile", qdrant_ca_certificate_file).toString();
+    qdrant_client_certificate_file =
+        s.value("qdrantClientCertificateFile", qdrant_client_certificate_file).toString();
+    qdrant_client_key_file = s.value("qdrantClientKeyFile", qdrant_client_key_file).toString();
+    qdrant_allow_self_signed_server_certificate =
+        s.value("qdrantAllowSelfSignedServerCertificate",
+                qdrant_allow_self_signed_server_certificate)
+            .toBool();
+    qdrant_timeout_sec = s.value("qdrantTimeoutSec", qdrant_timeout_sec).toInt();
+    vector_search_max_indexing_threads = qMax(
+        1, s.value("vectorSearchMaxIndexingThreads", vector_search_max_indexing_threads).toInt());
 
     s.endGroup();
 
@@ -401,6 +421,19 @@ void settings_t::save() const
     s.setValue("completionModel", completion_model);
     s.setValue("completionThinkingLevel", completion_thinking_level);
     s.setValue("completionReasoningEffort", completion_reasoning_effort);
+    s.setValue("vectorSearchEnabled", vector_search_enabled);
+    s.setValue("vectorSearchProvider", vector_search_provider);
+    s.setValue("qdrantUrl", qdrant_url);
+    s.setValue("qdrantApiKey", qdrant_api_key);
+    s.setValue("qdrantCollectionName", qdrant_collection_name);
+    s.setValue("qdrantAutoCreateCollection", qdrant_auto_create_collection);
+    s.setValue("qdrantCaCertificateFile", qdrant_ca_certificate_file);
+    s.setValue("qdrantClientCertificateFile", qdrant_client_certificate_file);
+    s.setValue("qdrantClientKeyFile", qdrant_client_key_file);
+    s.setValue("qdrantAllowSelfSignedServerCertificate",
+               qdrant_allow_self_signed_server_certificate);
+    s.setValue("qdrantTimeoutSec", qdrant_timeout_sec);
+    s.setValue("vectorSearchMaxIndexingThreads", vector_search_max_indexing_threads);
     Migration::stamp_global_settings(s);
 
     s.endGroup();

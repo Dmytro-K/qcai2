@@ -111,7 +111,8 @@ qdrant_HttpRequestWorker::qdrant_HttpRequestWorker(QObject *parent,
     : QObject(parent), manager(_manager), timeOutTimer(this), isResponseCompressionEnabled(false),
       isRequestCompressionEnabled(false), httpResponseCode(-1)
 {
-    randomGenerator = QRandomGenerator(QDateTime::currentSecsSinceEpoch());
+    randomGenerator =
+        QRandomGenerator(static_cast<quint32>(QDateTime::currentSecsSinceEpoch() & 0xffffffff));
     if (manager == nullptr)
     {
         manager = new QNetworkAccessManager(this);
@@ -654,7 +655,7 @@ QByteArray qdrant_HttpRequestWorker::decompress(const QByteArray &data)
         {
             break;
         }
-        strm.avail_in = data.size();
+        strm.avail_in = static_cast<uInt>(data.size());
         strm.next_in = (Bytef *)(data.data());
         if (Z_OK != inflateInit2(&strm, 15 + 32))
         {
@@ -709,7 +710,7 @@ QByteArray qdrant_HttpRequestWorker::compress(const QByteArray &input, int level
         }
         output.clear();
         auto input_data = input.data();
-        int input_data_left = input.length();
+        int input_data_left = static_cast<int>(input.length());
         do
         {
             int chunk_size = qMin(CHUNK_SIZE, input_data_left);

@@ -24,6 +24,7 @@
 #include "settings/settings.h"
 #include "settings/settings_page.h"
 #include "tools/build_tools.h"
+#include "vector_search/vector_search_service.h"
 
 #if QCAI2_ENABLE_CLANGD
 #include "tools/clangd_tools.h"
@@ -38,9 +39,12 @@
 #include "tools/run_command_tool.h"
 #include "tools/search_tools.h"
 #include "tools/tool_registry.h"
+#include "tools/vector_search_tools.h"
 #include "util/crash_handler.h"
 #include "util/ide_output_capture.h"
 #include "util/logger.h"
+#include "vector_search/text_embedder.h"
+#include "vector_search/vector_indexing_manager.h"
 
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
@@ -54,6 +58,7 @@
 
 #include <QAction>
 #include <QMenu>
+#include <QMessageBox>
 
 using namespace Core;
 
@@ -112,6 +117,8 @@ void ai_agent_plugin_t::initialize()
     this->safety_policy = new safety_policy_t(this);
     this->controller = new agent_controller_t(this);
     this->output_capture = new ide_output_capture_t(this);
+    this->vector_search_service = &qcai2::vector_search_service();
+    vector_indexing_manager().initialize(this->editor_context, this->chat_context_manager);
 
 #if QCAI2_ENABLE_CLANGD
     this->clangd_service = new clangd_service_t(this);
@@ -123,6 +130,10 @@ void ai_agent_plugin_t::initialize()
     this->safety_policy->set_max_tool_calls(s.max_tool_calls);
     this->safety_policy->set_max_diff_lines(s.max_diff_lines);
     this->safety_policy->set_max_changed_files(s.max_changed_files);
+    this->vector_search_service->apply_settings(s);
+
+    QCAI_INFO("Plugin", QStringLiteral("Vector search: %1")
+                            .arg(this->vector_search_service->configuration_summary()));
 
     // Set up tools and providers
     this->register_tools();
@@ -214,6 +225,41 @@ void ai_agent_plugin_t::extensionsInitialized()
 {
     // Show the navigation widget on startup
     this->show_navigation_widget();
+
+    if ((this->vector_search_service != nullptr) && (settings().vector_search_enabled == true))
+    {
+        QMetaObject::invokeMethod(
+            this,
+            [this]() {
+                QString error;
+                if (this->vector_search_service->verify_connection(&error) == false)
+                {
+                    QCAI_WARN("Plugin",
+                              QStringLiteral("Vector search startup check failed: %1").arg(error));
+                    QMessageBox::warning(ICore::mainWindow(), tr_t::tr("Vector Search"),
+                                         tr_t::tr("Qdrant server is not available: %1\n\n"
+                                                  "Vector search functionality is disabled until "
+                                                  "the connection succeeds.")
+                                             .arg(error));
+                    return;
+                }
+                if (this->vector_search_service->ensure_collection(
+                        text_embedder_t::k_embedding_dimensions, &error) == false)
+                {
+                    QCAI_WARN(
+                        "Plugin",
+                        QStringLiteral("Vector search collection check failed: %1").arg(error));
+                    QMessageBox::warning(ICore::mainWindow(), tr_t::tr("Vector Search"),
+                                         tr_t::tr("Qdrant server is not available: %1\n\n"
+                                                  "Vector search functionality is disabled until "
+                                                  "the connection succeeds.")
+                                             .arg(error));
+                    return;
+                }
+                vector_indexing_manager().refresh_from_settings();
+            },
+            Qt::QueuedConnection);
+    }
 }
 
 ai_agent_plugin_t::ShutdownFlag ai_agent_plugin_t::aboutToShutdown()
@@ -373,6 +419,8 @@ void ai_agent_plugin_t::register_tools()
     this->tool_registry->register_tool(std::make_shared<create_file_tool_t>());
     this->tool_registry->register_tool(std::make_shared<apply_patch_tool_t>());
     this->tool_registry->register_tool(std::make_shared<search_repo_tool_t>());
+    this->tool_registry->register_tool(std::make_shared<vector_search_tool_t>());
+    this->tool_registry->register_tool(std::make_shared<vector_search_history_tool_t>());
     this->tool_registry->register_tool(std::make_shared<list_directory_tool_t>());
     this->tool_registry->register_tool(std::make_shared<run_command_tool_t>());
     this->tool_registry->register_tool(std::make_shared<find_symbol_tool_t>());
