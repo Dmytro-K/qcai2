@@ -10,7 +10,7 @@
 - [x] Diff review with per-line accept/reject and inline editor markers
 - [x] AI code completion with inline ghost-text suggestions
 - [x] Chat history, rolling summaries, and context budgeting
-- [x] Per-project sessions under `.qcai2/` with migration and auto-reload
+- [x] Per-project sessions under `.qcai2/` with migration, auto-reload, and per-conversation state files
 - [x] Safety: dry-run by default, approval gates, path sandboxing, command allowlisting
 - [x] `#file` references and slash commands with auto-completion
 - [x] Built-in tools for file creation, directory listing, command execution, symbol lookup, diagnostics, git, and IDE output access
@@ -18,9 +18,9 @@
 - [x] Live provider progress status, detailed per-request Markdown logs, and per-project usage statistics
 - [x] GitHub Copilot Premium request usage display
 - [x] Optional auto-compact based on prior context token usage
+- [x] Conversation list UI
 - [ ] More slash commands: `/clear`, `/diff`
 - [ ] Per-project custom instructions (`.qcai2/rules.md`)
-- [ ] Conversation list UI
 - [ ] Semantic search over chat history
 - [ ] Semantic search over code
 - [ ] Multi-turn inline edit
@@ -208,6 +208,7 @@ Open **Edit → Preferences → Qcai2** in Qt Creator.
   - Optional debug logging to the `Debug Log` tab
   - Optional detailed per-request Markdown logging under the project `.qcai2/logs/` directory
   - Optional `Agent Debug` mode that shows raw JSON payloads in chat
+  - Conversation history is split into a project session file plus per-conversation state files under `.qcai2/conversations/`
 - **Auto-compact**:
   - Disabled by default
   - When enabled, automatically runs `/compact` before the next request after the previous request exceeds the input-token threshold

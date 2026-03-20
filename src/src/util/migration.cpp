@@ -4,6 +4,7 @@
 #include "migrations/migration_0_0_4_001.h"
 #include "migrations/migration_0_0_5_002.h"
 #include "migrations/migration_0_0_5_003.h"
+#include "migrations/migration_0_0_7_001.h"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -535,6 +536,18 @@ QString project_backup_dir_path(const QString &storage_path)
     return ensure_project_backup_dir(storage_path);
 }
 
+QString project_conversations_dir_path(const QString &storage_path)
+{
+    return QDir(QFileInfo(storage_path).absolutePath()).filePath(QStringLiteral("conversations"));
+}
+
+QString conversation_log_journal_file_path(const QString &storage_path,
+                                           const QString &conversation_id)
+{
+    return QDir(project_conversations_dir_path(storage_path))
+        .filePath(QStringLiteral("%1.actions-log.jsonl").arg(conversation_id));
+}
+
 revision_t parse_revision(const QString &version, const QString &build_suffix)
 {
     static const QRegularExpression version_only_re(
@@ -673,9 +686,12 @@ bool migrate_project_state(const QString &storage_path, QString *error)
     QJsonObject root = doc.object();
     const revision_t stored = stored_project_revision(root);
     const revision_t current = current_revision();
+    const bool needs_0_0_7_001_repair =
+        project_state_needs_migration_to_0_0_7_001(storage_path, root);
     bool changed = false;
 
-    if (((!stored.valid || stored.revision_string() != current.revision_string()) == true))
+    if (((!stored.valid || stored.revision_string() != current.revision_string()) == true) ||
+        needs_0_0_7_001_repair == true)
     {
         if (create_project_state_backup(storage_path, root, stored, current, error) == false)
         {
@@ -708,6 +724,23 @@ bool migrate_project_state(const QString &storage_path, QString *error)
         changed = migrate_project_state_to_0_0_5_003(root) || changed;
     }
 
+    const revision_t migration_0_0_7_001 =
+        parse_revision(QStringLiteral("0.0.7"), QStringLiteral("-001"));
+    if (is_older(stored, migration_0_0_7_001) == true || needs_0_0_7_001_repair == true)
+    {
+        if (migrate_project_state_to_0_0_7_001(storage_path, root, error) == false)
+        {
+            return false;
+        }
+        changed = true;
+    }
+
+    changed = normalize_conversation_log_storage_to_0_0_7_001(storage_path, error) || changed;
+    if (error != nullptr && error->isEmpty() == false)
+    {
+        return false;
+    }
+
     if (((!stored.valid || stored.revision_string() != current.revision_string()) == true))
     {
         stamp_project_state(root);
@@ -730,6 +763,12 @@ QString project_goal_file_path(const QString &storage_path)
 QString project_actions_log_file_path(const QString &storage_path)
 {
     return sibling_file_path(storage_path, QStringLiteral(".actions-log.md"));
+}
+
+QString conversation_state_file_path(const QString &storage_path, const QString &conversation_id)
+{
+    return QDir(project_conversations_dir_path(storage_path))
+        .filePath(QStringLiteral("%1.json").arg(conversation_id));
 }
 
 }  // namespace qcai2::Migration

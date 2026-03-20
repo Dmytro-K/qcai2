@@ -17,6 +17,9 @@ class tst_chat_context_t : public QObject
 private slots:
     void stores_artifacts_and_builds_envelope();
     void new_conversation_is_isolated();
+    void lists_conversations_with_most_recent_first();
+    void renames_conversation();
+    void deletes_conversation();
     void writes_hourly_usage_stats_csv();
 };
 
@@ -217,6 +220,137 @@ void tst_chat_context_t::new_conversation_is_isolated()
 
     QVERIFY(combined_prompt.contains(QStringLiteral("second-conversation-marker")));
     QVERIFY(combined_prompt.contains(QStringLiteral("first-conversation-marker")) == false);
+}
+
+void tst_chat_context_t::lists_conversations_with_most_recent_first()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+    QVERIFY(QDir(temp_dir.path()).mkpath(QStringLiteral(".qcai2")));
+
+    chat_context_manager_t manager;
+    QString error;
+    QVERIFY(
+        manager.set_active_workspace(QStringLiteral("workspace-4"), temp_dir.path(), {}, &error));
+    QVERIFY(error.isEmpty());
+
+    const QString first_conversation =
+        manager.start_new_conversation(QStringLiteral("First"), &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(first_conversation.isEmpty() == false);
+
+    const QString second_conversation =
+        manager.start_new_conversation(QStringLiteral("Second"), &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(second_conversation.isEmpty() == false);
+
+    QVERIFY(manager.set_active_workspace(QStringLiteral("workspace-4"), temp_dir.path(),
+                                         first_conversation, &error));
+    QVERIFY(error.isEmpty());
+
+    const QString run_id = manager.begin_run(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("provider"), QStringLiteral("model"),
+        QStringLiteral("off"), QStringLiteral("off"), true, {}, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(run_id.isEmpty() == false);
+    QVERIFY(manager.append_user_message(run_id, QStringLiteral("refresh ordering"),
+                                        QStringLiteral("goal"), {}, &error));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    const QList<conversation_record_t> conversations = manager.conversations(&error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(conversations.size(), 2);
+    QCOMPARE(conversations.constFirst().conversation_id, first_conversation);
+    QCOMPARE(conversations.constLast().conversation_id, second_conversation);
+}
+
+void tst_chat_context_t::renames_conversation()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+    QVERIFY(QDir(temp_dir.path()).mkpath(QStringLiteral(".qcai2")));
+
+    chat_context_manager_t manager;
+    QString error;
+    QVERIFY(
+        manager.set_active_workspace(QStringLiteral("workspace-5"), temp_dir.path(), {}, &error));
+    QVERIFY(error.isEmpty());
+
+    const QString conversation_id = manager.start_new_conversation({}, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(conversation_id.isEmpty() == false);
+
+    QVERIFY(manager.rename_conversation(conversation_id, QStringLiteral("Renamed Conversation"),
+                                        &error));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    const QList<conversation_record_t> conversations = manager.conversations(&error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(conversations.size(), 1);
+    QCOMPARE(conversations.constFirst().title, QStringLiteral("Renamed Conversation"));
+    QCOMPARE(manager.active_conversation().title, QStringLiteral("Renamed Conversation"));
+}
+
+void tst_chat_context_t::deletes_conversation()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+    QVERIFY(QDir(temp_dir.path()).mkpath(QStringLiteral(".qcai2")));
+
+    chat_context_manager_t manager;
+    QString error;
+    QVERIFY(
+        manager.set_active_workspace(QStringLiteral("workspace-6"), temp_dir.path(), {}, &error));
+    QVERIFY(error.isEmpty());
+
+    const QString first_conversation =
+        manager.start_new_conversation(QStringLiteral("Delete Me"), &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(first_conversation.isEmpty() == false);
+
+    const QString run_id = manager.begin_run(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("provider"), QStringLiteral("model"),
+        QStringLiteral("off"), QStringLiteral("off"), true, {}, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(run_id.isEmpty() == false);
+    QVERIFY(manager.append_user_message(run_id, QStringLiteral("message before delete"),
+                                        QStringLiteral("goal"), {}, &error));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(manager.append_artifact(run_id, QStringLiteral("plan"), QStringLiteral("Plan"),
+                                    QStringLiteral("artifact content"), {}, &error));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    const QString second_conversation =
+        manager.start_new_conversation(QStringLiteral("Keep Me"), &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(second_conversation.isEmpty() == false);
+
+    QVERIFY(manager.set_active_workspace(QStringLiteral("workspace-6"), temp_dir.path(),
+                                         first_conversation, &error));
+    QVERIFY(error.isEmpty());
+
+    const QString conversation_dir =
+        QDir(temp_dir.path())
+            .filePath(
+                QStringLiteral(".qcai2/chat-context/conversations/%1").arg(first_conversation));
+    const QString runs_dir =
+        QDir(temp_dir.path()).filePath(QStringLiteral(".qcai2/chat-context/runs"));
+    const QString artifact_dir = manager.artifact_directory_path();
+    QVERIFY(QFileInfo::exists(conversation_dir));
+    QCOMPARE(QDir(runs_dir).entryList(QStringList() << "*.json", QDir::Files).size(), 1);
+    QCOMPARE(QDir(artifact_dir).entryList(QDir::Files).size(), 1);
+
+    QVERIFY(manager.delete_conversation(first_conversation, &error));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    const QList<conversation_record_t> conversations = manager.conversations(&error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(conversations.size(), 1);
+    QCOMPARE(conversations.constFirst().conversation_id, second_conversation);
+    QVERIFY(manager.active_conversation_id().isEmpty());
+    QVERIFY(QFileInfo::exists(conversation_dir) == false);
+    QCOMPARE(QDir(runs_dir).entryList(QStringList() << "*.json", QDir::Files).size(), 0);
+    QCOMPARE(QDir(artifact_dir).entryList(QDir::Files).size(), 0);
 }
 
 void tst_chat_context_t::writes_hourly_usage_stats_csv()

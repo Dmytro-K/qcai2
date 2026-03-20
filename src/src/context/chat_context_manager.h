@@ -25,9 +25,14 @@ public:
     QString active_workspace_id() const;
     QString active_workspace_root() const;
     QString active_conversation_id() const;
+    conversation_record_t active_conversation() const;
 
     QString ensure_active_conversation(QString *error = nullptr);
     QString start_new_conversation(const QString &title = {}, QString *error = nullptr);
+    QList<conversation_record_t> conversations(QString *error = nullptr) const;
+    bool rename_conversation(const QString &conversation_id, const QString &title,
+                             QString *error = nullptr);
+    bool delete_conversation(const QString &conversation_id, QString *error = nullptr);
 
     void sync_workspace_state(const editor_context_t::snapshot_t &snapshot,
                               const settings_t &settings, QString *error = nullptr);

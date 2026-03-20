@@ -10,6 +10,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
+#include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSplitter>
@@ -205,6 +206,9 @@ private:
      * Refreshes the diff tab state and optionally re-renders inline editor markers.
      */
     void sync_diff_ui(const QString &diff, bool focus_diff_tab, bool refresh_inline_markers);
+    void refresh_conversation_list();
+    void rename_selected_conversation();
+    void delete_selected_conversation();
 
     /** Designer-generated UI wrapper. */
     std::unique_ptr<Ui::agent_dock_widget_t> ui;
@@ -214,6 +218,7 @@ private:
 
     /** Input controls shown beside the goal editor. */
     QComboBox *project_combo;
+    QComboBox *conversation_combo = nullptr;
     linked_files_list_widget_t *linked_files_view = nullptr;
     goal_text_edit_t *goal_edit;
     QComboBox *mode_combo;
@@ -240,6 +245,8 @@ private:
     QPushButton *copy_plan_btn;
     QLabel *status_label;
     QLabel *usage_value_label;
+    QPushButton *rename_conversation_btn = nullptr;
+    QPushButton *delete_conversation_btn = nullptr;
 
     /** Full diff currently shown in the preview tab. */
     QString current_diff;
@@ -255,6 +262,9 @@ private:
 
     /** Length of streaming markdown already appended to the log view. */
     qsizetype streaming_rendered_len = 0;
+
+    /** True while the conversations combo is being repopulated programmatically. */
+    bool conversation_list_refreshing = false;
 
     /** True while streaming tokens are being appended incrementally. */
     bool is_streaming = false;

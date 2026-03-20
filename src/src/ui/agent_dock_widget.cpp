@@ -32,10 +32,13 @@
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QKeyEvent>
+#include <QLineEdit>
+#include <QListWidgetItem>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPaintEvent>
@@ -84,6 +87,27 @@ QStringList open_ai_agent_models()
         QStringLiteral("gemini-3-pro-preview"),
         QStringLiteral("gemini-3-flash"),
     };
+}
+
+QString conversation_display_title(const conversation_record_t &conversation)
+{
+    const QString explicit_title = conversation.title.trimmed();
+    if (explicit_title.isEmpty() == false)
+    {
+        return explicit_title;
+    }
+
+    QDateTime created_at = QDateTime::fromString(conversation.created_at, Qt::ISODateWithMs);
+    if (created_at.isValid() == false)
+    {
+        created_at = QDateTime::fromString(conversation.created_at, Qt::ISODate);
+    }
+    if (created_at.isValid() == true)
+    {
+        return QObject::tr("Conversation %1")
+            .arg(created_at.toLocalTime().toString(QStringLiteral("yyyy-MM-dd hh:mm")));
+    }
+    return QObject::tr("Untitled Conversation");
 }
 
 void populate_effort_combo(QComboBox *combo)
@@ -898,6 +922,132 @@ void agent_dock_widget_t::clear_chat_state()
     this->linked_files_controller->refresh_ui();
 }
 
+void agent_dock_widget_t::refresh_conversation_list()
+{
+    if (this->conversation_combo == nullptr)
+    {
+        return;
+    }
+
+    const QList<conversation_record_t> conversations =
+        this->session_controller->available_conversations();
+    const QString active_conversation_id = this->session_controller->active_conversation();
+
+    this->conversation_list_refreshing = true;
+    const QSignalBlocker blocker(this->conversation_combo);
+    this->conversation_combo->clear();
+
+    int active_index = -1;
+    int index = 0;
+    for (const conversation_record_t &conversation : conversations)
+    {
+        this->conversation_combo->addItem(conversation_display_title(conversation),
+                                          conversation.conversation_id);
+        this->conversation_combo->setItemData(index, conversation.title, Qt::UserRole + 1);
+        this->conversation_combo->setItemData(
+            index,
+            tr("Created: %1\nUpdated: %2")
+                .arg(conversation.created_at.isEmpty() ? tr("Unknown") : conversation.created_at,
+                     conversation.updated_at.isEmpty() ? tr("Unknown") : conversation.updated_at),
+            Qt::ToolTipRole);
+        if (conversation.conversation_id == active_conversation_id)
+        {
+            active_index = index;
+        }
+        ++index;
+    }
+
+    if (active_index >= 0)
+    {
+        this->conversation_combo->setCurrentIndex(active_index);
+    }
+    else if (this->conversation_combo->count() > 0)
+    {
+        this->conversation_combo->setCurrentIndex(0);
+    }
+
+    const bool has_project =
+        this->session_controller->current_project_file_path().isEmpty() == false;
+    this->conversation_combo->setEnabled(has_project && this->stop_btn->isEnabled() == false);
+    this->rename_conversation_btn->setEnabled(this->conversation_combo->currentIndex() >= 0 &&
+                                              this->stop_btn->isEnabled() == false);
+    this->delete_conversation_btn->setEnabled(this->conversation_combo->currentIndex() >= 0 &&
+                                              this->stop_btn->isEnabled() == false);
+    this->conversation_list_refreshing = false;
+}
+
+void agent_dock_widget_t::rename_selected_conversation()
+{
+    if (this->conversation_combo == nullptr || this->conversation_combo->currentIndex() < 0)
+    {
+        return;
+    }
+
+    const int index = this->conversation_combo->currentIndex();
+    const QString conversation_id = this->conversation_combo->itemData(index).toString();
+    if (conversation_id.isEmpty() == true)
+    {
+        return;
+    }
+
+    bool ok = false;
+    const QString explicit_title =
+        this->conversation_combo->itemData(index, Qt::UserRole + 1).toString().trimmed();
+    const QString initial_title = explicit_title.isEmpty() == true
+                                      ? this->conversation_combo->itemText(index)
+                                      : explicit_title;
+    const QString title = QInputDialog::getText(
+        this, tr("Rename Conversation"),
+        tr("Conversation title (leave empty to use the default generated title):"),
+        QLineEdit::Normal, initial_title, &ok);
+    if (ok == false)
+    {
+        return;
+    }
+
+    QString error;
+    if (this->session_controller->rename_conversation(conversation_id, title, &error) == false)
+    {
+        QMessageBox::warning(this, tr("Rename Conversation"),
+                             error.isEmpty() ? tr("Failed to rename conversation.") : error);
+        return;
+    }
+    this->refresh_conversation_list();
+}
+
+void agent_dock_widget_t::delete_selected_conversation()
+{
+    if (this->conversation_combo == nullptr || this->conversation_combo->currentIndex() < 0)
+    {
+        return;
+    }
+
+    const int index = this->conversation_combo->currentIndex();
+    const QString conversation_id = this->conversation_combo->itemData(index).toString();
+    if (conversation_id.isEmpty() == true)
+    {
+        return;
+    }
+
+    if (QMessageBox::question(this, tr("Delete Conversation"),
+                              tr("Delete the current conversation? This removes its saved "
+                                 "messages and local state."),
+                              QMessageBox::Yes | QMessageBox::No,
+                              QMessageBox::No) != QMessageBox::Yes)
+    {
+        return;
+    }
+
+    QString error;
+    if (this->session_controller->delete_conversation(conversation_id, &error) == false)
+    {
+        QMessageBox::warning(this, tr("Delete Conversation"),
+                             error.isEmpty() ? tr("Failed to delete conversation.") : error);
+        return;
+    }
+    this->refresh_conversation_list();
+}
+
 void agent_dock_widget_t::setup_ui()
 {
     this->ui = std::make_unique<Ui::agent_dock_widget_t>();
@@ -906,6 +1056,7 @@ void agent_dock_widget_t::setup_ui()
     this->status_label = this->ui->statusLabel;
     this->usage_value_label = this->ui->usageValueLabel;
     this->project_combo = this->ui->projectCombo;
+    this->conversation_combo = this->ui->conversationCombo;
     auto *designer_goal_edit = this->ui->goalEdit;
     this->mode_combo = this->ui->modeCombo;
     this->model_combo = this->ui->modelCombo;
@@ -924,6 +1075,8 @@ void agent_dock_widget_t::setup_ui()
     this->apply_patch_btn = this->ui->applyPatchBtn;
     this->revert_patch_btn = this->ui->revertPatchBtn;
     this->copy_plan_btn = this->ui->copyPlanBtn;
+    this->rename_conversation_btn = this->ui->renameConversationBtn;
+    this->delete_conversation_btn = this->ui->deleteConversationBtn;
     auto *new_chat_btn = this->ui->newChatButton;
 
     this->ui->contentSplitter->setStretchFactor(0, 3);
@@ -1023,19 +1176,6 @@ void agent_dock_widget_t::setup_ui()
     connect(this->revert_patch_btn, &QPushButton::clicked, this,
             &agent_dock_widget_t::on_revert_patch_clicked);
     connect(new_chat_btn, &QPushButton::clicked, this, [this]() {
-        const bool has_content = !this->goal_edit->toPlainText().trimmed().isEmpty() ||
-                                 !this->log_view->toPlainText().isEmpty() ||
-                                 this->plan_list->count() > 0 || !this->current_diff.isEmpty() ||
-                                 this->approval_list->count() > 0;
-
-        if (has_content &&
-            QMessageBox::question(
-                this, tr("New Chat"), tr("Start a new chat and clear the current history?"),
-                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-        {
-            return;
-        }
-
         if (this->stop_btn->isEnabled())
         {
             this->on_stop_clicked();
@@ -1047,6 +1187,40 @@ void agent_dock_widget_t::setup_ui()
     });
     connect(this->copy_plan_btn, &QPushButton::clicked, this,
             &agent_dock_widget_t::on_copy_plan_clicked);
+    connect(this->rename_conversation_btn, &QPushButton::clicked, this,
+            &agent_dock_widget_t::rename_selected_conversation);
+    connect(this->delete_conversation_btn, &QPushButton::clicked, this,
+            &agent_dock_widget_t::delete_selected_conversation);
+    connect(this->conversation_combo, qOverload<int>(&QComboBox::currentIndexChanged), this,
+            [this](int index) {
+                if (this->conversation_list_refreshing || index < 0)
+                {
+                    return;
+                }
+
+                const QString conversation_id =
+                    this->conversation_combo->itemData(index).toString();
+                if (conversation_id.isEmpty() == true ||
+                    conversation_id == this->session_controller->active_conversation())
+                {
+                    this->rename_conversation_btn->setEnabled(
+                        index >= 0 && this->stop_btn->isEnabled() == false);
+                    this->delete_conversation_btn->setEnabled(
+                        index >= 0 && this->stop_btn->isEnabled() == false);
+                    return;
+                }
+
+                if (this->stop_btn->isEnabled())
+                {
+                    QMessageBox::information(
+                        this, tr("Conversation Switch"),
+                        tr("Stop the current run before switching conversations."));
+                    this->refresh_conversation_list();
+                    return;
+                }
+
+                this->session_controller->switch_conversation(conversation_id);
+            });
 
     static_cast<diff_preview_edit_t *>(this->diff_view)
         ->set_approval_changed_callback([this](qsizetype approved, qsizetype total) {
@@ -1127,6 +1301,23 @@ void agent_dock_widget_t::update_run_state(bool running)
     this->dry_run_check->setEnabled(!running);
     this->project_combo->setEnabled(!running && this->project_combo->count() > 0 &&
                                     !this->project_combo->itemData(0).toString().isEmpty());
+    if (this->conversation_combo != nullptr)
+    {
+        this->conversation_combo->setEnabled(
+            !running && this->session_controller->current_project_file_path().isEmpty() == false);
+    }
+    if (this->rename_conversation_btn != nullptr)
+    {
+        this->rename_conversation_btn->setEnabled(!running &&
+                                                  this->conversation_combo != nullptr &&
+                                                  this->conversation_combo->currentIndex() >= 0);
+    }
+    if (this->delete_conversation_btn != nullptr)
+    {
+        this->delete_conversation_btn->setEnabled(!running &&
+                                                  this->conversation_combo != nullptr &&
+                                                  this->conversation_combo->currentIndex() >= 0);
+    }
 }
 
 bool agent_dock_widget_t::try_execute_slash_command(QString &goal)
@@ -1363,11 +1554,13 @@ void agent_dock_widget_t::append_stamped_log_entry(const QString &body)
 
     if (!this->streaming_markdown.isEmpty())
     {
+        const QString flushed_markdown = redact_read_file_payloads(this->streaming_markdown);
         if (!this->log_markdown.isEmpty())
         {
             this->log_markdown += QStringLiteral("\n\n");
         }
-        this->log_markdown += redact_read_file_payloads(this->streaming_markdown);
+        this->log_markdown += flushed_markdown;
+        this->session_controller->append_current_conversation_log_entry(flushed_markdown);
         this->streaming_markdown.clear();
         this->streaming_rendered_len = 0;
         this->is_streaming = false;
@@ -1382,6 +1575,7 @@ void agent_dock_widget_t::append_stamped_log_entry(const QString &body)
         this->log_markdown += QStringLiteral("\n\n");
     }
     this->log_markdown += stamped;
+    this->session_controller->append_current_conversation_log_entry(stamped);
 
     this->render_throttle->stop();
     this->render_log_full();

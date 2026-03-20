@@ -653,6 +653,11 @@ QString chat_context_manager_t::active_conversation_id() const
     return this->conversation.conversation_id;
 }
 
+conversation_record_t chat_context_manager_t::active_conversation() const
+{
+    return this->conversation;
+}
+
 QString chat_context_manager_t::ensure_active_conversation(QString *error)
 {
     if (this->ensure_conversation_available(error) == false)
@@ -690,6 +695,100 @@ QString chat_context_manager_t::start_new_conversation(const QString &title, QSt
         return {};
     }
     return this->conversation.conversation_id;
+}
+
+QList<conversation_record_t> chat_context_manager_t::conversations(QString *error) const
+{
+    if (this->ensure_store_open(error) == false)
+    {
+        return {};
+    }
+    if (this->workspace_id.isEmpty() == true)
+    {
+        return {};
+    }
+    return this->store->conversations(this->workspace_id, error);
+}
+
+bool chat_context_manager_t::rename_conversation(const QString &conversation_id,
+                                                 const QString &title, QString *error)
+{
+    if (this->ensure_store_open(error) == false)
+    {
+        return false;
+    }
+    if (conversation_id.trimmed().isEmpty() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Conversation identifier is empty");
+        }
+        return false;
+    }
+
+    conversation_record_t record = this->store->conversation(conversation_id.trimmed(), error);
+    if (record.is_valid() == false)
+    {
+        if (error != nullptr && error->isEmpty() == true)
+        {
+            *error = QStringLiteral("Conversation not found: %1").arg(conversation_id);
+        }
+        return false;
+    }
+
+    record.title = title.trimmed();
+    record.updated_at = now_utc_iso_string();
+    if (this->store->ensure_conversation(&record, error) == false)
+    {
+        return false;
+    }
+
+    if (this->conversation.conversation_id == record.conversation_id)
+    {
+        this->conversation = record;
+    }
+    return true;
+}
+
+bool chat_context_manager_t::delete_conversation(const QString &conversation_id, QString *error)
+{
+    const QString trimmed_id = conversation_id.trimmed();
+    if (this->ensure_store_open(error) == false)
+    {
+        return false;
+    }
+    if (trimmed_id.isEmpty() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Conversation identifier is empty");
+        }
+        return false;
+    }
+    if (this->store->delete_conversation(trimmed_id, error) == false)
+    {
+        return false;
+    }
+
+    for (auto it = this->active_runs.begin(); it != this->active_runs.end();)
+    {
+        if (it.value().conversation_id == trimmed_id)
+        {
+            it = this->active_runs.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    if (this->conversation.conversation_id == trimmed_id)
+    {
+        this->conversation = {};
+        this->conversation.workspace_id = this->workspace_id;
+        this->conversation.workspace_root = this->workspace_root;
+    }
+    return true;
 }
 
 void chat_context_manager_t::sync_workspace_state(const editor_context_t::snapshot_t &snapshot,

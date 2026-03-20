@@ -74,13 +74,6 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="newChatButton">
-       <property name="text">
-        <string>New Chat</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QPushButton" name="applyPatchBtn">
        <property name="enabled">
         <bool>false</bool>
@@ -106,6 +99,56 @@
         <string>Copy Plan</string>
        </property>
       </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="conversationRow">
+     <property name="spacing">
+      <number>4</number>
+     </property>
+     <item>
+      <widget class="QComboBox" name="conversationCombo">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="sizeAdjustPolicy">
+        <enum>QComboBox::SizeAdjustPolicy::AdjustToContents</enum>
+       </property>
+       <property name="minimumContentsLength">
+        <number>28</number>
+       </property>
+      </widget>
+     </item>
+      <item>
+       <widget class="QPushButton" name="renameConversationBtn">
+        <property name="enabled">
+         <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>Rename</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="deleteConversationBtn">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>Delete</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+        <widget class="QPushButton" name="newChatButton">
+        <property name="text">
+         <string>New Conversation</string>
+        </property>
+       </widget>
      </item>
     </layout>
    </item>

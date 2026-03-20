@@ -22,6 +22,9 @@ public:
     bool ensure_conversation(conversation_record_t *conversation, QString *error = nullptr);
     conversation_record_t conversation(const QString &conversation_id,
                                        QString *error = nullptr) const;
+    QList<conversation_record_t> conversations(const QString &workspace_id,
+                                               QString *error = nullptr) const;
+    bool delete_conversation(const QString &conversation_id, QString *error = nullptr);
 
     bool save_run(const run_record_t &run, QString *error = nullptr);
     bool update_run(const run_record_t &run, QString *error = nullptr);

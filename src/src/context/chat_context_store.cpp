@@ -297,6 +297,23 @@ conversation_record_t loadConversationState(const QString &path, QString *error)
     return conversation_record_t::from_json(obj);
 }
 
+bool conversation_newer_than(const conversation_record_t &lhs, const conversation_record_t &rhs)
+{
+    if (lhs.updated_at != rhs.updated_at)
+    {
+        return lhs.updated_at > rhs.updated_at;
+    }
+    if (lhs.last_message_sequence != rhs.last_message_sequence)
+    {
+        return lhs.last_message_sequence > rhs.last_message_sequence;
+    }
+    if (lhs.created_at != rhs.created_at)
+    {
+        return lhs.created_at > rhs.created_at;
+    }
+    return lhs.conversation_id > rhs.conversation_id;
+}
+
 context_summary_t loadLatestSummaryState(const QString &path, QString *error)
 {
     bool exists = false;
@@ -425,6 +442,7 @@ bool chat_context_store_t::ensure_conversation(conversation_record_t *conversati
     storedConversation.workspace_root = nonNullString(conversation->workspace_root);
     storedConversation.title = nonNullString(conversation->title);
     storedConversation.updated_at = conversation->updated_at;
+    storedConversation.last_message_sequence = conversation->last_message_sequence;
     storedConversation.metadata = conversation->metadata;
 
     if (storedConversation.created_at.isEmpty() == true)
@@ -459,6 +477,145 @@ conversation_record_t chat_context_store_t::conversation(const QString &conversa
     }
 
     return loadConversationState(this->conversation_state_path(conversation_id), error);
+}
+
+QList<conversation_record_t> chat_context_store_t::conversations(const QString &workspace_id,
+                                                                 QString *error) const
+{
+    QList<conversation_record_t> records;
+    if (this->ensure_open(error) == false)
+    {
+        return records;
+    }
+
+    const QDir conversations_dir(this->conversations_directory_path());
+    const QFileInfoList entries =
+        conversations_dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    for (const QFileInfo &entry : entries)
+    {
+        QString local_error;
+        const conversation_record_t record = loadConversationState(
+            QDir(entry.absoluteFilePath()).filePath(QStringLiteral("conversation.json")),
+            &local_error);
+        if (local_error.isEmpty() == false)
+        {
+            if (error != nullptr)
+            {
+                *error = local_error;
+            }
+            return {};
+        }
+        if (record.is_valid() == false)
+        {
+            continue;
+        }
+        if (workspace_id.isEmpty() == false && record.workspace_id != workspace_id)
+        {
+            continue;
+        }
+        records.append(record);
+    }
+
+    std::sort(records.begin(), records.end(), conversation_newer_than);
+    return records;
+}
+
+bool chat_context_store_t::delete_conversation(const QString &conversation_id, QString *error)
+{
+    const QString trimmed_id = conversation_id.trimmed();
+    if (this->ensure_open(error) == false)
+    {
+        return false;
+    }
+    if (trimmed_id.isEmpty() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Conversation identifier is empty");
+        }
+        return false;
+    }
+
+    QString local_error;
+    const conversation_record_t record = this->conversation(trimmed_id, &local_error);
+    if (local_error.isEmpty() == false)
+    {
+        if (error != nullptr)
+        {
+            *error = local_error;
+        }
+        return false;
+    }
+    if (record.is_valid() == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Conversation not found: %1").arg(trimmed_id);
+        }
+        return false;
+    }
+
+    const QList<QJsonObject> artifact_objects =
+        readAllJsonLines(this->conversation_artifacts_path(trimmed_id), &local_error);
+    if (local_error.isEmpty() == false)
+    {
+        if (error != nullptr)
+        {
+            *error = local_error;
+        }
+        return false;
+    }
+    for (const QJsonObject &obj : artifact_objects)
+    {
+        const artifact_record_t artifact = artifact_record_t::from_json(obj);
+        if (artifact.storage_path.isEmpty() == false)
+        {
+            QFile::remove(QDir(this->artifacts_directory_path).filePath(artifact.storage_path));
+        }
+    }
+
+    const QDir runs_dir(this->runs_directory_path());
+    const QFileInfoList run_entries =
+        runs_dir.entryInfoList(QStringList() << "*.json", QDir::Files, QDir::Name);
+    for (const QFileInfo &entry : run_entries)
+    {
+        const QJsonObject run_object =
+            readJsonFile(entry.absoluteFilePath(), nullptr, &local_error);
+        if (local_error.isEmpty() == false)
+        {
+            if (error != nullptr)
+            {
+                *error = local_error;
+            }
+            return false;
+        }
+        const run_record_t run = run_record_t::from_json(run_object);
+        if (run.conversation_id == trimmed_id)
+        {
+            if (QFile::remove(entry.absoluteFilePath()) == false)
+            {
+                if (error != nullptr)
+                {
+                    *error = QStringLiteral("Failed to remove run file: %1")
+                                 .arg(entry.absoluteFilePath());
+                }
+                return false;
+            }
+        }
+    }
+
+    const QString conversation_dir_path = this->conversation_directory_path(trimmed_id);
+    if (QFileInfo::exists(conversation_dir_path) == true &&
+        QDir(conversation_dir_path).removeRecursively() == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to remove conversation directory: %1")
+                         .arg(conversation_dir_path);
+        }
+        return false;
+    }
+    return true;
 }
 
 bool chat_context_store_t::save_run(const run_record_t &run, QString *error)

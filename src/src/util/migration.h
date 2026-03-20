@@ -32,6 +32,7 @@ bool is_older(const revision_t &lhs, const revision_t &rhs);
 QString global_backup_dir_path();
 QString global_structured_settings_file_path();
 QString project_backup_dir_path(const QString &storage_path);
+QString project_conversations_dir_path(const QString &storage_path);
 
 void stamp_global_settings(QSettings &settings);
 bool migrate_global_settings(QSettings &settings, QString *error = nullptr);
@@ -41,5 +42,8 @@ bool migrate_project_state(const QString &storage_path, QString *error = nullptr
 
 QString project_goal_file_path(const QString &storage_path);
 QString project_actions_log_file_path(const QString &storage_path);
+QString conversation_state_file_path(const QString &storage_path, const QString &conversation_id);
+QString conversation_log_journal_file_path(const QString &storage_path,
+                                           const QString &conversation_id);
 
 }  // namespace qcai2::Migration
