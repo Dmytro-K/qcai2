@@ -2,8 +2,12 @@
 
 #include "../settings/settings.h"
 
+#include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
+#include <QTextStream>
 
 namespace qcai2
 {
@@ -18,9 +22,38 @@ constexpr int kSummaryChunkMaxTokens = 1400;
 constexpr int kSummaryCarryForwardChars = 1800;
 constexpr int kSummaryMaxChars = 4200;
 
-QString sidecar_path_for_workspace(const QString &workspace_root, const QString &fileName)
+struct usage_stats_row_t
 {
-    return QDir(workspace_root).filePath(QStringLiteral(".qcai2/%1").arg(fileName));
+    QString date_local;
+    QString hour_local;
+    QString tz;
+    QString provider;
+    QString model;
+    QString request_kind;
+    bool dry_run = false;
+    qint64 request_count = 0;
+    qint64 completed_count = 0;
+    qint64 non_completed_count = 0;
+    qint64 usage_reported_count = 0;
+    qint64 input_tokens = 0;
+    qint64 output_tokens = 0;
+    qint64 total_tokens = 0;
+    qint64 reasoning_tokens = 0;
+    qint64 cached_input_tokens = 0;
+    qint64 duration_ms_total = 0;
+
+    QString key() const
+    {
+        return date_local + QLatin1Char('|') + hour_local + QLatin1Char('|') + tz +
+               QLatin1Char('|') + provider + QLatin1Char('|') + model + QLatin1Char('|') +
+               request_kind + QLatin1Char('|') +
+               (dry_run == true ? QStringLiteral("true") : QStringLiteral("false"));
+    }
+};
+
+QString qcai2_path_for_workspace(const QString &workspace_root, const QString &file_name)
+{
+    return QDir(workspace_root).filePath(QStringLiteral(".qcai2/%1").arg(file_name));
 }
 
 QString known_or_unknown(const QString &value)
@@ -65,6 +98,501 @@ bool propagate_error(QString *target, const QString &error)
         *target = error;
     }
     return true;
+}
+
+const QStringList &usage_stats_header_columns()
+{
+    static const QStringList columns = {
+        QStringLiteral("date_local"),
+        QStringLiteral("hour_local"),
+        QStringLiteral("tz"),
+        QStringLiteral("provider"),
+        QStringLiteral("model"),
+        QStringLiteral("request_kind"),
+        QStringLiteral("dry_run"),
+        QStringLiteral("request_count"),
+        QStringLiteral("completed_count"),
+        QStringLiteral("non_completed_count"),
+        QStringLiteral("usage_reported_count"),
+        QStringLiteral("input_tokens"),
+        QStringLiteral("output_tokens"),
+        QStringLiteral("total_tokens"),
+        QStringLiteral("reasoning_tokens"),
+        QStringLiteral("cached_input_tokens"),
+        QStringLiteral("duration_ms_total"),
+    };
+    return columns;
+}
+
+QString csv_escape(const QString &value)
+{
+    QString escaped = value;
+    escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+    if (escaped.contains(QLatin1Char(',')) == true || escaped.contains(QLatin1Char('"')) == true ||
+        escaped.contains(QLatin1Char('\n')) == true || escaped.contains(QLatin1Char('\r')) == true)
+    {
+        return QStringLiteral("\"%1\"").arg(escaped);
+    }
+    return escaped;
+}
+
+QString csv_join(const QStringList &fields)
+{
+    QStringList escaped;
+    escaped.reserve(fields.size());
+    for (const QString &field : fields)
+    {
+        escaped.append(csv_escape(field));
+    }
+    return escaped.join(QLatin1Char(','));
+}
+
+bool parse_csv_line(const QString &line, QStringList *fields, QString *error)
+{
+    if (fields == nullptr)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("CSV fields target is null");
+        }
+        return false;
+    }
+
+    QStringList parsed_fields;
+    QString current_field;
+    bool in_quotes = false;
+    for (int index = 0; index < line.size(); ++index)
+    {
+        const QChar ch = line.at(index);
+        if (in_quotes == true)
+        {
+            if (ch == QLatin1Char('"'))
+            {
+                if (index + 1 < line.size() && line.at(index + 1) == QLatin1Char('"'))
+                {
+                    current_field += QLatin1Char('"');
+                    ++index;
+                }
+                else
+                {
+                    in_quotes = false;
+                }
+            }
+            else
+            {
+                current_field += ch;
+            }
+            continue;
+        }
+
+        if (ch == QLatin1Char(','))
+        {
+            parsed_fields.append(current_field);
+            current_field.clear();
+            continue;
+        }
+
+        if (ch == QLatin1Char('"'))
+        {
+            if (current_field.isEmpty() == false)
+            {
+                if (error != nullptr)
+                {
+                    *error = QStringLiteral("Malformed CSV line: quote appears mid-field");
+                }
+                return false;
+            }
+            in_quotes = true;
+            continue;
+        }
+
+        current_field += ch;
+    }
+
+    if (in_quotes == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Malformed CSV line: unterminated quoted field");
+        }
+        return false;
+    }
+
+    parsed_fields.append(current_field);
+    *fields = parsed_fields;
+    return true;
+}
+
+bool parse_qint64_field(const QString &value, qint64 *target, const QString &field_name,
+                        QString *error)
+{
+    if (target == nullptr)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Target is null for field %1").arg(field_name);
+        }
+        return false;
+    }
+
+    bool ok = false;
+    const qint64 parsed = value.toLongLong(&ok);
+    if (ok == false)
+    {
+        if (error != nullptr)
+        {
+            *error =
+                QStringLiteral("Invalid integer value '%1' for field %2").arg(value, field_name);
+        }
+        return false;
+    }
+    *target = parsed;
+    return true;
+}
+
+bool usage_stats_row_from_fields(const QStringList &fields, usage_stats_row_t *row, QString *error)
+{
+    if (row == nullptr)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Usage stats row target is null");
+        }
+        return false;
+    }
+
+    if (fields.size() != usage_stats_header_columns().size())
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Unexpected stats CSV column count: %1").arg(fields.size());
+        }
+        return false;
+    }
+
+    usage_stats_row_t parsed_row;
+    parsed_row.date_local = fields.at(0);
+    parsed_row.hour_local = fields.at(1);
+    parsed_row.tz = fields.at(2);
+    parsed_row.provider = fields.at(3);
+    parsed_row.model = fields.at(4);
+    parsed_row.request_kind = fields.at(5);
+    if (fields.at(6) == QStringLiteral("true"))
+    {
+        parsed_row.dry_run = true;
+    }
+    else if (fields.at(6) == QStringLiteral("false"))
+    {
+        parsed_row.dry_run = false;
+    }
+    else
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Invalid boolean value '%1' for dry_run").arg(fields.at(6));
+        }
+        return false;
+    }
+
+    if (parse_qint64_field(fields.at(7), &parsed_row.request_count,
+                           QStringLiteral("request_count"), error) == false ||
+        parse_qint64_field(fields.at(8), &parsed_row.completed_count,
+                           QStringLiteral("completed_count"), error) == false ||
+        parse_qint64_field(fields.at(9), &parsed_row.non_completed_count,
+                           QStringLiteral("non_completed_count"), error) == false ||
+        parse_qint64_field(fields.at(10), &parsed_row.usage_reported_count,
+                           QStringLiteral("usage_reported_count"), error) == false ||
+        parse_qint64_field(fields.at(11), &parsed_row.input_tokens, QStringLiteral("input_tokens"),
+                           error) == false ||
+        parse_qint64_field(fields.at(12), &parsed_row.output_tokens,
+                           QStringLiteral("output_tokens"), error) == false ||
+        parse_qint64_field(fields.at(13), &parsed_row.total_tokens, QStringLiteral("total_tokens"),
+                           error) == false ||
+        parse_qint64_field(fields.at(14), &parsed_row.reasoning_tokens,
+                           QStringLiteral("reasoning_tokens"), error) == false ||
+        parse_qint64_field(fields.at(15), &parsed_row.cached_input_tokens,
+                           QStringLiteral("cached_input_tokens"), error) == false ||
+        parse_qint64_field(fields.at(16), &parsed_row.duration_ms_total,
+                           QStringLiteral("duration_ms_total"), error) == false)
+    {
+        return false;
+    }
+
+    *row = parsed_row;
+    return true;
+}
+
+QStringList usage_stats_row_fields(const usage_stats_row_t &row)
+{
+    return {
+        row.date_local,
+        row.hour_local,
+        row.tz,
+        row.provider,
+        row.model,
+        row.request_kind,
+        row.dry_run == true ? QStringLiteral("true") : QStringLiteral("false"),
+        QString::number(row.request_count),
+        QString::number(row.completed_count),
+        QString::number(row.non_completed_count),
+        QString::number(row.usage_reported_count),
+        QString::number(row.input_tokens),
+        QString::number(row.output_tokens),
+        QString::number(row.total_tokens),
+        QString::number(row.reasoning_tokens),
+        QString::number(row.cached_input_tokens),
+        QString::number(row.duration_ms_total),
+    };
+}
+
+QDateTime parse_iso_datetime_utc(const QString &value)
+{
+    QDateTime timestamp = QDateTime::fromString(value, Qt::ISODateWithMs);
+    if (timestamp.isValid() == false)
+    {
+        timestamp = QDateTime::fromString(value, Qt::ISODate);
+    }
+    return timestamp.toUTC();
+}
+
+qint64 usage_value_or_zero(int value)
+{
+    return value >= 0 ? static_cast<qint64>(value) : 0;
+}
+
+qint64 run_duration_ms(const run_record_t &run)
+{
+    const QDateTime started_at = parse_iso_datetime_utc(run.started_at);
+    const QDateTime finished_at = parse_iso_datetime_utc(run.finished_at);
+    if (started_at.isValid() == false || finished_at.isValid() == false)
+    {
+        return 0;
+    }
+    const qint64 duration = started_at.msecsTo(finished_at);
+    return duration >= 0 ? duration : 0;
+}
+
+QString utc_offset_string(const QDateTime &date_time)
+{
+    const int offset_seconds = date_time.offsetFromUtc();
+    const QChar sign = offset_seconds >= 0 ? QLatin1Char('+') : QLatin1Char('-');
+    const int absolute_seconds = std::abs(offset_seconds);
+    const int hours = absolute_seconds / 3600;
+    const int minutes = (absolute_seconds % 3600) / 60;
+    return QStringLiteral("%1%2:%3")
+        .arg(sign)
+        .arg(hours, 2, 10, QLatin1Char('0'))
+        .arg(minutes, 2, 10, QLatin1Char('0'));
+}
+
+QString usage_stats_directory_path(const QString &workspace_root)
+{
+    return qcai2_path_for_workspace(workspace_root, QStringLiteral("stats"));
+}
+
+QString usage_stats_file_path(const QString &workspace_root, const QDate &date_local)
+{
+    return QDir(usage_stats_directory_path(workspace_root))
+        .filePath(QStringLiteral("usage-%1.csv").arg(date_local.toString(Qt::ISODate)));
+}
+
+bool load_usage_stats_rows(const QString &path, QList<usage_stats_row_t> *rows, QString *error)
+{
+    if (rows == nullptr)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Usage stats rows target is null");
+        }
+        return false;
+    }
+
+    rows->clear();
+    QFile file(path);
+    if (file.exists() == false)
+    {
+        return true;
+    }
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text) == false)
+    {
+        if (error != nullptr)
+        {
+            *error =
+                QStringLiteral("Failed to open %1 for reading: %2").arg(path, file.errorString());
+        }
+        return false;
+    }
+
+    QTextStream stream(&file);
+    if (stream.atEnd() == true)
+    {
+        return true;
+    }
+
+    QString header_line = stream.readLine();
+    if (header_line.endsWith(QLatin1Char('\r')) == true)
+    {
+        header_line.chop(1);
+    }
+    QStringList header_fields;
+    if (parse_csv_line(header_line, &header_fields, error) == false)
+    {
+        return false;
+    }
+    if (header_fields != usage_stats_header_columns())
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Unexpected stats CSV header in %1").arg(path);
+        }
+        return false;
+    }
+
+    while (stream.atEnd() == false)
+    {
+        QString line = stream.readLine();
+        if (line.endsWith(QLatin1Char('\r')) == true)
+        {
+            line.chop(1);
+        }
+        if (line.trimmed().isEmpty() == true)
+        {
+            continue;
+        }
+
+        QStringList fields;
+        if (parse_csv_line(line, &fields, error) == false)
+        {
+            return false;
+        }
+
+        usage_stats_row_t row;
+        if (usage_stats_row_from_fields(fields, &row, error) == false)
+        {
+            return false;
+        }
+        rows->append(row);
+    }
+
+    return true;
+}
+
+bool write_usage_stats_rows(const QString &path, const QList<usage_stats_row_t> &rows,
+                            QString *error)
+{
+    const QFileInfo file_info(path);
+    if (QDir().mkpath(file_info.absolutePath()) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to create stats directory for %1").arg(path);
+        }
+        return false;
+    }
+
+    QSaveFile file(path);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text) == false)
+    {
+        if (error != nullptr)
+        {
+            *error =
+                QStringLiteral("Failed to open %1 for writing: %2").arg(path, file.errorString());
+        }
+        return false;
+    }
+
+    QTextStream stream(&file);
+    stream << csv_join(usage_stats_header_columns()) << Qt::endl;
+    for (const usage_stats_row_t &row : rows)
+    {
+        stream << csv_join(usage_stats_row_fields(row)) << Qt::endl;
+    }
+
+    if (file.commit() == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to commit usage stats file %1").arg(path);
+        }
+        return false;
+    }
+
+    return true;
+}
+
+void accumulate_usage_stats_row(usage_stats_row_t *row, const run_record_t &run)
+{
+    row->request_count += 1;
+    if (run.status == QStringLiteral("completed"))
+    {
+        row->completed_count += 1;
+    }
+    else
+    {
+        row->non_completed_count += 1;
+    }
+
+    if (run.usage.has_any() == true)
+    {
+        row->usage_reported_count += 1;
+    }
+
+    row->input_tokens += usage_value_or_zero(run.usage.input_tokens);
+    row->output_tokens += usage_value_or_zero(run.usage.output_tokens);
+    row->total_tokens += usage_value_or_zero(run.usage.resolved_total_tokens());
+    row->reasoning_tokens += usage_value_or_zero(run.usage.reasoning_tokens);
+    row->cached_input_tokens += usage_value_or_zero(run.usage.cached_input_tokens);
+    row->duration_ms_total += run_duration_ms(run);
+}
+
+bool record_usage_stats(const QString &workspace_root, const run_record_t &run, QString *error)
+{
+    if (workspace_root.isEmpty() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Cannot write usage stats without an active workspace root");
+        }
+        return false;
+    }
+
+    QDateTime finished_at_utc = parse_iso_datetime_utc(run.finished_at);
+    if (finished_at_utc.isValid() == false)
+    {
+        finished_at_utc = QDateTime::currentDateTimeUtc();
+    }
+    const QDateTime finished_at_local = finished_at_utc.toLocalTime();
+
+    usage_stats_row_t new_row;
+    new_row.date_local = finished_at_local.date().toString(Qt::ISODate);
+    new_row.hour_local =
+        QStringLiteral("%1").arg(finished_at_local.time().hour(), 2, 10, QLatin1Char('0'));
+    new_row.tz = utc_offset_string(finished_at_local);
+    new_row.provider = known_or_unknown(run.provider_id);
+    new_row.model = known_or_unknown(run.model);
+    new_row.request_kind = known_or_unknown(run.kind);
+    new_row.dry_run = run.dry_run;
+
+    const QString path = usage_stats_file_path(workspace_root, finished_at_local.date());
+    QList<usage_stats_row_t> rows;
+    if (load_usage_stats_rows(path, &rows, error) == false)
+    {
+        return false;
+    }
+
+    const QString new_key = new_row.key();
+    for (usage_stats_row_t &row : rows)
+    {
+        if (row.key() == new_key)
+        {
+            accumulate_usage_stats_row(&row, run);
+            return write_usage_stats_rows(path, rows, error);
+        }
+    }
+
+    accumulate_usage_stats_row(&new_row, run);
+    rows.append(new_row);
+    return write_usage_stats_rows(path, rows, error);
 }
 
 }  // namespace
@@ -292,8 +820,19 @@ bool chat_context_manager_t::finish_run(const QString &run_id, const QString &st
     {
         *error = QStringLiteral("Run record was not updated");
     }
+
+    bool stats_recorded = true;
+    if (updated == true)
+    {
+        QString stats_error;
+        stats_recorded = record_usage_stats(this->workspace_root, run, &stats_error);
+        if (stats_recorded == false && error != nullptr)
+        {
+            *error = stats_error;
+        }
+    }
     this->active_runs.remove(run_id);
-    return updated;
+    return updated && stats_recorded;
 }
 
 bool chat_context_manager_t::append_user_message(const QString &run_id, const QString &content,
@@ -873,12 +1412,12 @@ context_summary_t chat_context_manager_t::compose_next_summary(
 
 QString chat_context_manager_t::database_path_for_workspace() const
 {
-    return sidecar_path_for_workspace(this->workspace_root, QStringLiteral("chat-context"));
+    return qcai2_path_for_workspace(this->workspace_root, QStringLiteral("chat-context"));
 }
 
 QString chat_context_manager_t::artifact_path_for_workspace() const
 {
-    return sidecar_path_for_workspace(this->workspace_root, QStringLiteral("artifacts"));
+    return qcai2_path_for_workspace(this->workspace_root, QStringLiteral("artifacts"));
 }
 
 }  // namespace qcai2

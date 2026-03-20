@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -16,6 +17,7 @@ class tst_chat_context_t : public QObject
 private slots:
     void stores_artifacts_and_builds_envelope();
     void new_conversation_is_isolated();
+    void writes_hourly_usage_stats_csv();
 };
 
 void tst_chat_context_t::stores_artifacts_and_builds_envelope()
@@ -181,6 +183,107 @@ void tst_chat_context_t::new_conversation_is_isolated()
 
     QVERIFY(combined_prompt.contains(QStringLiteral("second-conversation-marker")));
     QVERIFY(combined_prompt.contains(QStringLiteral("first-conversation-marker")) == false);
+}
+
+void tst_chat_context_t::writes_hourly_usage_stats_csv()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+    QVERIFY(QDir(temp_dir.path()).mkpath(QStringLiteral(".qcai2")));
+
+    chat_context_manager_t manager;
+    QString error;
+    QVERIFY(
+        manager.set_active_workspace(QStringLiteral("workspace-3"), temp_dir.path(), {}, &error));
+    QVERIFY(error.isEmpty());
+
+    const QString conversation_id =
+        manager.start_new_conversation(QStringLiteral("Stats"), &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(conversation_id.isEmpty() == false);
+
+    provider_usage_t first_usage;
+    first_usage.input_tokens = 100;
+    first_usage.output_tokens = 40;
+    first_usage.total_tokens = 140;
+    first_usage.reasoning_tokens = 10;
+    first_usage.cached_input_tokens = 20;
+
+    QString run_id =
+        manager.begin_run(context_request_kind_t::AGENT_CHAT, QStringLiteral("provider-a"),
+                          QStringLiteral("model-a"), QStringLiteral("medium"),
+                          QStringLiteral("high"), false, {}, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(manager.finish_run(run_id, QStringLiteral("completed"), first_usage, {}, &error));
+    QVERIFY(error.isEmpty());
+
+    provider_usage_t second_usage;
+    second_usage.input_tokens = 50;
+    second_usage.output_tokens = 25;
+    second_usage.total_tokens = 75;
+    second_usage.reasoning_tokens = 5;
+    second_usage.cached_input_tokens = 10;
+
+    run_id = manager.begin_run(context_request_kind_t::AGENT_CHAT, QStringLiteral("provider-a"),
+                               QStringLiteral("model-a"), QStringLiteral("medium"),
+                               QStringLiteral("high"), false, {}, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(manager.finish_run(run_id, QStringLiteral("completed"), second_usage, {}, &error));
+    QVERIFY(error.isEmpty());
+
+    const QDir stats_dir(QDir(temp_dir.path()).filePath(QStringLiteral(".qcai2/stats")));
+    QVERIFY(stats_dir.exists());
+
+    const QStringList csv_files =
+        stats_dir.entryList(QStringList{QStringLiteral("usage-*.csv")}, QDir::Files);
+    QCOMPARE(csv_files.size(), 1);
+
+    QFile stats_file(stats_dir.filePath(csv_files.constFirst()));
+    QVERIFY(stats_file.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QStringList lines =
+        QString::fromUtf8(stats_file.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    QCOMPARE(lines.size(), 2);
+
+    const QStringList header = lines.at(0).split(QLatin1Char(','));
+    const QStringList row = lines.at(1).split(QLatin1Char(','));
+    QCOMPARE(header.size(), 17);
+    QCOMPARE(row.size(), 17);
+
+    QCOMPARE(header.at(0), QStringLiteral("date_local"));
+    QCOMPARE(header.at(1), QStringLiteral("hour_local"));
+    QCOMPARE(header.at(2), QStringLiteral("tz"));
+    QCOMPARE(header.at(3), QStringLiteral("provider"));
+    QCOMPARE(header.at(4), QStringLiteral("model"));
+    QCOMPARE(header.at(5), QStringLiteral("request_kind"));
+    QCOMPARE(header.at(6), QStringLiteral("dry_run"));
+    QCOMPARE(header.at(7), QStringLiteral("request_count"));
+    QCOMPARE(header.at(8), QStringLiteral("completed_count"));
+    QCOMPARE(header.at(9), QStringLiteral("non_completed_count"));
+    QCOMPARE(header.at(10), QStringLiteral("usage_reported_count"));
+    QCOMPARE(header.at(11), QStringLiteral("input_tokens"));
+    QCOMPARE(header.at(12), QStringLiteral("output_tokens"));
+    QCOMPARE(header.at(13), QStringLiteral("total_tokens"));
+    QCOMPARE(header.at(14), QStringLiteral("reasoning_tokens"));
+    QCOMPARE(header.at(15), QStringLiteral("cached_input_tokens"));
+    QCOMPARE(header.at(16), QStringLiteral("duration_ms_total"));
+
+    QVERIFY(row.at(0).isEmpty() == false);
+    QVERIFY(row.at(1).isEmpty() == false);
+    QVERIFY(QRegularExpression(QStringLiteral("^[+-]\\d{2}:\\d{2}$")).match(row.at(2)).hasMatch());
+    QCOMPARE(row.at(3), QStringLiteral("provider-a"));
+    QCOMPARE(row.at(4), QStringLiteral("model-a"));
+    QCOMPARE(row.at(5), QStringLiteral("agent"));
+    QCOMPARE(row.at(6), QStringLiteral("false"));
+    QCOMPARE(row.at(7), QStringLiteral("2"));
+    QCOMPARE(row.at(8), QStringLiteral("2"));
+    QCOMPARE(row.at(9), QStringLiteral("0"));
+    QCOMPARE(row.at(10), QStringLiteral("2"));
+    QCOMPARE(row.at(11), QStringLiteral("150"));
+    QCOMPARE(row.at(12), QStringLiteral("65"));
+    QCOMPARE(row.at(13), QStringLiteral("215"));
+    QCOMPARE(row.at(14), QStringLiteral("15"));
+    QCOMPARE(row.at(15), QStringLiteral("30"));
+    QVERIFY(row.at(16).toLongLong() >= 0);
 }
 
 QTEST_MAIN(tst_chat_context_t)
