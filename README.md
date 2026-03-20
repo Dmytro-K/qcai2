@@ -13,7 +13,7 @@
 - [x] Per-project sessions under `.qcai2/` with migration, auto-reload, and per-conversation state files
 - [x] Safety: dry-run by default, approval gates, path sandboxing, command allowlisting
 - [x] `#file` references and slash commands with auto-completion
-- [x] Built-in tools for file creation, directory listing, command execution, symbol lookup, diagnostics, git, and IDE output access
+- [x] Built-in tools for file creation, directory listing, command execution, symbol lookup, optional clangd-backed code-model queries, diagnostics, git, and IDE output access
 - [x] Slash commands including `/compact`, `/explain`, `/refactor`, and `/test`
 - [x] Live provider progress status, detailed per-request Markdown logs, and per-project usage statistics
 - [x] GitHub Copilot Premium request usage display
@@ -49,6 +49,7 @@
 - CMake 3.28+
 - Qt 6 with `Widgets`, `Network`, and (when tests are enabled) `Test`
 - Qt Creator development package / SDK with the `Core`, `TextEditor`, and `ProjectExplorer` CMake packages
+- `ClangCodeModel` is also required when building with `-DFEATURE_CLANGD_ENABLE=ON` (default)
 - Node.js + npm for the Copilot sidecar install/runtime flow
 - Optional: `ripgrep` for faster repository searches inside the plugin
 
@@ -62,6 +63,10 @@ cmake -S . -B build \
 ```
 
 If CMake cannot discover the package roots automatically, also pass `-DQt6_DIR=...` and/or `-DQtCreator_DIR=...`.
+
+Optional feature flags:
+
+- `-DFEATURE_CLANGD_ENABLE=OFF` builds without the Qt Creator `ClangCodeModel` dependency.
 
 ### Build
 

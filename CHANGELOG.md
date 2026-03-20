@@ -12,6 +12,7 @@
 - Added GitHub Copilot Premium request usage show
 - Added optional auto compact
 - Added a conversation list
+- Added a ClangCodeModel/clangd agent tools
 
 ### Changed
 

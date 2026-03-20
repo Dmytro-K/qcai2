@@ -18,6 +18,7 @@ class ai_completion_provider_t;
 class ghost_text_manager_t;
 class copilot_provider_t;
 class ide_output_capture_t;
+class clangd_service_t;
 
 namespace Internal
 {
@@ -117,6 +118,9 @@ private:
 
     /** Captures Qt Creator Compile Output and Application Output for agent tools. */
     ide_output_capture_t *output_capture = nullptr;
+
+    /** Reusable ClangCodeModel/clangd bridge shared by tools and future features. */
+    clangd_service_t *clangd_service = nullptr;
 
     /** Sidebar factory that hosts the AI Agent inside Qt Creator navigation panels. */
     ai_agent_navigation_widget_factory_t *navigation_widget_factory = nullptr;

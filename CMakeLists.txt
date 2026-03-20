@@ -266,7 +266,21 @@ set(CMAKE_CXX_FLAGS_MINSIZEREL_INIT "${CMAKE_C_FLAGS_MINSIZEREL_INIT}")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "${CMAKE_C_FLAGS_RELWITHDEBINFO_INIT}")
 
-find_package(QtCreator REQUIRED COMPONENTS Core TextEditor ProjectExplorer)
+option(FEATURE_CLANGD_ENABLE "Enable clangd / ClangCodeModel integration" ON)
+
+set(QCAI2_QTCREATOR_COMPONENTS
+    Core
+    TextEditor
+    ProjectExplorer
+)
+if(FEATURE_CLANGD_ENABLE)
+    list(APPEND QCAI2_QTCREATOR_COMPONENTS ClangCodeModel)
+    set(QCAI2_ENABLE_CLANGD_VALUE 1)
+else()
+    set(QCAI2_ENABLE_CLANGD_VALUE 0)
+endif()
+
+find_package(QtCreator REQUIRED COMPONENTS ${QCAI2_QTCREATOR_COMPONENTS})
 find_package(Qt6 COMPONENTS Widgets Network Sql REQUIRED)
 
 add_subdirectory(src/src/util/migrations)
@@ -389,13 +403,31 @@ endif()
 
 add_subdirectory(lib/qtmcp)
 
+set(QCAI2_PLUGIN_DEPENDS
+    QtCreator::Core
+    QtCreator::TextEditor
+    QtCreator::ProjectExplorer
+)
+if(FEATURE_CLANGD_ENABLE)
+    list(APPEND QCAI2_PLUGIN_DEPENDS QtCreator::ClangCodeModel)
+endif()
+
+set(QCAI2_CLANGD_PLUGIN_SOURCES)
+if(FEATURE_CLANGD_ENABLE)
+    list(APPEND QCAI2_CLANGD_PLUGIN_SOURCES
+        src/src/clangd/clangd_service.h
+        src/src/clangd/clangd_service.cpp
+        src/src/tools/clangd_tool_metadata.cpp
+        src/src/tools/clangd_tools.h
+        src/src/tools/clangd_tools.cpp
+    )
+endif()
+
 add_qtc_plugin(qcai2
   PLUGIN_PATH
     plugins/${IDE_VERSION}
   PLUGIN_DEPENDS
-    QtCreator::Core
-    QtCreator::TextEditor
-    QtCreator::ProjectExplorer
+    ${QCAI2_PLUGIN_DEPENDS}
   DEPENDS
     Qt::Widgets
     Qt::Network
@@ -435,6 +467,7 @@ add_qtc_plugin(qcai2
     src/src/goal/slash_command_goal_handler.cpp
     src/src/context/editor_context.h
     src/src/context/editor_context.cpp
+    ${QCAI2_CLANGD_PLUGIN_SOURCES}
     src/src/context/chat_context.h
     src/src/context/chat_context.cpp
     src/src/context/chat_context_store.h
@@ -542,6 +575,7 @@ target_compile_definitions(qcai2 PRIVATE
     QCAI2_SIDECAR_PATH="${CMAKE_CURRENT_SOURCE_DIR}/src/sidecar/copilot-sidecar.js"
     QCAI2_QTCREATOR_IDE_VERSION="${IDE_VERSION}"
     QCAI2_INSTALLED_SIDECAR_RELATIVE_PATH="qcai2/sidecar/copilot-sidecar.js"
+    QCAI2_ENABLE_CLANGD=${QCAI2_ENABLE_CLANGD_VALUE}
 )
 
 # Install sidecar files alongside the plugin

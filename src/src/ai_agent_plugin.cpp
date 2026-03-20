@@ -3,6 +3,11 @@
 #include "../qcai2constants.h"
 #include "../qcai2tr.h"
 #include "agent_controller.h"
+
+#if QCAI2_ENABLE_CLANGD
+#include "clangd/clangd_service.h"
+#endif
+
 #include "completion/ai_completion_provider.h"
 #include "completion/ghost_text_manager.h"
 #include "context/chat_context_manager.h"
@@ -19,6 +24,11 @@
 #include "settings/settings.h"
 #include "settings/settings_page.h"
 #include "tools/build_tools.h"
+
+#if QCAI2_ENABLE_CLANGD
+#include "tools/clangd_tools.h"
+#endif
+
 #include "tools/create_file_tool.h"
 #include "tools/file_tools.h"
 #include "tools/find_symbol_tool.h"
@@ -102,6 +112,10 @@ void ai_agent_plugin_t::initialize()
     this->safety_policy = new safety_policy_t(this);
     this->controller = new agent_controller_t(this);
     this->output_capture = new ide_output_capture_t(this);
+
+#if QCAI2_ENABLE_CLANGD
+    this->clangd_service = new clangd_service_t(this);
+#endif
 
     // Configure safety from settings
     auto &s = settings();
@@ -362,6 +376,10 @@ void ai_agent_plugin_t::register_tools()
     this->tool_registry->register_tool(std::make_shared<list_directory_tool_t>());
     this->tool_registry->register_tool(std::make_shared<run_command_tool_t>());
     this->tool_registry->register_tool(std::make_shared<find_symbol_tool_t>());
+
+#if QCAI2_ENABLE_CLANGD
+    register_clangd_query_tools(this->tool_registry, this->clangd_service);
+#endif
 
     auto build_tool = std::make_shared<run_build_tool_t>();
     auto tests_tool = std::make_shared<run_tests_tool_t>();

@@ -196,6 +196,24 @@ target_link_libraries(tst_qcai2_tool_registry PRIVATE
 )
 add_test(NAME qcai2_tool_registry COMMAND tst_qcai2_tool_registry)
 
+if(ENABLE_CLANGD)
+add_executable(tst_qcai2_clangd_tools
+    tst_clangd_tools.cpp
+    ../src/tools/clangd_tool_metadata.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_clangd_tools)
+
+target_include_directories(tst_qcai2_clangd_tools PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_clangd_tools PRIVATE
+    Qt::Core
+    Qt::Test
+)
+add_test(NAME qcai2_clangd_tools COMMAND tst_qcai2_clangd_tools)
+endif()
+
 add_executable(tst_qcai2_request_detailed_log
     tst_request_detailed_log.cpp
     ../src/util/request_detailed_log.cpp
