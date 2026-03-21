@@ -53,6 +53,7 @@
 - `ClangCodeModel` is also required when building with `-DFEATURE_CLANGD_ENABLE=ON` (default)
 - Node.js + npm for the Copilot sidecar install/runtime flow
 - Optional: `ripgrep` for faster repository searches inside the plugin
+- Optional: `gcovr` for C/C++ coverage reports when building tests with `-DQCAI2_ENABLE_COVERAGE=ON`
 
 ### Configure
 
@@ -84,6 +85,30 @@ cmake --build build --parallel
 ```bash
 ctest --test-dir build --output-on-failure
 ```
+
+### Coverage report
+
+Configure with coverage instrumentation enabled:
+
+```bash
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DWITH_TESTS=ON \
+  -DQCAI2_ENABLE_COVERAGE=ON \
+  -DCMAKE_PREFIX_PATH="<path-to-qt>;<path-to-qtcreator>"
+```
+
+Then build and generate the `gcovr` reports:
+
+```bash
+cmake --build build --target coverage --parallel
+```
+
+This runs `ctest` and writes the reports to `build/coverage/`:
+
+- `coverage.txt`
+- `coverage.xml`
+- `coverage.html`
 
 ### Format files
 

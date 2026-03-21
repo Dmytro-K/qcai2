@@ -394,6 +394,11 @@ endif()
 # so make that default to 'NO'.
 # Enable tests by passing -DWITH_TESTS=ON to CMake.
 option(WITH_TESTS "Builds with tests" NO)
+option(QCAI2_ENABLE_COVERAGE "Enable gcovr coverage instrumentation and reporting for tests" OFF)
+
+if(QCAI2_ENABLE_COVERAGE AND NOT WITH_TESTS)
+    message(FATAL_ERROR "QCAI2_ENABLE_COVERAGE requires -DWITH_TESTS=ON.")
+endif()
 
 add_subdirectory(lib/qtmcp)
 
@@ -419,16 +424,53 @@ if(FEATURE_QDRANT_ENABLE)
 endif()
 
 if(WITH_TESTS)
-  # Look for QtTest
-  find_package(Qt6 REQUIRED COMPONENTS Test)
+    if(QCAI2_ENABLE_COVERAGE)
+        if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+            message(FATAL_ERROR
+                "QCAI2_ENABLE_COVERAGE is supported only with GCC- and Clang-compatible compilers.")
+        endif()
+        find_program(QCAI2_GCOVR_EXECUTABLE NAMES gcovr REQUIRED)
+        get_filename_component(QCAI2_COMPILER_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        find_program(QCAI2_GCOV_EXECUTABLE NAMES gcov
+            PATHS "${QCAI2_COMPILER_BIN_DIR}"
+            NO_DEFAULT_PATH
+        )
+        if(NOT QCAI2_GCOV_EXECUTABLE)
+            find_program(QCAI2_GCOV_EXECUTABLE NAMES gcov REQUIRED)
+        endif()
+    endif()
 
-  # Tell CMake functions like add_qtc_plugin about the QtTest component.
-  set(IMPLICIT_DEPENDS Qt::Test)
+    # Look for QtTest
+    find_package(Qt6 REQUIRED COMPONENTS Test)
 
-  # Enable ctest for auto tests.
-  enable_testing()
+    # Tell CMake functions like add_qtc_plugin about the QtTest component.
+    set(IMPLICIT_DEPENDS Qt::Test)
 
-  add_subdirectory(src/tests)
+    # Enable ctest for auto tests.
+    enable_testing()
+
+    add_subdirectory(src/tests)
+
+    if(QCAI2_ENABLE_COVERAGE)
+        set(QCAI2_GCOVR_REPORT_SCRIPT
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate-gcovr-report.cmake")
+        set(QCAI2_GCOVR_REPORT_DIR "${CMAKE_BINARY_DIR}/coverage")
+
+        add_custom_target(coverage
+            COMMAND ${CMAKE_COMMAND}
+                "-DQCAI2_GCOVR_EXECUTABLE=${QCAI2_GCOVR_EXECUTABLE}"
+                "-DQCAI2_GCOV_EXECUTABLE=${QCAI2_GCOV_EXECUTABLE}"
+                "-DQCAI2_CTEST_EXECUTABLE=${CMAKE_CTEST_COMMAND}"
+                "-DQCAI2_COVERAGE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DQCAI2_COVERAGE_BUILD_DIR=${CMAKE_BINARY_DIR}"
+                "-DQCAI2_COVERAGE_OUTPUT_DIR=${QCAI2_GCOVR_REPORT_DIR}"
+                -P "${QCAI2_GCOVR_REPORT_SCRIPT}"
+            DEPENDS qcai2_tests
+            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+            USES_TERMINAL
+            COMMENT "Running tests and generating gcovr coverage reports"
+        )
+    endif()
 endif()
 
 set(QCAI2_PLUGIN_DEPENDS

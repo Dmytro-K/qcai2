@@ -1,3 +1,13 @@
+function(qcai2_register_test test_name target_name)
+    add_test(NAME ${test_name} COMMAND ${target_name})
+    set_property(GLOBAL APPEND PROPERTY QCAI2_TEST_TARGETS ${target_name})
+endfunction()
+
+if(QCAI2_ENABLE_COVERAGE)
+    add_compile_options(-O0 -g --coverage)
+    add_link_options(--coverage)
+endif()
+
 add_executable(tst_qcai2_json
     tst_json.cpp
     ../src/util/json.cpp
@@ -12,7 +22,7 @@ target_link_libraries(tst_qcai2_json PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_json COMMAND tst_qcai2_json)
+qcai2_register_test(qcai2_json tst_qcai2_json)
 
 add_executable(tst_qcai2_toolcall
     tst_toolcall.cpp
@@ -28,7 +38,7 @@ target_link_libraries(tst_qcai2_toolcall PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_toolcall COMMAND tst_qcai2_toolcall)
+qcai2_register_test(qcai2_toolcall tst_qcai2_toolcall)
 
 add_executable(tst_qcai2_agent_messages
     tst_agent_messages.cpp
@@ -44,7 +54,7 @@ target_link_libraries(tst_qcai2_agent_messages PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_agent_messages COMMAND tst_qcai2_agent_messages)
+qcai2_register_test(qcai2_agent_messages tst_qcai2_agent_messages)
 
 add_executable(tst_qcai2_provider_usage
     tst_provider_usage.cpp
@@ -61,7 +71,7 @@ target_link_libraries(tst_qcai2_provider_usage PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_provider_usage COMMAND tst_qcai2_provider_usage)
+qcai2_register_test(qcai2_provider_usage tst_qcai2_provider_usage)
 
 add_executable(tst_qcai2_agent_progress
     tst_agent_progress.cpp
@@ -82,7 +92,7 @@ target_link_libraries(tst_qcai2_agent_progress PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_agent_progress COMMAND tst_qcai2_agent_progress)
+qcai2_register_test(qcai2_agent_progress tst_qcai2_agent_progress)
 
 add_executable(tst_qcai2_chat_context
     tst_chat_context.cpp
@@ -107,7 +117,7 @@ target_link_libraries(tst_qcai2_chat_context PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_chat_context COMMAND tst_qcai2_chat_context)
+qcai2_register_test(qcai2_chat_context tst_qcai2_chat_context)
 
 add_executable(tst_qcai2_slash_commands
     tst_slash_commands.cpp
@@ -147,7 +157,7 @@ target_link_libraries(tst_qcai2_slash_commands PRIVATE
     Qt::Network
     Qt::Test
 )
-add_test(NAME qcai2_slash_commands COMMAND tst_qcai2_slash_commands)
+qcai2_register_test(qcai2_slash_commands tst_qcai2_slash_commands)
 
 add_executable(tst_qcai2_output_capture
     tst_output_capture.cpp
@@ -163,7 +173,7 @@ target_link_libraries(tst_qcai2_output_capture PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_output_capture COMMAND tst_qcai2_output_capture)
+qcai2_register_test(qcai2_output_capture tst_qcai2_output_capture)
 
 add_executable(tst_qcai2_safety_policy
     tst_safety_policy.cpp
@@ -180,7 +190,7 @@ target_link_libraries(tst_qcai2_safety_policy PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_safety_policy COMMAND tst_qcai2_safety_policy)
+qcai2_register_test(qcai2_safety_policy tst_qcai2_safety_policy)
 
 add_executable(tst_qcai2_mcp_config
     tst_mcp_config.cpp
@@ -197,7 +207,7 @@ target_link_libraries(tst_qcai2_mcp_config PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_mcp_config COMMAND tst_qcai2_mcp_config)
+qcai2_register_test(qcai2_mcp_config tst_qcai2_mcp_config)
 
 add_executable(tst_qcai2_tool_registry
     tst_tool_registry.cpp
@@ -214,7 +224,7 @@ target_link_libraries(tst_qcai2_tool_registry PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_tool_registry COMMAND tst_qcai2_tool_registry)
+qcai2_register_test(qcai2_tool_registry tst_qcai2_tool_registry)
 
 if(FEATURE_CLANGD_ENABLE)
 add_executable(tst_qcai2_clangd_tools
@@ -231,7 +241,7 @@ target_link_libraries(tst_qcai2_clangd_tools PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_clangd_tools COMMAND tst_qcai2_clangd_tools)
+qcai2_register_test(qcai2_clangd_tools tst_qcai2_clangd_tools)
 endif()
 
 add_executable(tst_qcai2_vector_search
@@ -266,7 +276,7 @@ target_link_libraries(tst_qcai2_vector_search PRIVATE
     Qt::Network
     Qt::Test
 )
-add_test(NAME qcai2_vector_search COMMAND tst_qcai2_vector_search)
+qcai2_register_test(qcai2_vector_search tst_qcai2_vector_search)
 
 add_executable(tst_qcai2_vector_search_tools
     tst_vector_search_tools.cpp
@@ -302,7 +312,7 @@ target_link_libraries(tst_qcai2_vector_search_tools PRIVATE
     Qt::Network
     Qt::Test
 )
-add_test(NAME qcai2_vector_search_tools COMMAND tst_qcai2_vector_search_tools)
+qcai2_register_test(qcai2_vector_search_tools tst_qcai2_vector_search_tools)
 
 add_executable(tst_qcai2_request_detailed_log
     tst_request_detailed_log.cpp
@@ -322,7 +332,7 @@ target_link_libraries(tst_qcai2_request_detailed_log PRIVATE
     Qt::Core
     Qt::Test
 )
-add_test(NAME qcai2_request_detailed_log COMMAND tst_qcai2_request_detailed_log)
+qcai2_register_test(qcai2_request_detailed_log tst_qcai2_request_detailed_log)
 
 add_executable(tst_qcai2_migration
     tst_migration.cpp
@@ -341,4 +351,10 @@ target_link_libraries(tst_qcai2_migration PRIVATE
     qcai2_libarchive
     qcai2_version_info
 )
-add_test(NAME qcai2_migration COMMAND tst_qcai2_migration)
+qcai2_register_test(qcai2_migration tst_qcai2_migration)
+
+get_property(QCAI2_TEST_TARGETS GLOBAL PROPERTY QCAI2_TEST_TARGETS)
+if(QCAI2_TEST_TARGETS)
+    list(REMOVE_DUPLICATES QCAI2_TEST_TARGETS)
+    add_custom_target(qcai2_tests DEPENDS ${QCAI2_TEST_TARGETS})
+endif()
