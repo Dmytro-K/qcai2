@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.7] - 2026-03-20
+## [0.0.7] - 2026-03-21
 
 ### Added
 
@@ -17,6 +17,7 @@
 ### Changed
 
 - Improved cache locality
+- Fixed markdown streaming
 
 ## [0.0.6] - 2026-03-15
 

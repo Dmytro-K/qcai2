@@ -183,6 +183,11 @@ private:
     void append_stamped_log_entry(const QString &body);
 
     /**
+     * Commits buffered streaming markdown into the persistent log buffer.
+     */
+    void flush_streaming_markdown();
+
+    /**
      * Returns the combined committed and streaming markdown for the Actions Log.
      */
     QString current_log_markdown() const;
@@ -259,6 +264,12 @@ private:
 
     /** Streaming log text buffered until the throttle timer fires. */
     QString streaming_markdown;
+
+    /** Raw provider stream buffered so JSON envelopes can be decoded for display. */
+    QString streaming_response_raw;
+
+    /** Most recent streamed answer already committed into the actions log. */
+    QString last_committed_streaming_markdown;
 
     /** Length of streaming markdown already appended to the log view. */
     qsizetype streaming_rendered_len = 0;

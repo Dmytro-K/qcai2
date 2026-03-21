@@ -119,4 +119,11 @@ private:
     static agent_response_t parse_json(const QJsonObject &obj);
 };
 
+/**
+ * Extracts the user-facing markdown preview from a possibly partial streamed model response.
+ * For structured JSON responses this returns the decoded `final.summary` content as it streams.
+ * For plain-text responses it returns the raw text.
+ */
+QString streaming_response_markdown_preview(const QString &raw);
+
 }  // namespace qcai2

@@ -21,6 +21,9 @@ private slots:
     void parse_fenced_json_extracts_structured_response();
     void parse_multiple_objects_handles_braces_inside_strings();
     void parse_plain_text_falls_back_to_raw_text();
+    void streaming_preview_extracts_partial_final_summary();
+    void streaming_preview_decodes_json_escapes();
+    void streaming_preview_hides_non_final_json();
 };
 
 void agent_messages_test_t::chat_message_round_trips_through_json()
@@ -119,6 +122,30 @@ void agent_messages_test_t::parse_plain_text_falls_back_to_raw_text()
 
     QVERIFY(response.type == response_type_t::TEXT);
     QCOMPARE(response.text, raw);
+}
+
+void agent_messages_test_t::streaming_preview_extracts_partial_final_summary()
+{
+    const QString raw = QStringLiteral(R"({"type":"final","summary":"# Title\n\nHello, **wo)");
+
+    QCOMPARE(streaming_response_markdown_preview(raw), QStringLiteral("# Title\n\nHello, **wo"));
+}
+
+void agent_messages_test_t::streaming_preview_decodes_json_escapes()
+{
+    const QString raw =
+        QStringLiteral(R"({"type":"final","summary":"Line 1\nLine 2 with \"quotes\""})");
+
+    QCOMPARE(streaming_response_markdown_preview(raw),
+             QStringLiteral("Line 1\nLine 2 with \"quotes\""));
+}
+
+void agent_messages_test_t::streaming_preview_hides_non_final_json()
+{
+    const QString raw =
+        QStringLiteral(R"({"type":"tool_call","name":"search_repo","args":{"query":"todo"}})");
+
+    QVERIFY(streaming_response_markdown_preview(raw).isEmpty());
 }
 
 QTEST_APPLESS_MAIN(agent_messages_test_t)

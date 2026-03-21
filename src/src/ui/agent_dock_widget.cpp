@@ -710,7 +710,9 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
             [this](const QString &status) { this->status_label->setText(status); });
     connect(this->controller, &agent_controller_t::streaming_token, this,
             [this](const QString &token) {
-                this->streaming_markdown += token;
+                this->streaming_response_raw += token;
+                this->streaming_markdown =
+                    streaming_response_markdown_preview(this->streaming_response_raw);
                 if (!this->is_streaming)
                 {
                     this->is_streaming = true;
@@ -902,6 +904,8 @@ void agent_dock_widget_t::clear_chat_state()
     this->raw_markdown_view->clear();
     this->log_markdown.clear();
     this->streaming_markdown.clear();
+    this->streaming_response_raw.clear();
+    this->last_committed_streaming_markdown.clear();
     this->streaming_rendered_len = 0;
     this->is_streaming = false;
     this->plan_list->clear();
@@ -1392,6 +1396,7 @@ void agent_dock_widget_t::on_run_clicked()
     }
 
     this->reset_usage_display(settings().provider, selected_model);
+    this->last_committed_streaming_markdown.clear();
     this->controller->set_request_context(
         this->linked_files_controller->linked_files_prompt_context(),
         this->linked_files_controller->effective_linked_files());
@@ -1500,6 +1505,16 @@ void agent_dock_widget_t::on_log_message(const QString &msg)
         return;
     }
 
+    static const QString final_prefix = QStringLiteral("✅ Agent finished: ");
+    const bool suppress_streamed_final_echo =
+        text.startsWith(final_prefix) && text.mid(final_prefix.size()).trimmed() ==
+                                             this->last_committed_streaming_markdown.trimmed();
+    if (suppress_streamed_final_echo)
+    {
+        this->last_committed_streaming_markdown.clear();
+        return;
+    }
+
     this->append_stamped_log_entry(text);
 }
 
@@ -1552,19 +1567,7 @@ void agent_dock_widget_t::append_stamped_log_entry(const QString &body)
         return;
     }
 
-    if (!this->streaming_markdown.isEmpty())
-    {
-        const QString flushed_markdown = redact_read_file_payloads(this->streaming_markdown);
-        if (!this->log_markdown.isEmpty())
-        {
-            this->log_markdown += QStringLiteral("\n\n");
-        }
-        this->log_markdown += flushed_markdown;
-        this->session_controller->append_current_conversation_log_entry(flushed_markdown);
-        this->streaming_markdown.clear();
-        this->streaming_rendered_len = 0;
-        this->is_streaming = false;
-    }
+    this->flush_streaming_markdown();
 
     const QString stamped =
         QStringLiteral("`[%1]`  %2")
@@ -1581,17 +1584,36 @@ void agent_dock_widget_t::append_stamped_log_entry(const QString &body)
     this->render_log_full();
 }
 
+void agent_dock_widget_t::flush_streaming_markdown()
+{
+    if (this->streaming_markdown.isEmpty() && this->streaming_response_raw.isEmpty())
+    {
+        return;
+    }
+
+    if (this->streaming_markdown.isEmpty() == false)
+    {
+        const QString flushed_markdown = redact_read_file_payloads(this->streaming_markdown);
+        this->last_committed_streaming_markdown = flushed_markdown;
+        if (!this->log_markdown.isEmpty())
+        {
+            this->log_markdown += QStringLiteral("\n\n");
+        }
+        this->log_markdown += flushed_markdown;
+        this->session_controller->append_current_conversation_log_entry(flushed_markdown);
+    }
+    this->streaming_markdown.clear();
+    this->streaming_response_raw.clear();
+    this->streaming_rendered_len = 0;
+    this->is_streaming = false;
+}
+
 void agent_dock_widget_t::render_log()
 {
     if (this->is_streaming)
     {
-        // During streaming: append only new tokens (fast, no re-parse)
-        const QString new_tokens = this->streaming_markdown.mid(this->streaming_rendered_len);
         this->streaming_rendered_len = this->streaming_markdown.size();
-        if (!new_tokens.isEmpty())
-        {
-            this->render_log_streaming(new_tokens);
-        }
+        this->render_log_full();
         return;
     }
 
@@ -1691,6 +1713,15 @@ void agent_dock_widget_t::on_iteration_changed(int iteration)
 void agent_dock_widget_t::on_stopped(const QString &summary)
 {
     this->update_run_state(false);
+    if (this->render_throttle->isActive())
+    {
+        this->render_throttle->stop();
+    }
+    if (!this->streaming_markdown.isEmpty() || !this->streaming_response_raw.isEmpty())
+    {
+        this->flush_streaming_markdown();
+        this->render_log_full();
+    }
     if (this->status_label->text().isEmpty() == true ||
         this->status_label->text() == tr("Ready") ||
         this->status_label->text() == tr("Running..."))
@@ -1761,6 +1792,8 @@ bool agent_dock_widget_t::eventFilter(QObject *obj, QEvent *event)
             this->raw_markdown_view->clear();
             this->log_markdown.clear();
             this->streaming_markdown.clear();
+            this->streaming_response_raw.clear();
+            this->last_committed_streaming_markdown.clear();
             this->streaming_rendered_len = 0;
             this->is_streaming = false;
             this->session_controller->save_chat();

@@ -74,6 +74,89 @@ QList<QString> extract_top_level_objects(const QString &raw)
     return objects;
 }
 
+QString extract_partial_json_string_field(const QString &raw, const QString &field_name)
+{
+    const QRegularExpression field_re(
+        QStringLiteral(R"("%1"\s*:\s*")").arg(QRegularExpression::escape(field_name)));
+    const QRegularExpressionMatch match = field_re.match(raw);
+    if (match.hasMatch() == false)
+    {
+        return {};
+    }
+
+    QString value;
+    bool escaping = false;
+    for (qsizetype i = match.capturedEnd(); i < raw.size(); ++i)
+    {
+        const QChar ch = raw.at(i);
+        if (escaping == true)
+        {
+            escaping = false;
+            switch (ch.unicode())
+            {
+                case '"':
+                    value += QLatin1Char('"');
+                    break;
+                case '\\':
+                    value += QLatin1Char('\\');
+                    break;
+                case '/':
+                    value += QLatin1Char('/');
+                    break;
+                case 'b':
+                    value += QLatin1Char('\b');
+                    break;
+                case 'f':
+                    value += QLatin1Char('\f');
+                    break;
+                case 'n':
+                    value += QLatin1Char('\n');
+                    break;
+                case 'r':
+                    value += QLatin1Char('\r');
+                    break;
+                case 't':
+                    value += QLatin1Char('\t');
+                    break;
+                case 'u': {
+                    if (i + 4 >= raw.size())
+                    {
+                        return value;
+                    }
+                    bool ok = false;
+                    const ushort code = raw.sliced(i + 1, 4).toUShort(&ok, 16);
+                    if (ok == false)
+                    {
+                        return value;
+                    }
+                    value += QChar(code);
+                    i += 4;
+                    break;
+                }
+                default:
+                    value += ch;
+                    break;
+            }
+            continue;
+        }
+
+        if (ch == QLatin1Char('\\'))
+        {
+            escaping = true;
+            continue;
+        }
+
+        if (ch == QLatin1Char('"'))
+        {
+            return value;
+        }
+
+        value += ch;
+    }
+
+    return value;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -209,6 +292,40 @@ agent_response_t agent_response_t::parse(const QString &raw)
     r.type = response_type_t::TEXT;
     r.text = raw;
     return r;
+}
+
+QString streaming_response_markdown_preview(const QString &raw)
+{
+    if (raw.trimmed().isEmpty() == true)
+    {
+        return {};
+    }
+
+    const QString trimmed = raw.trimmed();
+    const bool looks_like_json = trimmed.startsWith(QLatin1Char('{'));
+
+    if (looks_like_json == false)
+    {
+        return raw;
+    }
+
+    const agent_response_t parsed = agent_response_t::parse(raw);
+    if (parsed.type == response_type_t::FINAL)
+    {
+        return parsed.summary;
+    }
+    if (parsed.type != response_type_t::TEXT && parsed.type != response_type_t::ERROR)
+    {
+        return {};
+    }
+
+    const QString partial_type = extract_partial_json_string_field(raw, QStringLiteral("type"));
+    if (partial_type.isEmpty() == false && partial_type != QStringLiteral("final"))
+    {
+        return {};
+    }
+
+    return extract_partial_json_string_field(raw, QStringLiteral("summary"));
 }
 
 }  // namespace qcai2
