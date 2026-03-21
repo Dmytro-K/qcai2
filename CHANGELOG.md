@@ -13,8 +13,6 @@
 - Added optional auto compact
 - Added a conversation list
 - Added a ClangCodeModel/clangd agent tools
-- Added a Qdrant-backed vector search backend
-- Added `/search` slash command for vector search
 
 ### Changed
 

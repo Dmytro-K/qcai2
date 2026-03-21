@@ -98,6 +98,9 @@ QString vector_search_service_t::configuration_summary() const
     }
     if (this->current_backend == nullptr)
     {
+#if !QCAI2_FEATURE_QDRANT_ENABLE
+        return QStringLiteral("Qdrant support is disabled at build time.");
+#endif
         return QStringLiteral("Vector search enabled without an active backend.");
     }
     return this->current_backend->configuration_summary();
@@ -127,6 +130,16 @@ bool vector_search_service_t::verify_connection(QString *error)
 
     if (this->current_backend == nullptr)
     {
+#if !QCAI2_FEATURE_QDRANT_ENABLE
+        const QString unsupported_message =
+            QStringLiteral("Qdrant support is disabled at build time.");
+        this->set_status(false, unsupported_message);
+        if (error != nullptr)
+        {
+            *error = unsupported_message;
+        }
+        return false;
+#endif
         const QString message = QStringLiteral("Vector search enabled without an active backend.");
         this->set_status(false, message);
         if (error != nullptr)

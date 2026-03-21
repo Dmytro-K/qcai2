@@ -47,6 +47,7 @@ private slots:
     /**
      * @brief Requires a query argument for `/search`.
      */
+#if QCAI2_FEATURE_QDRANT_ENABLE
     void dispatch_search_requires_query();
 
     /**
@@ -58,6 +59,7 @@ private slots:
      * @brief Redirects `/search` into an AI goal when vector search is available.
      */
     void dispatch_search_sets_goal_override();
+#endif
 
     /**
      * @brief Allows test-only commands to auto-register through DECLARE_COMMAND.
@@ -206,9 +208,11 @@ void slash_command_registry_test_t::command_names_returns_slash_prefixed_names()
 {
     slash_command_registry_t registry;
 
-    QCOMPARE(registry.command_names(),
-             QStringList({QStringLiteral("/hello"), QStringLiteral("/macro_test"),
-                          QStringLiteral("/search")}));
+    QStringList expected_commands{QStringLiteral("/hello"), QStringLiteral("/macro_test")};
+#if QCAI2_FEATURE_QDRANT_ENABLE
+    expected_commands.append(QStringLiteral("/search"));
+#endif
+    QCOMPARE(registry.command_names(), expected_commands);
 }
 
 void slash_command_registry_test_t::dispatch_non_slash_input_is_ignored()
@@ -252,6 +256,7 @@ void slash_command_registry_test_t::dispatch_hello_logs_hello_world()
     QCOMPARE(log_entries, QStringList{QStringLiteral("Hello World")});
 }
 
+#if QCAI2_FEATURE_QDRANT_ENABLE
 void slash_command_registry_test_t::dispatch_search_requires_query()
 {
     slash_command_registry_t registry;
@@ -321,6 +326,7 @@ void slash_command_registry_test_t::dispatch_search_sets_goal_override()
     QVERIFY(result.goal_override.contains(QStringLiteral("vector search backend")));
     QVERIFY(result.goal_override.contains(QStringLiteral("Fake Vector Backend")));
 }
+#endif
 
 void slash_command_registry_test_t::dispatch_macro_declared_command_is_registered()
 {

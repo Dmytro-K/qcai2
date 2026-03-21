@@ -16,7 +16,6 @@ using namespace qcai2;
 namespace
 {
 
-#if QCAI2_FEATURE_QDRANT_ENABLE
 class http_test_server_t : public QObject
 {
     Q_OBJECT
@@ -104,8 +103,8 @@ private:
     bool collection_exists = true;
     bool collection_created = false;
 };
-#endif
 
+#if QCAI2_FEATURE_QDRANT_ENABLE
 settings_t configured_qdrant_settings(const QString &base_url)
 {
     settings_t settings;
@@ -116,6 +115,7 @@ settings_t configured_qdrant_settings(const QString &base_url)
     settings.qdrant_timeout_sec = 2;
     return settings;
 }
+#endif
 
 }  // namespace
 
@@ -159,6 +159,11 @@ private slots:
         QVERIFY(service.is_enabled());
         QVERIFY(!service.is_available());
         QCOMPARE(service.backend_id(), QString());
+        QCOMPARE(service.status_message(),
+                 QStringLiteral("Qdrant support is disabled at build time."));
+        QString error;
+        QVERIFY(!service.verify_connection(&error));
+        QCOMPARE(error, QStringLiteral("Qdrant support is disabled at build time."));
         QCOMPARE(service.status_message(),
                  QStringLiteral("Qdrant support is disabled at build time."));
 #endif

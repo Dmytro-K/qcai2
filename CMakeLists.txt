@@ -267,7 +267,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "${CMAKE_C_FLAGS_RELWITHDEBINFO_INIT}")
 
 option(FEATURE_CLANGD_ENABLE "Enable clangd / ClangCodeModel integration" ON)
-option(FEATURE_QDRANT_ENABLE "Enable Qdrant vector search integration" ON)
+option(FEATURE_QDRANT_ENABLE "Enable Qdrant vector search integration" OFF)
 
 set(QCAI2_QTCREATOR_COMPONENTS
     Core
@@ -460,10 +460,14 @@ set(QCAI2_VECTOR_SEARCH_PLUGIN_SOURCES
     src/src/vector_search/vector_indexing_manager.h
     src/src/vector_search/vector_indexing_manager.cpp
 )
+set(QCAI2_VECTOR_SEARCH_COMMAND_SOURCES)
 if(FEATURE_QDRANT_ENABLE)
     list(APPEND QCAI2_VECTOR_SEARCH_PLUGIN_SOURCES
         src/src/vector_search/qdrant/qdrant_vector_search_backend.h
         src/src/vector_search/qdrant/qdrant_vector_search_backend.cpp
+    )
+    list(APPEND QCAI2_VECTOR_SEARCH_COMMAND_SOURCES
+        src/src/commands/search_command.cpp
     )
 endif()
 
@@ -500,8 +504,8 @@ add_qtc_plugin(qcai2
     src/src/commands/compact_command.cpp
     src/src/commands/explain_command.cpp
     src/src/commands/refactor_command.cpp
-    src/src/commands/search_command.cpp
     src/src/commands/test_command.cpp
+    ${QCAI2_VECTOR_SEARCH_COMMAND_SOURCES}
     src/src/goal/goal_special_handler.h
     src/src/goal/goal_text_edit.h
     src/src/goal/goal_text_edit.cpp

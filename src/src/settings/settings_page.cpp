@@ -546,7 +546,7 @@ public:
         this->refreshVectorSearchStatusFromService();
 
         QString error;
-        if ((s.vector_search_enabled == true) &&
+        if ((k_qdrant_support_enabled == true) && (s.vector_search_enabled == true) &&
             ((vector_search_service().verify_connection(&error) == false) ||
              (vector_search_service().ensure_collection(text_embedder_t::k_embedding_dimensions,
                                                         &error) == false)))
@@ -678,6 +678,11 @@ private:
     {
         const settings_t candidate = this->settingsFromUi();
         vector_search_service().apply_settings(candidate);
+        if (k_qdrant_support_enabled == false)
+        {
+            this->refreshVectorSearchStatusFromService();
+            return;
+        }
         QString error;
         if (vector_search_service().verify_connection(&error) == true)
         {

@@ -113,7 +113,6 @@ add_executable(tst_qcai2_slash_commands
     tst_slash_commands.cpp
     ../src/commands/slash_command_registry.cpp
     ../src/commands/hello_command.cpp
-    ../src/commands/search_command.cpp
     ../src/vector_search/vector_search_service.cpp
     ../src/goal/file_reference_goal_handler.cpp
     ../src/goal/slash_command_goal_handler.cpp
@@ -121,6 +120,7 @@ add_executable(tst_qcai2_slash_commands
 
 if(FEATURE_QDRANT_ENABLE)
 target_sources(tst_qcai2_slash_commands PRIVATE
+    ../src/commands/search_command.cpp
     ../src/vector_search/qdrant/qdrant_vector_search_backend.cpp
 )
 target_compile_definitions(tst_qcai2_slash_commands PRIVATE

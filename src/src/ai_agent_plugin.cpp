@@ -226,6 +226,7 @@ void ai_agent_plugin_t::extensionsInitialized()
     // Show the navigation widget on startup
     this->show_navigation_widget();
 
+#if QCAI2_FEATURE_QDRANT_ENABLE
     if ((this->vector_search_service != nullptr) && (settings().vector_search_enabled == true))
     {
         QMetaObject::invokeMethod(
@@ -260,6 +261,7 @@ void ai_agent_plugin_t::extensionsInitialized()
             },
             Qt::QueuedConnection);
     }
+#endif
 }
 
 ai_agent_plugin_t::ShutdownFlag ai_agent_plugin_t::aboutToShutdown()
