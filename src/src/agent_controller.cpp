@@ -366,6 +366,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
         this->provider != nullptr ? this->provider->id() : QString(),
         agent_status_render_mode_t::INTERACTIVE, settings().agent_debug);
     this->detailed_request_log.reset();
+    const QString configured_system_prompt = s.system_prompt.trimmed();
 
     QCAI_INFO("Agent",
               QStringLiteral("Starting run — mode: %1, provider: %2, model: %3, reasoning: %4, "
@@ -478,6 +479,11 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                         envelope.provider_messages.isEmpty() == false)
                     {
                         this->messages = envelope.provider_messages;
+                        if (configured_system_prompt.isEmpty() == false)
+                        {
+                            this->messages.prepend(
+                                {QStringLiteral("system"), configured_system_prompt});
+                        }
                         restoredPersistentContext = true;
                     }
                 }
@@ -504,6 +510,10 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
 
     if (restoredPersistentContext == false)
     {
+        if (configured_system_prompt.isEmpty() == false)
+        {
+            this->messages.append({QStringLiteral("system"), configured_system_prompt});
+        }
         this->messages.append({QStringLiteral("system"), this->build_system_prompt()});
 
         for (const QString &message : dynamic_system_messages)

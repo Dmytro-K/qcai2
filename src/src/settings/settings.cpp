@@ -306,6 +306,7 @@ void settings_t::load()
     debug_logging = s.value("debugLogging", debug_logging).toBool();
     detailed_request_logging =
         s.value("detailedRequestLogging", detailed_request_logging).toBool();
+    system_prompt = s.value("systemPrompt", system_prompt).toString();
     inline_diff_refinement_enabled =
         s.value("inlineDiffRefinementEnabled", inline_diff_refinement_enabled).toBool();
     agent_debug = s.value("agentDebug", agent_debug).toBool();
@@ -417,6 +418,7 @@ void settings_t::save() const
     s.setValue("aiCompletionEnabled", ai_completion_enabled);
     s.setValue("debugLogging", debug_logging);
     s.setValue("detailedRequestLogging", detailed_request_logging);
+    s.setValue("systemPrompt", system_prompt);
     s.setValue("inlineDiffRefinementEnabled", inline_diff_refinement_enabled);
     s.setValue("agentDebug", agent_debug);
     s.setValue("completionMinChars", completion_min_chars);

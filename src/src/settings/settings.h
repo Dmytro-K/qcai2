@@ -103,6 +103,9 @@ struct settings_t
     /** Appends detailed per-request Markdown logs into the project `.qcai2/logs` folder. */
     bool detailed_request_logging = false;
 
+    /** Optional custom system prompt prepended to agent and ask requests. */
+    QString system_prompt;
+
     /** Allows rejected inline diff hunks to trigger a follow-up refinement round. */
     bool inline_diff_refinement_enabled = false;
 

@@ -622,9 +622,9 @@
        </layout>
       </widget>
       <widget class="QWidget" name="completionTab">
-       <attribute name="title">
-        <string>Code Completion</string>
-       </attribute>
+        <attribute name="title">
+         <string>Code Completion</string>
+        </attribute>
       <layout class="QVBoxLayout" name="completionLayout">
        <item>
         <widget class="QCheckBox" name="aiCompletionCheck">
@@ -736,12 +736,39 @@
          </property>
         </spacer>
        </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="safetyTab">
-      <attribute name="title">
-       <string>Safety &amp; Behavior</string>
-      </attribute>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="systemPromptTab">
+       <attribute name="title">
+        <string>System Prompt</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="systemPromptLayout">
+        <item>
+         <widget class="QLabel" name="systemPromptDescriptionLabel">
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>This optional prompt is prepended as a stable system message before dynamic project context, so provider-side prompt caching can reuse it across requests.</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPlainTextEdit" name="systemPromptEdit">
+          <property name="placeholderText">
+           <string>Optional custom system prompt for Ask and Agent mode...</string>
+          </property>
+          <property name="tabChangesFocus">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="safetyTab">
+       <attribute name="title">
+        <string>Safety &amp; Behavior</string>
+       </attribute>
       <layout class="QVBoxLayout" name="safetyLayout">
        <item>
         <widget class="QGroupBox" name="limitsGroup">
