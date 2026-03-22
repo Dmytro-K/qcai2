@@ -24,7 +24,7 @@
 - [ ] Per-project custom instructions (`.qcai2/rules.md`)
 - [ ] Semantic search over chat history
 - [ ] Semantic search over code
-- [ ] Multi-turn inline edit
+- [x] Multi-turn inline edit
 - [ ] Web search tool
 - [ ] Image/screenshot attachment
 - [ ] Multi-agent orchestration with delegated subtasks and parallel execution

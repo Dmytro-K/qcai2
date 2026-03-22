@@ -67,6 +67,21 @@ QString format_tool_result_log(const QString &result)
     return QStringLiteral("✅ **result_t**\n\n%1").arg(as_indented_code_block(preview.trimmed()));
 }
 
+QString merge_diff_sections(const QString &left, const QString &right)
+{
+    const QString normalized_left = Diff::normalize(left).trimmed();
+    const QString normalized_right = Diff::normalize(right).trimmed();
+    if (normalized_left.isEmpty() == true)
+    {
+        return normalized_right;
+    }
+    if (normalized_right.isEmpty() == true)
+    {
+        return normalized_left;
+    }
+    return normalized_left + QStringLiteral("\n") + normalized_right;
+}
+
 int prompt_result_limit_for_tool(const QString &name)
 {
     if (name == QStringLiteral("show_compile_output") ||
@@ -207,7 +222,10 @@ QString agent_controller_t::build_system_prompt() const
             "3) {\"type\":\"final\", \"summary\":\"what was done\", \"diff\":\"optional unified "
             "diff\"}\n"
             "4) {\"type\":\"need_approval\", \"action\":\"what\", \"reason\":\"why\", "
-            "\"preview\":\"details\"}\n\n");
+            "\"preview\":\"details\"}\n"
+            "If the user later rejects part of an inline diff, continue the same task and reply "
+            "with a new \"final\" response that preserves accepted edits and replaces only the "
+            "rejected changes.\n\n");
     }
 
     // Available tools
@@ -333,6 +351,9 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
         thinking_level.trimmed().isEmpty() ? s.thinking_level : thinking_level.trimmed();
     this->plan.clear();
     this->final_diff_preview.clear();
+    this->accepted_inline_diff_preview.clear();
+    this->waiting_for_inline_diff_review = false;
+    this->pending_final_summary.clear();
     this->pending_approvals.clear();
     this->messages.clear();
     this->run_id.clear();
@@ -744,7 +765,8 @@ void agent_controller_t::handle_response(const QString &response, const QString 
             this->execute_tool(parsed.tool_name, parsed.tool_args);
             break;
 
-        case response_type_t::FINAL:
+        case response_type_t::FINAL: {
+            const bool inline_refinement_enabled = settings().inline_diff_refinement_enabled;
             this->handle_normalized_progress_event(
                 {agent_progress_event_kind_t::FINAL_ANSWER_STARTED,
                  agent_progress_operation_t::NONE,
@@ -753,7 +775,12 @@ void agent_controller_t::handle_response(const QString &response, const QString 
                  {},
                  {},
                  {}});
-            emit this->log_message(QStringLiteral("✅ Agent finished: %1").arg(parsed.summary));
+            emit this->log_message(
+                QStringLiteral("%1 %2")
+                    .arg((parsed.diff.isEmpty() == false && inline_refinement_enabled == true)
+                             ? QStringLiteral("📝 Agent proposed changes:")
+                             : QStringLiteral("✅ Agent finished:"))
+                    .arg(parsed.summary));
             if (!parsed.diff.isEmpty())
             {
                 // Strip "=== NEW FILE:" blocks — only show unified diff of modified files
@@ -761,11 +788,19 @@ void agent_controller_t::handle_response(const QString &response, const QString 
                     Diff::extract_and_create_new_files(parsed.diff, QString(), /*dryRun=*/true);
                 const QString cleanDiff = nf.remaining_diff.trimmed();
                 this->final_diff_preview = Diff::normalize(cleanDiff);
-                if (!this->final_diff_preview.isEmpty())
+                if (inline_refinement_enabled == true && !this->final_diff_preview.isEmpty())
                 {
+                    this->waiting_for_inline_diff_review = true;
+                    this->pending_final_summary = parsed.summary;
                     emit this->diff_available(this->final_diff_preview);
+                    emit this->log_message(
+                        QStringLiteral("📝 Review the proposed inline diff. Resolve the hunks to "
+                                       "finish, or reject changes to ask for a revised patch."));
+                    break;
                 }
             }
+            this->waiting_for_inline_diff_review = false;
+            this->pending_final_summary.clear();
             this->running = false;
             this->handle_normalized_progress_event(
                 {agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED,
@@ -781,6 +816,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
                             {QStringLiteral("responseType"), QStringLiteral("final")}});
             emit this->stopped(parsed.summary);
             break;
+        }
 
         case response_type_t::NEED_APPROVAL: {
             pending_approval_t pa;
@@ -1047,6 +1083,84 @@ void agent_controller_t::handle_provider_inactivity_timeout()
     emit this->stopped(QStringLiteral("Provider response timed out."));
 }
 
+void agent_controller_t::request_inline_diff_refinement(const QString &accepted_diff,
+                                                        const QString &rejected_diff)
+{
+    if (!this->running || !this->waiting_for_inline_diff_review)
+    {
+        return;
+    }
+
+    const QString normalized_rejected = Diff::normalize(rejected_diff).trimmed();
+    if (normalized_rejected.isEmpty() == true)
+    {
+        this->finalize_inline_diff_review();
+        return;
+    }
+
+    this->accepted_inline_diff_preview =
+        merge_diff_sections(this->accepted_inline_diff_preview, accepted_diff);
+    this->waiting_for_inline_diff_review = false;
+    this->pending_final_summary.clear();
+    this->final_diff_preview.clear();
+
+    emit this->diff_available(QString());
+    emit this->log_message(
+        QStringLiteral("↩️ Inline diff feedback received. Asking the agent for a revised patch."));
+
+    QString feedback =
+        QStringLiteral("The user reviewed your proposed inline diff and wants a different "
+                       "implementation for the rejected changes.\n\n");
+    if (this->accepted_inline_diff_preview.isEmpty() == false)
+    {
+        feedback += QStringLiteral("These accepted hunks are already applied to the workspace and "
+                                   "must be preserved exactly:\n%1\n\n")
+                        .arg(as_indented_code_block(this->accepted_inline_diff_preview));
+    }
+    feedback += QStringLiteral("Replace the following rejected hunks with a different approach:\n"
+                               "%1\n\n"
+                               "Reply with one JSON object of type \"final\" only. Keep the "
+                               "summary concise and include a unified diff that covers only the "
+                               "replacement changes still needed.")
+                    .arg(as_indented_code_block(normalized_rejected));
+
+    this->append_controller_user_message(
+        feedback, QStringLiteral("inline_diff_rejected"),
+        QJsonObject{
+            {QStringLiteral("acceptedDiff"), this->accepted_inline_diff_preview.left(4000)},
+            {QStringLiteral("rejectedDiff"), normalized_rejected.left(4000)}});
+    this->run_next_iteration();
+}
+
+void agent_controller_t::finalize_inline_diff_review()
+{
+    if (!this->running || !this->waiting_for_inline_diff_review)
+    {
+        return;
+    }
+
+    this->waiting_for_inline_diff_review = false;
+    this->running = false;
+    const QString summary = this->pending_final_summary.trimmed().isEmpty() == false
+                                ? this->pending_final_summary.trimmed()
+                                : QStringLiteral("Inline diff review completed.");
+    this->pending_final_summary.clear();
+    this->handle_normalized_progress_event(
+        {agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED,
+         agent_progress_operation_t::NONE,
+         this->provider != nullptr ? this->provider->id() : QString(),
+         QStringLiteral("controller.final.completed"),
+         {},
+         {},
+         summary});
+    this->finalize_persistent_run(
+        QStringLiteral("completed"),
+        QJsonObject{{QStringLiteral("summary"), summary},
+                    {QStringLiteral("responseType"), QStringLiteral("final")},
+                    {QStringLiteral("completedAfterInlineReview"), true}});
+    emit this->stopped(summary);
+}
+
 void agent_controller_t::append_controller_user_message(const QString &content,
                                                         const QString &source,
                                                         const QJsonObject &metadata)
@@ -1094,12 +1208,13 @@ void agent_controller_t::finalize_persistent_run(const QString &status,
     }
 
     QString artifactError;
-    if (this->final_diff_preview.isEmpty() == false)
+    const QString persisted_diff =
+        merge_diff_sections(this->accepted_inline_diff_preview, this->final_diff_preview);
+    if (persisted_diff.isEmpty() == false)
     {
         this->chat_context_manager->append_artifact(
-            this->run_id, QStringLiteral("diff"), QStringLiteral("final_diff"),
-            this->final_diff_preview, QJsonObject{{QStringLiteral("status"), status}},
-            &artifactError);
+            this->run_id, QStringLiteral("diff"), QStringLiteral("final_diff"), persisted_diff,
+            QJsonObject{{QStringLiteral("status"), status}}, &artifactError);
     }
     QString finishError;
     this->chat_context_manager->finish_run(this->run_id, status, this->accumulated_usage, metadata,
@@ -1127,8 +1242,9 @@ void agent_controller_t::finalize_detailed_request_log(const QString &status,
         return;
     }
 
-    this->detailed_request_log->finish_request(status, metadata, this->accumulated_usage,
-                                               this->final_diff_preview);
+    this->detailed_request_log->finish_request(
+        status, metadata, this->accumulated_usage,
+        merge_diff_sections(this->accepted_inline_diff_preview, this->final_diff_preview));
     QString log_error;
     if (this->detailed_request_log->append_to_project_log(&log_error) == false &&
         log_error.isEmpty() == false)

@@ -748,6 +748,17 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
             });
     connect(this->inline_diff_manager, &inline_diff_manager_t::all_resolved, this, [this]() {
         this->on_log_message(QStringLiteral("✅ All inline diff hunks resolved."));
+        const QString accepted_diff = this->inline_diff_manager->accepted_diff();
+        const QString rejected_diff = this->inline_diff_manager->rejected_diff();
+        const bool needs_refinement = this->inline_diff_manager->rejected_count() > 0;
+        QTimer::singleShot(0, this, [this, accepted_diff, rejected_diff, needs_refinement]() {
+            if (needs_refinement == true)
+            {
+                this->controller->request_inline_diff_refinement(accepted_diff, rejected_diff);
+                return;
+            }
+            this->controller->finalize_inline_diff_review();
+        });
     });
     connect(this->controller, &agent_controller_t::error_occurred, this,
             [this](const QString &err) {
@@ -1506,9 +1517,13 @@ void agent_dock_widget_t::on_log_message(const QString &msg)
     }
 
     static const QString final_prefix = QStringLiteral("✅ Agent finished: ");
+    static const QString proposal_prefix = QStringLiteral("📝 Agent proposed changes: ");
+    const auto matches_streamed_summary = [this, &text](const QString &prefix) {
+        return text.startsWith(prefix) && text.mid(prefix.size()).trimmed() ==
+                                              this->last_committed_streaming_markdown.trimmed();
+    };
     const bool suppress_streamed_final_echo =
-        text.startsWith(final_prefix) && text.mid(final_prefix.size()).trimmed() ==
-                                             this->last_committed_streaming_markdown.trimmed();
+        matches_streamed_summary(final_prefix) || matches_streamed_summary(proposal_prefix);
     if (suppress_streamed_final_echo)
     {
         this->last_committed_streaming_markdown.clear();

@@ -148,6 +148,7 @@ class settings_widget_t : public Core::IOptionsPageWidget
         int vector_search_max_indexing_threads = 0;
         bool debug_logging = false;
         bool detailed_request_logging = false;
+        bool inline_diff_refinement_enabled = false;
         bool agent_debug = false;
         qtmcp::server_definitions_t mcp_servers;
         bool auto_compact_enabled = false;
@@ -215,6 +216,7 @@ public:
         this->qdrantTestConnectionButton = this->ui->qdrantTestConnectionButton;
         this->debugLoggingCheck = this->ui->debugLoggingCheck;
         this->detailedRequestLoggingCheck = this->ui->detailedRequestLoggingCheck;
+        this->inlineDiffRefinementCheck = this->ui->inlineDiffRefinementCheck;
         this->agentDebugCheck = this->ui->agentDebugCheck;
         this->mcpServersWidget = new mcp_servers_widget_t(this);
         this->mcpServersWidget->set_servers(s.mcp_servers);
@@ -465,6 +467,7 @@ public:
 
         this->debugLoggingCheck->setChecked(s.debug_logging);
         this->detailedRequestLoggingCheck->setChecked(s.detailed_request_logging);
+        this->inlineDiffRefinementCheck->setChecked(s.inline_diff_refinement_enabled);
 
         this->agentDebugCheck->setChecked(s.agent_debug);
 
@@ -517,12 +520,14 @@ public:
         installCheckSettingsDirtyTrigger(this->vectorSearchMaxIndexingThreadsSpin);
         installCheckSettingsDirtyTrigger(this->debugLoggingCheck);
         installCheckSettingsDirtyTrigger(this->detailedRequestLoggingCheck);
+        installCheckSettingsDirtyTrigger(this->inlineDiffRefinementCheck);
         installCheckSettingsDirtyTrigger(this->agentDebugCheck);
         // QDoubleSpinBox not supported by installCheckSettingsDirtyTrigger
         connect(this->tempSpin, &QDoubleSpinBox::valueChanged, Utils::checkSettingsDirty);
         connect(this->completionModelCombo, &QComboBox::currentTextChanged,
                 Utils::checkSettingsDirty);
         connect(this->detailedRequestLoggingCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
+        connect(this->inlineDiffRefinementCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->vectorSearchEnabledCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->mcpServersWidget, &mcp_servers_widget_t::changed, Utils::checkSettingsDirty);
     }
@@ -538,6 +543,7 @@ public:
         s = this->settingsFromUi();
         s.debug_logging = this->debugLoggingCheck->isChecked();
         s.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
+        s.inline_diff_refinement_enabled = this->inlineDiffRefinementCheck->isChecked();
         s.agent_debug = this->agentDebugCheck->isChecked();
         s.save();
 
@@ -621,6 +627,7 @@ private:
         s.vector_search_max_indexing_threads = this->vectorSearchMaxIndexingThreadsSpin->value();
         s.debug_logging = this->debugLoggingCheck->isChecked();
         s.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
+        s.inline_diff_refinement_enabled = this->inlineDiffRefinementCheck->isChecked();
         s.agent_debug = this->agentDebugCheck->isChecked();
         s.mcp_servers = this->mcpServersWidget->servers();
         return s;
@@ -758,6 +765,7 @@ private:
             this->vectorSearchMaxIndexingThreadsSpin->value(),
             this->debugLoggingCheck->isChecked(),
             this->detailedRequestLoggingCheck->isChecked(),
+            this->inlineDiffRefinementCheck->isChecked(),
             this->agentDebugCheck->isChecked(),
             this->mcpServersWidget->servers(),
             this->autoCompactCheck->isChecked(),
@@ -830,6 +838,7 @@ private:
 
         this->debugLoggingCheck->setChecked(snap.debug_logging);
         this->detailedRequestLoggingCheck->setChecked(snap.detailed_request_logging);
+        this->inlineDiffRefinementCheck->setChecked(snap.inline_diff_refinement_enabled);
         this->agentDebugCheck->setChecked(snap.agent_debug);
         this->mcpServersWidget->set_servers(snap.mcp_servers);
         this->refreshVectorSearchStatusFromService();
@@ -882,6 +891,7 @@ private:
     QPushButton *qdrantTestConnectionButton;
     QCheckBox *debugLoggingCheck;
     QCheckBox *detailedRequestLoggingCheck;
+    QCheckBox *inlineDiffRefinementCheck;
     QCheckBox *agentDebugCheck;
     mcp_servers_widget_t *mcpServersWidget = nullptr;
 };

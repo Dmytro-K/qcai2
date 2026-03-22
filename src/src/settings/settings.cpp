@@ -306,6 +306,8 @@ void settings_t::load()
     debug_logging = s.value("debugLogging", debug_logging).toBool();
     detailed_request_logging =
         s.value("detailedRequestLogging", detailed_request_logging).toBool();
+    inline_diff_refinement_enabled =
+        s.value("inlineDiffRefinementEnabled", inline_diff_refinement_enabled).toBool();
     agent_debug = s.value("agentDebug", agent_debug).toBool();
     completion_min_chars = s.value("completionMinChars", completion_min_chars).toInt();
     completion_delay_ms = s.value("completionDelayMs", completion_delay_ms).toInt();
@@ -415,6 +417,7 @@ void settings_t::save() const
     s.setValue("aiCompletionEnabled", ai_completion_enabled);
     s.setValue("debugLogging", debug_logging);
     s.setValue("detailedRequestLogging", detailed_request_logging);
+    s.setValue("inlineDiffRefinementEnabled", inline_diff_refinement_enabled);
     s.setValue("agentDebug", agent_debug);
     s.setValue("completionMinChars", completion_min_chars);
     s.setValue("completionDelayMs", completion_delay_ms);

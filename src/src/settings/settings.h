@@ -103,6 +103,9 @@ struct settings_t
     /** Appends detailed per-request Markdown logs into the project `.qcai2/logs` folder. */
     bool detailed_request_logging = false;
 
+    /** Allows rejected inline diff hunks to trigger a follow-up refinement round. */
+    bool inline_diff_refinement_enabled = false;
+
     /** Shows raw agent JSON payloads in chat when true. */
     bool agent_debug = false;
 

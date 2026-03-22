@@ -125,9 +125,35 @@ public:
     }
 
     /**
+     * Returns the number of hunks accepted in the current review round.
+     */
+    qsizetype accepted_count() const
+    {
+        return this->accepted.size();
+    }
+
+    /**
+     * Returns the number of hunks rejected in the current review round.
+     */
+    qsizetype rejected_count() const
+    {
+        return this->rejected.size();
+    }
+
+    /**
      * Returns a unified diff built from the hunks that are still unresolved.
      */
     QString remaining_diff() const;
+
+    /**
+     * Returns a unified diff built from the hunks accepted in the current review round.
+     */
+    QString accepted_diff() const;
+
+    /**
+     * Returns a unified diff built from the hunks rejected in the current review round.
+     */
+    QString rejected_diff() const;
 
 signals:
     /**
@@ -183,11 +209,23 @@ private:
      */
     void create_marker(int index);
 
+    /**
+     * Builds a unified diff from the provided hunk indexes.
+     * @param indexes Resolved hunk indexes to include.
+     */
+    QString diff_for_indexes(const QSet<int> &indexes) const;
+
     /** Parsed hunks for the current diff preview. */
     std::vector<hunk_entry_t> hunks;
 
     /** Hunk indexes that were already accepted or rejected. */
     QSet<int> resolved;
+
+    /** Hunk indexes that were accepted in the current review round. */
+    QSet<int> accepted;
+
+    /** Hunk indexes that were rejected in the current review round. */
+    QSet<int> rejected;
 
     /** Project directory used to resolve relative file paths. */
     QString project_dir;

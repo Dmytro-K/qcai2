@@ -840,17 +840,24 @@
             </property>
            </widget>
           </item>
-          <item>
-           <widget class="QCheckBox" name="detailedRequestLoggingCheck">
-            <property name="text">
-             <string>Detailed request logging (per-project Markdown file)</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="agentDebugCheck">
-            <property name="text">
-             <string>Agent Debug (show raw JSON in chat)</string>
+           <item>
+            <widget class="QCheckBox" name="detailedRequestLoggingCheck">
+             <property name="text">
+              <string>Detailed request logging (per-project Markdown file)</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="inlineDiffRefinementCheck">
+             <property name="text">
+              <string>Enable multi-turn inline diff refinement after rejecting changes</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="agentDebugCheck">
+             <property name="text">
+              <string>Agent Debug (show raw JSON in chat)</string>
             </property>
            </widget>
           </item>

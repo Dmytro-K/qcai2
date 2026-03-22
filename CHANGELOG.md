@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.8] - 2026-03-22
+
+### Added
+
+- Added an optional multi-turn inline diff refinement flow
+
 ## [0.0.7] - 2026-03-21
 
 ### Added

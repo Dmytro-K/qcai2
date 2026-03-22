@@ -455,6 +455,7 @@ void inline_diff_manager_t::accept_hunk(int hunkIndex)
               QStringLiteral("Accepted hunk %1 in %2").arg(hunkIndex).arg(h.file_path));
 
     this->resolved.insert(hunkIndex);
+    this->accepted.insert(hunkIndex);
     this->hunks[std::size_t(hunkIndex)].widget_handles.clear();
     delete this->hunks[std::size_t(hunkIndex)].mark;
     this->hunks[std::size_t(hunkIndex)].mark = nullptr;
@@ -479,6 +480,7 @@ void inline_diff_manager_t::reject_hunk(int hunkIndex)
               QStringLiteral("Rejected hunk %1 in %2").arg(hunkIndex).arg(h.file_path));
 
     this->resolved.insert(hunkIndex);
+    this->rejected.insert(hunkIndex);
     this->hunks[std::size_t(hunkIndex)].widget_handles.clear();
     delete this->hunks[std::size_t(hunkIndex)].mark;
     this->hunks[std::size_t(hunkIndex)].mark = nullptr;
@@ -497,6 +499,32 @@ QString inline_diff_manager_t::remaining_diff() const
     for (std::size_t i = 0; i < this->hunks.size(); ++i)
     {
         if (this->resolved.contains(int(i)))
+        {
+            continue;
+        }
+        patches.append(Diff::normalize(this->hunks[i].hunk.full_patch).trimmed());
+    }
+
+    return patches.join(QStringLiteral("\n"));
+}
+
+QString inline_diff_manager_t::accepted_diff() const
+{
+    return this->diff_for_indexes(this->accepted);
+}
+
+QString inline_diff_manager_t::rejected_diff() const
+{
+    return this->diff_for_indexes(this->rejected);
+}
+
+QString inline_diff_manager_t::diff_for_indexes(const QSet<int> &indexes) const
+{
+    QStringList patches;
+    patches.reserve(qsizetype(this->hunks.size()));
+    for (std::size_t i = 0; i < this->hunks.size(); ++i)
+    {
+        if (indexes.contains(int(i)) == false)
         {
             continue;
         }
@@ -537,6 +565,9 @@ void inline_diff_manager_t::clear_all()
     }
     this->hunks.clear();
     this->resolved.clear();
+    this->accepted.clear();
+    this->rejected.clear();
+    this->project_dir.clear();
 }
 
 }  // namespace qcai2

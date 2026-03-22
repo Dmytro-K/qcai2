@@ -128,6 +128,19 @@ public:
     void deny_action(int approval_id);
 
     /**
+     * Continues the current run after the user rejected part of an inline diff proposal.
+     * @param acceptedDiff Hunks already accepted and applied to disk.
+     * @param rejectedDiff Hunks that must be replaced with a different approach.
+     */
+    void request_inline_diff_refinement(const QString &accepted_diff,
+                                        const QString &rejected_diff);
+
+    /**
+     * Finishes a run after the user completed inline diff review without requesting refinement.
+     */
+    void finalize_inline_diff_review();
+
+    /**
      * Returns true while a run is active.
      */
     bool is_running() const
@@ -164,7 +177,16 @@ public:
      */
     QString accumulated_diff() const
     {
-        return this->final_diff_preview;
+        if (this->accepted_inline_diff_preview.isEmpty() == true)
+        {
+            return this->final_diff_preview;
+        }
+        if (this->final_diff_preview.isEmpty() == true)
+        {
+            return this->accepted_inline_diff_preview;
+        }
+        return this->accepted_inline_diff_preview + QStringLiteral("\n") +
+               this->final_diff_preview;
     }
 
     /**
@@ -458,6 +480,15 @@ private:
 
     /** Final diff preview accumulated across responses. */
     QString final_diff_preview;
+
+    /** Accepted inline diff hunks already applied in earlier review rounds. */
+    QString accepted_inline_diff_preview;
+
+    /** True while the controller is waiting for the user to review a final inline diff. */
+    bool waiting_for_inline_diff_review = false;
+
+    /** Final summary pending completion of inline diff review. */
+    QString pending_final_summary;
 
     /** Pending tool execution waiting for an explicit user decision. */
     struct pending_approval_t
