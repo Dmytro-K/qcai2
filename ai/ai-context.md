@@ -262,6 +262,8 @@ Design modules, classes, interfaces, and functions so they are easy to cover wit
 
 Avoid function implementations in header files unless they are genuinely necessary there, such as template definitions or other cases that require inline visibility. Prefer keeping declarations in `.h` files and moving implementations to `.cpp` files whenever practical.
 
+Document important architecture, behavior, and non-trivial code paths explicitly. New features and refactors should not leave key logic undocumented in either code comments, headers, or repository context when that documentation would help future maintenance.
+
 ---
 
 ## Build, tests, installation

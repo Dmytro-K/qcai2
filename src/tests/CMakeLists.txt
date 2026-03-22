@@ -94,6 +94,23 @@ target_link_libraries(tst_qcai2_agent_progress PRIVATE
 )
 qcai2_register_test(qcai2_agent_progress tst_qcai2_agent_progress)
 
+add_executable(tst_qcai2_agent_run_state_machine
+    tst_agent_run_state_machine.cpp
+    ../src/agent_run_state_machine.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_agent_run_state_machine)
+
+target_include_directories(tst_qcai2_agent_run_state_machine PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_agent_run_state_machine PRIVATE
+    Qt::Core
+    Qt::StateMachine
+    Qt::Test
+)
+qcai2_register_test(qcai2_agent_run_state_machine tst_qcai2_agent_run_state_machine)
+
 add_executable(tst_qcai2_chat_context
     tst_chat_context.cpp
     ../src/context/chat_context.h

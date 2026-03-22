@@ -288,7 +288,7 @@ else()
 endif()
 
 find_package(QtCreator REQUIRED COMPONENTS ${QCAI2_QTCREATOR_COMPONENTS})
-find_package(Qt6 COMPONENTS Widgets Network Sql REQUIRED)
+find_package(Qt6 COMPONENTS Widgets Network Sql StateMachine REQUIRED)
 
 add_subdirectory(src/src/util/migrations)
 
@@ -521,6 +521,7 @@ add_qtc_plugin(qcai2
   DEPENDS
     Qt::Widgets
     Qt::Network
+    Qt::StateMachine
     Qt::Concurrent
     QtCreator::ExtensionSystem
     QtCreator::Utils
@@ -531,6 +532,8 @@ add_qtc_plugin(qcai2
     src/resources/aiagentplugin.qrc
     src/src/ai_agent_plugin.h
     src/src/ai_agent_plugin.cpp
+    src/src/agent_run_state_machine.h
+    src/src/agent_run_state_machine.cpp
     src/src/agent_controller.h
     src/src/agent_controller.cpp
     src/src/ui/agent_dock_widget.h
@@ -864,7 +867,7 @@ endif()
 
 qcai2_collect_target_cpp_sources(QCAI2_CLANG_TIDY_SOURCES qcai2)
 set(QCAI2_CLANG_ANALYZER_BUILD_TARGETS qcai2)
-foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_agent_messages tst_qcai2_provider_usage tst_qcai2_agent_progress tst_qcai2_chat_context tst_qcai2_slash_commands tst_qcai2_safety_policy tst_qcai2_mcp_config tst_qcai2_tool_registry tst_qcai2_migration)
+foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_agent_messages tst_qcai2_provider_usage tst_qcai2_agent_progress tst_qcai2_agent_run_state_machine tst_qcai2_chat_context tst_qcai2_slash_commands tst_qcai2_safety_policy tst_qcai2_mcp_config tst_qcai2_tool_registry tst_qcai2_migration)
     if(TARGET ${qcai2_test_target})
         qcai2_collect_target_cpp_sources(qcai2_test_sources ${qcai2_test_target})
         list(APPEND QCAI2_CLANG_TIDY_SOURCES ${qcai2_test_sources})

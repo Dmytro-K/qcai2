@@ -117,11 +117,11 @@ jobs:
         target: desktop
         arch: ${{ matrix.config.qt_arch }}
         archives: ${{ matrix.config.qt_archives }}
-        modules: qtnetworkauth
+        modules: qtnetworkauth qtscxml
         dir: ${{ github.workspace }}/qt
         cache: true
 
-    - name: Verify Qt NetworkAuth
+    - name: Verify Qt modules
       shell: bash
       run: |
         set -euo pipefail
@@ -141,7 +141,18 @@ jobs:
           exit 1
         fi
 
+        statemachine_config="$(
+          find "${QT_ROOT_DIR}" \
+            -path '*/Qt6StateMachine/Qt6StateMachineConfig.cmake' \
+            -print -quit
+        )"
+        if [ -z "${statemachine_config}" ]; then
+          echo "::error::Qt StateMachine was not installed under ${QT_ROOT_DIR}"
+          exit 1
+        fi
+
         echo "Using Qt NetworkAuth config ${networkauth_config}"
+        echo "Using Qt StateMachine config ${statemachine_config}"
 
     - name: Download Qt Creator
       id: qt_creator

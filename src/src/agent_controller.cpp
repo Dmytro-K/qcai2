@@ -156,7 +156,7 @@ QString artifact_kind_for_tool(const QString &tool_name)
 
 }  // namespace
 
-agent_controller_t::agent_controller_t(QObject *parent) : QObject(parent)
+agent_controller_t::agent_controller_t(QObject *parent) : QObject(parent), run_state_machine(this)
 {
     this->provider_watchdog.setSingleShot(true);
     this->provider_watchdog.setInterval(k_provider_inactivity_timeout_ms);
@@ -262,7 +262,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                                const QString &model_name, const QString &reasoning_effort,
                                const QString &thinking_level)
 {
-    if (this->running)
+    if (this->is_running())
     {
         return;
     }
@@ -337,7 +337,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
             this->mcp_tool_manager->refresh_for_project(context_snapshot.project_dir);
     }
 
-    this->running = true;
+    this->run_state_machine.start_run();
     this->dry_run = dry_run;
     this->current_iteration = 0;
     this->current_tool_call_count = 0;
@@ -353,7 +353,6 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
     this->plan.clear();
     this->final_diff_preview.clear();
     this->accepted_inline_diff_preview.clear();
-    this->waiting_for_inline_diff_review = false;
     this->pending_final_summary.clear();
     this->pending_approvals.clear();
     this->messages.clear();
@@ -552,11 +551,11 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
 
 void agent_controller_t::stop()
 {
-    if (!this->running)
+    if (!this->is_running())
     {
         return;
     }
-    this->running = false;
+    this->run_state_machine.mark_stopped();
     QCAI_INFO("Agent", QStringLiteral("Agent stopped by user at iteration %1, tool calls: %2")
                            .arg(this->current_iteration)
                            .arg(this->current_tool_call_count));
@@ -575,7 +574,7 @@ void agent_controller_t::stop()
 
 void agent_controller_t::run_next_iteration()
 {
-    if (!this->running)
+    if (!this->is_running())
     {
         return;
     }
@@ -585,7 +584,7 @@ void agent_controller_t::run_next_iteration()
                                                          : settings().max_iterations;
     if (this->current_iteration >= maxIter)
     {
-        this->running = false;
+        this->run_state_machine.mark_failed();
         emit this->log_message(QStringLiteral("⚠ Max iterations reached (%1).").arg(maxIter));
         this->finalize_persistent_run(
             QStringLiteral("error"),
@@ -609,7 +608,7 @@ void agent_controller_t::run_next_iteration()
                    .arg(this->thinking_level)
                    .arg(s.temperature));
 
-    this->waiting_for_provider = true;
+    this->run_state_machine.await_provider_response();
     this->provider_activity_seen = false;
     this->provider_request_timer.start();
     emit this->log_message(QStringLiteral("⏳ Waiting for model response..."));
@@ -659,7 +658,7 @@ void agent_controller_t::run_next_iteration()
 void agent_controller_t::handle_response(const QString &response, const QString &error,
                                          const provider_usage_t &usage)
 {
-    if (!this->running)
+    if (!this->is_running())
     {
         return;
     }
@@ -702,7 +701,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
         QCAI_ERROR("Agent", QStringLiteral("Provider error: %1").arg(error));
         emit this->log_message(QStringLiteral("❌ Provider error: %1").arg(error));
         emit this->error_occurred(error);
-        this->running = false;
+        this->run_state_machine.mark_failed();
         this->finalize_persistent_run(QStringLiteral("error"),
                                       QJsonObject{{QStringLiteral("error"), error}});
         emit this->stopped(QStringLiteral("Provider error."));
@@ -745,7 +744,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
         {
             emit this->log_message(
                 QStringLiteral("⚠ Ask mode received a non-final response twice."));
-            this->running = false;
+            this->run_state_machine.mark_failed();
             this->finalize_persistent_run(
                 QStringLiteral("error"),
                 QJsonObject{
@@ -808,7 +807,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
                 this->final_diff_preview = Diff::normalize(cleanDiff);
                 if (inline_refinement_enabled == true && !this->final_diff_preview.isEmpty())
                 {
-                    this->waiting_for_inline_diff_review = true;
+                    this->run_state_machine.await_inline_diff_review();
                     this->pending_final_summary = parsed.summary;
                     emit this->diff_available(this->final_diff_preview);
                     emit this->log_message(
@@ -817,9 +816,8 @@ void agent_controller_t::handle_response(const QString &response, const QString 
                     break;
                 }
             }
-            this->waiting_for_inline_diff_review = false;
             this->pending_final_summary.clear();
-            this->running = false;
+            this->run_state_machine.mark_completed();
             this->handle_normalized_progress_event(
                 {agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED,
                  agent_progress_operation_t::NONE,
@@ -841,6 +839,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
             pa.id = this->next_approval_id++;
             pa.tool_name = parsed.approval_action;
             this->pending_approvals.append(pa);
+            this->run_state_machine.await_user_approval();
             emit this->approval_requested(pa.id, parsed.approval_action, parsed.approval_reason,
                                           parsed.approval_preview);
             emit this->log_message(
@@ -870,7 +869,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
                     emit this->log_message(
                         QStringLiteral("💬 Agent finished with unstructured response."));
                 }
-                this->running = false;
+                this->run_state_machine.mark_completed();
                 this->handle_normalized_progress_event(
                     {agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED,
                      agent_progress_operation_t::NONE,
@@ -903,7 +902,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
 
 void agent_controller_t::execute_tool(const QString &name, const QJsonObject &args)
 {
-    if (!this->running)
+    if (!this->is_running())
     {
         return;
     }
@@ -912,7 +911,7 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
                                                           : settings().max_tool_calls;
     if (this->current_tool_call_count >= maxCalls)
     {
-        this->running = false;
+        this->run_state_machine.mark_failed();
         emit this->log_message(QStringLiteral("⚠ Max tool calls reached (%1).").arg(maxCalls));
         this->finalize_persistent_run(
             QStringLiteral("error"),
@@ -946,6 +945,7 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
             pa.tool_name = name;
             pa.tool_args = args;
             this->pending_approvals.append(pa);
+            this->run_state_machine.await_user_approval();
             emit this->approval_requested(
                 pa.id, name, reason,
                 QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)));
@@ -1047,7 +1047,7 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
 
 void agent_controller_t::arm_provider_watchdog()
 {
-    if (this->running && this->waiting_for_provider)
+    if (this->is_running() && this->run_state_machine.is_waiting_for_provider())
     {
         const bool thinkingEnabled = !this->thinking_level.isEmpty() &&
                                      this->thinking_level != QStringLiteral("off") &&
@@ -1062,13 +1062,12 @@ void agent_controller_t::arm_provider_watchdog()
 void agent_controller_t::disarm_provider_watchdog()
 {
     this->provider_watchdog.stop();
-    this->waiting_for_provider = false;
     this->provider_activity_seen = false;
 }
 
 void agent_controller_t::handle_provider_inactivity_timeout()
 {
-    if (!this->running || !this->waiting_for_provider)
+    if (!this->is_running() || !this->run_state_machine.is_waiting_for_provider())
     {
         return;
     }
@@ -1093,7 +1092,7 @@ void agent_controller_t::handle_provider_inactivity_timeout()
         QStringLiteral("⌛ Provider response timed out after %1 seconds of inactivity.")
             .arg(actualTimeoutMs / 1000));
     emit this->error_occurred(QStringLiteral("Provider response timed out."));
-    this->running = false;
+    this->run_state_machine.mark_failed();
     this->disarm_provider_watchdog();
     this->finalize_persistent_run(
         QStringLiteral("error"),
@@ -1104,7 +1103,7 @@ void agent_controller_t::handle_provider_inactivity_timeout()
 void agent_controller_t::request_inline_diff_refinement(const QString &accepted_diff,
                                                         const QString &rejected_diff)
 {
-    if (!this->running || !this->waiting_for_inline_diff_review)
+    if (!this->is_running() || !this->run_state_machine.is_waiting_for_inline_diff_review())
     {
         return;
     }
@@ -1118,7 +1117,6 @@ void agent_controller_t::request_inline_diff_refinement(const QString &accepted_
 
     this->accepted_inline_diff_preview =
         merge_diff_sections(this->accepted_inline_diff_preview, accepted_diff);
-    this->waiting_for_inline_diff_review = false;
     this->pending_final_summary.clear();
     this->final_diff_preview.clear();
 
@@ -1152,13 +1150,12 @@ void agent_controller_t::request_inline_diff_refinement(const QString &accepted_
 
 void agent_controller_t::finalize_inline_diff_review()
 {
-    if (!this->running || !this->waiting_for_inline_diff_review)
+    if (!this->is_running() || !this->run_state_machine.is_waiting_for_inline_diff_review())
     {
         return;
     }
 
-    this->waiting_for_inline_diff_review = false;
-    this->running = false;
+    this->run_state_machine.mark_completed();
     const QString summary = this->pending_final_summary.trimmed().isEmpty() == false
                                 ? this->pending_final_summary.trimmed()
                                 : QStringLiteral("Inline diff review completed.");

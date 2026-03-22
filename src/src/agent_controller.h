@@ -2,6 +2,7 @@
 #include <cstdint>
 #pragma once
 
+#include "agent_run_state_machine.h"
 #include "context/editor_context.h"
 #include "models/agent_messages.h"
 #include "progress/agent_progress.h"
@@ -145,7 +146,7 @@ public:
      */
     bool is_running() const
     {
-        return this->running;
+        return this->run_state_machine.is_running();
     }
 
     /**
@@ -398,8 +399,8 @@ private:
     /** Limits for iterations, tool calls, and approval handling. */
     safety_policy_t *safety_policy = nullptr;
 
-    /** True while the controller is processing a run. */
-    bool running = false;
+    /** Qt state machine that tracks the current run lifecycle phase. */
+    agent_run_state_machine_t run_state_machine;
 
     /** True when live patch application is disabled. */
     bool dry_run = true;
@@ -484,9 +485,6 @@ private:
     /** Accepted inline diff hunks already applied in earlier review rounds. */
     QString accepted_inline_diff_preview;
 
-    /** True while the controller is waiting for the user to review a final inline diff. */
-    bool waiting_for_inline_diff_review = false;
-
     /** Final summary pending completion of inline diff review. */
     QString pending_final_summary;
 
@@ -510,9 +508,6 @@ private:
 
     /** Kills agent runs that stall waiting for a provider response. */
     QTimer provider_watchdog;
-
-    /** True while a provider request is currently in flight. */
-    bool waiting_for_provider = false;
 
     /** Tracks whether the current request has produced any visible activity yet. */
     bool provider_activity_seen = false;
