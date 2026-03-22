@@ -171,6 +171,18 @@ settings_t &settings()
     return test_settings;
 }
 
+prompt_instruction_options_t prompt_instruction_options(const settings_t &settings)
+{
+    return {
+        settings.system_prompt,
+        settings.load_agents_md,
+        settings.load_github_copilot_instructions,
+        settings.load_claude_md,
+        settings.load_gemini_md,
+        settings.load_github_instructions_dir,
+    };
+}
+
 void settings_t::load()
 {
 }
@@ -199,7 +211,8 @@ QString read_project_rules(const QString & /*project_root*/, QString *error)
 }
 
 QStringList configured_system_instructions(const QString & /*project_root*/,
-                                           const QString & /*global_prompt*/, QString *error)
+                                           const prompt_instruction_options_t & /*options*/,
+                                           QString *error)
 {
     if (error != nullptr)
     {
@@ -210,7 +223,8 @@ QStringList configured_system_instructions(const QString & /*project_root*/,
 
 void append_configured_system_instructions(QList<chat_message_t> * /*messages*/,
                                            const QString & /*project_root*/,
-                                           const QString & /*global_prompt*/, QString *error)
+                                           const prompt_instruction_options_t & /*options*/,
+                                           QString *error)
 {
     if (error != nullptr)
     {

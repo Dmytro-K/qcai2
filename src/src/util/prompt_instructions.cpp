@@ -1,6 +1,7 @@
 #include "prompt_instructions.h"
 
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -12,6 +13,102 @@ namespace
 QString normalized_instruction_text(const QString &text)
 {
     return text.trimmed();
+}
+
+QStringList standard_instruction_file_paths(const QString &project_root,
+                                            const qcai2::prompt_instruction_options_t &options)
+{
+    if (project_root.trimmed().isEmpty())
+    {
+        return {};
+    }
+
+    QDir project_dir(project_root);
+    QStringList paths;
+    if (options.load_agents_md == true)
+    {
+        paths.append(project_dir.filePath(QStringLiteral("AGENTS.md")));
+    }
+    if (options.load_github_copilot_instructions == true)
+    {
+        paths.append(project_dir.filePath(QStringLiteral(".github/copilot-instructions.md")));
+    }
+    if (options.load_claude_md == true)
+    {
+        paths.append(project_dir.filePath(QStringLiteral("CLAUDE.md")));
+    }
+    if (options.load_gemini_md == true)
+    {
+        paths.append(project_dir.filePath(QStringLiteral("GEMINI.md")));
+    }
+
+    const QString instructions_dir = project_dir.filePath(QStringLiteral(".github/instructions"));
+    if (options.load_github_instructions_dir == true &&
+        QFileInfo::exists(instructions_dir) == true)
+    {
+        QStringList nested_instruction_paths;
+        QDirIterator it(instructions_dir, QStringList{QStringLiteral("*.instructions.md")},
+                        QDir::Files, QDirIterator::Subdirectories);
+        while (it.hasNext() == true)
+        {
+            nested_instruction_paths.append(it.next());
+        }
+        nested_instruction_paths.sort();
+        paths.append(nested_instruction_paths);
+    }
+
+    return paths;
+}
+
+QStringList read_standard_instruction_files(const QString &project_root,
+                                            const qcai2::prompt_instruction_options_t &options,
+                                            QString *error)
+{
+    if (error != nullptr)
+    {
+        error->clear();
+    }
+
+    QStringList instructions;
+    QString first_error;
+    QStringList seen_paths;
+    const QStringList candidate_paths = standard_instruction_file_paths(project_root, options);
+    for (const QString &path : candidate_paths)
+    {
+        const QString canonical_path = QFileInfo(path).canonicalFilePath();
+        const QString dedup_path = canonical_path.isEmpty() == false ? canonical_path : path;
+        if (seen_paths.contains(dedup_path) == true)
+        {
+            continue;
+        }
+        seen_paths.append(dedup_path);
+
+        QFile file(path);
+        if (file.exists() == false)
+        {
+            continue;
+        }
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text) == false)
+        {
+            if (first_error.isEmpty() == true)
+            {
+                first_error = QStringLiteral("%1: %2").arg(path, file.errorString());
+            }
+            continue;
+        }
+
+        const QString text = normalized_instruction_text(QString::fromUtf8(file.readAll()));
+        if (text.isEmpty() == false)
+        {
+            instructions.append(text);
+        }
+    }
+
+    if (error != nullptr)
+    {
+        *error = first_error;
+    }
+    return instructions;
 }
 
 }  // namespace
@@ -107,7 +204,8 @@ QString read_project_rules(const QString &project_root, QString *error)
 }
 
 QStringList configured_system_instructions(const QString &project_root,
-                                           const QString &global_prompt, QString *error)
+                                           const prompt_instruction_options_t &options,
+                                           QString *error)
 {
     if (error != nullptr)
     {
@@ -119,7 +217,7 @@ QStringList configured_system_instructions(const QString &project_root,
     QString ignore_error;
     const bool ignore_global_prompt =
         project_ignores_global_system_prompt(project_root, &ignore_error);
-    const QString normalized_global_prompt = normalized_instruction_text(global_prompt);
+    const QString normalized_global_prompt = normalized_instruction_text(options.global_prompt);
     if (ignore_global_prompt == false && !normalized_global_prompt.isEmpty())
     {
         instructions.append(normalized_global_prompt);
@@ -132,6 +230,11 @@ QStringList configured_system_instructions(const QString &project_root,
         instructions.append(project_rules);
     }
 
+    QString standard_files_error;
+    const QStringList standard_file_instructions =
+        read_standard_instruction_files(project_root, options, &standard_files_error);
+    instructions.append(standard_file_instructions);
+
     if (error != nullptr)
     {
         if (ignore_error.isEmpty() == false)
@@ -142,6 +245,10 @@ QStringList configured_system_instructions(const QString &project_root,
         {
             *error = rules_error;
         }
+        else if (standard_files_error.isEmpty() == false)
+        {
+            *error = standard_files_error;
+        }
     }
 
     return instructions;
@@ -149,15 +256,15 @@ QStringList configured_system_instructions(const QString &project_root,
 
 void append_configured_system_instructions(QList<chat_message_t> *messages,
                                            const QString &project_root,
-                                           const QString &global_prompt, QString *error)
+                                           const prompt_instruction_options_t &options,
+                                           QString *error)
 {
     if (messages == nullptr)
     {
         return;
     }
 
-    const QStringList instructions =
-        configured_system_instructions(project_root, global_prompt, error);
+    const QStringList instructions = configured_system_instructions(project_root, options, error);
     for (const QString &instruction : instructions)
     {
         messages->append(chat_message_t{QStringLiteral("system"), instruction});

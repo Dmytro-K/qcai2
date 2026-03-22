@@ -912,6 +912,60 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QGroupBox" name="projectInstructionFilesGroup">
+          <property name="title">
+           <string>Auto-load project AI instruction files</string>
+          </property>
+          <layout class="QVBoxLayout" name="projectInstructionFilesLayout">
+           <item>
+            <widget class="QLabel" name="projectInstructionFilesDescriptionLabel">
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+             <property name="text">
+              <string>Enable which standard repository AI instruction files are added as extra system messages when they exist in the project root.</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="loadAgentsMdCheck">
+             <property name="text">
+              <string>Load `AGENTS.md`</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="loadGithubCopilotInstructionsCheck">
+             <property name="text">
+              <string>Load `.github/copilot-instructions.md`</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="loadClaudeMdCheck">
+             <property name="text">
+              <string>Load `CLAUDE.md`</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="loadGeminiMdCheck">
+             <property name="text">
+              <string>Load `GEMINI.md`</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="loadGithubInstructionsDirCheck">
+             <property name="text">
+              <string>Load `.github/instructions/**/*.instructions.md`</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
        </layout>
       </widget>
       <widget class="QWidget" name="safetyTab">

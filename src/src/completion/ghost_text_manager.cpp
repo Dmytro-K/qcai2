@@ -150,12 +150,13 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
 
     QList<chat_message_t> messages;
     QString instruction_error;
-    append_configured_system_instructions(&messages, project_root, settings().system_prompt,
-                                          &instruction_error);
+    append_configured_system_instructions(
+        &messages, project_root, prompt_instruction_options(settings()), &instruction_error);
     if (instruction_error.isEmpty() == false)
     {
-        QCAI_WARN("GhostText",
-                  QStringLiteral("Failed to load project rules: %1").arg(instruction_error));
+        QCAI_WARN(
+            "GhostText",
+            QStringLiteral("Failed to load project instructions: %1").arg(instruction_error));
     }
     messages.append({QStringLiteral("system"),
                      QStringLiteral("You are a code completion assistant. "

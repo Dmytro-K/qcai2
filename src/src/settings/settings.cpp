@@ -1,6 +1,7 @@
 #include "settings.h"
 #include "../util/logger.h"
 #include "../util/migration.h"
+#include "../util/prompt_instructions.h"
 
 #include <QDir>
 #include <QFile>
@@ -257,6 +258,18 @@ bool writeStructuredSettingsFile(const QString &path, const QJsonObject &root,
 
 }  // namespace
 
+prompt_instruction_options_t prompt_instruction_options(const settings_t &settings)
+{
+    return {
+        settings.system_prompt,
+        settings.load_agents_md,
+        settings.load_github_copilot_instructions,
+        settings.load_claude_md,
+        settings.load_gemini_md,
+        settings.load_github_instructions_dir,
+    };
+}
+
 void settings_t::load()
 {
     QSettings s;
@@ -307,6 +320,13 @@ void settings_t::load()
     detailed_request_logging =
         s.value("detailedRequestLogging", detailed_request_logging).toBool();
     system_prompt = s.value("systemPrompt", system_prompt).toString();
+    load_agents_md = s.value("loadAgentsMd", load_agents_md).toBool();
+    load_github_copilot_instructions =
+        s.value("loadGithubCopilotInstructions", load_github_copilot_instructions).toBool();
+    load_claude_md = s.value("loadClaudeMd", load_claude_md).toBool();
+    load_gemini_md = s.value("loadGeminiMd", load_gemini_md).toBool();
+    load_github_instructions_dir =
+        s.value("loadGithubInstructionsDir", load_github_instructions_dir).toBool();
     web_tools_enabled = s.value("webToolsEnabled", web_tools_enabled).toBool();
     web_search_provider = s.value("webSearchProvider", web_search_provider).toString().trimmed();
     web_search_endpoint = s.value("webSearchEndpoint", web_search_endpoint).toString().trimmed();
@@ -426,6 +446,11 @@ void settings_t::save() const
     s.setValue("debugLogging", debug_logging);
     s.setValue("detailedRequestLogging", detailed_request_logging);
     s.setValue("systemPrompt", system_prompt);
+    s.setValue("loadAgentsMd", load_agents_md);
+    s.setValue("loadGithubCopilotInstructions", load_github_copilot_instructions);
+    s.setValue("loadClaudeMd", load_claude_md);
+    s.setValue("loadGeminiMd", load_gemini_md);
+    s.setValue("loadGithubInstructionsDir", load_github_instructions_dir);
     s.setValue("webToolsEnabled", web_tools_enabled);
     s.setValue("webSearchProvider", web_search_provider);
     s.setValue("webSearchEndpoint", web_search_endpoint);

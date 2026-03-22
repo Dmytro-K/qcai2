@@ -537,10 +537,10 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
     this->detailed_request_log.reset();
     QString configured_instructions_error;
     const QStringList configured_instructions = configured_system_instructions(
-        workspace_root, s.system_prompt, &configured_instructions_error);
+        workspace_root, prompt_instruction_options(s), &configured_instructions_error);
     if (configured_instructions_error.isEmpty() == false)
     {
-        this->emit_run_log_message(QStringLiteral("⚠ Failed to load project rules: %1")
+        this->emit_run_log_message(QStringLiteral("⚠ Failed to load project instructions: %1")
                                        .arg(configured_instructions_error));
     }
 

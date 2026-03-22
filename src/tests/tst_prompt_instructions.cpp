@@ -57,9 +57,22 @@ class tst_prompt_instructions_t : public QObject
 private slots:
     void includes_global_prompt_when_not_ignored();
     void appends_project_rules_after_global_prompt();
+    void appends_standard_ai_instruction_files_after_project_rules();
+    void appends_recursive_github_instruction_files_in_sorted_order();
+    void disabled_standard_ai_instruction_sources_are_skipped();
     void omits_global_prompt_when_project_requests_it();
     void appends_system_messages_in_order();
 };
+
+namespace
+{
+
+prompt_instruction_options_t default_instruction_options()
+{
+    return {.global_prompt = QStringLiteral("Global prompt")};
+}
+
+}  // namespace
 
 void tst_prompt_instructions_t::includes_global_prompt_when_not_ignored()
 {
@@ -67,8 +80,9 @@ void tst_prompt_instructions_t::includes_global_prompt_when_not_ignored()
     QVERIFY(temp_dir.isValid());
 
     QString error;
-    const QStringList instructions = configured_system_instructions(
-        temp_dir.path(), QStringLiteral("  Global prompt  "), &error);
+    prompt_instruction_options_t s = default_instruction_options();
+    s.global_prompt = QStringLiteral("  Global prompt  ");
+    const QStringList instructions = configured_system_instructions(temp_dir.path(), s, &error);
 
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(instructions, QStringList{QStringLiteral("Global prompt")});
@@ -84,9 +98,99 @@ void tst_prompt_instructions_t::appends_project_rules_after_global_prompt()
 
     QString error;
     const QStringList instructions =
-        configured_system_instructions(temp_dir.path(), QStringLiteral("Global prompt"), &error);
+        configured_system_instructions(temp_dir.path(), default_instruction_options(), &error);
     const QStringList expected_instructions = {QStringLiteral("Global prompt"),
                                                QStringLiteral("Project rules here")};
+
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(instructions, expected_instructions);
+}
+
+void tst_prompt_instructions_t::appends_standard_ai_instruction_files_after_project_rules()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+
+    QVERIFY(write_text_file(project_rules_file_path(temp_dir.path()),
+                            QStringLiteral("Project rules here")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.md")),
+                            QStringLiteral("Agent instructions")));
+    QVERIFY(write_text_file(
+        QDir(temp_dir.path()).filePath(QStringLiteral(".github/copilot-instructions.md")),
+        QStringLiteral("Copilot instructions")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("CLAUDE.md")),
+                            QStringLiteral("Claude instructions")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("GEMINI.md")),
+                            QStringLiteral("Gemini instructions")));
+
+    QString error;
+    const QStringList instructions =
+        configured_system_instructions(temp_dir.path(), default_instruction_options(), &error);
+    const QStringList expected_instructions = {
+        QStringLiteral("Global prompt"),       QStringLiteral("Project rules here"),
+        QStringLiteral("Agent instructions"),  QStringLiteral("Copilot instructions"),
+        QStringLiteral("Claude instructions"), QStringLiteral("Gemini instructions")};
+
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(instructions, expected_instructions);
+}
+
+void tst_prompt_instructions_t::appends_recursive_github_instruction_files_in_sorted_order()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+
+    QVERIFY(write_text_file(
+        QDir(temp_dir.path())
+            .filePath(QStringLiteral(".github/instructions/backend/database.instructions.md")),
+        QStringLiteral("Database instructions")));
+    QVERIFY(write_text_file(
+        QDir(temp_dir.path()).filePath(QStringLiteral(".github/instructions/ui.instructions.md")),
+        QStringLiteral("UI instructions")));
+    QVERIFY(write_text_file(
+        QDir(temp_dir.path())
+            .filePath(QStringLiteral(".github/instructions/backend/api.instructions.md")),
+        QStringLiteral("API instructions")));
+
+    QString error;
+    const QStringList instructions =
+        configured_system_instructions(temp_dir.path(), default_instruction_options(), &error);
+    const QStringList expected_instructions = {
+        QStringLiteral("Global prompt"), QStringLiteral("API instructions"),
+        QStringLiteral("Database instructions"), QStringLiteral("UI instructions")};
+
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(instructions, expected_instructions);
+}
+
+void tst_prompt_instructions_t::disabled_standard_ai_instruction_sources_are_skipped()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.md")),
+                            QStringLiteral("Agent instructions")));
+    QVERIFY(write_text_file(
+        QDir(temp_dir.path()).filePath(QStringLiteral(".github/copilot-instructions.md")),
+        QStringLiteral("Copilot instructions")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("CLAUDE.md")),
+                            QStringLiteral("Claude instructions")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("GEMINI.md")),
+                            QStringLiteral("Gemini instructions")));
+    QVERIFY(write_text_file(
+        QDir(temp_dir.path()).filePath(QStringLiteral(".github/instructions/ui.instructions.md")),
+        QStringLiteral("UI instructions")));
+
+    prompt_instruction_options_t s = default_instruction_options();
+    s.load_agents_md = false;
+    s.load_claude_md = false;
+    s.load_github_instructions_dir = false;
+
+    QString error;
+    const QStringList instructions = configured_system_instructions(temp_dir.path(), s, &error);
+    const QStringList expected_instructions = {QStringLiteral("Global prompt"),
+                                               QStringLiteral("Copilot instructions"),
+                                               QStringLiteral("Gemini instructions")};
 
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(instructions, expected_instructions);
@@ -104,7 +208,7 @@ void tst_prompt_instructions_t::omits_global_prompt_when_project_requests_it()
 
     QString error;
     const QStringList instructions =
-        configured_system_instructions(temp_dir.path(), QStringLiteral("Global prompt"), &error);
+        configured_system_instructions(temp_dir.path(), default_instruction_options(), &error);
 
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(instructions, QStringList{QStringLiteral("Project-only instructions")});
@@ -121,7 +225,7 @@ void tst_prompt_instructions_t::appends_system_messages_in_order()
     QList<chat_message_t> messages{{QStringLiteral("user"), QStringLiteral("goal")}};
     QString error;
     append_configured_system_instructions(&messages, temp_dir.path(),
-                                          QStringLiteral("Global prompt"), &error);
+                                          default_instruction_options(), &error);
 
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(messages.size(), 3);

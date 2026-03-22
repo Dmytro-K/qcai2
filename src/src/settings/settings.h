@@ -106,6 +106,21 @@ struct settings_t
     /** Optional custom system prompt prepended to agent and ask requests. */
     QString system_prompt;
 
+    /** Auto-loads project-root `AGENTS.md` into system instructions when true. */
+    bool load_agents_md = true;
+
+    /** Auto-loads project-root `.github/copilot-instructions.md` when true. */
+    bool load_github_copilot_instructions = true;
+
+    /** Auto-loads project-root `CLAUDE.md` into system instructions when true. */
+    bool load_claude_md = true;
+
+    /** Auto-loads project-root `GEMINI.md` into system instructions when true. */
+    bool load_gemini_md = true;
+
+    /** Auto-loads recursive instruction files from `.github/instructions/` when true. */
+    bool load_github_instructions_dir = true;
+
     /** Enables web_search and web_fetch tools when true. */
     bool web_tools_enabled = false;
 

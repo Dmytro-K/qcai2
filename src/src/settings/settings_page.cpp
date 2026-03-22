@@ -151,6 +151,11 @@ class settings_widget_t : public Core::IOptionsPageWidget
         bool debug_logging = false;
         bool detailed_request_logging = false;
         QString system_prompt;
+        bool load_agents_md = false;
+        bool load_github_copilot_instructions = false;
+        bool load_claude_md = false;
+        bool load_gemini_md = false;
+        bool load_github_instructions_dir = false;
         bool web_tools_enabled = false;
         QString web_search_provider;
         QString web_search_endpoint;
@@ -227,6 +232,11 @@ public:
         this->debugLoggingCheck = this->ui->debugLoggingCheck;
         this->detailedRequestLoggingCheck = this->ui->detailedRequestLoggingCheck;
         this->systemPromptEdit = this->ui->systemPromptEdit;
+        this->loadAgentsMdCheck = this->ui->loadAgentsMdCheck;
+        this->loadGithubCopilotInstructionsCheck = this->ui->loadGithubCopilotInstructionsCheck;
+        this->loadClaudeMdCheck = this->ui->loadClaudeMdCheck;
+        this->loadGeminiMdCheck = this->ui->loadGeminiMdCheck;
+        this->loadGithubInstructionsDirCheck = this->ui->loadGithubInstructionsDirCheck;
         this->webToolsEnabledCheck = this->ui->webToolsEnabledCheck;
         this->webSearchProviderCombo = this->ui->webSearchProviderCombo;
         this->webSearchEndpointEdit = this->ui->webSearchEndpointEdit;
@@ -487,6 +497,11 @@ public:
         this->debugLoggingCheck->setChecked(s.debug_logging);
         this->detailedRequestLoggingCheck->setChecked(s.detailed_request_logging);
         this->systemPromptEdit->setPlainText(s.system_prompt);
+        this->loadAgentsMdCheck->setChecked(s.load_agents_md);
+        this->loadGithubCopilotInstructionsCheck->setChecked(s.load_github_copilot_instructions);
+        this->loadClaudeMdCheck->setChecked(s.load_claude_md);
+        this->loadGeminiMdCheck->setChecked(s.load_gemini_md);
+        this->loadGithubInstructionsDirCheck->setChecked(s.load_github_instructions_dir);
         this->webToolsEnabledCheck->setChecked(s.web_tools_enabled);
         this->webSearchProviderCombo->addItem(tr_t::tr("DuckDuckGo HTML"),
                                               QStringLiteral("duckduckgo"));
@@ -583,6 +598,11 @@ public:
         installCheckSettingsDirtyTrigger(this->vectorSearchMaxIndexingThreadsSpin);
         installCheckSettingsDirtyTrigger(this->debugLoggingCheck);
         installCheckSettingsDirtyTrigger(this->detailedRequestLoggingCheck);
+        installCheckSettingsDirtyTrigger(this->loadAgentsMdCheck);
+        installCheckSettingsDirtyTrigger(this->loadGithubCopilotInstructionsCheck);
+        installCheckSettingsDirtyTrigger(this->loadClaudeMdCheck);
+        installCheckSettingsDirtyTrigger(this->loadGeminiMdCheck);
+        installCheckSettingsDirtyTrigger(this->loadGithubInstructionsDirCheck);
         installCheckSettingsDirtyTrigger(this->webToolsEnabledCheck);
         installCheckSettingsDirtyTrigger(this->webSearchProviderCombo);
         installCheckSettingsDirtyTrigger(this->webSearchEndpointEdit);
@@ -615,6 +635,12 @@ public:
         candidate.debug_logging = this->debugLoggingCheck->isChecked();
         candidate.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
         candidate.system_prompt = this->systemPromptEdit->toPlainText().trimmed();
+        candidate.load_agents_md = this->loadAgentsMdCheck->isChecked();
+        candidate.load_github_copilot_instructions =
+            this->loadGithubCopilotInstructionsCheck->isChecked();
+        candidate.load_claude_md = this->loadClaudeMdCheck->isChecked();
+        candidate.load_gemini_md = this->loadGeminiMdCheck->isChecked();
+        candidate.load_github_instructions_dir = this->loadGithubInstructionsDirCheck->isChecked();
         candidate.web_tools_enabled = this->webToolsEnabledCheck->isChecked();
         candidate.web_search_provider = this->webSearchProviderCombo->currentData().toString();
         candidate.web_search_endpoint = this->webSearchEndpointEdit->text().trimmed();
@@ -710,6 +736,11 @@ private:
         s.debug_logging = this->debugLoggingCheck->isChecked();
         s.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
         s.system_prompt = this->systemPromptEdit->toPlainText().trimmed();
+        s.load_agents_md = this->loadAgentsMdCheck->isChecked();
+        s.load_github_copilot_instructions = this->loadGithubCopilotInstructionsCheck->isChecked();
+        s.load_claude_md = this->loadClaudeMdCheck->isChecked();
+        s.load_gemini_md = this->loadGeminiMdCheck->isChecked();
+        s.load_github_instructions_dir = this->loadGithubInstructionsDirCheck->isChecked();
         s.web_tools_enabled = this->webToolsEnabledCheck->isChecked();
         s.web_search_provider = this->webSearchProviderCombo->currentData().toString();
         s.web_search_endpoint = this->webSearchEndpointEdit->text().trimmed();
@@ -883,6 +914,11 @@ private:
             this->debugLoggingCheck->isChecked(),
             this->detailedRequestLoggingCheck->isChecked(),
             this->systemPromptEdit->toPlainText().trimmed(),
+            this->loadAgentsMdCheck->isChecked(),
+            this->loadGithubCopilotInstructionsCheck->isChecked(),
+            this->loadClaudeMdCheck->isChecked(),
+            this->loadGeminiMdCheck->isChecked(),
+            this->loadGithubInstructionsDirCheck->isChecked(),
             this->webToolsEnabledCheck->isChecked(),
             this->webSearchProviderCombo->currentData().toString(),
             this->webSearchEndpointEdit->text().trimmed(),
@@ -964,6 +1000,12 @@ private:
         this->debugLoggingCheck->setChecked(snap.debug_logging);
         this->detailedRequestLoggingCheck->setChecked(snap.detailed_request_logging);
         this->systemPromptEdit->setPlainText(snap.system_prompt);
+        this->loadAgentsMdCheck->setChecked(snap.load_agents_md);
+        this->loadGithubCopilotInstructionsCheck->setChecked(
+            snap.load_github_copilot_instructions);
+        this->loadClaudeMdCheck->setChecked(snap.load_claude_md);
+        this->loadGeminiMdCheck->setChecked(snap.load_gemini_md);
+        this->loadGithubInstructionsDirCheck->setChecked(snap.load_github_instructions_dir);
         this->webToolsEnabledCheck->setChecked(snap.web_tools_enabled);
         const int web_provider_index =
             this->webSearchProviderCombo->findData(snap.web_search_provider);
@@ -1031,6 +1073,11 @@ private:
     QCheckBox *debugLoggingCheck;
     QCheckBox *detailedRequestLoggingCheck;
     QPlainTextEdit *systemPromptEdit;
+    QCheckBox *loadAgentsMdCheck;
+    QCheckBox *loadGithubCopilotInstructionsCheck;
+    QCheckBox *loadClaudeMdCheck;
+    QCheckBox *loadGeminiMdCheck;
+    QCheckBox *loadGithubInstructionsDirCheck;
     QCheckBox *webToolsEnabledCheck;
     QComboBox *webSearchProviderCombo;
     QLineEdit *webSearchEndpointEdit;
