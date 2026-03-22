@@ -174,6 +174,89 @@ chat_message_t chat_message_t::from_json(const QJsonObject &obj)
 }
 
 // ---------------------------------------------------------------------------
+// agent_decision_option_t / agent_decision_request_t
+// ---------------------------------------------------------------------------
+
+QJsonObject agent_decision_option_t::to_json() const
+{
+    return QJsonObject{{QStringLiteral("id"), this->id},
+                       {QStringLiteral("label"), this->label},
+                       {QStringLiteral("description"), this->description}};
+}
+
+agent_decision_option_t agent_decision_option_t::from_json(const QJsonObject &obj)
+{
+    agent_decision_option_t option;
+    option.id = obj.value(QStringLiteral("id")).toString();
+    option.label = obj.value(QStringLiteral("label")).toString();
+    option.description = obj.value(QStringLiteral("description")).toString();
+    return option;
+}
+
+QJsonObject agent_decision_request_t::to_json() const
+{
+    QJsonArray options_json;
+    for (const agent_decision_option_t &option : this->options)
+    {
+        options_json.append(option.to_json());
+    }
+
+    return QJsonObject{{QStringLiteral("request_id"), this->request_id},
+                       {QStringLiteral("title"), this->title},
+                       {QStringLiteral("description"), this->description},
+                       {QStringLiteral("options"), options_json},
+                       {QStringLiteral("allow_freeform"), this->allow_freeform},
+                       {QStringLiteral("freeform_placeholder"), this->freeform_placeholder},
+                       {QStringLiteral("recommended_option_id"), this->recommended_option_id}};
+}
+
+agent_decision_request_t agent_decision_request_t::from_json(const QJsonObject &obj)
+{
+    agent_decision_request_t request;
+    request.request_id = obj.value(QStringLiteral("request_id")).toString();
+    request.title = obj.value(QStringLiteral("title")).toString();
+    request.description = obj.value(QStringLiteral("description")).toString();
+    request.allow_freeform = obj.value(QStringLiteral("allow_freeform")).toBool(false);
+    request.freeform_placeholder = obj.value(QStringLiteral("freeform_placeholder")).toString();
+    request.recommended_option_id = obj.value(QStringLiteral("recommended_option_id")).toString();
+
+    const QJsonArray options_json = obj.value(QStringLiteral("options")).toArray();
+    request.options.reserve(options_json.size());
+    for (const QJsonValue &value : options_json)
+    {
+        if (value.isObject() == false)
+        {
+            continue;
+        }
+        request.options.append(agent_decision_option_t::from_json(value.toObject()));
+    }
+    return request;
+}
+
+int agent_decision_request_t::option_index(const QString &option_id) const
+{
+    const QString trimmed_option_id = option_id.trimmed();
+    if (trimmed_option_id.isEmpty() == true)
+    {
+        return -1;
+    }
+
+    for (int i = 0; i < this->options.size(); ++i)
+    {
+        if (this->options.at(i).id == trimmed_option_id)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+bool agent_decision_request_t::is_valid() const
+{
+    return this->options.isEmpty() == false || this->allow_freeform == true;
+}
+
+// ---------------------------------------------------------------------------
 // agent_response_t
 // ---------------------------------------------------------------------------
 
@@ -219,6 +302,13 @@ agent_response_t agent_response_t::parse_json(const QJsonObject &obj)
         r.approval_action = obj.value("action").toString();
         r.approval_reason = obj.value("reason").toString();
         r.approval_preview = obj.value("preview").toString();
+        return r;
+    }
+
+    if (type == "decision_request")
+    {
+        r.type = response_type_t::DECISION_REQUEST;
+        r.decision_request = agent_decision_request_t::from_json(obj);
         return r;
     }
 

@@ -14,11 +14,13 @@ private slots:
     void start_run_enters_starting_state();
     void awaiting_provider_enters_waiting_for_provider_state();
     void approval_wait_enters_waiting_for_approval_state();
+    void user_decision_wait_enters_waiting_for_user_decision_state();
     void inline_diff_review_wait_enters_review_state();
     void completion_enters_completed_state();
     void failure_enters_failed_state();
     void stop_enters_stopped_state();
     void start_run_restarts_after_terminal_state();
+    void user_decision_can_resume_provider_wait();
     void inline_review_can_resume_provider_wait();
 };
 
@@ -64,6 +66,19 @@ void tst_agent_run_state_machine_t::approval_wait_enters_waiting_for_approval_st
     QCOMPARE(state_machine.current_state(),
              agent_run_state_machine_t::state_t::WAITING_FOR_APPROVAL);
     QVERIFY(state_machine.is_waiting_for_approval());
+}
+
+void tst_agent_run_state_machine_t::user_decision_wait_enters_waiting_for_user_decision_state()
+{
+    agent_run_state_machine_t state_machine;
+    state_machine.start_run();
+    state_machine.await_provider_response();
+
+    state_machine.await_user_decision();
+
+    QCOMPARE(state_machine.current_state(),
+             agent_run_state_machine_t::state_t::WAITING_FOR_USER_DECISION);
+    QVERIFY(state_machine.is_waiting_for_user_decision());
 }
 
 void tst_agent_run_state_machine_t::inline_diff_review_wait_enters_review_state()
@@ -126,6 +141,20 @@ void tst_agent_run_state_machine_t::start_run_restarts_after_terminal_state()
 
     QCOMPARE(state_machine.current_state(), agent_run_state_machine_t::state_t::STARTING);
     QVERIFY(state_machine.is_running());
+}
+
+void tst_agent_run_state_machine_t::user_decision_can_resume_provider_wait()
+{
+    agent_run_state_machine_t state_machine;
+    state_machine.start_run();
+    state_machine.await_provider_response();
+    state_machine.await_user_decision();
+
+    state_machine.await_provider_response();
+
+    QCOMPARE(state_machine.current_state(),
+             agent_run_state_machine_t::state_t::WAITING_FOR_PROVIDER);
+    QVERIFY(state_machine.is_waiting_for_provider());
 }
 
 void tst_agent_run_state_machine_t::inline_review_can_resume_provider_wait()

@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
+#include <QMetaType>
 #include <QString>
 
 namespace qcai2
@@ -52,6 +53,87 @@ struct plan_step_t
 };
 
 /**
+ * One predefined answer option offered in a structured user-decision request.
+ */
+struct agent_decision_option_t
+{
+    /** Stable option identifier returned when the user picks this choice. */
+    QString id;
+
+    /** Short user-visible label for the option. */
+    QString label;
+
+    /** Optional longer explanation shown with the option. */
+    QString description;
+
+    /**
+     * Serializes the option to JSON.
+     * @return JSON object for provider/debug usage.
+     */
+    QJsonObject to_json() const;
+
+    /**
+     * Deserializes one option from JSON.
+     * @param obj JSON object to convert.
+     * @return Parsed option payload.
+     */
+    static agent_decision_option_t from_json(const QJsonObject &obj);
+};
+
+/**
+ * Structured request asking the user to choose between a small set of options.
+ */
+struct agent_decision_request_t
+{
+    /** Stable request identifier used to match the later user answer. */
+    QString request_id;
+
+    /** Short user-visible title shown on the decision card. */
+    QString title;
+
+    /** Optional longer explanation shown above the options. */
+    QString description;
+
+    /** Predefined options the user can pick from. */
+    QList<agent_decision_option_t> options;
+
+    /** True when the UI should offer a custom freeform answer field. */
+    bool allow_freeform = false;
+
+    /** Placeholder text shown in the custom-answer field when enabled. */
+    QString freeform_placeholder;
+
+    /** Option id that should be preselected when the card opens. */
+    QString recommended_option_id;
+
+    /**
+     * Serializes the request to JSON.
+     * @return JSON object for provider/debug usage.
+     */
+    QJsonObject to_json() const;
+
+    /**
+     * Deserializes one decision request from JSON.
+     * @param obj JSON object to convert.
+     * @return Parsed request payload.
+     */
+    static agent_decision_request_t from_json(const QJsonObject &obj);
+
+    /**
+     * Returns the zero-based index of one option by id.
+     * @param option_id Option identifier to find.
+     * @return Matching option index, or -1 when no option matches.
+     */
+    int option_index(const QString &option_id) const;
+
+    /**
+     * Reports whether the request contains at least one actionable answer path.
+     * @return True when it has options or allows a freeform answer.
+     */
+    bool is_valid() const;
+};
+
+/**
  * High-level response shape parsed from model output.
  */
 enum class response_type_t : std::uint8_t
@@ -64,6 +146,8 @@ enum class response_type_t : std::uint8_t
     FINAL,
     /** A request for explicit user approval. */
     NEED_APPROVAL,
+    /** A structured request for a user decision with multiple options. */
+    DECISION_REQUEST,
     /** Unstructured fallback text. */
     TEXT,
     /** Parsing failure or unsupported structured content. */
@@ -102,6 +186,9 @@ struct agent_response_t
     /** Preview payload shown with the approval request. */
     QString approval_preview;
 
+    /** Structured decision payload for response_type_t::DECISION_REQUEST. */
+    agent_decision_request_t decision_request;
+
     /** Raw text for response_type_t::TEXT or response_type_t::ERROR. */
     QString text;
 
@@ -127,3 +214,6 @@ private:
 QString streaming_response_markdown_preview(const QString &raw);
 
 }  // namespace qcai2
+
+Q_DECLARE_METATYPE(qcai2::agent_decision_option_t)
+Q_DECLARE_METATYPE(qcai2::agent_decision_request_t)

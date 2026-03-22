@@ -37,6 +37,8 @@ public:
         WAITING_FOR_PROVIDER,
         /** The controller is blocked on an explicit user approval decision. */
         WAITING_FOR_APPROVAL,
+        /** The controller is blocked on a structured user decision request. */
+        WAITING_FOR_USER_DECISION,
         /** The controller is waiting for the user to review a proposed inline diff. */
         WAITING_FOR_INLINE_DIFF_REVIEW,
         /** The run finished successfully. */
@@ -90,6 +92,12 @@ public:
     bool is_waiting_for_approval() const;
 
     /**
+     * Reports whether the current phase is waiting on a structured user decision.
+     * @return True only in `WAITING_FOR_USER_DECISION`.
+     */
+    bool is_waiting_for_user_decision() const;
+
+    /**
      * Reports whether the current phase is waiting on inline diff review.
      * @return True only in `WAITING_FOR_INLINE_DIFF_REVIEW`.
      */
@@ -109,6 +117,11 @@ public:
      * Enters the phase that waits for a user approval decision.
      */
     void await_user_approval();
+
+    /**
+     * Enters the phase that waits for a structured user decision response.
+     */
+    void await_user_decision();
 
     /**
      * Enters the phase that waits for inline diff review.
@@ -156,6 +169,8 @@ signals:
     void provider_response_wait_requested();
     /** Internal trigger used to request transition into `WAITING_FOR_APPROVAL`. */
     void user_approval_wait_requested();
+    /** Internal trigger used to request transition into `WAITING_FOR_USER_DECISION`. */
+    void user_decision_wait_requested();
     /** Internal trigger used to request transition into `WAITING_FOR_INLINE_DIFF_REVIEW`. */
     void inline_diff_review_wait_requested();
     /** Internal trigger used to request transition into `COMPLETED`. */
@@ -176,6 +191,8 @@ private:
     QState *waiting_for_provider_state = nullptr;
     /** Waiting-for-approval phase state object. */
     QState *waiting_for_approval_state = nullptr;
+    /** Waiting-for-user-decision phase state object. */
+    QState *waiting_for_user_decision_state = nullptr;
     /** Waiting-for-inline-review phase state object. */
     QState *waiting_for_inline_diff_review_state = nullptr;
     /** Completed phase state object. */

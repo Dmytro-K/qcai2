@@ -10,6 +10,7 @@
 - Added `web_search` tool with support of DuckDuckGo, Serper.dev, Perplexity API, Brave Search API
 - Added interactive run steering (Soft in-flight steering)
 - Added request queue (Ctrl+Enter by default)
+- Added structured user decision requests
 
 ### Changed
 

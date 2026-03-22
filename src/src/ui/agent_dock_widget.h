@@ -36,6 +36,7 @@ class agent_dock_linked_files_controller_t;
 class agent_dock_session_controller_t;
 class auto_hiding_list_widget_t;
 class chat_context_manager_t;
+class decision_request_widget_t;
 
 /**
  * Main dock widget for goal entry, logs, diff review, and approval prompts.
@@ -140,6 +141,12 @@ private:
                                const QString &preview);
 
     /**
+     * Renders one structured user-decision card and pauses normal run controls around it.
+     * @param request Structured decision payload emitted by the controller.
+     */
+    void on_decision_requested(const agent_decision_request_t &request);
+
+    /**
      * Updates the status summary for the latest iteration.
      * @param iteration Current iteration number.
      */
@@ -204,6 +211,20 @@ private:
      * Rebuilds the generic pending-items list from the current queue state.
      */
     void refresh_pending_items_view();
+
+    /**
+     * Submits one predefined decision option chosen from the decision card.
+     * @param request_id Identifier of the pending decision request.
+     * @param option_id Identifier of the chosen option.
+     */
+    void submit_decision_option(const QString &request_id, const QString &option_id);
+
+    /**
+     * Submits one freeform decision answer from the decision card.
+     * @param request_id Identifier of the pending decision request.
+     * @param freeform_text Custom answer text.
+     */
+    void submit_decision_freeform(const QString &request_id, const QString &freeform_text);
 
     /**
      * Handles keyboard shortcuts from the goal editor.
@@ -289,6 +310,7 @@ private:
     QPushButton *queue_btn = nullptr;
     QPushButton *stop_btn;
     QCheckBox *dry_run_check;
+    decision_request_widget_t *decision_request_widget = nullptr;
     auto_hiding_list_widget_t *pending_items_view = nullptr;
 
     /** Views hosted in the tab widget. */

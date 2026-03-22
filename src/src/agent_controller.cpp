@@ -120,6 +120,8 @@ QString response_type_label(response_type_t type)
             return QStringLiteral("final");
         case response_type_t::NEED_APPROVAL:
             return QStringLiteral("need_approval");
+        case response_type_t::DECISION_REQUEST:
+            return QStringLiteral("decision_request");
         case response_type_t::TEXT:
             return QStringLiteral("text");
         case response_type_t::ERROR:
@@ -212,10 +214,75 @@ QString format_soft_steer_request_log(const QString &message, const QString &req
     return sections.join(QStringLiteral("\n\n"));
 }
 
+QString decision_request_title_for_log(const agent_decision_request_t &request)
+{
+    const QString trimmed_title = request.title.trimmed();
+    if (trimmed_title.isEmpty() == false)
+    {
+        return trimmed_title;
+    }
+    if (request.description.trimmed().isEmpty() == false)
+    {
+        return request.description.trimmed().left(80);
+    }
+    return QStringLiteral("Decision request");
+}
+
+QString decision_answer_summary(const agent_decision_request_t &request,
+                                const agent_decision_option_t *option,
+                                const QString &freeform_text)
+{
+    Q_UNUSED(request)
+    if (option != nullptr)
+    {
+        return option->label.trimmed().isEmpty() == false ? option->label.trimmed() : option->id;
+    }
+    return freeform_text.trimmed().left(80);
+}
+
+QString decision_answer_message(const agent_decision_request_t &request,
+                                const agent_decision_option_t *option,
+                                const QString &freeform_text)
+{
+    const QString title = request.title.trimmed();
+    if (option != nullptr)
+    {
+        QString message =
+            title.isEmpty() == false
+                ? QStringLiteral("The user answered your decision request \"%1\" by choosing the "
+                                 "option \"%2\".")
+                      .arg(title, option->label.trimmed().isEmpty() == false
+                                      ? option->label.trimmed()
+                                      : option->id)
+                : QStringLiteral("The user chose the option \"%1\" for your decision request.")
+                      .arg(option->label.trimmed().isEmpty() == false ? option->label.trimmed()
+                                                                      : option->id);
+        if (option->description.trimmed().isEmpty() == false)
+        {
+            message += QStringLiteral("\nOption details: %1").arg(option->description.trimmed());
+        }
+        message += QStringLiteral(
+            "\nContinue the task using this user preference and the latest context.");
+        return message;
+    }
+
+    return title.isEmpty() == false
+               ? QStringLiteral("The user answered your decision request \"%1\" with a custom "
+                                "response:\n%2\n\nContinue the task using this response as the "
+                                "latest explicit user preference.")
+                     .arg(title, as_indented_code_block(freeform_text.trimmed()))
+               : QStringLiteral(
+                     "The user answered your decision request with a custom response:\n"
+                     "%1\n\nContinue the task using this response as the latest explicit "
+                     "user preference.")
+                     .arg(as_indented_code_block(freeform_text.trimmed()));
+}
+
 }  // namespace
 
 agent_controller_t::agent_controller_t(QObject *parent) : QObject(parent), run_state_machine(this)
 {
+    qRegisterMetaType<agent_decision_request_t>();
     this->provider_watchdog.setSingleShot(true);
     this->provider_watchdog.setInterval(k_provider_inactivity_timeout_ms);
     connect(&this->provider_watchdog, &QTimer::timeout, this,
@@ -277,6 +344,7 @@ QString agent_controller_t::build_system_prompt() const
             "You are compacting the existing conversation context for future requests.\n"
             "Do NOT call tools.\n"
             "Do NOT ask for approval.\n"
+            "Do NOT request a user decision.\n"
             "Do NOT return a diff.\n"
             "Reply with exactly one JSON object of type \"final\".\n"
             "Put the full compacted context into final.summary.\n"
@@ -294,8 +362,8 @@ QString agent_controller_t::build_system_prompt() const
             "the current project/editor context. You MUST respond in JSON with exactly this "
             "shape:\n"
             "{\"type\":\"final\",\"summary\":\"direct answer for the user\",\"diff\":\"\"}\n\n"
-            "Do NOT return plan, tool_call, or need_approval. Do NOT use tools. Do NOT include a "
-            "diff unless the user explicitly asked for code changes.\n\n");
+            "Do NOT return plan, tool_call, need_approval, or decision_request. Do NOT use "
+            "tools. Do NOT include a diff unless the user explicitly asked for code changes.\n\n");
     }
     else
     {
@@ -308,9 +376,20 @@ QString agent_controller_t::build_system_prompt() const
             "diff\"}\n"
             "4) {\"type\":\"need_approval\", \"action\":\"what\", \"reason\":\"why\", "
             "\"preview\":\"details\"}\n"
+            "5) {\"type\":\"decision_request\", \"request_id\":\"stable_id\", "
+            "\"title\":\"short question\", \"description\":\"why the user must decide\", "
+            "\"options\":[{\"id\":\"option_id\", \"label\":\"short label\", "
+            "\"description\":\"optional trade-off\"}], \"allow_freeform\":true, "
+            "\"freeform_placeholder\":\"custom answer\", "
+            "\"recommended_option_id\":\"best_default_id\"}\n"
             "If the user later rejects part of an inline diff, continue the same task and reply "
             "with a new \"final\" response that preserves accepted edits and replaces only the "
-            "rejected changes.\n\n");
+            "rejected changes.\n"
+            "Use decision_request only when critical information is missing, when multiple valid "
+            "paths have meaningful trade-offs, when you need an explicit user preference, or when "
+            "the next action is risky, expensive, or hard to undo. Do not use it for trivial, "
+            "obvious, or safe decisions. Prefer 2-5 options and allow a freeform answer when it "
+            "would help.\n\n");
     }
 
     // Available tools
@@ -440,6 +519,8 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
     this->accepted_inline_diff_preview.clear();
     this->pending_final_summary.clear();
     this->pending_approvals.clear();
+    this->has_pending_decision_request = false;
+    this->pending_decision = {};
     this->messages.clear();
     this->run_id.clear();
     this->accumulated_usage = {};
@@ -716,6 +797,8 @@ void agent_controller_t::stop()
     this->pending_soft_steer_messages.clear();
     this->soft_steer_pending_flag = false;
     this->pending_soft_steer_system_note.clear();
+    this->has_pending_decision_request = false;
+    this->pending_decision = {};
     this->disarm_provider_watchdog();
     emit this->log_message(QStringLiteral("⏹ Agent stopped by user."));
     this->finalize_persistent_run(
@@ -723,6 +806,67 @@ void agent_controller_t::stop()
         QJsonObject{{QStringLiteral("reason"), QStringLiteral("user-stop")}});
     emit this->stopped(
         QStringLiteral("Stopped by user at iteration %1.").arg(this->current_iteration));
+}
+
+bool agent_controller_t::submit_user_decision(const QString &request_id, const QString &option_id,
+                                              const QString &freeform_text)
+{
+    if (this->is_running() == false ||
+        this->run_state_machine.is_waiting_for_user_decision() == false ||
+        this->has_pending_decision_request == false || this->pending_decision.answered == true)
+    {
+        return false;
+    }
+
+    const QString trimmed_request_id = request_id.trimmed();
+    if (trimmed_request_id.isEmpty() == true ||
+        trimmed_request_id != this->pending_decision.request.request_id)
+    {
+        return false;
+    }
+
+    const QString trimmed_option_id = option_id.trimmed();
+    const QString trimmed_freeform = freeform_text.trimmed();
+    const agent_decision_option_t *selected_option = nullptr;
+    if (trimmed_option_id.isEmpty() == false)
+    {
+        const int option_index = this->pending_decision.request.option_index(trimmed_option_id);
+        if (option_index < 0)
+        {
+            return false;
+        }
+        selected_option = &this->pending_decision.request.options.at(option_index);
+    }
+    else if (this->pending_decision.request.allow_freeform == false)
+    {
+        return false;
+    }
+    else if (trimmed_freeform.isEmpty() == true)
+    {
+        return false;
+    }
+
+    const agent_decision_request_t request = this->pending_decision.request;
+    this->pending_decision.answered = true;
+    this->has_pending_decision_request = false;
+
+    const QString answer_summary =
+        decision_answer_summary(request, selected_option, trimmed_freeform);
+    emit this->decision_answered(request.request_id, answer_summary);
+    emit this->status_changed(QStringLiteral("Decision received. Continuing..."));
+    emit this->log_message(QStringLiteral("✅ User decision answered: %1").arg(answer_summary));
+    this->append_controller_user_message(
+        decision_answer_message(request, selected_option, trimmed_freeform),
+        QStringLiteral("user_decision_answer"),
+        QJsonObject{{QStringLiteral("requestId"), request.request_id},
+                    {QStringLiteral("title"), request.title},
+                    {QStringLiteral("optionId"),
+                     selected_option != nullptr ? selected_option->id : QString()},
+                    {QStringLiteral("optionLabel"),
+                     selected_option != nullptr ? selected_option->label : QString()},
+                    {QStringLiteral("freeform"), trimmed_freeform}});
+    this->run_next_iteration();
+    return true;
 }
 
 bool agent_controller_t::persist_compaction_summary(const QString &content,
@@ -1054,7 +1198,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
         this->append_controller_user_message(
             QStringLiteral(
                 "Ask mode is enabled. Reply with one JSON object of type \"final\" only. "
-                "Do not plan, call tools, or ask for approval."),
+                "Do not plan, call tools, ask for approval, or request a user decision."),
             QStringLiteral("controller_mode_correction"));
         this->run_next_iteration();
         return;
@@ -1143,6 +1287,40 @@ void agent_controller_t::handle_response(const QString &response, const QString 
             break;
         }
 
+        case response_type_t::DECISION_REQUEST: {
+            agent_decision_request_t request = parsed.decision_request;
+            if (request.request_id.trimmed().isEmpty() == true)
+            {
+                request.request_id =
+                    QStringLiteral("decision-%1").arg(this->next_generated_decision_request_id++);
+            }
+
+            if (request.is_valid() == false)
+            {
+                emit this->log_message(
+                    QStringLiteral("⚠ Invalid decision_request received, asking the model to "
+                                   "retry with actionable options."));
+                this->append_controller_user_message(
+                    QStringLiteral("Your decision_request was invalid. Provide at least one "
+                                   "predefined option or allow a freeform answer, and respond "
+                                   "again in the required JSON format."),
+                    QStringLiteral("controller_invalid_decision_request"),
+                    QJsonObject{{QStringLiteral("requestId"), request.request_id}});
+                this->run_next_iteration();
+                break;
+            }
+
+            this->pending_decision = {.request = request, .answered = false};
+            this->has_pending_decision_request = true;
+            this->run_state_machine.await_user_decision();
+            emit this->decision_requested(request);
+            emit this->status_changed(QStringLiteral("Waiting for user decision: %1")
+                                          .arg(decision_request_title_for_log(request)));
+            emit this->log_message(QStringLiteral("⏸ Waiting for user decision: %1")
+                                       .arg(decision_request_title_for_log(request)));
+            break;
+        }
+
         case response_type_t::TEXT:
         case response_type_t::ERROR:
             // If model keeps responding with text, treat it as final answer
@@ -1188,7 +1366,7 @@ void agent_controller_t::handle_response(const QString &response, const QString 
                     QStringLiteral("ℹ Raw text response, asking for JSON format."));
                 this->append_controller_user_message(
                     QStringLiteral("Please respond in the required JSON format (plan, tool_call, "
-                                   "final, or need_approval)."),
+                                   "final, need_approval, or decision_request)."),
                     QStringLiteral("controller_json_retry"));
                 this->run_next_iteration();
             }
@@ -1442,6 +1620,8 @@ bool agent_controller_t::apply_soft_steer_if_pending(const QString &safe_point,
     this->pending_validation_tool_name.clear();
     this->pending_validation_label.clear();
     this->pending_approvals.clear();
+    this->has_pending_decision_request = false;
+    this->pending_decision = {};
     this->pending_final_summary.clear();
     this->final_diff_preview.clear();
     emit this->diff_available(QString());

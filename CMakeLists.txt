@@ -540,6 +540,8 @@ add_qtc_plugin(qcai2
     src/src/ui/agent_dock_widget.cpp
     src/src/ui/auto_hiding_list_widget.h
     src/src/ui/auto_hiding_list_widget.cpp
+    src/src/ui/decision_request_widget.h
+    src/src/ui/decision_request_widget.cpp
     src/src/ui/request_queue.h
     src/src/ui/request_queue.cpp
     src/src/linked_files/agent_dock_linked_files_controller.h
@@ -871,7 +873,7 @@ endif()
 
 qcai2_collect_target_cpp_sources(QCAI2_CLANG_TIDY_SOURCES qcai2)
 set(QCAI2_CLANG_ANALYZER_BUILD_TARGETS qcai2)
-foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_agent_messages tst_qcai2_provider_usage tst_qcai2_agent_progress tst_qcai2_agent_run_state_machine tst_qcai2_chat_context tst_qcai2_slash_commands tst_qcai2_safety_policy tst_qcai2_mcp_config tst_qcai2_tool_registry tst_qcai2_migration)
+foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_agent_messages tst_qcai2_provider_usage tst_qcai2_agent_progress tst_qcai2_agent_run_state_machine tst_qcai2_decision_request_widget tst_qcai2_chat_context tst_qcai2_slash_commands tst_qcai2_safety_policy tst_qcai2_mcp_config tst_qcai2_tool_registry tst_qcai2_migration)
     if(TARGET ${qcai2_test_target})
         qcai2_collect_target_cpp_sources(qcai2_test_sources ${qcai2_test_target})
         list(APPEND QCAI2_CLANG_TIDY_SOURCES ${qcai2_test_sources})

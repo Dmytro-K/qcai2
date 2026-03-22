@@ -586,6 +586,15 @@ private slots:
     void steering_during_tool_execution_replans_after_tool_completion();
     void steering_while_waiting_for_approval_restarts_without_manual_resolution();
     void steering_while_reviewing_inline_diff_clears_diff_and_restarts();
+    void decision_request_enters_waiting_state();
+    void decision_request_without_id_gets_generated();
+    void invalid_decision_request_retries_without_waiting();
+    void answering_decision_with_option_resumes_run();
+    void answering_decision_with_freeform_resumes_run();
+    void invalid_decision_answers_are_rejected();
+    void freeform_answer_is_rejected_when_disabled();
+    void steering_queued_while_waiting_for_decision_applies_after_answer();
+    void decision_double_submit_is_blocked();
     void compaction_persists_summary_without_chat_history_or_stream_echo();
 };
 
@@ -853,6 +862,271 @@ void tst_agent_controller_soft_steer_t::
     provider.finish(QStringLiteral("{\"type\":\"final\",\"summary\":\"Updated after diff review\","
                                    "\"diff\":\"\"}"));
     QTRY_COMPARE(stopped_spy.count(), 1);
+}
+
+void tst_agent_controller_soft_steer_t::decision_request_enters_waiting_state()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    QSignalSpy decision_spy(&controller, &agent_controller_t::decision_requested);
+
+    controller.start(QStringLiteral("Need a user choice"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    QCOMPARE(provider.requests.size(), 1);
+
+    provider.finish(QStringLiteral(
+        "{\"type\":\"decision_request\",\"request_id\":\"decision-1\",\"title\":\"Pick one\","
+        "\"description\":\"Need a user choice\",\"options\":[{\"id\":\"a\",\"label\":\"Option "
+        "A\",\"description\":\"First\"},{\"id\":\"b\",\"label\":\"Option B\",\"description\":"
+        "\"Second\"}],\"allow_freeform\":true,\"freeform_placeholder\":\"Other\",\"recommended_"
+        "option_id\":\"b\"}"));
+
+    QTRY_COMPARE(decision_spy.count(), 1);
+    QVERIFY(controller.is_waiting_for_user_decision());
+    QCOMPARE(controller.pending_decision_request_id(), QStringLiteral("decision-1"));
+
+    const agent_decision_request_t request =
+        decision_spy.at(0).at(0).value<agent_decision_request_t>();
+    QCOMPARE(request.options.size(), 2);
+    QCOMPARE(request.recommended_option_id, QStringLiteral("b"));
+    QVERIFY(request.allow_freeform);
+}
+
+void tst_agent_controller_soft_steer_t::decision_request_without_id_gets_generated()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    QSignalSpy decision_spy(&controller, &agent_controller_t::decision_requested);
+
+    controller.start(QStringLiteral("Need a user choice"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"decision_request\",\"title\":\"Pick one\",\"options\":[{\"id\":\"a\","
+        "\"label\":\"Option A\",\"description\":\"First\"}],\"allow_freeform\":true}"));
+
+    QTRY_COMPARE(decision_spy.count(), 1);
+    const agent_decision_request_t request =
+        decision_spy.at(0).at(0).value<agent_decision_request_t>();
+    QVERIFY(request.request_id.isEmpty() == false);
+    QCOMPARE(controller.pending_decision_request_id(), request.request_id);
+}
+
+void tst_agent_controller_soft_steer_t::invalid_decision_request_retries_without_waiting()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    QSignalSpy decision_spy(&controller, &agent_controller_t::decision_requested);
+
+    controller.start(QStringLiteral("Need a user choice"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"decision_request\",\"request_id\":\"broken\",\"title\":\"Broken\","
+        "\"options\":[],\"allow_freeform\":false}"));
+
+    QTRY_COMPARE(provider.requests.size(), 2);
+    QCOMPARE(decision_spy.count(), 0);
+    QVERIFY(controller.is_waiting_for_user_decision() == false);
+
+    const QStringList user_messages =
+        message_contents(provider.requests.at(1).messages, QStringLiteral("user"));
+    QVERIFY(user_messages.constLast().contains(QStringLiteral("decision_request was invalid")));
+}
+
+void tst_agent_controller_soft_steer_t::answering_decision_with_option_resumes_run()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    QSignalSpy answered_spy(&controller, &agent_controller_t::decision_answered);
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+
+    controller.start(QStringLiteral("Need a user choice"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"decision_request\",\"request_id\":\"decision-1\",\"title\":\"Pick one\","
+        "\"options\":[{\"id\":\"full\",\"label\":\"Full validation\",\"description\":\"Run all "
+        "tests\"}],\"allow_freeform\":false}"));
+
+    QTRY_VERIFY(controller.is_waiting_for_user_decision());
+    QVERIFY(controller.submit_user_decision(QStringLiteral("decision-1"), QStringLiteral("full")));
+    QTRY_COMPARE(answered_spy.count(), 1);
+    QTRY_COMPARE(provider.requests.size(), 2);
+    QVERIFY(controller.is_waiting_for_user_decision() == false);
+
+    const QStringList user_messages =
+        message_contents(provider.requests.at(1).messages, QStringLiteral("user"));
+    QVERIFY(user_messages.constLast().contains(QStringLiteral("Full validation")));
+
+    provider.finish(
+        QStringLiteral("{\"type\":\"final\",\"summary\":\"Used chosen option\",\"diff\":\"\"}"));
+    QTRY_COMPARE(stopped_spy.count(), 1);
+}
+
+void tst_agent_controller_soft_steer_t::answering_decision_with_freeform_resumes_run()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    QSignalSpy answered_spy(&controller, &agent_controller_t::decision_answered);
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+
+    controller.start(QStringLiteral("Need a user choice"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"decision_request\",\"request_id\":\"decision-2\",\"title\":\"Pick one\","
+        "\"description\":\"Need a custom answer\",\"options\":[{\"id\":\"a\",\"label\":\"Option "
+        "A\",\"description\":\"First\"}],\"allow_freeform\":true}"));
+
+    QTRY_VERIFY(controller.is_waiting_for_user_decision());
+    QVERIFY(controller.submit_user_decision(QStringLiteral("decision-2"), {},
+                                            QStringLiteral("Use a staged rollout instead.")));
+    QTRY_COMPARE(answered_spy.count(), 1);
+    QTRY_COMPARE(provider.requests.size(), 2);
+
+    const QStringList user_messages =
+        message_contents(provider.requests.at(1).messages, QStringLiteral("user"));
+    QVERIFY(user_messages.constLast().contains(QStringLiteral("Use a staged rollout instead.")));
+
+    provider.finish(
+        QStringLiteral("{\"type\":\"final\",\"summary\":\"Used custom answer\",\"diff\":\"\"}"));
+    QTRY_COMPARE(stopped_spy.count(), 1);
+}
+
+void tst_agent_controller_soft_steer_t::invalid_decision_answers_are_rejected()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    controller.start(QStringLiteral("Need a user choice"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"decision_request\",\"request_id\":\"decision-invalid\",\"title\":\"Pick "
+        "one\",\"options\":[{\"id\":\"a\",\"label\":\"Option A\",\"description\":\"First\"}],"
+        "\"allow_freeform\":true}"));
+
+    QTRY_VERIFY(controller.is_waiting_for_user_decision());
+    QVERIFY(controller.submit_user_decision(QStringLiteral("wrong-id"), QStringLiteral("a")) ==
+            false);
+    QVERIFY(controller.submit_user_decision(QStringLiteral("decision-invalid"),
+                                            QStringLiteral("missing-option")) == false);
+    QVERIFY(controller.submit_user_decision(QStringLiteral("decision-invalid"), {}, {}) == false);
+    QCOMPARE(provider.requests.size(), 1);
+    QVERIFY(controller.is_waiting_for_user_decision());
+}
+
+void tst_agent_controller_soft_steer_t::freeform_answer_is_rejected_when_disabled()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    controller.start(QStringLiteral("Need a user choice"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"decision_request\",\"request_id\":\"decision-no-freeform\",\"title\":\"Pick "
+        "one\",\"options\":[{\"id\":\"a\",\"label\":\"Option A\",\"description\":\"First\"}],"
+        "\"allow_freeform\":false}"));
+
+    QTRY_VERIFY(controller.is_waiting_for_user_decision());
+    QVERIFY(controller.submit_user_decision(QStringLiteral("decision-no-freeform"), {},
+                                            QStringLiteral("Custom answer")) == false);
+    QCOMPARE(provider.requests.size(), 1);
+    QVERIFY(controller.is_waiting_for_user_decision());
+}
+
+void tst_agent_controller_soft_steer_t::
+    steering_queued_while_waiting_for_decision_applies_after_answer()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    QSignalSpy steer_pending_spy(&controller, &agent_controller_t::soft_steer_pending);
+    QSignalSpy steer_applied_spy(&controller, &agent_controller_t::soft_steer_applied);
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+
+    controller.start(QStringLiteral("Need a user choice"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"decision_request\",\"request_id\":\"decision-3\",\"title\":\"Pick one\","
+        "\"options\":[{\"id\":\"full\",\"label\":\"Full validation\",\"description\":\"Run all "
+        "tests\"}],\"allow_freeform\":true}"));
+
+    QTRY_VERIFY(controller.is_waiting_for_user_decision());
+    QVERIFY(
+        controller.enqueue_soft_steer_message(QStringLiteral("After that, also update docs.")));
+    QCOMPARE(steer_pending_spy.count(), 1);
+    QCOMPARE(provider.requests.size(), 1);
+
+    QVERIFY(controller.submit_user_decision(QStringLiteral("decision-3"), QStringLiteral("full")));
+    QTRY_COMPARE(provider.requests.size(), 2);
+    QTRY_COMPARE(steer_applied_spy.count(), 1);
+
+    const QStringList user_messages =
+        message_contents(provider.requests.at(1).messages, QStringLiteral("user"));
+    QVERIFY(user_messages.size() >= 3);
+    QVERIFY(
+        user_messages.at(user_messages.size() - 2).contains(QStringLiteral("Full validation")));
+    QCOMPARE(user_messages.constLast(), QStringLiteral("After that, also update docs."));
+
+    provider.finish(QStringLiteral("{\"type\":\"final\",\"summary\":\"Done\",\"diff\":\"\"}"));
+    QTRY_COMPARE(stopped_spy.count(), 1);
+}
+
+void tst_agent_controller_soft_steer_t::decision_double_submit_is_blocked()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    controller.start(QStringLiteral("Need a user choice"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"decision_request\",\"request_id\":\"decision-4\",\"title\":\"Pick one\","
+        "\"options\":[{\"id\":\"a\",\"label\":\"Option A\",\"description\":\"First\"}],"
+        "\"allow_freeform\":true}"));
+
+    QTRY_VERIFY(controller.is_waiting_for_user_decision());
+    QVERIFY(controller.submit_user_decision(QStringLiteral("decision-4"), QStringLiteral("a")));
+    QVERIFY(controller.submit_user_decision(QStringLiteral("decision-4"), QStringLiteral("a")) ==
+            false);
+    QTRY_COMPARE(provider.requests.size(), 2);
 }
 
 void tst_agent_controller_soft_steer_t::

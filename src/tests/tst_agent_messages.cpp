@@ -14,9 +14,11 @@ class agent_messages_test_t : public QObject
 
 private slots:
     void chat_message_round_trips_through_json();
+    void decision_request_round_trips_through_json_and_helpers();
     void parse_plan_builds_indexed_steps_from_strings_and_objects();
     void parse_tool_call_reads_name_and_args();
     void parse_need_approval_reads_approval_fields();
+    void parse_decision_request_reads_structured_fields();
     void parse_unknown_json_object_falls_back_to_compact_text();
     void parse_fenced_json_extracts_structured_response();
     void parse_multiple_objects_handles_braces_inside_strings();
@@ -36,6 +38,39 @@ void agent_messages_test_t::chat_message_round_trips_through_json()
 
     QCOMPARE(parsed.role, source.role);
     QCOMPARE(parsed.content, source.content);
+}
+
+void agent_messages_test_t::decision_request_round_trips_through_json_and_helpers()
+{
+    const agent_decision_request_t source{
+        QStringLiteral("decision-helpers"),
+        QStringLiteral("Choose a path"),
+        QStringLiteral("Need a trade-off decision"),
+        {agent_decision_option_t{QStringLiteral("fast"), QStringLiteral("Fast"),
+                                 QStringLiteral("Run targeted checks only")},
+         agent_decision_option_t{QStringLiteral("full"), QStringLiteral("Full"),
+                                 QStringLiteral("Run full validation")}},
+        true,
+        QStringLiteral("Describe another strategy"),
+        QStringLiteral("full")};
+
+    const QJsonObject json = source.to_json();
+    const agent_decision_request_t parsed = agent_decision_request_t::from_json(json);
+
+    QCOMPARE(parsed.request_id, source.request_id);
+    QCOMPARE(parsed.title, source.title);
+    QCOMPARE(parsed.description, source.description);
+    QCOMPARE(parsed.options.size(), 2);
+    QCOMPARE(parsed.options.at(0).id, QStringLiteral("fast"));
+    QCOMPARE(parsed.options.at(1).label, QStringLiteral("Full"));
+    QVERIFY(parsed.allow_freeform);
+    QCOMPARE(parsed.freeform_placeholder, QStringLiteral("Describe another strategy"));
+    QCOMPARE(parsed.recommended_option_id, QStringLiteral("full"));
+    QCOMPARE(parsed.option_index(QStringLiteral("fast")), 0);
+    QCOMPARE(parsed.option_index(QStringLiteral("full")), 1);
+    QCOMPARE(parsed.option_index(QStringLiteral("missing")), -1);
+    QVERIFY(parsed.is_valid());
+    QVERIFY(agent_decision_request_t{}.is_valid() == false);
 }
 
 void agent_messages_test_t::parse_plan_builds_indexed_steps_from_strings_and_objects()
@@ -72,6 +107,27 @@ void agent_messages_test_t::parse_need_approval_reads_approval_fields()
     QCOMPARE(response.approval_action, QStringLiteral("apply_patch"));
     QCOMPARE(response.approval_reason, QStringLiteral("Needs consent"));
     QCOMPARE(response.approval_preview, QStringLiteral("diff"));
+}
+
+void agent_messages_test_t::parse_decision_request_reads_structured_fields()
+{
+    const agent_response_t response = agent_response_t::parse(QStringLiteral(
+        R"({"type":"decision_request","request_id":"decide-build","title":"Choose validation path","description":"Need your preference","options":[{"id":"fast","label":"Fast","description":"Targeted tests only"},{"id":"full","label":"Full","description":"Run the whole suite"}],"allow_freeform":true,"freeform_placeholder":"Describe another strategy","recommended_option_id":"full"})"));
+
+    QVERIFY(response.type == response_type_t::DECISION_REQUEST);
+    QCOMPARE(response.decision_request.request_id, QStringLiteral("decide-build"));
+    QCOMPARE(response.decision_request.title, QStringLiteral("Choose validation path"));
+    QCOMPARE(response.decision_request.description, QStringLiteral("Need your preference"));
+    QCOMPARE(response.decision_request.options.size(), 2);
+    QCOMPARE(response.decision_request.options.at(0).id, QStringLiteral("fast"));
+    QCOMPARE(response.decision_request.options.at(0).label, QStringLiteral("Fast"));
+    QCOMPARE(response.decision_request.options.at(0).description,
+             QStringLiteral("Targeted tests only"));
+    QCOMPARE(response.decision_request.options.at(1).id, QStringLiteral("full"));
+    QCOMPARE(response.decision_request.recommended_option_id, QStringLiteral("full"));
+    QVERIFY(response.decision_request.allow_freeform);
+    QCOMPARE(response.decision_request.freeform_placeholder,
+             QStringLiteral("Describe another strategy"));
 }
 
 void agent_messages_test_t::parse_unknown_json_object_falls_back_to_compact_text()
@@ -146,6 +202,10 @@ void agent_messages_test_t::streaming_preview_hides_non_final_json()
         QStringLiteral(R"({"type":"tool_call","name":"search_repo","args":{"query":"todo"}})");
 
     QVERIFY(streaming_response_markdown_preview(raw).isEmpty());
+
+    const QString decision_raw = QStringLiteral(
+        R"({"type":"decision_request","request_id":"d1","title":"Choose","options":[{"id":"a","label":"A"}],"allow_freeform":true})");
+    QVERIFY(streaming_response_markdown_preview(decision_raw).isEmpty());
 }
 
 QTEST_APPLESS_MAIN(agent_messages_test_t)

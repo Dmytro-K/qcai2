@@ -145,6 +145,25 @@ target_link_libraries(tst_qcai2_auto_hiding_list_widget PRIVATE
 )
 qcai2_register_test(qcai2_auto_hiding_list_widget tst_qcai2_auto_hiding_list_widget)
 
+add_executable(tst_qcai2_decision_request_widget
+    tst_decision_request_widget.cpp
+    ../src/ui/decision_request_widget.cpp
+    ../src/models/agent_messages.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_decision_request_widget)
+
+target_include_directories(tst_qcai2_decision_request_widget PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_decision_request_widget PRIVATE
+    Qt::Core
+    Qt::Gui
+    Qt::Widgets
+    Qt::Test
+)
+qcai2_register_test(qcai2_decision_request_widget tst_qcai2_decision_request_widget)
+
 add_executable(tst_qcai2_agent_controller_soft_steer
     tst_agent_controller_soft_steer.cpp
     ../src/agent_controller.cpp

@@ -13,6 +13,7 @@
 #include "../util/logger.h"
 #include "../util/migration.h"
 #include "auto_hiding_list_widget.h"
+#include "decision_request_widget.h"
 #include "ui_agent_dock_widget.h"
 
 #include <coreplugin/editormanager/editormanager.h>
@@ -744,6 +745,18 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
             &agent_dock_widget_t::on_diff_available);
     connect(this->controller, &agent_controller_t::approval_requested, this,
             &agent_dock_widget_t::on_approval_requested);
+    connect(this->controller, &agent_controller_t::decision_requested, this,
+            &agent_dock_widget_t::on_decision_requested);
+    connect(this->controller, &agent_controller_t::decision_answered, this,
+            [this](const QString &request_id, const QString &answer_summary) {
+                if (this->decision_request_widget != nullptr &&
+                    this->decision_request_widget->current_request_id() == request_id)
+                {
+                    this->decision_request_widget->mark_resolved(answer_summary);
+                }
+                this->status_label->setText(QStringLiteral("Decision answered."));
+                this->session_controller->save_chat();
+            });
     connect(this->controller, &agent_controller_t::iteration_changed, this,
             &agent_dock_widget_t::on_iteration_changed);
     connect(this->controller, &agent_controller_t::stopped, this,
@@ -945,6 +958,10 @@ void agent_dock_widget_t::clear_chat_state()
     this->diff_file_list->clear();
     this->approval_list->clear();
     this->approval_items.clear();
+    if (this->decision_request_widget != nullptr)
+    {
+        this->decision_request_widget->clear_request();
+    }
     this->applied_diff.clear();
     this->current_diff.clear();
     this->status_label->setText(tr("Ready"));
@@ -1119,6 +1136,8 @@ void agent_dock_widget_t::setup_ui()
     auto *new_chat_btn = this->ui->newChatButton;
     this->queue_btn = new QPushButton(tr("Queue"), this);
     this->queue_btn->setObjectName(QStringLiteral("queueBtn"));
+    this->decision_request_widget = new decision_request_widget_t(this);
+    this->decision_request_widget->setObjectName(QStringLiteral("decisionRequestWidget"));
     this->pending_items_view = new auto_hiding_list_widget_t(this);
     this->pending_items_view->setObjectName(QStringLiteral("pendingItemsView"));
     this->pending_items_view->setSelectionMode(QAbstractItemView::NoSelection);
@@ -1130,9 +1149,14 @@ void agent_dock_widget_t::setup_ui()
     this->pending_items_view->setToolTip(
         tr("Pending items that will run automatically in FIFO order."));
     this->pending_items_view->setMaximumHeight(this->fontMetrics().height() * 5);
-    this->ui->inputPanelLayout->insertWidget(0, this->pending_items_view);
+    this->ui->inputPanelLayout->insertWidget(0, this->decision_request_widget);
+    this->ui->inputPanelLayout->insertWidget(1, this->pending_items_view);
     this->ui->btnColumn->insertWidget(this->ui->btnColumn->indexOf(this->run_btn) + 1,
                                       this->queue_btn);
+    connect(this->decision_request_widget, &decision_request_widget_t::option_submitted, this,
+            &agent_dock_widget_t::submit_decision_option);
+    connect(this->decision_request_widget, &decision_request_widget_t::freeform_submitted, this,
+            &agent_dock_widget_t::submit_decision_freeform);
 
     this->ui->contentSplitter->setStretchFactor(0, 3);
     this->ui->contentSplitter->setStretchFactor(1, 1);
@@ -1930,6 +1954,21 @@ void agent_dock_widget_t::on_approval_requested(int id, const QString &action,
     }
 }
 
+void agent_dock_widget_t::on_decision_requested(const agent_decision_request_t &request)
+{
+    if (this->decision_request_widget == nullptr)
+    {
+        return;
+    }
+
+    this->decision_request_widget->set_decision_request(request);
+    this->status_label->setText(QStringLiteral("Waiting for user decision: %1")
+                                    .arg(request.title.trimmed().isEmpty() == false
+                                             ? request.title.trimmed()
+                                             : QStringLiteral("Decision request")));
+    this->session_controller->save_chat();
+}
+
 void agent_dock_widget_t::on_iteration_changed(int iteration)
 {
     this->on_log_message(QStringLiteral("🔄 Iteration %1 / Tool calls: %2")
@@ -1941,6 +1980,10 @@ void agent_dock_widget_t::on_stopped(const QString &summary)
 {
     const agent_run_state_machine_t::state_t run_state = this->controller->current_run_state();
     this->update_run_state(false);
+    if (this->decision_request_widget != nullptr)
+    {
+        this->decision_request_widget->clear_request();
+    }
     if (this->render_throttle->isActive())
     {
         this->render_throttle->stop();
@@ -1978,6 +2021,24 @@ void agent_dock_widget_t::on_stopped(const QString &summary)
 
     QMetaObject::invokeMethod(
         this, [this]() { this->maybe_start_next_queued_request(); }, Qt::QueuedConnection);
+}
+
+void agent_dock_widget_t::submit_decision_option(const QString &request_id,
+                                                 const QString &option_id)
+{
+    if (this->controller->submit_user_decision(request_id, option_id, {}) == true)
+    {
+        this->tabs->setCurrentWidget(this->log_view);
+    }
+}
+
+void agent_dock_widget_t::submit_decision_freeform(const QString &request_id,
+                                                   const QString &freeform_text)
+{
+    if (this->controller->submit_user_decision(request_id, {}, freeform_text) == true)
+    {
+        this->tabs->setCurrentWidget(this->log_view);
+    }
 }
 
 bool agent_dock_widget_t::eventFilter(QObject *obj, QEvent *event)

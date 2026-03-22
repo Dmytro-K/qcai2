@@ -145,6 +145,16 @@ public:
     void deny_action(int approval_id);
 
     /**
+     * Submits one structured user-decision answer and resumes the paused run.
+     * @param request_id Identifier of the pending decision request.
+     * @param option_id Identifier of the chosen predefined option, if any.
+     * @param freeform_text Custom user text when no predefined option was chosen.
+     * @return True when the answer was accepted and the run resumed.
+     */
+    bool submit_user_decision(const QString &request_id, const QString &option_id = {},
+                              const QString &freeform_text = {});
+
+    /**
      * Continues the current run after the user rejected part of an inline diff proposal.
      * @param acceptedDiff Hunks already accepted and applied to disk.
      * @param rejectedDiff Hunks that must be replaced with a different approach.
@@ -182,6 +192,24 @@ public:
     agent_run_state_machine_t::state_t current_run_state() const
     {
         return this->run_state_machine.current_state();
+    }
+
+    /**
+     * Returns true when the active run is waiting for a structured user decision.
+     */
+    bool is_waiting_for_user_decision() const
+    {
+        return this->run_state_machine.is_waiting_for_user_decision();
+    }
+
+    /**
+     * Returns the pending decision-request identifier, if any.
+     */
+    QString pending_decision_request_id() const
+    {
+        return this->has_pending_decision_request == true
+                   ? this->pending_decision.request.request_id
+                   : QString();
     }
 
     /**
@@ -288,6 +316,19 @@ signals:
      */
     void approval_requested(int id, const QString &action, const QString &reason,
                             const QString &preview);
+
+    /**
+     * Requests a structured user decision before the run may continue.
+     * @param request Typed decision payload to render in the UI.
+     */
+    void decision_requested(const agent_decision_request_t &request);
+
+    /**
+     * Reports that one structured user decision was answered.
+     * @param request_id Identifier of the answered request.
+     * @param answer_summary Short user-visible summary of the chosen answer.
+     */
+    void decision_answered(const QString &request_id, const QString &answer_summary);
 
     /**
      * Reports the 1-based iteration count after it increments.
@@ -604,6 +645,25 @@ private:
     };
     /** Queue of tool calls waiting for user approval. */
     QList<pending_approval_t> pending_approvals;
+
+    /** One pending structured user-decision request waiting for the user's answer. */
+    struct pending_decision_t
+    {
+        /** Typed decision payload currently shown in the UI. */
+        agent_decision_request_t request;
+
+        /** True after the first accepted answer so duplicate submits can be blocked. */
+        bool answered = false;
+    };
+
+    /** Pending structured user decision for the active run. */
+    pending_decision_t pending_decision;
+
+    /** True when `pending_decision` currently contains one active request. */
+    bool has_pending_decision_request = false;
+
+    /** Counter used when the model omits a request id. */
+    int next_generated_decision_request_id = 1;
 
     /** Next approval identifier emitted to the UI. */
     int next_approval_id = 1;

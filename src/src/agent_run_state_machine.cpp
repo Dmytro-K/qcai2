@@ -17,6 +17,7 @@ bool is_running_state(agent_run_state_machine_t::state_t state)
         case agent_run_state_machine_t::state_t::STARTING:
         case agent_run_state_machine_t::state_t::WAITING_FOR_PROVIDER:
         case agent_run_state_machine_t::state_t::WAITING_FOR_APPROVAL:
+        case agent_run_state_machine_t::state_t::WAITING_FOR_USER_DECISION:
         case agent_run_state_machine_t::state_t::WAITING_FOR_INLINE_DIFF_REVIEW:
             return true;
         case agent_run_state_machine_t::state_t::IDLE:
@@ -42,6 +43,8 @@ QString agent_run_state_name(agent_run_state_machine_t::state_t state)
             return QStringLiteral("waiting_for_provider");
         case agent_run_state_machine_t::state_t::WAITING_FOR_APPROVAL:
             return QStringLiteral("waiting_for_approval");
+        case agent_run_state_machine_t::state_t::WAITING_FOR_USER_DECISION:
+            return QStringLiteral("waiting_for_user_decision");
         case agent_run_state_machine_t::state_t::WAITING_FOR_INLINE_DIFF_REVIEW:
             return QStringLiteral("waiting_for_inline_diff_review");
         case agent_run_state_machine_t::state_t::COMPLETED:
@@ -61,6 +64,7 @@ agent_run_state_machine_t::agent_run_state_machine_t(QObject *parent) : QObject(
     this->starting_state = new QState(this->state_machine);
     this->waiting_for_provider_state = new QState(this->state_machine);
     this->waiting_for_approval_state = new QState(this->state_machine);
+    this->waiting_for_user_decision_state = new QState(this->state_machine);
     this->waiting_for_inline_diff_review_state = new QState(this->state_machine);
     this->completed_state = new QState(this->state_machine);
     this->failed_state = new QState(this->state_machine);
@@ -74,6 +78,7 @@ agent_run_state_machine_t::agent_run_state_machine_t(QObject *parent) : QObject(
     bind_state(this->starting_state, state_t::STARTING);
     bind_state(this->waiting_for_provider_state, state_t::WAITING_FOR_PROVIDER);
     bind_state(this->waiting_for_approval_state, state_t::WAITING_FOR_APPROVAL);
+    bind_state(this->waiting_for_user_decision_state, state_t::WAITING_FOR_USER_DECISION);
     bind_state(this->waiting_for_inline_diff_review_state,
                state_t::WAITING_FOR_INLINE_DIFF_REVIEW);
     bind_state(this->completed_state, state_t::COMPLETED);
@@ -108,9 +113,15 @@ agent_run_state_machine_t::agent_run_state_machine_t(QObject *parent) : QObject(
         this, &agent_run_state_machine_t::user_approval_wait_requested,
         this->waiting_for_approval_state);
     this->waiting_for_provider_state->addTransition(
+        this, &agent_run_state_machine_t::user_decision_wait_requested,
+        this->waiting_for_user_decision_state);
+    this->waiting_for_provider_state->addTransition(
         this, &agent_run_state_machine_t::inline_diff_review_wait_requested,
         this->waiting_for_inline_diff_review_state);
     this->waiting_for_approval_state->addTransition(
+        this, &agent_run_state_machine_t::provider_response_wait_requested,
+        this->waiting_for_provider_state);
+    this->waiting_for_user_decision_state->addTransition(
         this, &agent_run_state_machine_t::provider_response_wait_requested,
         this->waiting_for_provider_state);
     this->waiting_for_inline_diff_review_state->addTransition(
@@ -120,6 +131,7 @@ agent_run_state_machine_t::agent_run_state_machine_t(QObject *parent) : QObject(
     add_terminal_transitions(this->starting_state);
     add_terminal_transitions(this->waiting_for_provider_state);
     add_terminal_transitions(this->waiting_for_approval_state);
+    add_terminal_transitions(this->waiting_for_user_decision_state);
     add_terminal_transitions(this->waiting_for_inline_diff_review_state);
 
     this->state_machine->setInitialState(this->idle_state);
@@ -154,6 +166,11 @@ bool agent_run_state_machine_t::is_waiting_for_approval() const
     return this->current_state_value == state_t::WAITING_FOR_APPROVAL;
 }
 
+bool agent_run_state_machine_t::is_waiting_for_user_decision() const
+{
+    return this->current_state_value == state_t::WAITING_FOR_USER_DECISION;
+}
+
 bool agent_run_state_machine_t::is_waiting_for_inline_diff_review() const
 {
     return this->current_state_value == state_t::WAITING_FOR_INLINE_DIFF_REVIEW;
@@ -174,6 +191,12 @@ void agent_run_state_machine_t::await_provider_response()
 void agent_run_state_machine_t::await_user_approval()
 {
     emit this->user_approval_wait_requested();
+    this->flush_state_machine_events();
+}
+
+void agent_run_state_machine_t::await_user_decision()
+{
+    emit this->user_decision_wait_requested();
     this->flush_state_machine_events();
 }
 
