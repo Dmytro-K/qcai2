@@ -26,6 +26,8 @@ private slots:
     void streaming_preview_extracts_partial_final_summary();
     void streaming_preview_decodes_json_escapes();
     void streaming_preview_hides_non_final_json();
+    void streaming_preview_hides_mixed_tool_payload_leaks();
+    void streaming_preview_extracts_final_summary_from_mixed_payload();
 };
 
 void agent_messages_test_t::chat_message_round_trips_through_json()
@@ -206,6 +208,24 @@ void agent_messages_test_t::streaming_preview_hides_non_final_json()
     const QString decision_raw = QStringLiteral(
         R"({"type":"decision_request","request_id":"d1","title":"Choose","options":[{"id":"a","label":"A"}],"allow_freeform":true})");
     QVERIFY(streaming_response_markdown_preview(decision_raw).isEmpty());
+}
+
+void agent_messages_test_t::streaming_preview_hides_mixed_tool_payload_leaks()
+{
+    const QString raw = QStringLiteral(
+        "Let me investigate more deeply — read the header and other relevant files.\n</s>\n\n"
+        R"({"type":"tool_call","name":"read_file","args":{"path":"src/name_table.h"}})");
+
+    QVERIFY(streaming_response_markdown_preview(raw).isEmpty());
+}
+
+void agent_messages_test_t::streaming_preview_extracts_final_summary_from_mixed_payload()
+{
+    const QString raw =
+        QStringLiteral("Preface that should not leak into the Actions Log.\n</s>\n\n"
+                       R"({"type":"final","summary":"Fixed the bug.","diff":""})");
+
+    QCOMPARE(streaming_response_markdown_preview(raw), QStringLiteral("Fixed the bug."));
 }
 
 QTEST_APPLESS_MAIN(agent_messages_test_t)

@@ -11,6 +11,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QElapsedTimer>
 #include <QLabel>
 #include <QListWidget>
 #include <QPlainTextEdit>
@@ -282,6 +283,21 @@ private:
     void update_usage_display();
 
     /**
+     * Starts the live elapsed-seconds label for the active request.
+     */
+    void start_request_duration_display();
+
+    /**
+     * Stops and hides the live elapsed-seconds label when no request is active.
+     */
+    void stop_request_duration_display();
+
+    /**
+     * Refreshes the elapsed-seconds label from the current request start time.
+     */
+    void update_request_duration_display();
+
+    /**
      * Clears the current in-memory chat, plan, diff, and approval state.
      */
     void clear_chat_state();
@@ -335,6 +351,7 @@ private:
     QPushButton *revert_patch_btn;
     QPushButton *copy_plan_btn;
     QLabel *status_label;
+    QLabel *request_duration_label = nullptr;
     QLabel *usage_value_label;
     QPushButton *rename_conversation_btn = nullptr;
     QPushButton *delete_conversation_btn = nullptr;
@@ -388,6 +405,12 @@ private:
 
     /** Short timer that batches frequent log renders while streaming. */
     QTimer *render_throttle;
+
+    /** One-second timer that refreshes the live request duration label. */
+    QTimer *request_duration_timer = nullptr;
+
+    /** Start timestamp for the currently running request. */
+    QElapsedTimer request_elapsed_timer;
 
     /** Manages inline editor markers for diff hunks. */
     inline_diff_manager_t *inline_diff_manager;

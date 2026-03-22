@@ -168,6 +168,22 @@ target_link_libraries(tst_qcai2_request_queue PRIVATE
 )
 qcai2_register_test(qcai2_request_queue tst_qcai2_request_queue)
 
+add_executable(tst_qcai2_request_duration_formatter
+    tst_request_duration_formatter.cpp
+    ../src/ui/request_duration_formatter.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_request_duration_formatter)
+
+target_include_directories(tst_qcai2_request_duration_formatter PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_request_duration_formatter PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_request_duration_formatter tst_qcai2_request_duration_formatter)
+
 add_executable(tst_qcai2_auto_hiding_list_widget
     tst_auto_hiding_list_widget.cpp
     ../src/ui/auto_hiding_list_widget.cpp

@@ -391,14 +391,6 @@ QString streaming_response_markdown_preview(const QString &raw)
         return {};
     }
 
-    const QString trimmed = raw.trimmed();
-    const bool looks_like_json = trimmed.startsWith(QLatin1Char('{'));
-
-    if (looks_like_json == false)
-    {
-        return raw;
-    }
-
     const agent_response_t parsed = agent_response_t::parse(raw);
     if (parsed.type == response_type_t::FINAL)
     {
@@ -415,7 +407,12 @@ QString streaming_response_markdown_preview(const QString &raw)
         return {};
     }
 
-    return extract_partial_json_string_field(raw, QStringLiteral("summary"));
+    if (partial_type.isEmpty() == false)
+    {
+        return extract_partial_json_string_field(raw, QStringLiteral("summary"));
+    }
+
+    return raw;
 }
 
 }  // namespace qcai2

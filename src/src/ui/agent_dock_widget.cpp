@@ -15,6 +15,7 @@
 #include "auto_hiding_list_widget.h"
 #include "debugger_status_widget.h"
 #include "decision_request_widget.h"
+#include "request_duration_formatter.h"
 #include "ui_agent_dock_widget.h"
 
 #include <coreplugin/editormanager/editormanager.h>
@@ -704,6 +705,10 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
     this->render_throttle->setSingleShot(true);
     this->render_throttle->setInterval(50);
     connect(this->render_throttle, &QTimer::timeout, this, &agent_dock_widget_t::render_log);
+    this->request_duration_timer = new QTimer(this);
+    this->request_duration_timer->setInterval(1000);
+    connect(this->request_duration_timer, &QTimer::timeout, this,
+            &agent_dock_widget_t::update_request_duration_display);
 
     // Connect controller signals
     connect(this->controller, &agent_controller_t::log_message, this,
@@ -967,6 +972,7 @@ void agent_dock_widget_t::clear_chat_state()
     this->applied_diff.clear();
     this->current_diff.clear();
     this->status_label->setText(tr("Ready"));
+    this->stop_request_duration_display();
     this->deferred_request = queued_request_t{};
     this->has_deferred_request = false;
     this->skip_auto_compact_once = false;
@@ -1138,6 +1144,12 @@ void agent_dock_widget_t::setup_ui()
     auto *new_chat_btn = this->ui->newChatButton;
     this->queue_btn = new QPushButton(tr("Queue"), this);
     this->queue_btn->setObjectName(QStringLiteral("queueBtn"));
+    this->request_duration_label = new QLabel(this);
+    this->request_duration_label->setObjectName(QStringLiteral("requestDurationLabel"));
+    this->request_duration_label->setAlignment(Qt::AlignHCenter);
+    this->request_duration_label->setStyleSheet(QStringLiteral("color: #888; padding: 0px 2px;"));
+    this->request_duration_label->setVisible(false);
+    this->request_duration_label->setText(format_request_duration_label(0));
     this->decision_request_widget = new decision_request_widget_t(this);
     this->decision_request_widget->setObjectName(QStringLiteral("decisionRequestWidget"));
     this->pending_items_view = new auto_hiding_list_widget_t(this);
@@ -1155,6 +1167,8 @@ void agent_dock_widget_t::setup_ui()
     this->ui->inputPanelLayout->insertWidget(1, this->pending_items_view);
     this->ui->btnColumn->insertWidget(this->ui->btnColumn->indexOf(this->run_btn) + 1,
                                       this->queue_btn);
+    this->ui->btnColumn->insertWidget(this->ui->btnColumn->indexOf(clear_debug_btn) + 1,
+                                      this->request_duration_label);
     connect(this->decision_request_widget, &decision_request_widget_t::option_submitted, this,
             &agent_dock_widget_t::submit_decision_option);
     connect(this->decision_request_widget, &decision_request_widget_t::freeform_submitted, this,
@@ -1409,6 +1423,15 @@ void agent_dock_widget_t::update_run_state(bool running)
         this->delete_conversation_btn->setEnabled(!running &&
                                                   this->conversation_combo != nullptr &&
                                                   this->conversation_combo->currentIndex() >= 0);
+    }
+
+    if (running == true)
+    {
+        this->start_request_duration_display();
+    }
+    else
+    {
+        this->stop_request_duration_display();
     }
 }
 
@@ -1802,6 +1825,54 @@ void agent_dock_widget_t::update_usage_display()
 
     this->usage_value_label->setText(format_usage_value_for_provider(
         this->usage_provider_id, this->displayed_usage, this->displayed_provider_request_count));
+}
+
+void agent_dock_widget_t::start_request_duration_display()
+{
+    if (this->request_duration_label == nullptr || this->request_duration_timer == nullptr)
+    {
+        return;
+    }
+
+    this->request_elapsed_timer.restart();
+    this->request_duration_label->setText(format_request_duration_label(0));
+    this->request_duration_label->setVisible(true);
+    if (this->request_duration_timer->isActive() == false)
+    {
+        this->request_duration_timer->start();
+    }
+}
+
+void agent_dock_widget_t::stop_request_duration_display()
+{
+    if (this->request_duration_timer != nullptr)
+    {
+        this->request_duration_timer->stop();
+    }
+    this->request_elapsed_timer.invalidate();
+    if (this->request_duration_label != nullptr)
+    {
+        this->request_duration_label->clear();
+        this->request_duration_label->setVisible(false);
+    }
+}
+
+void agent_dock_widget_t::update_request_duration_display()
+{
+    if (this->request_duration_label == nullptr)
+    {
+        return;
+    }
+    if (this->request_elapsed_timer.isValid() == false)
+    {
+        this->request_duration_label->clear();
+        this->request_duration_label->setVisible(false);
+        return;
+    }
+
+    this->request_duration_label->setText(
+        format_request_duration_label(this->request_elapsed_timer.elapsed()));
+    this->request_duration_label->setVisible(true);
 }
 
 void agent_dock_widget_t::append_stamped_log_entry(const QString &body)
