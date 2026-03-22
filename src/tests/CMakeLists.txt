@@ -1,4 +1,12 @@
 function(qcai2_register_test test_name target_name)
+    if(WIN32)
+        add_custom_command(TARGET ${target_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_RUNTIME_DLLS:${target_name}>
+                $<TARGET_FILE_DIR:${target_name}>
+            COMMAND_EXPAND_LISTS
+        )
+    endif()
     add_test(NAME ${test_name} COMMAND ${target_name})
     set_property(GLOBAL APPEND PROPERTY QCAI2_TEST_TARGETS ${target_name})
 endfunction()
@@ -183,6 +191,25 @@ target_link_libraries(tst_qcai2_request_duration_formatter PRIVATE
     Qt::Test
 )
 qcai2_register_test(qcai2_request_duration_formatter tst_qcai2_request_duration_formatter)
+
+add_executable(tst_qcai2_file_tools
+    tst_file_tools.cpp
+    ../src/tools/file_tools.cpp
+    ../src/util/diff.cpp
+    ../src/util/process_runner.cpp
+    ../src/util/logger.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_file_tools)
+
+target_include_directories(tst_qcai2_file_tools PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_file_tools PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_file_tools tst_qcai2_file_tools)
 
 add_executable(tst_qcai2_auto_hiding_list_widget
     tst_auto_hiding_list_widget.cpp

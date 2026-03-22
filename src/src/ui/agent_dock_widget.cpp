@@ -114,6 +114,93 @@ QString conversation_display_title(const conversation_record_t &conversation)
     return QObject::tr("Untitled Conversation");
 }
 
+constexpr int k_approval_preview_role = Qt::UserRole + 1;
+constexpr int k_approval_pending_role = Qt::UserRole + 2;
+constexpr int k_approval_inline_role = Qt::UserRole + 3;
+
+struct inline_approval_diff_t
+{
+    QString full_diff;
+    QString review_diff;
+};
+
+QString strip_modified_headers(const QString &diff)
+{
+    const QStringList lines = diff.split(QLatin1Char('\n'));
+    QStringList clean_lines;
+    clean_lines.reserve(lines.size());
+    for (const QString &line : lines)
+    {
+        if (line.startsWith(QStringLiteral("=== MODIFIED:")) == false)
+        {
+            clean_lines.append(line);
+        }
+    }
+    return clean_lines.join(QLatin1Char('\n'));
+}
+
+QString review_project_dir(agent_dock_session_controller_t *session_controller,
+                           agent_controller_t *controller)
+{
+    if (session_controller != nullptr)
+    {
+        const QString session_project_dir = session_controller->current_project_dir().trimmed();
+        if (session_project_dir.isEmpty() == false)
+        {
+            return session_project_dir;
+        }
+    }
+
+    if (controller != nullptr && controller->editor_context() != nullptr)
+    {
+        return controller->editor_context()->capture().project_dir.trimmed();
+    }
+
+    return {};
+}
+
+inline_approval_diff_t extract_inline_approval_diff(const QString &action, const QString &preview,
+                                                    const QString &project_dir)
+{
+    if (action != QStringLiteral("apply_patch") || project_dir.trimmed().isEmpty() == true)
+    {
+        return {};
+    }
+
+    QString full_diff;
+    QJsonParseError parse_error;
+    const QJsonDocument doc = QJsonDocument::fromJson(preview.toUtf8(), &parse_error);
+    if (parse_error.error == QJsonParseError::NoError && doc.isObject() == true)
+    {
+        full_diff = doc.object().value(QStringLiteral("diff")).toString();
+    }
+    else
+    {
+        full_diff = preview.trimmed();
+    }
+
+    if (full_diff.trimmed().isEmpty() == true)
+    {
+        return {};
+    }
+
+    const Diff::new_file_result_t extracted =
+        Diff::extract_and_create_new_files(full_diff, project_dir, true);
+    if (extracted.error.isEmpty() == false)
+    {
+        return {};
+    }
+
+    const QString review_diff =
+        Diff::normalize(strip_modified_headers(extracted.remaining_diff)).trimmed();
+    if (review_diff.isEmpty() == true)
+    {
+        return {};
+    }
+
+    return {full_diff, review_diff};
+}
+
 void populate_effort_combo(QComboBox *combo)
 {
     combo->addItem(QObject::tr("Off"), QStringLiteral("off"));
@@ -787,6 +874,29 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
         const QString rejected_diff = this->inline_diff_manager->rejected_diff();
         const bool needs_refinement = this->inline_diff_manager->rejected_count() > 0;
         QTimer::singleShot(0, this, [this, accepted_diff, rejected_diff, needs_refinement]() {
+            if (this->active_inline_approval_id >= 0)
+            {
+                const int approval_id = this->active_inline_approval_id;
+                this->active_inline_approval_id = -1;
+
+                QListWidgetItem *item = this->approval_items.value(approval_id, nullptr);
+                const bool resolved = this->controller->resolve_apply_patch_inline_approval(
+                    approval_id, accepted_diff, rejected_diff);
+                if (resolved == true && item != nullptr)
+                {
+                    item->setData(k_approval_pending_role, false);
+                    item->setText(item->text() + (accepted_diff.trimmed().isEmpty() == true
+                                                      ? QStringLiteral(" ❌")
+                                                      : (rejected_diff.trimmed().isEmpty() == true
+                                                             ? QStringLiteral(" ✅")
+                                                             : QStringLiteral(" ↩️"))));
+                    this->approval_items.remove(approval_id);
+                    this->update_approval_selection_ui();
+                    this->session_controller->save_chat();
+                    return;
+                }
+            }
+
             if (needs_refinement == true)
             {
                 this->controller->request_inline_diff_refinement(accepted_diff, rejected_diff);
@@ -900,7 +1010,7 @@ void agent_dock_widget_t::sync_diff_ui(const QString &diff, bool focusDiffTab,
     }
 
     this->diff_file_list->clear();
-    const QString work_dir = this->session_controller->current_project_dir();
+    const QString work_dir = review_project_dir(this->session_controller.get(), this->controller);
 
     if (!diff.isEmpty())
     {
@@ -965,6 +1075,8 @@ void agent_dock_widget_t::clear_chat_state()
     this->diff_file_list->clear();
     this->approval_list->clear();
     this->approval_items.clear();
+    this->approval_preview_view->clear();
+    this->active_inline_approval_id = -1;
     if (this->decision_request_widget != nullptr)
     {
         this->decision_request_widget->clear_request();
@@ -979,6 +1091,7 @@ void agent_dock_widget_t::clear_chat_state()
     this->request_queue.clear();
     this->refresh_pending_items_view();
     this->reset_usage_display();
+    this->update_approval_selection_ui();
     this->apply_patch_btn->setEnabled(false);
     this->revert_patch_btn->setEnabled(false);
     this->tabs->setCurrentWidget(this->plan_list);
@@ -1134,10 +1247,13 @@ void agent_dock_widget_t::setup_ui()
     this->raw_markdown_view = this->ui->rawMarkdownView;
     this->diff_file_list = this->ui->diffFileList;
     this->approval_list = this->ui->approvalList;
+    this->approval_preview_view = this->ui->approvalPreviewView;
     this->debug_log_view = this->ui->debugLogView;
     this->apply_patch_btn = this->ui->applyPatchBtn;
     this->revert_patch_btn = this->ui->revertPatchBtn;
     this->copy_plan_btn = this->ui->copyPlanBtn;
+    this->approve_action_btn = this->ui->approveActionBtn;
+    this->deny_action_btn = this->ui->denyActionBtn;
     this->rename_conversation_btn = this->ui->renameConversationBtn;
     this->delete_conversation_btn = this->ui->deleteConversationBtn;
     auto *clear_debug_btn = this->ui->clearDebugBtn;
@@ -1240,6 +1356,7 @@ void agent_dock_widget_t::setup_ui()
 
     this->log_view->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     this->raw_markdown_view->setFont(QFont(QStringLiteral("monospace"), 9));
+    this->approval_preview_view->setFont(QFont(QStringLiteral("monospace"), 9));
     this->debug_log_view->setFont(QFont(QStringLiteral("monospace"), 9));
     this->debugger_status_widget = new debugger_status_widget_t(this->debugger_service, this);
     this->tabs->addTab(this->debugger_status_widget, tr("Debugger"));
@@ -1284,6 +1401,13 @@ void agent_dock_widget_t::setup_ui()
     });
     connect(this->copy_plan_btn, &QPushButton::clicked, this,
             &agent_dock_widget_t::on_copy_plan_clicked);
+    connect(
+        this->approval_list, &QListWidget::currentItemChanged, this,
+        [this](QListWidgetItem *, QListWidgetItem *) { this->update_approval_selection_ui(); });
+    connect(this->approve_action_btn, &QPushButton::clicked, this,
+            [this]() { this->resolve_selected_approval(true); });
+    connect(this->deny_action_btn, &QPushButton::clicked, this,
+            [this]() { this->resolve_selected_approval(false); });
     connect(clear_debug_btn, &QPushButton::clicked, this,
             &agent_dock_widget_t::on_clear_debug_clicked);
     connect(this->rename_conversation_btn, &QPushButton::clicked, this,
@@ -1695,7 +1819,7 @@ void agent_dock_widget_t::on_apply_patch_clicked()
         return;
     }
 
-    const QString work_dir = this->session_controller->current_project_dir();
+    const QString work_dir = review_project_dir(this->session_controller.get(), this->controller);
 
     if (work_dir.isEmpty())
     {
@@ -1725,7 +1849,7 @@ void agent_dock_widget_t::on_revert_patch_clicked()
         return;
     }
 
-    const QString work_dir = this->session_controller->current_project_dir();
+    const QString work_dir = review_project_dir(this->session_controller.get(), this->controller);
 
     QString error_msg;
     if (Diff::revert_patch(diff_to_revert, work_dir, error_msg))
@@ -2005,32 +2129,110 @@ void agent_dock_widget_t::on_diff_available(const QString &diff)
     this->sync_diff_ui(diff, diff.isEmpty() == false, true);
 }
 
-void agent_dock_widget_t::on_approval_requested(int id, const QString &action,
-                                                const QString &reason, const QString &preview)
+void agent_dock_widget_t::update_approval_selection_ui()
 {
-    auto *item = new QListWidgetItem(QStringLiteral("[#%1] %2 — %3").arg(id).arg(action, reason));
-    item->setData(Qt::UserRole, id);
-    item->setToolTip(preview);
-    this->approval_list->addItem(item);
-    this->approval_items[id] = item;
-    this->tabs->setCurrentWidget(this->approval_list);
-
-    // Show approval dialog
-    auto result = QMessageBox::question(
-        this, tr("Approval Required"),
-        QStringLiteral("%1\n\nReason: %2\n\nPreview:\n%3").arg(action, reason, preview.left(1000)),
-        QMessageBox::Yes | QMessageBox::No);
-
-    if (result == QMessageBox::Yes)
+    QListWidgetItem *item = this->approval_list->currentItem();
+    if (item == nullptr)
     {
-        item->setText(item->text() + QStringLiteral(" ✅"));
-        this->controller->approve_action(id);
+        this->approval_preview_view->clear();
+        this->approve_action_btn->setEnabled(false);
+        this->deny_action_btn->setEnabled(false);
+        return;
+    }
+
+    const QString preview = item->data(k_approval_preview_role).toString();
+    const bool pending = item->data(k_approval_pending_role).toBool();
+    const bool inline_review = item->data(k_approval_inline_role).toBool();
+
+    QString visible_preview = preview;
+    if (inline_review == true && pending == true)
+    {
+        visible_preview += QStringLiteral(
+            "\n\n---\nResolve this approval via inline accept/reject actions in the editor.");
+    }
+
+    this->approval_preview_view->setPlainText(visible_preview);
+    this->approve_action_btn->setEnabled(pending == true && inline_review == false);
+    this->deny_action_btn->setEnabled(pending == true && inline_review == false);
+}
+
+void agent_dock_widget_t::resolve_selected_approval(bool approved)
+{
+    QListWidgetItem *item = this->approval_list->currentItem();
+    if (item == nullptr)
+    {
+        return;
+    }
+
+    const int approval_id = item->data(Qt::UserRole).toInt();
+    const bool pending = item->data(k_approval_pending_role).toBool();
+    const bool inline_review = item->data(k_approval_inline_role).toBool();
+    if (pending == false || inline_review == true)
+    {
+        this->update_approval_selection_ui();
+        return;
+    }
+
+    item->setData(k_approval_pending_role, false);
+    item->setText(item->text() +
+                  (approved == true ? QStringLiteral(" ✅") : QStringLiteral(" ❌")));
+    this->approval_items.remove(approval_id);
+
+    if (approved == true)
+    {
+        this->controller->approve_action(approval_id);
     }
     else
     {
-        item->setText(item->text() + QStringLiteral(" ❌"));
-        this->controller->deny_action(id);
+        this->controller->deny_action(approval_id);
     }
+
+    this->update_approval_selection_ui();
+    this->session_controller->save_chat();
+}
+
+void agent_dock_widget_t::on_approval_requested(int id, const QString &action,
+                                                const QString &reason, const QString &preview)
+{
+    const QString project_dir =
+        review_project_dir(this->session_controller.get(), this->controller);
+    const inline_approval_diff_t inline_diff =
+        extract_inline_approval_diff(action, preview, project_dir);
+    const bool has_inline_review = inline_diff.review_diff.trimmed().isEmpty() == false;
+
+    auto *item = new QListWidgetItem(QStringLiteral("[#%1] %2 — %3").arg(id).arg(action, reason));
+    item->setData(Qt::UserRole, id);
+    item->setData(k_approval_preview_role,
+                  has_inline_review == true ? inline_diff.full_diff : preview);
+    item->setData(k_approval_pending_role, true);
+    item->setData(k_approval_inline_role, has_inline_review);
+    item->setToolTip(preview);
+    this->approval_list->addItem(item);
+    this->approval_items[id] = item;
+    this->approval_list->setCurrentItem(item);
+
+    if (has_inline_review == true)
+    {
+        this->active_inline_approval_id = id;
+        this->on_log_message(
+            QStringLiteral("📝 Review '%1' via inline diff annotations in the editor.")
+                .arg(action));
+        this->sync_diff_ui(inline_diff.review_diff, true, true);
+        if (auto *page = this->diff_view->parentWidget())
+        {
+            this->tabs->setCurrentWidget(page);
+        }
+    }
+    else
+    {
+        if (auto *page = this->approval_list->parentWidget())
+        {
+            this->tabs->setCurrentWidget(page);
+        }
+    }
+
+    this->update_approval_selection_ui();
+    this->session_controller->save_chat();
 }
 
 void agent_dock_widget_t::on_decision_requested(const agent_decision_request_t &request)
@@ -2059,6 +2261,7 @@ void agent_dock_widget_t::on_stopped(const QString &summary)
 {
     const agent_run_state_machine_t::state_t run_state = this->controller->current_run_state();
     this->update_run_state(false);
+    this->active_inline_approval_id = -1;
     if (this->decision_request_widget != nullptr)
     {
         this->decision_request_widget->clear_request();
@@ -2082,6 +2285,7 @@ void agent_dock_widget_t::on_stopped(const QString &summary)
     {
         this->status_label->setText(QStringLiteral("Done: %1").arg(summary.left(80)));
     }
+    this->update_approval_selection_ui();
     this->session_controller->save_chat();
 
     if (run_state != agent_run_state_machine_t::state_t::COMPLETED)

@@ -306,6 +306,8 @@ private:
      * Refreshes the diff tab state and optionally re-renders inline editor markers.
      */
     void sync_diff_ui(const QString &diff, bool focus_diff_tab, bool refresh_inline_markers);
+    void update_approval_selection_ui();
+    void resolve_selected_approval(bool approved);
     void refresh_conversation_list();
     void rename_selected_conversation();
     void delete_selected_conversation();
@@ -344,12 +346,15 @@ private:
     QPlainTextEdit *diff_view;
     QListWidget *diff_file_list;
     QListWidget *approval_list;
+    QPlainTextEdit *approval_preview_view = nullptr;
     QPlainTextEdit *debug_log_view;
 
     /** Persistent action buttons and status label. */
     QPushButton *apply_patch_btn;
     QPushButton *revert_patch_btn;
     QPushButton *copy_plan_btn;
+    QPushButton *approve_action_btn = nullptr;
+    QPushButton *deny_action_btn = nullptr;
     QLabel *status_label;
     QLabel *request_duration_label = nullptr;
     QLabel *usage_value_label;
@@ -402,6 +407,9 @@ private:
 
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> approval_items;
+
+    /** Pending `apply_patch` approval currently being reviewed via inline editor annotations. */
+    int active_inline_approval_id = -1;
 
     /** Short timer that batches frequent log renders while streaming. */
     QTimer *render_throttle;

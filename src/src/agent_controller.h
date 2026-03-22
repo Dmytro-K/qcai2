@@ -145,6 +145,17 @@ public:
     void deny_action(int approval_id);
 
     /**
+     * Resolves an `apply_patch` approval using already reviewed inline diff hunks.
+     * Accepted hunks are assumed to be already applied in the editor.
+     * @param approval_id Pending approval id.
+     * @param accepted_diff Unified diff hunks accepted inline and already applied to disk.
+     * @param rejected_diff Unified diff hunks rejected inline and still needing an alternative.
+     * @return True when the pending approval was resolved.
+     */
+    bool resolve_apply_patch_inline_approval(int approval_id, const QString &accepted_diff,
+                                             const QString &rejected_diff);
+
+    /**
      * Submits one structured user-decision answer and resumes the paused run.
      * @param request_id Identifier of the pending decision request.
      * @param option_id Identifier of the chosen predefined option, if any.

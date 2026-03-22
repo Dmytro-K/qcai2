@@ -25,6 +25,7 @@ jobs:
     outputs:
         tag: ${{ steps.git.outputs.tag }}
     strategy:
+      fail-fast: false
       matrix:
         config:
           - {
@@ -238,21 +239,47 @@ jobs:
         windows_test_path=
 
         if [ "${RUNNER_OS}" = "Windows" ]; then
-          if [ -d /usr/bin ]; then
-            git_usr_bin="/usr/bin"
-          else
-            git_bin_dir="$(dirname "$(command -v git)")"
-            git_usr_bin="$(cd "${git_bin_dir}/../../usr/bin" && pwd)"
+          git_bin_dir="$(dirname "$(command -v git)")"
+          git_root=
+          if [ "${git_bin_dir}" = "/usr/bin" ]; then
+            git_root="/"
+          elif [ "${git_bin_dir}" = "/cmd" ]; then
+            git_root="/"
+          elif [ "${git_bin_dir}" = "/bin" ]; then
+            git_root="/"
+          elif [[ "${git_bin_dir}" == */usr/bin ]]; then
+            git_root="${git_bin_dir%/usr/bin}"
+          elif [[ "${git_bin_dir}" == */cmd ]]; then
+            git_root="${git_bin_dir%/cmd}"
+          elif [[ "${git_bin_dir}" == */bin ]]; then
+            git_root="${git_bin_dir%/bin}"
+          fi
+          if [ -z "${git_root}" ]; then
+            echo "::warning::Could not determine Git root from ${git_bin_dir}; falling back to inherited PATH only."
           fi
           windows_qt_prefix="$(cygpath -u "${qt_prefix}")"
           windows_qtcreator_path="$(cd "${{ steps.qt_creator.outputs.path }}" && pwd)"
           windows_qt_bin="$(cygpath -w "${windows_qt_prefix}/bin")"
           windows_qtcreator_bin="$(cygpath -w "${windows_qtcreator_path}/bin")"
           windows_qtcreator_lib="$(cygpath -w "${windows_qtcreator_path}/lib/qtcreator")"
-          windows_git_usr_bin="$(cygpath -w "${git_usr_bin}")"
           windows_inherited_path="$(cygpath -wp "${PATH}")"
-          windows_test_path="${windows_qt_bin};${windows_qtcreator_bin};${windows_qtcreator_lib};${windows_git_usr_bin};${windows_inherited_path}"
-          echo "Using Windows test PATH additions: ${windows_qt_bin} ; ${windows_qtcreator_bin} ; ${windows_qtcreator_lib} ; ${windows_git_usr_bin}"
+          windows_git_path=
+          for candidate in "${git_root}/cmd" "${git_root}/bin" "${git_root}/usr/bin"; do
+            if [ -n "${git_root}" ] && [ -d "${candidate}" ]; then
+              candidate_win="$(cygpath -w "${candidate}")"
+              if [ -z "${windows_git_path}" ]; then
+                windows_git_path="${candidate_win}"
+              else
+                windows_git_path="${windows_git_path};${candidate_win}"
+              fi
+            fi
+          done
+          if [ -n "${windows_git_path}" ]; then
+            windows_test_path="${windows_qt_bin};${windows_qtcreator_bin};${windows_qtcreator_lib};${windows_git_path};${windows_inherited_path}"
+          else
+            windows_test_path="${windows_qt_bin};${windows_qtcreator_bin};${windows_qtcreator_lib};${windows_inherited_path}"
+          fi
+          echo "Using Windows test PATH additions: ${windows_qt_bin} ; ${windows_qtcreator_bin} ; ${windows_qtcreator_lib} ; ${windows_git_path}"
         fi
 
         cmake_args=(
@@ -280,7 +307,28 @@ jobs:
         if [ "${RUNNER_OS}" = "Linux" ]; then
           QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
         elif [ "${RUNNER_OS}" = "Windows" ]; then
-          cmake -E env "PATH=${windows_test_path}" ctest --test-dir build --output-on-failure
+          if ! cmake -E env "PATH=${windows_test_path}" ctest --test-dir build --output-on-failure; then
+            if [ -f build/Testing/Temporary/LastTestsFailed.log ]; then
+              echo "----- build/Testing/Temporary/LastTestsFailed.log -----"
+              cat build/Testing/Temporary/LastTestsFailed.log
+            fi
+            if [ -f build/Testing/Temporary/LastTest.log ]; then
+              echo "----- build/Testing/Temporary/LastTest.log -----"
+              cat build/Testing/Temporary/LastTest.log
+            fi
+            echo "----- ctest --rerun-failed -VV -----"
+            cmake -E env "PATH=${windows_test_path}" ctest --test-dir build --rerun-failed -VV \
+              --output-on-failure || true
+            if [ -f build/Testing/Temporary/LastTestsFailed.log ] && grep -q 'qcai2_file_tools' build/Testing/Temporary/LastTestsFailed.log; then
+              echo "----- direct qcai2_file_tools rerun -----"
+              echo "Windows test PATH: ${windows_test_path}"
+              type -a git || true
+              git --version || true
+              cmake -E env "PATH=${windows_test_path}" "QCAI2_FILE_TOOLS_DEBUG=1" \
+                build/src/tests/tst_qcai2_file_tools.exe -v2 || true
+            fi
+            exit 1
+          fi
         else
           ctest --test-dir build --output-on-failure
         fi

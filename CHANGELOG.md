@@ -17,6 +17,7 @@
 
 - Fixed compaction
 - Project/system prompt loading now also reads standard AI instruction files such as `AGENTS.md`, etc
+- Fixed diff preview
 
 ## [0.0.7] - 2026-03-21
 

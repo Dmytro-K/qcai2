@@ -84,6 +84,41 @@ QString merge_diff_sections(const QString &left, const QString &right)
     return normalized_left + QStringLiteral("\n") + normalized_right;
 }
 
+QString strip_modified_headers(const QString &diff)
+{
+    const QStringList lines = diff.split(QLatin1Char('\n'));
+    QStringList clean_lines;
+    clean_lines.reserve(lines.size());
+    for (const QString &line : lines)
+    {
+        if (line.startsWith(QStringLiteral("=== MODIFIED:")) == false)
+        {
+            clean_lines.append(line);
+        }
+    }
+    return clean_lines.join(QLatin1Char('\n'));
+}
+
+QString previewable_apply_patch_diff(const QJsonObject &args, const QString &work_dir)
+{
+    const QString raw_diff = args.value(QStringLiteral("diff")).toString().trimmed();
+    if (raw_diff.isEmpty() == true)
+    {
+        return {};
+    }
+
+    const Diff::new_file_result_t extracted =
+        Diff::extract_and_create_new_files(raw_diff, work_dir, true);
+    if (extracted.error.isEmpty() == false)
+    {
+        QCAI_WARN("Agent", QStringLiteral("Failed to extract dry-run apply_patch preview: %1")
+                               .arg(extracted.error));
+        return Diff::normalize(strip_modified_headers(raw_diff)).trimmed();
+    }
+
+    return Diff::normalize(strip_modified_headers(extracted.remaining_diff)).trimmed();
+}
+
 int prompt_result_limit_for_tool(const QString &name)
 {
     if (name == QStringLiteral("show_compile_output") ||
@@ -1405,6 +1440,14 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
         return;
     }
 
+    // Get workDir from editor context
+    QString workDir;
+    if (this->context_provider != nullptr)
+    {
+        auto snap = this->context_provider->capture();
+        workDir = snap.project_dir;
+    }
+
     // Check if approval is required
     if (tool->requires_approval() && !this->dry_run)
     {
@@ -1429,18 +1472,9 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
         }
     }
 
-    // Execute
     ++this->current_tool_call_count;
     const agent_progress_operation_t operation = classify_tool_operation(name);
     const QString progressLabel = progress_label_for_tool(name, operation);
-    this->handle_normalized_progress_event(
-        {agent_progress_event_kind_t::TOOL_STARTED,
-         operation,
-         this->provider != nullptr ? this->provider->id() : QString(),
-         QStringLiteral("controller.tool.start"),
-         name,
-         progressLabel,
-         {}});
     const bool suppressReadFileLog = (name == QStringLiteral("read_file"));
     if (!suppressReadFileLog)
     {
@@ -1453,19 +1487,66 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
             .arg(name,
                  QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Compact)).left(200)));
 
-    // Get workDir from editor context
-    QString workDir;
-    if (this->context_provider != nullptr)
+    QString result;
+    if (tool->requires_approval() && this->dry_run)
     {
-        auto snap = this->context_provider->capture();
-        workDir = snap.project_dir;
+        if (name == QStringLiteral("apply_patch"))
+        {
+            this->final_diff_preview = previewable_apply_patch_diff(args, workDir);
+            if (this->final_diff_preview.isEmpty() == false)
+            {
+                emit this->diff_available(this->final_diff_preview);
+                emit this->log_message(
+                    QStringLiteral("📝 Dry-run blocked 'apply_patch' and showed the diff preview "
+                                   "instead of applying it."));
+                result = QStringLiteral(
+                    "Dry-run mode is enabled. Tool 'apply_patch' was not executed. The proposed "
+                    "diff is available for preview in the UI. Do not perform live changes; "
+                    "continue by summarizing or refining the patch only.");
+            }
+            else
+            {
+                result = QStringLiteral(
+                    "Dry-run mode is enabled. Tool 'apply_patch' was not executed, and no "
+                    "previewable unified diff could be extracted from its arguments. Continue "
+                    "without applying live changes.");
+            }
+        }
+        else
+        {
+            result =
+                QStringLiteral(
+                    "Dry-run mode is enabled. Tool '%1' was not executed because it requires "
+                    "approval and may modify the workspace or external state. Continue without "
+                    "performing live changes.")
+                    .arg(name);
+        }
+    }
+    else
+    {
+        this->handle_normalized_progress_event(
+            {agent_progress_event_kind_t::TOOL_STARTED,
+             operation,
+             this->provider != nullptr ? this->provider->id() : QString(),
+             QStringLiteral("controller.tool.start"),
+             name,
+             progressLabel,
+             {}});
+        result = tool->execute(args, workDir);
+        this->handle_normalized_progress_event(
+            {agent_progress_event_kind_t::TOOL_COMPLETED,
+             operation,
+             this->provider != nullptr ? this->provider->id() : QString(),
+             QStringLiteral("controller.tool.completed"),
+             name,
+             progressLabel,
+             {}});
     }
 
-    QString result = tool->execute(args, workDir);
     if (this->detailed_request_log != nullptr)
     {
         this->detailed_request_log->record_tool_event({this->current_iteration, name, args, result,
-                                                       false, false, false,
+                                                       tool->requires_approval(), false, false,
                                                        name.startsWith(QStringLiteral("mcp_"))});
     }
     if (this->chat_context_manager != nullptr)
@@ -1490,14 +1571,6 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
     {
         emit this->log_message(format_tool_result_log(result));
     }
-    this->handle_normalized_progress_event(
-        {agent_progress_event_kind_t::TOOL_COMPLETED,
-         operation,
-         this->provider != nullptr ? this->provider->id() : QString(),
-         QStringLiteral("controller.tool.completed"),
-         name,
-         progressLabel,
-         {}});
 
     if (this->apply_soft_steer_if_pending(QStringLiteral("after_tool_execution"), {}, {}, name,
                                           result) == true)
@@ -2007,6 +2080,115 @@ void agent_controller_t::approve_action(int approvalId)
             return;
         }
     }
+}
+
+bool agent_controller_t::resolve_apply_patch_inline_approval(int approval_id,
+                                                             const QString &accepted_diff,
+                                                             const QString &rejected_diff)
+{
+    if (!this->is_running())
+    {
+        return false;
+    }
+
+    const QString normalized_accepted = Diff::normalize(accepted_diff).trimmed();
+    const QString normalized_rejected = Diff::normalize(rejected_diff).trimmed();
+
+    for (int i = 0; i < this->pending_approvals.size(); ++i)
+    {
+        if (this->pending_approvals[i].id != approval_id ||
+            this->pending_approvals[i].tool_name != QStringLiteral("apply_patch"))
+        {
+            continue;
+        }
+
+        auto pa = this->pending_approvals.takeAt(i);
+
+        if (normalized_accepted.isEmpty() == true)
+        {
+            emit this->log_message(QStringLiteral("❌ Denied: %1").arg(pa.tool_name));
+            if (this->detailed_request_log != nullptr)
+            {
+                this->detailed_request_log->record_tool_event(
+                    {this->current_iteration,
+                     pa.tool_name,
+                     pa.tool_args,
+                     {},
+                     true,
+                     false,
+                     true,
+                     pa.tool_name.startsWith(QStringLiteral("mcp_"))});
+            }
+            this->append_controller_user_message(
+                QStringLiteral("The user rejected the proposed inline diff for '%1'. Find an "
+                               "alternative approach or finish.")
+                    .arg(pa.tool_name),
+                QStringLiteral("approval_denied"),
+                QJsonObject{{QStringLiteral("tool"), pa.tool_name},
+                            {QStringLiteral("inlineDiffReview"), true}});
+            this->run_next_iteration();
+            return true;
+        }
+
+        ++this->current_tool_call_count;
+        QString result;
+
+        if (normalized_rejected.isEmpty() == true)
+        {
+            result = QStringLiteral("Patch applied via inline diff review.");
+            emit this->log_message(
+                QStringLiteral("✅ Approved inline diff: %1").arg(pa.tool_name));
+            if (this->detailed_request_log != nullptr)
+            {
+                this->detailed_request_log->record_tool_event(
+                    {this->current_iteration, pa.tool_name, pa.tool_args, result, true, true,
+                     false, pa.tool_name.startsWith(QStringLiteral("mcp_"))});
+            }
+            this->append_controller_user_message(
+                QStringLiteral("Approved and executed '%1'. result_t:\n%2\n\nContinue.")
+                    .arg(pa.tool_name, result),
+                QStringLiteral("approved_tool_result"),
+                QJsonObject{{QStringLiteral("tool"), pa.tool_name},
+                            {QStringLiteral("inlineDiffReview"), true}});
+            this->run_next_iteration();
+            return true;
+        }
+
+        emit this->log_message(
+            QStringLiteral("↩️ Inline diff feedback received for '%1'. Asking the agent for a "
+                           "revised patch.")
+                .arg(pa.tool_name));
+
+        QString feedback =
+            QStringLiteral("The user reviewed your proposed inline diff for '%1'.\n\n")
+                .arg(pa.tool_name);
+        feedback += QStringLiteral("These accepted hunks are already applied to the workspace and "
+                                   "must be preserved exactly:\n%1\n\n")
+                        .arg(as_indented_code_block(normalized_accepted));
+        feedback += QStringLiteral("Replace the following rejected hunks with a different "
+                                   "approach:\n%1\n\n"
+                                   "Continue the task from the updated workspace state. Use the "
+                                   "available tools if needed.")
+                        .arg(as_indented_code_block(normalized_rejected));
+
+        if (this->detailed_request_log != nullptr)
+        {
+            this->detailed_request_log->record_tool_event(
+                {this->current_iteration, pa.tool_name, pa.tool_args,
+                 QStringLiteral("Patch partially applied via inline diff review."), true, true,
+                 false, pa.tool_name.startsWith(QStringLiteral("mcp_"))});
+        }
+        this->append_controller_user_message(
+            feedback, QStringLiteral("inline_diff_rejected"),
+            QJsonObject{{QStringLiteral("tool"), pa.tool_name},
+                        {QStringLiteral("inlineDiffReview"), true},
+                        {QStringLiteral("acceptedDiff"), normalized_accepted.left(4000)},
+                        {QStringLiteral("rejectedDiff"), normalized_rejected.left(4000)}});
+        this->run_next_iteration();
+        return true;
+    }
+
+    return false;
 }
 
 void agent_controller_t::deny_action(int approvalId)

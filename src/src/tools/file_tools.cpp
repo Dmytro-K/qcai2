@@ -116,12 +116,12 @@ QString apply_patch_tool_t::execute(const QJsonObject &args, const QString &work
             clean_lines.append(line);
         }
     }
-    const QString unified_diff = clean_lines.join('\n').trimmed();
+    const QString unified_diff = clean_lines.join('\n');
 
     int patch_lines = 0;
     int patch_files = 0;
 
-    if (unified_diff.isEmpty() == false)
+    if (unified_diff.trimmed().isEmpty() == false)
     {
         auto val = Diff::validate(unified_diff);
         if (((!val.valid) == true))

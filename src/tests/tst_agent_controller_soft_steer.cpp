@@ -164,6 +164,38 @@ private:
     agent_controller_t *controller = nullptr;
 };
 
+class counting_apply_patch_tool_t final : public i_tool_t
+{
+public:
+    QString name() const override
+    {
+        return QStringLiteral("apply_patch");
+    }
+
+    QString description() const override
+    {
+        return QStringLiteral("Counts executions.");
+    }
+
+    QJsonObject args_schema() const override
+    {
+        return QJsonObject{};
+    }
+
+    QString execute(const QJsonObject & /*args*/, const QString & /*work_dir*/) override
+    {
+        ++this->execute_count;
+        return QStringLiteral("unexpected-tool-execution");
+    }
+
+    bool requires_approval() const override
+    {
+        return true;
+    }
+
+    int execute_count = 0;
+};
+
 }  // namespace
 
 settings_t &settings()
@@ -600,6 +632,8 @@ private slots:
     void steering_during_tool_execution_replans_after_tool_completion();
     void steering_while_waiting_for_approval_restarts_without_manual_resolution();
     void steering_while_reviewing_inline_diff_clears_diff_and_restarts();
+    void inline_apply_patch_approval_uses_reviewed_diff_without_rerunning_tool();
+    void dry_run_apply_patch_tool_call_is_blocked_and_shows_preview();
     void decision_request_enters_waiting_state();
     void decision_request_without_id_gets_generated();
     void invalid_decision_request_retries_without_waiting();
@@ -875,6 +909,103 @@ void tst_agent_controller_soft_steer_t::
 
     provider.finish(QStringLiteral("{\"type\":\"final\",\"summary\":\"Updated after diff review\","
                                    "\"diff\":\"\"}"));
+    QTRY_COMPARE(stopped_spy.count(), 1);
+}
+
+void tst_agent_controller_soft_steer_t::
+    inline_apply_patch_approval_uses_reviewed_diff_without_rerunning_tool()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    auto apply_patch_tool = std::make_shared<counting_apply_patch_tool_t>();
+    registry.register_tool(apply_patch_tool);
+
+    QSignalSpy approval_spy(&controller, &agent_controller_t::approval_requested);
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+
+    controller.start(QStringLiteral("Initial request"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    QCOMPARE(provider.requests.size(), 1);
+
+    const QString diff =
+        QStringLiteral("--- a/file.cpp\n+++ b/file.cpp\n@@ -1 +1 @@\n-old\n+new\n");
+    const QString response = QString::fromUtf8(
+        QJsonDocument(QJsonObject{{QStringLiteral("type"), QStringLiteral("need_approval")},
+                                  {QStringLiteral("action"), QStringLiteral("apply_patch")},
+                                  {QStringLiteral("reason"), QStringLiteral("Apply code change")},
+                                  {QStringLiteral("preview"), diff}})
+            .toJson(QJsonDocument::Compact));
+    provider.finish(response);
+
+    QTRY_COMPARE(approval_spy.count(), 1);
+    const int approval_id = approval_spy.at(0).at(0).toInt();
+
+    QVERIFY(controller.resolve_apply_patch_inline_approval(
+        approval_id, diff, QStringLiteral("@@ -10 +10 @@\n-old2\n+new2\n")));
+    QTRY_COMPARE(provider.requests.size(), 2);
+    QCOMPARE(apply_patch_tool->execute_count, 0);
+
+    const QStringList user_messages =
+        message_contents(provider.requests.at(1).messages, QStringLiteral("user"));
+    QVERIFY(
+        user_messages.constLast().contains(QStringLiteral("accepted hunks are already applied")));
+    QVERIFY(user_messages.constLast().contains(
+        QStringLiteral("Replace the following rejected hunks")));
+
+    provider.finish(
+        QStringLiteral("{\"type\":\"final\",\"summary\":\"Revised patch after inline review\","
+                       "\"diff\":\"\"}"));
+    QTRY_COMPARE(stopped_spy.count(), 1);
+}
+
+void tst_agent_controller_soft_steer_t::
+    dry_run_apply_patch_tool_call_is_blocked_and_shows_preview()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    auto apply_patch_tool = std::make_shared<counting_apply_patch_tool_t>();
+    registry.register_tool(apply_patch_tool);
+
+    QSignalSpy diff_spy(&controller, &agent_controller_t::diff_available);
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+
+    controller.start(QStringLiteral("Initial request"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    QCOMPARE(provider.requests.size(), 1);
+
+    const QString diff =
+        QStringLiteral("--- a/file.cpp\n+++ b/file.cpp\n@@ -1 +1 @@\n-old\n+new\n");
+    const QString response = QString::fromUtf8(
+        QJsonDocument(
+            QJsonObject{{QStringLiteral("type"), QStringLiteral("tool_call")},
+                        {QStringLiteral("name"), QStringLiteral("apply_patch")},
+                        {QStringLiteral("args"), QJsonObject{{QStringLiteral("diff"), diff}}}})
+            .toJson(QJsonDocument::Compact));
+    provider.finish(response);
+
+    QTRY_COMPARE(diff_spy.count(), 1);
+    QCOMPARE(diff_spy.at(0).at(0).toString(), diff.trimmed());
+    QCOMPARE(apply_patch_tool->execute_count, 0);
+    QTRY_COMPARE(provider.requests.size(), 2);
+
+    const QStringList user_messages =
+        message_contents(provider.requests.at(1).messages, QStringLiteral("user"));
+    QVERIFY(
+        user_messages.constLast().contains(QStringLiteral("Tool 'apply_patch' was not executed")));
+    QVERIFY(user_messages.constLast().contains(QStringLiteral("diff is available for preview")));
+
+    provider.finish(
+        QStringLiteral("{\"type\":\"final\",\"summary\":\"Dry-run summary\",\"diff\":\"\"}"));
     QTRY_COMPARE(stopped_spy.count(), 1);
 }
 
