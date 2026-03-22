@@ -6,6 +6,9 @@
 
 #include "src/util/migration.h"
 
+#include <archive.h>
+#include <archive_entry.h>
+
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -22,6 +25,48 @@ namespace
 QString compact_json(const QJsonObject &object)
 {
     return QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact));
+}
+
+QStringList archive_entry_paths(const QString &archive_path)
+{
+    struct archive *archive_handle = archive_read_new();
+    if (archive_handle == nullptr)
+    {
+        return {};
+    }
+
+    QStringList entries;
+    const QByteArray encoded_path = QFile::encodeName(archive_path);
+    const bool opened =
+        archive_read_support_filter_xz(archive_handle) == ARCHIVE_OK &&
+        archive_read_support_format_tar(archive_handle) == ARCHIVE_OK &&
+        archive_read_open_filename(archive_handle, encoded_path.constData(), 10240) == ARCHIVE_OK;
+
+    if (opened == true)
+    {
+        struct archive_entry *entry = nullptr;
+        while (true)
+        {
+            const int result = archive_read_next_header(archive_handle, &entry);
+            if (result == ARCHIVE_EOF)
+            {
+                break;
+            }
+            if (result != ARCHIVE_OK)
+            {
+                entries.clear();
+                break;
+            }
+
+            entries.append(QString::fromUtf8(archive_entry_pathname(entry)));
+            archive_read_data_skip(archive_handle);
+        }
+    }
+
+    archive_read_close(archive_handle);
+    archive_read_free(archive_handle);
+    entries.sort();
+    return entries;
 }
 
 }  // namespace
@@ -116,6 +161,26 @@ void migration_test_t::migrate_project_state_moves_goal_and_log_to_sibling_files
         file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
         QVERIFY(file.commit());
     }
+    {
+        QSaveFile file(QDir(context_dir_path).filePath("rules.md"));
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+        file.write("Project rules");
+        QVERIFY(file.commit());
+    }
+    QVERIFY(QDir().mkpath(QDir(context_dir_path).filePath("conversations")));
+    {
+        QSaveFile file(QDir(context_dir_path).filePath("conversations/existing.json"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(R"({"goal":"Legacy"})");
+        QVERIFY(file.commit());
+    }
+    QVERIFY(QDir().mkpath(QDir(context_dir_path).filePath("logs")));
+    {
+        QSaveFile file(QDir(context_dir_path).filePath("logs/request-log-1.md"));
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+        file.write("# Request log");
+        QVERIFY(file.commit());
+    }
 
     QString error;
     const bool migrated = Migration::migrate_project_state(storage_path, &error);
@@ -160,7 +225,15 @@ void migration_test_t::migrate_project_state_moves_goal_and_log_to_sibling_files
     const QStringList backups = backup_dir.entryList(QStringList() << "*.tar.xz", QDir::Files);
     qInfo() << "Project backup archives" << backups;
     QCOMPARE(backups.size(), 1);
-    QVERIFY(backups.constFirst().contains("session__"));
+    QVERIFY(backups.constFirst().contains("qcai2__"));
+
+    const QStringList archived_entries =
+        archive_entry_paths(backup_dir.filePath(backups.constFirst()));
+    QVERIFY(archived_entries.contains(QStringLiteral(".qcai2/session.json")));
+    QVERIFY(archived_entries.contains(QStringLiteral(".qcai2/rules.md")));
+    QVERIFY(archived_entries.contains(QStringLiteral(".qcai2/conversations/existing.json")));
+    QVERIFY(archived_entries.contains(QStringLiteral(".qcai2/logs/request-log-1.md")));
+    QVERIFY(archived_entries.contains(QStringLiteral("manifest.json")));
 }
 
 void migration_test_t::migrate_project_state_renames_ignored_linked_files_key()

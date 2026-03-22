@@ -9,10 +9,12 @@
 #include <archive.h>
 #include <archive_entry.h>
 
+#include <algorithm>
 #include <cerrno>
 
 #include <QDateTime>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -116,6 +118,11 @@ QString sibling_file_path(const QString &storage_path, const QString &suffix)
 {
     const QFileInfo storage_info(storage_path);
     return storage_info.dir().filePath(storage_info.completeBaseName() + suffix);
+}
+
+QString project_context_dir_path(const QString &storage_path)
+{
+    return QFileInfo(storage_path).absolutePath();
 }
 
 QString project_rules_file_path(const QString &storage_path)
@@ -364,6 +371,68 @@ QByteArray manifest_json(const QString &kind, const QString &created_at,
 bool append_file_if_exists(QList<archive_entry_data_t> &entries, const QString &archive_name,
                            const QString &disk_path, QString *error);
 
+bool append_raw_file_if_exists(QList<archive_entry_data_t> &entries, const QString &archive_name,
+                               const QString &disk_path, QString *error)
+{
+    QFile file(disk_path);
+    if (file.exists() == false)
+    {
+        return true;
+    }
+
+    if (file.open(QIODevice::ReadOnly) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to open %1 for reading: %2")
+                         .arg(disk_path, file.errorString());
+        }
+        return false;
+    }
+
+    entries.append({archive_name, file.readAll()});
+    return true;
+}
+
+bool append_directory_tree(QList<archive_entry_data_t> &entries, const QString &archive_root,
+                           const QString &disk_dir_path, QString *error)
+{
+    const QFileInfo dir_info(disk_dir_path);
+    if (dir_info.exists() == false)
+    {
+        return true;
+    }
+    if (dir_info.isDir() == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Expected directory at %1").arg(disk_dir_path);
+        }
+        return false;
+    }
+
+    QStringList file_paths;
+    QDirIterator iterator(disk_dir_path, QDir::Files, QDirIterator::Subdirectories);
+    while (iterator.hasNext() == true)
+    {
+        file_paths.append(iterator.next());
+    }
+    std::sort(file_paths.begin(), file_paths.end());
+
+    const QDir root_dir(disk_dir_path);
+    for (const QString &file_path : file_paths)
+    {
+        const QString relative_path = root_dir.relativeFilePath(file_path);
+        const QString archive_path = QDir(archive_root).filePath(relative_path);
+        if (append_raw_file_if_exists(entries, archive_path, file_path, error) == false)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 QJsonObject settings_snapshot(QSettings &settings)
 {
     QJsonObject snapshot;
@@ -427,9 +496,8 @@ bool append_file_if_exists(QList<archive_entry_data_t> &entries, const QString &
     return true;
 }
 
-bool create_project_state_backup(const QString &storage_path, const QJsonObject &root,
-                                 const revision_t &from_revision, const revision_t &to_revision,
-                                 QString *error)
+bool create_project_state_backup(const QString &storage_path, const revision_t &from_revision,
+                                 const revision_t &to_revision, QString *error)
 {
     const QString backup_dir = ensure_project_backup_dir(storage_path);
     if (ensure_dir_exists(backup_dir, error) == false)
@@ -438,29 +506,32 @@ bool create_project_state_backup(const QString &storage_path, const QJsonObject 
     }
 
     const QFileInfo storage_info(storage_path);
+    const QFileInfo context_dir_info(project_context_dir_path(storage_path));
     const QString timestamp = iso8601_basic_timestamp_utc();
+    QString archive_stem = context_dir_info.fileName();
+    if (archive_stem.startsWith(QLatin1Char('.')) == true)
+    {
+        archive_stem.remove(0, 1);
+    }
+    if (archive_stem.isEmpty() == true)
+    {
+        archive_stem = storage_info.completeBaseName();
+    }
     const QString archive_path =
         QDir(backup_dir)
             .filePath(QStringLiteral("%1__%2__%3_to_%4.tar.xz")
-                          .arg(storage_info.completeBaseName(), timestamp,
-                               revision_label(from_revision), revision_label(to_revision)));
+                          .arg(archive_stem, timestamp, revision_label(from_revision),
+                               revision_label(to_revision)));
 
     QList<archive_entry_data_t> entries;
-    entries.append({storage_info.fileName(), QJsonDocument(root).toJson(QJsonDocument::Indented)});
-    if (!append_file_if_exists(entries, QFileInfo(project_goal_file_path(storage_path)).fileName(),
-                               project_goal_file_path(storage_path), error))
-    {
-        return false;
-    }
-    if (!append_file_if_exists(entries,
-                               QFileInfo(project_actions_log_file_path(storage_path)).fileName(),
-                               project_actions_log_file_path(storage_path), error))
+    if (append_directory_tree(entries, context_dir_info.fileName(),
+                              context_dir_info.absoluteFilePath(), error) == false)
     {
         return false;
     }
     entries.append({QStringLiteral("manifest.json"),
                     manifest_json(QStringLiteral("project-state"), timestamp, from_revision,
-                                  to_revision, storage_path)});
+                                  to_revision, context_dir_info.absoluteFilePath())});
     return create_tar_xz_archive(archive_path, entries, error);
 }
 
@@ -785,7 +856,7 @@ bool migrate_project_state(const QString &storage_path, QString *error)
     if (((!stored.valid || stored.revision_string() != current.revision_string()) == true) ||
         needs_0_0_7_001_repair == true)
     {
-        if (create_project_state_backup(storage_path, root, stored, current, error) == false)
+        if (create_project_state_backup(storage_path, stored, current, error) == false)
         {
             return false;
         }
