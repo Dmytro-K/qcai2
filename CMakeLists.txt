@@ -951,7 +951,7 @@ set(SRC_IDE
     .clang-format
     .github/workflows/README.md
     .github/workflows/build_cmake.yml
-    ai/ai-context.md
+    AGENTS.md
     LICENSE
     README.md
     CHANGELOG.md
