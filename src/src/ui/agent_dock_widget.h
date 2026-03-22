@@ -88,6 +88,11 @@ private:
     void on_copy_plan_clicked();
 
     /**
+     * Clears the Debug Log view and retained in-memory logger entries.
+     */
+    void on_clear_debug_clicked();
+
+    /**
      * Appends a timestamped log entry to the log view.
      * @param msg Log message text.
      */

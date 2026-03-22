@@ -1092,6 +1092,7 @@ void agent_dock_widget_t::setup_ui()
     this->copy_plan_btn = this->ui->copyPlanBtn;
     this->rename_conversation_btn = this->ui->renameConversationBtn;
     this->delete_conversation_btn = this->ui->deleteConversationBtn;
+    auto *clear_debug_btn = this->ui->clearDebugBtn;
     auto *new_chat_btn = this->ui->newChatButton;
 
     this->ui->contentSplitter->setStretchFactor(0, 3);
@@ -1202,6 +1203,8 @@ void agent_dock_widget_t::setup_ui()
     });
     connect(this->copy_plan_btn, &QPushButton::clicked, this,
             &agent_dock_widget_t::on_copy_plan_clicked);
+    connect(clear_debug_btn, &QPushButton::clicked, this,
+            &agent_dock_widget_t::on_clear_debug_clicked);
     connect(this->rename_conversation_btn, &QPushButton::clicked, this,
             &agent_dock_widget_t::rename_selected_conversation);
     connect(this->delete_conversation_btn, &QPushButton::clicked, this,
@@ -1506,6 +1509,12 @@ void agent_dock_widget_t::on_copy_plan_clicked()
         items.append(this->plan_list->item(i)->text());
     }
     QGuiApplication::clipboard()->setText(items.join('\n'));
+}
+
+void agent_dock_widget_t::on_clear_debug_clicked()
+{
+    logger_t::instance().clear();
+    this->debug_log_view->clear();
 }
 
 void agent_dock_widget_t::on_log_message(const QString &msg)
