@@ -12,6 +12,7 @@
 #include "../util/diff.h"
 #include "../util/logger.h"
 #include "../util/migration.h"
+#include "auto_hiding_list_widget.h"
 #include "ui_agent_dock_widget.h"
 
 #include <coreplugin/editormanager/editormanager.h>
@@ -840,6 +841,11 @@ void agent_dock_widget_t::focus_goal_input()
     this->goal_edit->setTextCursor(cursor);
 }
 
+void agent_dock_widget_t::queue_current_request()
+{
+    this->on_queue_clicked();
+}
+
 QString agent_dock_widget_t::current_log_markdown() const
 {
     QString text = this->log_markdown;
@@ -942,8 +948,11 @@ void agent_dock_widget_t::clear_chat_state()
     this->applied_diff.clear();
     this->current_diff.clear();
     this->status_label->setText(tr("Ready"));
-    this->deferred_run_goal.clear();
+    this->deferred_request = queued_request_t{};
+    this->has_deferred_request = false;
     this->skip_auto_compact_once = false;
+    this->request_queue.clear();
+    this->refresh_pending_items_view();
     this->reset_usage_display();
     this->apply_patch_btn->setEnabled(false);
     this->revert_patch_btn->setEnabled(false);
@@ -1108,6 +1117,22 @@ void agent_dock_widget_t::setup_ui()
     this->delete_conversation_btn = this->ui->deleteConversationBtn;
     auto *clear_debug_btn = this->ui->clearDebugBtn;
     auto *new_chat_btn = this->ui->newChatButton;
+    this->queue_btn = new QPushButton(tr("Queue"), this);
+    this->queue_btn->setObjectName(QStringLiteral("queueBtn"));
+    this->pending_items_view = new auto_hiding_list_widget_t(this);
+    this->pending_items_view->setObjectName(QStringLiteral("pendingItemsView"));
+    this->pending_items_view->setSelectionMode(QAbstractItemView::NoSelection);
+    this->pending_items_view->setFocusPolicy(Qt::NoFocus);
+    this->pending_items_view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    this->pending_items_view->setWordWrap(true);
+    this->pending_items_view->setUniformItemSizes(false);
+    this->pending_items_view->setAlternatingRowColors(true);
+    this->pending_items_view->setToolTip(
+        tr("Pending items that will run automatically in FIFO order."));
+    this->pending_items_view->setMaximumHeight(this->fontMetrics().height() * 5);
+    this->ui->inputPanelLayout->insertWidget(0, this->pending_items_view);
+    this->ui->btnColumn->insertWidget(this->ui->btnColumn->indexOf(this->run_btn) + 1,
+                                      this->queue_btn);
 
     this->ui->contentSplitter->setStretchFactor(0, 3);
     this->ui->contentSplitter->setStretchFactor(1, 1);
@@ -1261,6 +1286,7 @@ void agent_dock_widget_t::setup_ui()
         });
 
     connect(this->run_btn, &QPushButton::clicked, this, &agent_dock_widget_t::on_run_clicked);
+    connect(this->queue_btn, &QPushButton::clicked, this, &agent_dock_widget_t::on_queue_clicked);
     connect(this->stop_btn, &QPushButton::clicked, this, &agent_dock_widget_t::on_stop_clicked);
     connect(this->project_combo, &QComboBox::currentIndexChanged, this, [this](int index) {
         if (index < 0)
@@ -1319,12 +1345,17 @@ void agent_dock_widget_t::setup_ui()
     goal_select_all_shortcut->setContext(Qt::WidgetShortcut);
     QObject::connect(goal_select_all_shortcut, &QShortcut::activated, this->goal_edit,
                      &QTextEdit::selectAll);
+    this->refresh_pending_items_view();
 }
 
 void agent_dock_widget_t::update_run_state(bool running)
 {
     this->run_btn->setEnabled(true);
     this->run_btn->setText(running ? tr("Steer") : tr("Run"));
+    if (this->queue_btn != nullptr)
+    {
+        this->queue_btn->setEnabled(true);
+    }
     this->stop_btn->setEnabled(running);
     this->goal_edit->setReadOnly(false);
     this->mode_combo->setEnabled(!running);
@@ -1388,6 +1419,110 @@ bool agent_dock_widget_t::try_execute_slash_command(QString &goal)
     return true;
 }
 
+queued_request_t agent_dock_widget_t::capture_current_request(const QString &goal) const
+{
+    queued_request_t request;
+    request.goal = goal.trimmed();
+    request.request_context = this->linked_files_controller->linked_files_prompt_context();
+    request.linked_files = this->linked_files_controller->effective_linked_files();
+    request.dry_run = this->dry_run_check->isChecked();
+    request.run_mode = this->mode_combo->currentData().toString() == QStringLiteral("ask")
+                           ? agent_controller_t::run_mode_t::ASK
+                           : agent_controller_t::run_mode_t::AGENT;
+    request.model_name = this->model_combo->currentText().trimmed();
+    request.reasoning_effort = this->reasoning_combo->currentData().toString();
+    request.thinking_level = this->thinking_combo->currentData().toString();
+    return request;
+}
+
+void agent_dock_widget_t::start_request(const queued_request_t &request)
+{
+    if (request.is_valid() == false)
+    {
+        return;
+    }
+
+    queued_request_t request_to_start = request;
+
+    const auto &s = settings();
+    const int prev_input_tokens = this->displayed_usage.input_tokens;
+    const bool auto_compact_needed = s.auto_compact_enabled && !this->skip_auto_compact_once &&
+                                     prev_input_tokens >= s.auto_compact_threshold_tokens &&
+                                     prev_input_tokens >= 0 && this->has_deferred_request == false;
+    this->skip_auto_compact_once = false;
+
+    if (auto_compact_needed)
+    {
+        this->deferred_request = request;
+        this->has_deferred_request = true;
+        request_to_start.goal = compact_prompt_text();
+        emit this->controller->log_message(
+            QStringLiteral("🗜 Auto-compact triggered (context: %1 tokens ≥ %2). "
+                           "Compacting before running your request…")
+                .arg(prev_input_tokens)
+                .arg(s.auto_compact_threshold_tokens));
+    }
+
+    this->reset_usage_display(settings().provider, request.model_name);
+    this->last_committed_streaming_markdown.clear();
+    this->controller->set_request_context(request_to_start.request_context,
+                                          request_to_start.linked_files);
+    this->goal_edit->clear();
+    this->linked_files_controller->clear_state();
+    this->linked_files_controller->refresh_ui();
+
+    this->update_run_state(true);
+    this->tabs->setCurrentWidget(this->log_view);
+    this->controller->start(request_to_start.goal, request_to_start.dry_run,
+                            request_to_start.run_mode, request_to_start.model_name,
+                            request_to_start.reasoning_effort, request_to_start.thinking_level);
+}
+
+bool agent_dock_widget_t::enqueue_request(const queued_request_t &request)
+{
+    if (this->request_queue.enqueue(request) == false)
+    {
+        return false;
+    }
+
+    this->refresh_pending_items_view();
+    return true;
+}
+
+void agent_dock_widget_t::maybe_start_next_queued_request()
+{
+    if (this->controller->is_running() == true)
+    {
+        return;
+    }
+
+    queued_request_t next_request;
+    if (this->request_queue.take_next(&next_request) == false)
+    {
+        this->refresh_pending_items_view();
+        return;
+    }
+
+    this->refresh_pending_items_view();
+    this->start_request(next_request);
+}
+
+void agent_dock_widget_t::refresh_pending_items_view()
+{
+    if (this->pending_items_view == nullptr)
+    {
+        return;
+    }
+
+    this->pending_items_view->clear();
+    for (const queued_request_t &request : this->request_queue.items())
+    {
+        auto *item = new QListWidgetItem(request.display_text(), this->pending_items_view);
+        item->setToolTip(request.goal);
+    }
+    this->pending_items_view->refresh_visibility();
+}
+
 void agent_dock_widget_t::on_run_clicked()
 {
     QString goal = this->goal_edit->toPlainText().trimmed();
@@ -1416,51 +1551,51 @@ void agent_dock_widget_t::on_run_clicked()
         return;
     }
 
-    const QString selected_model = this->model_combo->currentText().trimmed();
-    const QString selected_mode = this->mode_combo->currentData().toString();
-
-    // Auto-compact: if enabled and the previous run's input-token count exceeded the
-    // threshold, run a compact pass first, then restart with the original goal.
-    const auto &s = settings();
-    const int prev_input_tokens = this->displayed_usage.input_tokens;
-    const bool auto_compact_needed = s.auto_compact_enabled && !this->skip_auto_compact_once &&
-                                     prev_input_tokens >= s.auto_compact_threshold_tokens &&
-                                     prev_input_tokens >= 0 && this->deferred_run_goal.isEmpty();
-    this->skip_auto_compact_once = false;
-
-    if (auto_compact_needed)
-    {
-        this->deferred_run_goal = goal;
-        goal = compact_prompt_text();
-        emit this->controller->log_message(
-            QStringLiteral("🗜 Auto-compact triggered (context: %1 tokens ≥ %2). "
-                           "Compacting before running your request…")
-                .arg(prev_input_tokens)
-                .arg(s.auto_compact_threshold_tokens));
-    }
-
-    this->reset_usage_display(settings().provider, selected_model);
-    this->last_committed_streaming_markdown.clear();
-    this->controller->set_request_context(
-        this->linked_files_controller->linked_files_prompt_context(),
-        this->linked_files_controller->effective_linked_files());
-    this->goal_edit->clear();
-
-    this->update_run_state(true);
-    this->tabs->setCurrentWidget(this->log_view);
-    this->controller->start(goal, this->dry_run_check->isChecked(),
-                            selected_mode == QStringLiteral("ask")
-                                ? agent_controller_t::run_mode_t::ASK
-                                : agent_controller_t::run_mode_t::AGENT,
-                            selected_model, this->reasoning_combo->currentData().toString(),
-                            this->thinking_combo->currentData().toString());
+    this->start_request(this->capture_current_request(goal));
 }
 
 void agent_dock_widget_t::on_stop_clicked()
 {
-    this->deferred_run_goal.clear();
+    this->deferred_request = queued_request_t{};
+    this->has_deferred_request = false;
     this->controller->stop();
     this->update_run_state(false);
+}
+
+void agent_dock_widget_t::on_queue_clicked()
+{
+    const QString goal = this->goal_edit->toPlainText().trimmed();
+    if (goal.isEmpty() == true)
+    {
+        return;
+    }
+
+    if (goal.startsWith(QLatin1Char('/')) == true)
+    {
+        this->tabs->setCurrentWidget(this->log_view);
+        this->on_log_message(
+            tr("Queued requests do not support slash commands. Use Run instead."));
+        return;
+    }
+
+    const queued_request_t request = this->capture_current_request(goal);
+    if (this->enqueue_request(request) == false)
+    {
+        return;
+    }
+
+    this->goal_edit->clear();
+    this->linked_files_controller->clear_state();
+    this->linked_files_controller->refresh_ui();
+    this->tabs->setCurrentWidget(this->log_view);
+    this->status_label->setText(tr("Queued %1 request(s)").arg(this->request_queue.size()));
+    this->on_log_message(QStringLiteral("📥 Queued request: %1").arg(request.display_text()));
+    this->session_controller->save_chat();
+
+    if (this->controller->is_running() == false && this->has_deferred_request == false)
+    {
+        this->maybe_start_next_queued_request();
+    }
 }
 
 void agent_dock_widget_t::on_apply_patch_clicked()
@@ -1781,6 +1916,7 @@ void agent_dock_widget_t::on_iteration_changed(int iteration)
 
 void agent_dock_widget_t::on_stopped(const QString &summary)
 {
+    const agent_run_state_machine_t::state_t run_state = this->controller->current_run_state();
     this->update_run_state(false);
     if (this->render_throttle->isActive())
     {
@@ -1799,20 +1935,26 @@ void agent_dock_widget_t::on_stopped(const QString &summary)
     }
     this->session_controller->save_chat();
 
-    // If a deferred goal was queued by auto-compact, launch it now.
-    if (!this->deferred_run_goal.isEmpty())
+    if (run_state != agent_run_state_machine_t::state_t::COMPLETED)
     {
-        const QString goal = this->deferred_run_goal;
-        this->deferred_run_goal.clear();
+        this->deferred_request = queued_request_t{};
+        this->has_deferred_request = false;
+        return;
+    }
+
+    if (this->has_deferred_request == true)
+    {
+        const queued_request_t request = this->deferred_request;
+        this->deferred_request = queued_request_t{};
+        this->has_deferred_request = false;
         this->skip_auto_compact_once = true;
         QMetaObject::invokeMethod(
-            this,
-            [this, goal]() {
-                this->goal_edit->setPlainText(goal);
-                this->on_run_clicked();
-            },
-            Qt::QueuedConnection);
+            this, [this, request]() { this->start_request(request); }, Qt::QueuedConnection);
+        return;
     }
+
+    QMetaObject::invokeMethod(
+        this, [this]() { this->maybe_start_next_queued_request(); }, Qt::QueuedConnection);
 }
 
 bool agent_dock_widget_t::eventFilter(QObject *obj, QEvent *event)

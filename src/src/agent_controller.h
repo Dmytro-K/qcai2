@@ -161,6 +161,14 @@ public:
     }
 
     /**
+     * Returns the current high-level run lifecycle state.
+     */
+    agent_run_state_machine_t::state_t current_run_state() const
+    {
+        return this->run_state_machine.current_state();
+    }
+
+    /**
      * Returns the completed iteration count for the active run.
      */
     int iteration() const

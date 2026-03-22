@@ -6,6 +6,7 @@
 #include "../diff/inline_diff_manager.h"
 #include "../goal/goal_text_edit.h"
 #include "../goal/linked_files_list_widget.h"
+#include "request_queue.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -33,6 +34,7 @@ namespace qcai2
 
 class agent_dock_linked_files_controller_t;
 class agent_dock_session_controller_t;
+class auto_hiding_list_widget_t;
 class chat_context_manager_t;
 
 /**
@@ -61,6 +63,11 @@ public:
      */
     void focus_goal_input();
 
+    /**
+     * Queues the current request using the same behavior as the dock Queue button.
+     */
+    void queue_current_request();
+
 private:
     /**
      * Starts a run using the current goal, model, and dry-run settings.
@@ -71,6 +78,11 @@ private:
      * Stops the active run and re-enables editing controls.
      */
     void on_stop_clicked();
+
+    /**
+     * Queues the current request to run after the active one fully finishes.
+     */
+    void on_queue_clicked();
 
     /**
      * Applies the currently approved subset of the diff preview.
@@ -161,6 +173,31 @@ private:
     bool try_execute_slash_command(QString &goal);
 
     /**
+     * Captures the current UI state as one executable request.
+     */
+    queued_request_t capture_current_request(const QString &goal) const;
+
+    /**
+     * Starts one captured request, applying auto-compact when needed.
+     */
+    void start_request(const queued_request_t &request);
+
+    /**
+     * Appends one request to the local FIFO queue and refreshes the pending-items UI.
+     */
+    bool enqueue_request(const queued_request_t &request);
+
+    /**
+     * Starts the next queued request when the controller is idle.
+     */
+    void maybe_start_next_queued_request();
+
+    /**
+     * Rebuilds the generic pending-items list from the current queue state.
+     */
+    void refresh_pending_items_view();
+
+    /**
      * Handles keyboard shortcuts from the goal editor.
      * @param obj JSON object to convert.
      * @param event Event being filtered.
@@ -241,8 +278,10 @@ private:
     QComboBox *reasoning_combo;
     QComboBox *thinking_combo;
     QPushButton *run_btn;
+    QPushButton *queue_btn = nullptr;
     QPushButton *stop_btn;
     QCheckBox *dry_run_check;
+    auto_hiding_list_widget_t *pending_items_view = nullptr;
 
     /** Views hosted in the tab widget. */
     QTabWidget *tabs;
@@ -298,10 +337,14 @@ private:
     provider_usage_t displayed_usage;
     int displayed_provider_request_count = 0;
 
-    /** Auto-compact: original user goal queued to run after an auto-compact pass completes. */
-    QString deferred_run_goal;
+    /** Auto-compact: original user request queued to run after an auto-compact pass completes. */
+    queued_request_t deferred_request;
+    bool has_deferred_request = false;
     /** Set to true after auto-compact finishes to skip re-triggering on the follow-up run. */
     bool skip_auto_compact_once = false;
+
+    /** FIFO queue of full requests waiting to run after the active one. */
+    request_queue_t request_queue;
 
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> approval_items;

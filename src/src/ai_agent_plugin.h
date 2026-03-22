@@ -3,6 +3,8 @@
 
 #include <extensionsystem/iplugin.h>
 
+#include <functional>
+
 namespace qcai2
 {
 
@@ -68,6 +70,16 @@ private:
      * Activates the AI Agent sidebar widget and focuses the goal editor.
      */
     void focus_goal_input();
+
+    /**
+     * Activates the AI Agent sidebar widget and queues the current draft request.
+     */
+    void queue_current_request();
+
+    /**
+     * Activates the AI Agent sidebar widget, then invokes a callback on it.
+     */
+    void with_agent_dock_widget(const std::function<void(agent_dock_widget_t *)> &callback);
 
     /**
      * Instantiates all supported providers and selects the active one.

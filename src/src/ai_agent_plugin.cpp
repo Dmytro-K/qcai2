@@ -220,6 +220,12 @@ void ai_agent_plugin_t::initialize()
         .setText(tr_t::tr("Focus AI Agent Goal"))
         .setDefaultKeySequence(tr_t::tr("Ctrl+Shift+Alt+S"))
         .addOnTriggered(this, &ai_agent_plugin_t::focus_goal_input);
+
+    ActionBuilder(this, Constants::queue_request_action_id)
+        .addToContainer(Constants::menu_id)
+        .setText(tr_t::tr("Queue AI Agent Request"))
+        .setDefaultKeySequence(tr_t::tr("Ctrl+Enter"))
+        .addOnTriggered(this, &ai_agent_plugin_t::queue_current_request);
 }
 
 void ai_agent_plugin_t::extensionsInitialized()
@@ -306,14 +312,38 @@ void ai_agent_plugin_t::focus_goal_input()
         return;
     }
 
+    this->with_agent_dock_widget([](agent_dock_widget_t *dock_widget) {
+        QMetaObject::invokeMethod(
+            dock_widget, [dock_widget]() { dock_widget->focus_goal_input(); },
+            Qt::QueuedConnection);
+    });
+}
+
+void ai_agent_plugin_t::queue_current_request()
+{
+    if (ICore::mainWindow() == nullptr)
+    {
+        QMetaObject::invokeMethod(this, &ai_agent_plugin_t::queue_current_request,
+                                  Qt::QueuedConnection);
+        return;
+    }
+
+    this->with_agent_dock_widget([](agent_dock_widget_t *dock_widget) {
+        QMetaObject::invokeMethod(
+            dock_widget, [dock_widget]() { dock_widget->queue_current_request(); },
+            Qt::QueuedConnection);
+    });
+}
+
+void ai_agent_plugin_t::with_agent_dock_widget(
+    const std::function<void(agent_dock_widget_t *)> &callback)
+{
     if (QWidget *widget =
             NavigationWidget::activateSubWidget(Constants::navigation_id, Side::Right))
     {
         if (auto *dock_widget = qobject_cast<agent_dock_widget_t *>(widget))
         {
-            QMetaObject::invokeMethod(
-                dock_widget, [dock_widget]() { dock_widget->focus_goal_input(); },
-                Qt::QueuedConnection);
+            callback(dock_widget);
         }
         else
         {

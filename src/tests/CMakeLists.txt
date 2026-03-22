@@ -111,6 +111,40 @@ target_link_libraries(tst_qcai2_agent_run_state_machine PRIVATE
 )
 qcai2_register_test(qcai2_agent_run_state_machine tst_qcai2_agent_run_state_machine)
 
+add_executable(tst_qcai2_request_queue
+    tst_request_queue.cpp
+    ../src/ui/request_queue.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_request_queue)
+
+target_include_directories(tst_qcai2_request_queue PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_request_queue PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_request_queue tst_qcai2_request_queue)
+
+add_executable(tst_qcai2_auto_hiding_list_widget
+    tst_auto_hiding_list_widget.cpp
+    ../src/ui/auto_hiding_list_widget.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_auto_hiding_list_widget)
+
+target_include_directories(tst_qcai2_auto_hiding_list_widget PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_auto_hiding_list_widget PRIVATE
+    Qt::Core
+    Qt::Gui
+    Qt::Widgets
+    Qt::Test
+)
+qcai2_register_test(qcai2_auto_hiding_list_widget tst_qcai2_auto_hiding_list_widget)
+
 add_executable(tst_qcai2_agent_controller_soft_steer
     tst_agent_controller_soft_steer.cpp
     ../src/agent_controller.cpp

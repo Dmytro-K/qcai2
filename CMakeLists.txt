@@ -538,6 +538,10 @@ add_qtc_plugin(qcai2
     src/src/agent_controller.cpp
     src/src/ui/agent_dock_widget.h
     src/src/ui/agent_dock_widget.cpp
+    src/src/ui/auto_hiding_list_widget.h
+    src/src/ui/auto_hiding_list_widget.cpp
+    src/src/ui/request_queue.h
+    src/src/ui/request_queue.cpp
     src/src/linked_files/agent_dock_linked_files_controller.h
     src/src/linked_files/agent_dock_linked_files_controller.cpp
     src/src/session/agent_dock_session_controller.h
