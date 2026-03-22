@@ -256,6 +256,8 @@ For `Ctrl+C` / `Ctrl+A`, `QShortcut` with `Qt::WidgetShortcut` is used directly 
    - debug logging;
    - agent debug.
 
+When adding a new setting, always implement the full dirty-state path in the same patch. That includes `settings_t` load/save, `settingsFromUi()`, `snapshot_t`, `captureSnapshot()`, `restoreSnapshot()`, and the settings-page dirty wiring via `installCheckSettingsDirtyTrigger(...)` and/or explicit `checkSettingsDirty` signal connections, so `Apply` and `Cancel` behave correctly immediately.
+
 ---
 
 ## Build, tests, installation
