@@ -557,7 +557,7 @@ void copilot_provider_t::complete(const QList<chat_message_t> &messages, const Q
     QCAI_DEBUG(
         "Copilot",
         QStringLiteral("Sending request #%1: model=%2 msgs=%3 streaming=%4 payload=%5 bytes "
-                       "timeout=%6")
+                       "session_idle_timeout=%6")
             .arg(id)
             .arg(model)
             .arg(messages.size())

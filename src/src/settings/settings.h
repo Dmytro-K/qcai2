@@ -69,8 +69,9 @@ struct settings_t
     /** Optional explicit path to the Copilot sidecar script. */
     QString copilot_sidecar_path;
 
-    /** Maximum Copilot completion wait time in seconds; 0 disables the timeout. */
-    int copilot_completion_timeout_sec = 300;
+    /** Maximum wait time for Copilot `sendAndWait()` / `session.idle`, in seconds; 0 disables it.
+     */
+    int copilot_completion_timeout_sec = 1200;
 
     /** Maximum agent loop iterations allowed per request. */
     int max_iterations = 8;

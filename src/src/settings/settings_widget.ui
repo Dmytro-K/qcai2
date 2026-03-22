@@ -231,7 +231,7 @@
                <item row="3" column="0">
                 <widget class="QLabel" name="copilotCompletionTimeoutLabel">
                  <property name="text">
-                  <string>Completion timeout:</string>
+                  <string>Session idle timeout:</string>
                  </property>
                 </widget>
                </item>
@@ -249,9 +249,9 @@
                  <property name="suffix">
                   <string> s</string>
                  </property>
-                 <property name="toolTip">
-                  <string>Maximum wait time for a Copilot completion request. Set to 0 to disable the timeout.</string>
-                 </property>
+                  <property name="toolTip">
+                   <string>Maximum time to wait for Copilot `sendAndWait()` to reach `session.idle`. Set to 0 to disable the timeout.</string>
+                  </property>
                 </widget>
                </item>
               </layout>

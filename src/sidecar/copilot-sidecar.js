@@ -280,9 +280,11 @@ async function handleComplete(id, params) {
     const max_output_tokens = Number.isFinite(maxTokens)
         ? Math.max(1, Math.trunc(maxTokens))
         : (Number.isFinite(max_tokens) ? Math.max(1, Math.trunc(max_tokens)) : undefined);
-    const completionTimeoutSec = Number.isFinite(params?.completionTimeoutSec)
-        ? Math.max(0, Math.trunc(params.completionTimeoutSec))
-        : 300;
+    const completionTimeoutSec = Number.isFinite(params?.sessionIdleTimeoutSec)
+        ? Math.max(0, Math.trunc(params.sessionIdleTimeoutSec))
+        : (Number.isFinite(params?.completionTimeoutSec)
+            ? Math.max(0, Math.trunc(params.completionTimeoutSec))
+            : 1200);
 
     const state = { cancelled: false, session: null, reusable: false, invalidateReusable: false };
     activeRequests.set(id, state);
@@ -303,7 +305,7 @@ async function handleComplete(id, params) {
         if (systemMessage) {
             sessionOpts.systemMessage = { mode: "replace", content: systemMessage };
         }
-        log(`Request #${id}: acquiring session model=${requestedModel} reasoning_effort=${reasoning_effort || "default"} timeout=${completionTimeoutSec > 0 ? `${completionTimeoutSec}s` : "none"}`);
+        log(`Request #${id}: acquiring session model=${requestedModel} reasoning_effort=${reasoning_effort || "default"} session_idle_timeout=${completionTimeoutSec > 0 ? `${completionTimeoutSec}s` : "none"}`);
         const sessionLease = await acquireSession(sessionOpts);
         session = sessionLease.session;
         state.session = session;
