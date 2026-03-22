@@ -260,6 +260,8 @@ When adding a new setting, always implement the full dirty-state path in the sam
 
 Design modules, classes, interfaces, and functions so they are easy to cover with focused unit tests. Prefer explicit dependencies, narrow responsibilities, and logic that can be exercised without requiring UI, filesystem, network, or IDE side effects when that separation is practical.
 
+Avoid function implementations in header files unless they are genuinely necessary there, such as template definitions or other cases that require inline visibility. Prefer keeping declarations in `.h` files and moving implementations to `.cpp` files whenever practical.
+
 ---
 
 ## Build, tests, installation
