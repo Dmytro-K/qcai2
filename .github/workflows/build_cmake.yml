@@ -1,6 +1,11 @@
 name: Build plugin
 
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore:
+      - tmp
+      - 'tmp/**'
+  pull_request:
 
 env:
   PLUGIN_NAME: qcai2
