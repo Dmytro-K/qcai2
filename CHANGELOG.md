@@ -11,6 +11,10 @@
 - Added interactive run steering (Soft in-flight steering)
 - Added request queue (Ctrl+Enter by default)
 
+### Changed
+
+- Fixed compaction
+
 ## [0.0.7] - 2026-03-21
 
 ### Added

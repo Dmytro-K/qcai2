@@ -49,6 +49,13 @@ public:
     bool append_assistant_message(const QString &run_id, const QString &content,
                                   const QString &source, const QJsonObject &metadata = {},
                                   QString *error = nullptr);
+
+    /**
+     * Persists one explicit compaction result as the latest rolling summary for the
+     * active conversation without writing a normal chat message turn.
+     */
+    bool append_compaction_summary(const QString &run_id, const QString &content,
+                                   const QJsonObject &metadata = {}, QString *error = nullptr);
     bool append_artifact(const QString &run_id, const QString &kind, const QString &title,
                          const QString &content, const QJsonObject &metadata = {},
                          QString *error = nullptr);

@@ -258,9 +258,35 @@ void agent_controller_t::set_request_context(const QString &context,
     this->linked_files = linked_files;
 }
 
+void agent_controller_t::emit_run_log_message(const QString &message,
+                                              bool visible_during_compaction)
+{
+    if (this->run_options.is_compaction == true && visible_during_compaction == false)
+    {
+        return;
+    }
+    emit this->log_message(message);
+}
+
 QString agent_controller_t::build_system_prompt() const
 {
     QString sys;
+    if (this->run_options.is_compaction == true)
+    {
+        return QStringLiteral(
+            "You are compacting the existing conversation context for future requests.\n"
+            "Do NOT call tools.\n"
+            "Do NOT ask for approval.\n"
+            "Do NOT return a diff.\n"
+            "Reply with exactly one JSON object of type \"final\".\n"
+            "Put the full compacted context into final.summary.\n"
+            "Keep the required structure from the user's compact request and preserve important "
+            "technical facts, decisions, constraints, unresolved problems, and recent relevant "
+            "context.\n"
+            "Return no extra prose outside the JSON object.\n\n"
+            "{\"type\":\"final\",\"summary\":\"full compacted context\",\"diff\":\"\"}\n");
+    }
+
     if (this->run_mode == run_mode_t::ASK)
     {
         sys += QStringLiteral(
@@ -318,7 +344,7 @@ QString agent_controller_t::build_system_prompt() const
 
 void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run_mode,
                                const QString &model_name, const QString &reasoning_effort,
-                               const QString &thinking_level)
+                               const QString &thinking_level, const run_options_t &options)
 {
     if (this->is_running())
     {
@@ -403,6 +429,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
     this->mode_retries = 0;
     this->goal = goal;
     this->run_mode = run_mode;
+    this->run_options = options;
     this->model_name = model_name.trimmed().isEmpty() ? s.model_name : model_name.trimmed();
     this->reasoning_effort =
         reasoning_effort.trimmed().isEmpty() ? s.reasoning_effort : reasoning_effort.trimmed();
@@ -432,8 +459,8 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
         workspace_root, s.system_prompt, &configured_instructions_error);
     if (configured_instructions_error.isEmpty() == false)
     {
-        emit this->log_message(QStringLiteral("⚠ Failed to load project rules: %1")
-                                   .arg(configured_instructions_error));
+        this->emit_run_log_message(QStringLiteral("⚠ Failed to load project rules: %1")
+                                       .arg(configured_instructions_error));
     }
 
     QCAI_INFO("Agent",
@@ -498,23 +525,28 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                 if (contextError.isEmpty() == true)
                 {
                     const QJsonObject runMetadata{
-                        {QStringLiteral("goalPreview"), goal.left(200)},
+                        {QStringLiteral("goalPreview"), this->run_options.is_compaction == true
+                                                            ? QStringLiteral("[compaction]")
+                                                            : goal.left(200)},
                         {QStringLiteral("projectFilePath"), context_snapshot.project_file_path},
                         {QStringLiteral("projectDir"), context_snapshot.project_dir},
                         {QStringLiteral("linkedFileCount"), this->linked_files.size()},
                         {QStringLiteral("mode"), run_mode_label(this->run_mode)},
+                        {QStringLiteral("compaction"), this->run_options.is_compaction},
                     };
                     this->run_id = this->chat_context_manager->begin_run(
-                        context_request_kind(this->run_mode), this->provider->id(),
-                        this->model_name, this->reasoning_effort, this->thinking_level,
-                        this->dry_run, runMetadata, &contextError);
+                        this->run_options.is_compaction == true
+                            ? context_request_kind_t::AGENT_CHAT
+                            : context_request_kind(this->run_mode),
+                        this->provider->id(), this->model_name, this->reasoning_effort,
+                        this->thinking_level, this->dry_run, runMetadata, &contextError);
                     if (contextError.isEmpty() == true && this->detailed_request_log != nullptr)
                     {
                         this->detailed_request_log->set_run_id(this->run_id);
                     }
                 }
 
-                if (contextError.isEmpty() == true &&
+                if (this->run_options.is_compaction == false && contextError.isEmpty() == true &&
                     this->request_context.trimmed().isEmpty() == false)
                 {
                     const QJsonObject requestContextMetadata{
@@ -527,7 +559,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                         requestContextMetadata, &contextError);
                 }
 
-                if (contextError.isEmpty() == true)
+                if (this->run_options.is_compaction == false && contextError.isEmpty() == true)
                 {
                     const QJsonObject goalMetadata{
                         {QStringLiteral("mode"), run_mode_label(this->run_mode)},
@@ -552,6 +584,10 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                         {
                             this->messages.prepend({QStringLiteral("system"), *it});
                         }
+                        if (this->run_options.is_compaction == true)
+                        {
+                            this->messages.append({QStringLiteral("user"), goal});
+                        }
                         restoredPersistentContext = true;
                     }
                 }
@@ -569,7 +605,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                                      QStringLiteral("context-bootstrap-failed")}},
                         &finishError);
                 }
-                emit this->log_message(
+                this->emit_run_log_message(
                     QStringLiteral("⚠ Persistent chat context unavailable: %1").arg(contextError));
                 this->run_id.clear();
             }
@@ -592,20 +628,30 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
         this->messages.append({QStringLiteral("user"), goal});
     }
 
-    emit this->log_message(
-        QStringLiteral("%1 %2 started. Goal: %3")
-            .arg(this->run_mode == run_mode_t::ASK ? QStringLiteral("💬") : QStringLiteral("▶"))
-            .arg(this->run_mode == run_mode_t::ASK ? QStringLiteral("Ask mode")
-                                                   : QStringLiteral("Agent"))
-            .arg(goal));
-    if (!this->linked_files.isEmpty())
+    if (this->run_options.is_compaction == true)
     {
-        emit this->log_message(QStringLiteral("📎 Linked files: %1")
-                                   .arg(this->linked_files.join(QStringLiteral(", "))));
+        this->emit_run_log_message(QStringLiteral("🗜 Compaction started."), true);
     }
-    for (const QString &message : std::as_const(mcp_refresh_messages))
+    else
     {
-        emit log_message(message);
+        this->emit_run_log_message(
+            QStringLiteral("%1 %2 started. Goal: %3")
+                .arg(this->run_mode == run_mode_t::ASK ? QStringLiteral("💬")
+                                                       : QStringLiteral("▶"))
+                .arg(this->run_mode == run_mode_t::ASK ? QStringLiteral("Ask mode")
+                                                       : QStringLiteral("Agent"))
+                .arg(goal),
+            true);
+        if (!this->linked_files.isEmpty())
+        {
+            this->emit_run_log_message(QStringLiteral("📎 Linked files: %1")
+                                           .arg(this->linked_files.join(QStringLiteral(", "))),
+                                       true);
+        }
+        for (const QString &message : std::as_const(mcp_refresh_messages))
+        {
+            emit log_message(message);
+        }
     }
     this->run_next_iteration();
 }
@@ -679,6 +725,29 @@ void agent_controller_t::stop()
         QStringLiteral("Stopped by user at iteration %1.").arg(this->current_iteration));
 }
 
+bool agent_controller_t::persist_compaction_summary(const QString &content,
+                                                    const QString &response_type)
+{
+    if (this->chat_context_manager == nullptr || this->run_id.isEmpty() == true)
+    {
+        return true;
+    }
+
+    QString context_error;
+    if (this->chat_context_manager->append_compaction_summary(
+            this->run_id, content,
+            QJsonObject{{QStringLiteral("responseType"), response_type},
+                        {QStringLiteral("mode"), QStringLiteral("compaction")}},
+            &context_error) == false)
+    {
+        this->emit_run_log_message(
+            QStringLiteral("⚠ Failed to persist compaction summary: %1").arg(context_error), true);
+        return false;
+    }
+
+    return true;
+}
+
 void agent_controller_t::run_next_iteration()
 {
     if (!this->is_running())
@@ -709,8 +778,12 @@ void agent_controller_t::run_next_iteration()
     }
 
     ++this->current_iteration;
-    emit this->iteration_changed(this->current_iteration);
-    emit this->log_message(QStringLiteral("── Iteration %1 ──").arg(this->current_iteration));
+    if (this->run_options.is_compaction == false)
+    {
+        emit this->iteration_changed(this->current_iteration);
+        this->emit_run_log_message(
+            QStringLiteral("── Iteration %1 ──").arg(this->current_iteration));
+    }
 
     const auto &s = settings();
     QCAI_DEBUG("Agent",
@@ -726,7 +799,7 @@ void agent_controller_t::run_next_iteration()
     this->run_state_machine.await_provider_response();
     this->provider_activity_seen = false;
     this->provider_request_timer.start();
-    emit this->log_message(QStringLiteral("⏳ Waiting for model response..."));
+    this->emit_run_log_message(QStringLiteral("⏳ Waiting for model response..."));
     if (this->pending_validation_label.isEmpty() == false)
     {
         this->handle_normalized_progress_event(
@@ -828,12 +901,19 @@ void agent_controller_t::handle_response(const QString &response, const QString 
              {},
              error});
         QCAI_ERROR("Agent", QStringLiteral("Provider error: %1").arg(error));
-        emit this->log_message(QStringLiteral("❌ Provider error: %1").arg(error));
+        this->emit_run_log_message(this->run_options.is_compaction == true
+                                       ? QStringLiteral("❌ Compaction failed: %1").arg(error)
+                                       : QStringLiteral("❌ Provider error: %1").arg(error),
+                                   true);
         emit this->error_occurred(error);
         this->run_state_machine.mark_failed();
-        this->finalize_persistent_run(QStringLiteral("error"),
-                                      QJsonObject{{QStringLiteral("error"), error}});
-        emit this->stopped(QStringLiteral("Provider error."));
+        this->finalize_persistent_run(
+            QStringLiteral("error"),
+            QJsonObject{{QStringLiteral("error"), error},
+                        {QStringLiteral("compaction"), this->run_options.is_compaction}});
+        emit this->stopped(this->run_options.is_compaction == true
+                               ? QStringLiteral("Compaction failed.")
+                               : QStringLiteral("Provider error."));
         return;
     }
 
@@ -860,6 +940,74 @@ void agent_controller_t::handle_response(const QString &response, const QString 
             this->run_next_iteration();
             return;
         }
+    }
+
+    if (this->run_options.is_compaction == true)
+    {
+        agent_response_t parsed = agent_response_t::parse(response);
+        if (this->detailed_request_log != nullptr)
+        {
+            this->detailed_request_log->record_iteration_output(
+                this->current_iteration, response, {}, response_type_label(parsed.type),
+                parsed.summary, usage, request_duration_ms);
+        }
+
+        QString compacted_content;
+        QString response_type = response_type_label(parsed.type);
+        if (parsed.type == response_type_t::FINAL)
+        {
+            compacted_content = parsed.summary.trimmed();
+        }
+        else if (parsed.type == response_type_t::TEXT || parsed.type == response_type_t::ERROR)
+        {
+            compacted_content = parsed.text.trimmed().isEmpty() == false ? parsed.text.trimmed()
+                                                                         : response.trimmed();
+        }
+
+        if (compacted_content.isEmpty() == true)
+        {
+            this->run_state_machine.mark_failed();
+            this->emit_run_log_message(
+                QStringLiteral("❌ Compaction failed: model returned an unsupported response."),
+                true);
+            this->finalize_persistent_run(
+                QStringLiteral("error"),
+                QJsonObject{
+                    {QStringLiteral("reason"), QStringLiteral("compaction-invalid-response")},
+                    {QStringLiteral("responseType"), response_type}});
+            emit this->stopped(QStringLiteral("Compaction failed."));
+            return;
+        }
+
+        if (this->persist_compaction_summary(compacted_content, response_type) == false)
+        {
+            this->run_state_machine.mark_failed();
+            this->finalize_persistent_run(
+                QStringLiteral("error"),
+                QJsonObject{{QStringLiteral("reason"),
+                             QStringLiteral("compaction-summary-persist-failed")},
+                            {QStringLiteral("responseType"), response_type}});
+            emit this->stopped(QStringLiteral("Compaction failed."));
+            return;
+        }
+
+        this->run_state_machine.mark_completed();
+        this->handle_normalized_progress_event(
+            {agent_progress_event_kind_t::FINAL_ANSWER_COMPLETED,
+             agent_progress_operation_t::NONE,
+             this->provider != nullptr ? this->provider->id() : QString(),
+             QStringLiteral("controller.compaction.completed"),
+             {},
+             {},
+             QStringLiteral("Compaction completed.")});
+        this->emit_run_log_message(QStringLiteral("🗜 Compaction completed."), true);
+        this->finalize_persistent_run(
+            QStringLiteral("completed"),
+            QJsonObject{{QStringLiteral("summary"), QStringLiteral("Compaction completed.")},
+                        {QStringLiteral("responseType"), response_type},
+                        {QStringLiteral("compaction"), true}});
+        emit this->stopped(QStringLiteral("Compaction completed."));
+        return;
     }
 
     // Add assistant message to history
@@ -1578,10 +1726,13 @@ void agent_controller_t::handle_provider_stream_delta(const QString &delta)
     if (this->provider_activity_seen == false)
     {
         this->provider_activity_seen = true;
-        emit this->log_message(QStringLiteral("✍ Model response in progress..."));
+        this->emit_run_log_message(QStringLiteral("✍ Model response in progress..."));
     }
     this->arm_provider_watchdog();
-    emit this->streaming_token(delta);
+    if (this->run_options.is_compaction == false)
+    {
+        emit this->streaming_token(delta);
+    }
 }
 
 void agent_controller_t::handle_provider_progress_event(const provider_raw_event_t &event)

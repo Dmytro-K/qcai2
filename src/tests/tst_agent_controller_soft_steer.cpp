@@ -21,6 +21,11 @@ namespace
 {
 
 settings_t test_settings;
+editor_context_t::snapshot_t test_editor_snapshot;
+int persisted_user_message_count = 0;
+int persisted_assistant_message_count = 0;
+int persisted_compaction_summary_count = 0;
+QString last_persisted_compaction_summary;
 
 QStringList message_contents(const QList<chat_message_t> &messages, const QString &role)
 {
@@ -215,7 +220,7 @@ void append_configured_system_instructions(QList<chat_message_t> * /*messages*/,
 
 editor_context_t::snapshot_t editor_context_t::capture() const
 {
-    return {};
+    return test_editor_snapshot;
 }
 
 QList<editor_context_t::project_info_t> editor_context_t::open_projects() const
@@ -370,6 +375,7 @@ bool chat_context_manager_t::append_user_message(const QString & /*run_id*/,
                                                  const QString & /*source*/,
                                                  const QJsonObject & /*metadata*/, QString *error)
 {
+    ++persisted_user_message_count;
     if (error != nullptr)
     {
         error->clear();
@@ -383,6 +389,21 @@ bool chat_context_manager_t::append_assistant_message(const QString & /*run_id*/
                                                       const QJsonObject & /*metadata*/,
                                                       QString *error)
 {
+    ++persisted_assistant_message_count;
+    if (error != nullptr)
+    {
+        error->clear();
+    }
+    return true;
+}
+
+bool chat_context_manager_t::append_compaction_summary(const QString & /*run_id*/,
+                                                       const QString &content,
+                                                       const QJsonObject & /*metadata*/,
+                                                       QString *error)
+{
+    ++persisted_compaction_summary_count;
+    last_persisted_compaction_summary = content;
     if (error != nullptr)
     {
         error->clear();
@@ -565,6 +586,7 @@ private slots:
     void steering_during_tool_execution_replans_after_tool_completion();
     void steering_while_waiting_for_approval_restarts_without_manual_resolution();
     void steering_while_reviewing_inline_diff_clears_diff_and_restarts();
+    void compaction_persists_summary_without_chat_history_or_stream_echo();
 };
 
 void tst_agent_controller_soft_steer_t::init()
@@ -576,6 +598,11 @@ void tst_agent_controller_soft_steer_t::init()
     test_settings.inline_diff_refinement_enabled = false;
     test_settings.max_iterations = 8;
     test_settings.max_tool_calls = 25;
+    persisted_user_message_count = 0;
+    persisted_assistant_message_count = 0;
+    persisted_compaction_summary_count = 0;
+    last_persisted_compaction_summary.clear();
+    test_editor_snapshot = {};
 }
 
 void tst_agent_controller_soft_steer_t::normal_final_response_without_steer_finishes_once()
@@ -826,6 +853,45 @@ void tst_agent_controller_soft_steer_t::
     provider.finish(QStringLiteral("{\"type\":\"final\",\"summary\":\"Updated after diff review\","
                                    "\"diff\":\"\"}"));
     QTRY_COMPARE(stopped_spy.count(), 1);
+}
+
+void tst_agent_controller_soft_steer_t::
+    compaction_persists_summary_without_chat_history_or_stream_echo()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    QSignalSpy log_spy(&controller, &agent_controller_t::log_message);
+    QSignalSpy stream_spy(&controller, &agent_controller_t::streaming_token);
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+
+    controller.start(QStringLiteral("Compact this conversation"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"),
+                     agent_controller_t::run_options_t{true});
+    QCOMPARE(provider.requests.size(), 1);
+    QVERIFY(controller.is_compaction_run());
+
+    provider.stream(QStringLiteral("secret compact draft"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"final\",\"summary\":\"## Current Goal\\nCompacted goal\\n\\n## Stable "
+        "Memory\\n- fact\\n\",\"diff\":\"\"}"));
+
+    QTRY_COMPARE(stopped_spy.count(), 1);
+    QCOMPARE(stream_spy.count(), 0);
+
+    QStringList visible_logs;
+    for (const QList<QVariant> &entry : log_spy)
+    {
+        visible_logs.append(entry.at(0).toString());
+    }
+    QVERIFY(contains_text(visible_logs, QStringLiteral("🗜 Compaction started.")));
+    QVERIFY(contains_text(visible_logs, QStringLiteral("🗜 Compaction completed.")));
+    QVERIFY(contains_text(visible_logs, QStringLiteral("Compact this conversation")) == false);
+    QVERIFY(contains_text(visible_logs, QStringLiteral("secret compact draft")) == false);
 }
 
 }  // namespace qcai2

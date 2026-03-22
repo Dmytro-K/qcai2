@@ -950,6 +950,54 @@ bool chat_context_manager_t::append_assistant_message(const QString &run_id,
                                 error);
 }
 
+bool chat_context_manager_t::append_compaction_summary(const QString &run_id,
+                                                       const QString &content,
+                                                       const QJsonObject &metadata, QString *error)
+{
+    const QString trimmed_content = content.trimmed();
+    if (trimmed_content.isEmpty() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Compaction summary is empty");
+        }
+        return false;
+    }
+    if (this->ensure_conversation_available(error) == false)
+    {
+        return false;
+    }
+
+    QString localError;
+    const context_summary_t latest =
+        this->store->latest_summary(this->conversation.conversation_id, &localError);
+    if (propagate_error(error, localError) == true)
+    {
+        return false;
+    }
+
+    const int latest_sequence =
+        this->store->latest_message_sequence(this->conversation.conversation_id, &localError);
+    if (propagate_error(error, localError) == true)
+    {
+        return false;
+    }
+
+    context_summary_t summary;
+    summary.workspace_id = this->workspace_id;
+    summary.conversation_id = this->conversation.conversation_id;
+    summary.version = latest.version + 1;
+    summary.start_sequence =
+        latest.is_valid() == true ? latest.start_sequence : (latest_sequence > 0 ? 1 : 0);
+    summary.end_sequence = qMax(latest_sequence, summary.start_sequence);
+    summary.content = trimmed_content;
+    summary.metadata = merge_json_objects(
+        metadata, QJsonObject{{QStringLiteral("source"), QStringLiteral("compaction")},
+                              {QStringLiteral("runId"), run_id},
+                              {QStringLiteral("previousSummaryId"), latest.summary_id}});
+    return this->store->add_summary(&summary, error);
+}
+
 bool chat_context_manager_t::append_artifact(const QString &run_id, const QString &kind,
                                              const QString &title, const QString &content,
                                              const QJsonObject &metadata, QString *error)
@@ -1445,12 +1493,23 @@ chat_context_manager_t::select_recent_messages(const context_budget_t &budget,
                                                QString *error) const
 {
     QList<context_message_t> selected;
+    QString localError;
+    const context_summary_t latest_summary =
+        this->store->latest_summary(this->conversation.conversation_id, &localError);
+    if (propagate_error(error, localError) == true)
+    {
+        return {};
+    }
     const QList<context_message_t> messages = this->store->recent_messages(
         this->conversation.conversation_id, budget.max_recent_messages * 2, error);
     int usedTokens = 0;
     for (qsizetype index = messages.size() - 1; index >= 0; --index)
     {
         const context_message_t &message = messages.at(static_cast<int>(index));
+        if (latest_summary.is_valid() == true && message.sequence <= latest_summary.end_sequence)
+        {
+            continue;
+        }
         if (message.include_in_prompt() == false)
         {
             continue;

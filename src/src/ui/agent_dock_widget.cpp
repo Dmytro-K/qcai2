@@ -1397,6 +1397,19 @@ bool agent_dock_widget_t::try_execute_slash_command(QString &goal)
     // Redirect to AI agent when the handler produced a goal_override.
     if (!result.goal_override.isEmpty())
     {
+        if (result.command_name == QStringLiteral("compact"))
+        {
+            if (this->controller->is_running() == true)
+            {
+                this->tabs->setCurrentWidget(this->log_view);
+                this->on_log_message(tr("Stop the current run before starting compaction."));
+                return true;
+            }
+
+            this->start_compaction_request(result.goal_override,
+                                           this->capture_current_request({}));
+            return true;
+        }
         goal = result.goal_override;
         return false;
     }
@@ -1435,7 +1448,19 @@ queued_request_t agent_dock_widget_t::capture_current_request(const QString &goa
     return request;
 }
 
-void agent_dock_widget_t::start_request(const queued_request_t &request)
+void agent_dock_widget_t::start_compaction_request(const QString &compact_goal,
+                                                   const queued_request_t &base_request)
+{
+    queued_request_t compaction_request = base_request;
+    compaction_request.goal = compact_goal.trimmed();
+    compaction_request.request_context.clear();
+    compaction_request.linked_files.clear();
+    compaction_request.run_mode = agent_controller_t::run_mode_t::AGENT;
+    this->start_request(compaction_request, agent_controller_t::run_options_t{true});
+}
+
+void agent_dock_widget_t::start_request(const queued_request_t &request,
+                                        const agent_controller_t::run_options_t &options)
 {
     if (request.is_valid() == false)
     {
@@ -1446,7 +1471,8 @@ void agent_dock_widget_t::start_request(const queued_request_t &request)
 
     const auto &s = settings();
     const int prev_input_tokens = this->displayed_usage.input_tokens;
-    const bool auto_compact_needed = s.auto_compact_enabled && !this->skip_auto_compact_once &&
+    const bool auto_compact_needed = options.is_compaction == false && s.auto_compact_enabled &&
+                                     !this->skip_auto_compact_once &&
                                      prev_input_tokens >= s.auto_compact_threshold_tokens &&
                                      prev_input_tokens >= 0 && this->has_deferred_request == false;
     this->skip_auto_compact_once = false;
@@ -1455,12 +1481,8 @@ void agent_dock_widget_t::start_request(const queued_request_t &request)
     {
         this->deferred_request = request;
         this->has_deferred_request = true;
-        request_to_start.goal = compact_prompt_text();
-        emit this->controller->log_message(
-            QStringLiteral("🗜 Auto-compact triggered (context: %1 tokens ≥ %2). "
-                           "Compacting before running your request…")
-                .arg(prev_input_tokens)
-                .arg(s.auto_compact_threshold_tokens));
+        this->start_compaction_request(compact_prompt_text(), request);
+        return;
     }
 
     this->reset_usage_display(settings().provider, request.model_name);
@@ -1475,7 +1497,8 @@ void agent_dock_widget_t::start_request(const queued_request_t &request)
     this->tabs->setCurrentWidget(this->log_view);
     this->controller->start(request_to_start.goal, request_to_start.dry_run,
                             request_to_start.run_mode, request_to_start.model_name,
-                            request_to_start.reasoning_effort, request_to_start.thinking_level);
+                            request_to_start.reasoning_effort, request_to_start.thinking_level,
+                            options);
 }
 
 bool agent_dock_widget_t::enqueue_request(const queued_request_t &request)

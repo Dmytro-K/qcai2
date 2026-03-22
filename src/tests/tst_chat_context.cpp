@@ -22,6 +22,7 @@ private slots:
     void deletes_conversation();
     void writes_hourly_usage_stats_csv();
     void excludes_superseded_soft_steer_messages_from_prompt_context();
+    void compact_summary_replaces_pre_compacted_recent_messages();
 };
 
 void tst_chat_context_t::stores_artifacts_and_builds_envelope()
@@ -511,6 +512,80 @@ void tst_chat_context_t::excludes_superseded_soft_steer_messages_from_prompt_con
     QVERIFY(assistant_messages.contains(QStringLiteral("Superseded draft")) == false);
     QVERIFY(user_messages.contains(QStringLiteral("Initial request")));
     QVERIFY(user_messages.contains(QStringLiteral("Newest request")));
+}
+
+void tst_chat_context_t::compact_summary_replaces_pre_compacted_recent_messages()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+    QVERIFY(QDir(temp_dir.path()).mkpath(QStringLiteral(".qcai2")));
+
+    chat_context_manager_t manager;
+    QString error;
+    QVERIFY(manager.set_active_workspace(QStringLiteral("workspace-compaction"), temp_dir.path(),
+                                         {}, &error));
+    QVERIFY(error.isEmpty());
+
+    const QString conversation_id =
+        manager.start_new_conversation(QStringLiteral("Compaction"), &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(conversation_id.isEmpty() == false);
+
+    QString run_id = manager.begin_run(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("provider"), QStringLiteral("model"),
+        QStringLiteral("medium"), QStringLiteral("medium"), true, {}, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(run_id.isEmpty() == false);
+
+    QVERIFY(manager.append_user_message(run_id, QStringLiteral("Old user message"),
+                                        QStringLiteral("goal"), {}, &error));
+    QVERIFY(error.isEmpty());
+    QVERIFY(manager.append_assistant_message(run_id, QStringLiteral("Old assistant message"),
+                                             QStringLiteral("model_response"), {}, &error));
+    QVERIFY(error.isEmpty());
+
+    QVERIFY(manager.append_compaction_summary(
+        run_id, QStringLiteral("## Current Goal\nCompacted context\n"),
+        QJsonObject{{QStringLiteral("source"), QStringLiteral("test")}}, &error));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    run_id = manager.begin_run(context_request_kind_t::AGENT_CHAT, QStringLiteral("provider"),
+                               QStringLiteral("model"), QStringLiteral("medium"),
+                               QStringLiteral("medium"), true, {}, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(run_id.isEmpty() == false);
+
+    QVERIFY(manager.append_user_message(run_id, QStringLiteral("New user message"),
+                                        QStringLiteral("goal"), {}, &error));
+    QVERIFY(error.isEmpty());
+    QVERIFY(manager.append_assistant_message(run_id, QStringLiteral("New assistant message"),
+                                             QStringLiteral("model_response"), {}, &error));
+    QVERIFY(error.isEmpty());
+
+    const context_envelope_t envelope = manager.build_context_envelope(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("System prompt"), {}, 2048, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(envelope.summary.is_valid());
+    QVERIFY(envelope.summary.content.contains(QStringLiteral("Compacted context")));
+
+    QStringList user_messages;
+    QStringList assistant_messages;
+    for (const chat_message_t &message : envelope.provider_messages)
+    {
+        if (message.role == QStringLiteral("user"))
+        {
+            user_messages.append(message.content);
+        }
+        if (message.role == QStringLiteral("assistant"))
+        {
+            assistant_messages.append(message.content);
+        }
+    }
+
+    QVERIFY(user_messages.contains(QStringLiteral("Old user message")) == false);
+    QVERIFY(assistant_messages.contains(QStringLiteral("Old assistant message")) == false);
+    QVERIFY(user_messages.contains(QStringLiteral("New user message")));
+    QVERIFY(assistant_messages.contains(QStringLiteral("New assistant message")));
 }
 
 QTEST_MAIN(tst_chat_context_t)

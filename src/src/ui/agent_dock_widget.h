@@ -180,7 +180,15 @@ private:
     /**
      * Starts one captured request, applying auto-compact when needed.
      */
-    void start_request(const queued_request_t &request);
+    void start_request(const queued_request_t &request,
+                       const agent_controller_t::run_options_t &options =
+                           agent_controller_t::run_options_t(false));
+
+    /**
+     * Starts an internal compaction run using the current model settings.
+     */
+    void start_compaction_request(const QString &compact_goal,
+                                  const queued_request_t &base_request);
 
     /**
      * Appends one request to the local FIFO queue and refreshes the pending-items UI.

@@ -45,6 +45,21 @@ public:
     };
 
     /**
+     * Extra controller-run options used for internal orchestration flows.
+     */
+    struct run_options_t
+    {
+        /** True when this run performs context compaction instead of a normal user turn. */
+        bool is_compaction = false;
+
+        /** Creates one options object with behavior-safe defaults. */
+        explicit run_options_t(bool is_compaction_value = false)
+            : is_compaction(is_compaction_value)
+        {
+        }
+    };
+
+    /**
      * Creates a controller with no configured provider or tools.
      * @param parent Parent QObject that owns this instance.
      */
@@ -109,7 +124,8 @@ public:
      * @param thinking_level Thinking depth selected in the dock widget.
      */
     void start(const QString &goal, bool dry_run, run_mode_t run_mode, const QString &model_name,
-               const QString &reasoning_effort, const QString &thinking_level);
+               const QString &reasoning_effort, const QString &thinking_level,
+               const run_options_t &options = run_options_t(false));
 
     /**
      * Stops the active run and cancels any in-flight provider request.
@@ -166,6 +182,14 @@ public:
     agent_run_state_machine_t::state_t current_run_state() const
     {
         return this->run_state_machine.current_state();
+    }
+
+    /**
+     * Returns true when the active run is an internal compaction run.
+     */
+    bool is_compaction_run() const
+    {
+        return this->run_options.is_compaction;
     }
 
     /**
@@ -425,6 +449,16 @@ private:
      */
     void handle_provider_stream_delta(const QString &delta);
 
+    /**
+     * Persists one compaction result into the dedicated summary store.
+     */
+    bool persist_compaction_summary(const QString &content, const QString &response_type);
+
+    /**
+     * Emits one user-visible log line unless the current run hides verbose compaction logs.
+     */
+    void emit_run_log_message(const QString &message, bool visible_during_compaction = false);
+
     /** Active provider used for the current run. */
     iai_provider_t *provider = nullptr;
 
@@ -472,6 +506,9 @@ private:
 
     /** Selected interaction mode for the current run. */
     run_mode_t run_mode = run_mode_t::AGENT;
+
+    /** Internal options that control special-purpose run behavior. */
+    run_options_t run_options;
 
     /** Selected model for the current run. */
     QString model_name;
