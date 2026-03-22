@@ -8,6 +8,8 @@
 #include "../providers/iai_provider.h"
 #include "../settings/settings.h"
 #include "../util/logger.h"
+#include "../util/project_root_resolver.h"
+#include "../util/prompt_instructions.h"
 
 #include <texteditor/codeassist/assistinterface.h>
 #include <texteditor/codeassist/assistproposalitem.h>
@@ -74,6 +76,7 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
     const QString prefix = full_text.mid(start_before, pos - start_before);
     const QString suffix = full_text.mid(pos, qMin(k_context_after, full_text.length() - pos));
     const QString file_name = iface->filePath().toUrlishString();
+    const QString project_root = project_root_for_file_path(file_name);
 
     // Build FIM (fill-in-the-middle) prompt
     const QString prompt =
@@ -85,6 +88,14 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
             .arg(file_name, prefix, suffix);
 
     QList<chat_message_t> messages;
+    QString instruction_error;
+    append_configured_system_instructions(&messages, project_root, settings().system_prompt,
+                                          &instruction_error);
+    if (instruction_error.isEmpty() == false)
+    {
+        QCAI_WARN("Completion",
+                  QStringLiteral("Failed to load project rules: %1").arg(instruction_error));
+    }
     messages.append({QStringLiteral("system"),
                      QStringLiteral("You are a code completion assistant. "
                                     "Return only the code that should be inserted at the cursor. "

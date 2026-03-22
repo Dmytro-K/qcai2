@@ -8,6 +8,8 @@
 #include "../providers/iai_provider.h"
 #include "../settings/settings.h"
 #include "../util/logger.h"
+#include "../util/project_root_resolver.h"
+#include "../util/prompt_instructions.h"
 
 #include <texteditor/textdocument.h>
 #include <texteditor/texteditor.h>
@@ -134,6 +136,7 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
     const QString fileName = (editor->textDocument() != nullptr)
                                  ? editor->textDocument()->filePath().toUrlishString()
                                  : QStringLiteral("untitled");
+    const QString project_root = project_root_for_file_path(fileName);
 
     const QString model = s.completion_model.isEmpty() ? this->model : s.completion_model;
 
@@ -146,6 +149,14 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
             .arg(fileName, prefix, suffix);
 
     QList<chat_message_t> messages;
+    QString instruction_error;
+    append_configured_system_instructions(&messages, project_root, settings().system_prompt,
+                                          &instruction_error);
+    if (instruction_error.isEmpty() == false)
+    {
+        QCAI_WARN("GhostText",
+                  QStringLiteral("Failed to load project rules: %1").arg(instruction_error));
+    }
     messages.append({QStringLiteral("system"),
                      QStringLiteral("You are a code completion assistant. "
                                     "Return only the code that should be inserted at the cursor. "

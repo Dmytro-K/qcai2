@@ -8,6 +8,7 @@
 #include "settings/settings.h"
 #include "util/diff.h"
 #include "util/logger.h"
+#include "util/prompt_instructions.h"
 #include "util/request_detailed_log.h"
 
 #include "context/chat_context.h"
@@ -366,7 +367,14 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
         this->provider != nullptr ? this->provider->id() : QString(),
         agent_status_render_mode_t::INTERACTIVE, settings().agent_debug);
     this->detailed_request_log.reset();
-    const QString configured_system_prompt = s.system_prompt.trimmed();
+    QString configured_instructions_error;
+    const QStringList configured_instructions = configured_system_instructions(
+        workspace_root, s.system_prompt, &configured_instructions_error);
+    if (configured_instructions_error.isEmpty() == false)
+    {
+        emit this->log_message(QStringLiteral("⚠ Failed to load project rules: %1")
+                                   .arg(configured_instructions_error));
+    }
 
     QCAI_INFO("Agent",
               QStringLiteral("Starting run — mode: %1, provider: %2, model: %3, reasoning: %4, "
@@ -479,10 +487,10 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                         envelope.provider_messages.isEmpty() == false)
                     {
                         this->messages = envelope.provider_messages;
-                        if (configured_system_prompt.isEmpty() == false)
+                        for (auto it = configured_instructions.crbegin();
+                             it != configured_instructions.crend(); ++it)
                         {
-                            this->messages.prepend(
-                                {QStringLiteral("system"), configured_system_prompt});
+                            this->messages.prepend({QStringLiteral("system"), *it});
                         }
                         restoredPersistentContext = true;
                     }
@@ -510,9 +518,9 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
 
     if (restoredPersistentContext == false)
     {
-        if (configured_system_prompt.isEmpty() == false)
+        for (const QString &instruction : configured_instructions)
         {
-            this->messages.append({QStringLiteral("system"), configured_system_prompt});
+            this->messages.append({QStringLiteral("system"), instruction});
         }
         this->messages.append({QStringLiteral("system"), this->build_system_prompt()});
 

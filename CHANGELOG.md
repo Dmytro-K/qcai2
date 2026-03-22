@@ -5,7 +5,8 @@
 ### Added
 
 - Added an optional multi-turn inline diff refinement flow
-- Added system prompt
+- Added global system prompt
+- Added per-project system prompt
 
 ## [0.0.7] - 2026-03-21
 

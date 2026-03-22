@@ -749,14 +749,14 @@
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>This optional prompt is prepended as a stable system message before dynamic project context, so provider-side prompt caching can reuse it across requests.</string>
+            <string>This optional prompt is prepended as a stable system message before built-in and dynamic project context, so provider-side prompt caching can reuse it across requests.</string>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QPlainTextEdit" name="systemPromptEdit">
           <property name="placeholderText">
-           <string>Optional custom system prompt for Ask and Agent mode...</string>
+           <string>Optional custom system prompt for Ask, Agent, and completion requests...</string>
           </property>
           <property name="tabChangesFocus">
            <bool>true</bool>

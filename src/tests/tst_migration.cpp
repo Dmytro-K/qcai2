@@ -38,6 +38,8 @@ private slots:
     void migrate_project_state_moves_conversation_ui_to_per_conversation_file();
     void migrate_project_state_repairs_partial_conversation_state_when_revision_current();
     void migrate_project_state_adds_vector_search_exclude_schema();
+    void migrate_project_state_creates_project_prompt_defaults_when_missing();
+    void migrate_project_state_initializes_prompt_defaults_without_session_file();
 };
 
 void migration_test_t::parse_revision_reads_version_and_build_suffix()
@@ -406,6 +408,85 @@ void migration_test_t::migrate_project_state_adds_vector_search_exclude_schema()
     QVERIFY(vector_search_root.value("exclude").isArray());
     QCOMPARE(vector_search_root.value("exclude").toArray().size(), 0);
     QCOMPARE(root.value("storageRevision").toString(), Migration::current_revision_string());
+}
+
+void migration_test_t::migrate_project_state_creates_project_prompt_defaults_when_missing()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString project_path = dir.filePath("project");
+    const QString context_dir_path = QDir(project_path).filePath(".qcai2");
+    QVERIFY(QDir().mkpath(context_dir_path));
+    const QString storage_path = QDir(context_dir_path).filePath("session.json");
+
+    {
+        QSaveFile file(storage_path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        const QJsonObject root{
+            {"conversationId", QStringLiteral("conversation-rules-template")},
+            {"storageRevision", Migration::current_revision_string()},
+            {"vector_search", QJsonObject{{QStringLiteral("exclude"), QJsonArray{}}}},
+        };
+        file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+        QVERIFY(file.commit());
+    }
+
+    const QString rules_path = QDir(project_path).filePath(".qcai2/rules.md");
+    QVERIFY(QFileInfo::exists(rules_path) == false);
+
+    QString error;
+    const bool migrated = Migration::migrate_project_state(storage_path, &error);
+    QVERIFY2(migrated, qPrintable(error));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    QFile state_file(storage_path);
+    QVERIFY2(state_file.open(QIODevice::ReadOnly), qPrintable(state_file.errorString()));
+    const QJsonDocument state_doc = QJsonDocument::fromJson(state_file.readAll());
+    QVERIFY(state_doc.isObject());
+    const QJsonObject root = state_doc.object();
+    QVERIFY(root.contains(QStringLiteral("ignoreGlobalSystemPrompt")));
+    QCOMPARE(root.value(QStringLiteral("ignoreGlobalSystemPrompt")).toBool(true), false);
+
+    QFile rules_file(rules_path);
+    QVERIFY2(rules_file.exists(), qPrintable(rules_path));
+    QVERIFY2(rules_file.open(QIODevice::ReadOnly | QIODevice::Text),
+             qPrintable(rules_file.errorString()));
+    QCOMPARE(QString::fromUtf8(rules_file.readAll()), QString());
+}
+
+void migration_test_t::migrate_project_state_initializes_prompt_defaults_without_session_file()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString project_path = dir.filePath("project");
+    const QString storage_path = QDir(project_path).filePath(".qcai2/session.json");
+    const QString rules_path = QDir(project_path).filePath(".qcai2/rules.md");
+
+    QVERIFY(QFileInfo::exists(storage_path) == false);
+    QVERIFY(QFileInfo::exists(rules_path) == false);
+
+    QString error;
+    const bool migrated = Migration::migrate_project_state(storage_path, &error);
+    QVERIFY2(migrated, qPrintable(error));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    QFile state_file(storage_path);
+    QVERIFY2(state_file.exists(), qPrintable(storage_path));
+    QVERIFY2(state_file.open(QIODevice::ReadOnly), qPrintable(state_file.errorString()));
+    const QJsonDocument state_doc = QJsonDocument::fromJson(state_file.readAll());
+    QVERIFY(state_doc.isObject());
+    const QJsonObject root = state_doc.object();
+    QCOMPARE(root.value(QStringLiteral("storageRevision")).toString(),
+             Migration::current_revision_string());
+    QCOMPARE(root.value(QStringLiteral("ignoreGlobalSystemPrompt")).toBool(true), false);
+
+    QFile rules_file(rules_path);
+    QVERIFY2(rules_file.exists(), qPrintable(rules_path));
+    QVERIFY2(rules_file.open(QIODevice::ReadOnly | QIODevice::Text),
+             qPrintable(rules_file.errorString()));
+    QCOMPARE(QString::fromUtf8(rules_file.readAll()), QString());
 }
 
 QTEST_APPLESS_MAIN(migration_test_t)

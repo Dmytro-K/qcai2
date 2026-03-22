@@ -170,9 +170,9 @@ QJsonObject normalized_project_vector_search_object(const QJsonObject &root)
     return vector_search_root;
 }
 
-bool project_vector_search_has_excludes(const QJsonObject &vector_search_root)
+bool normalized_ignore_global_system_prompt(const QJsonObject &root)
 {
-    return vector_search_root.value(QStringLiteral("exclude")).toArray().isEmpty() == false;
+    return root.value(QStringLiteral("ignoreGlobalSystemPrompt")).toBool(false);
 }
 
 QString legacy_log_markdown_from_root(const QJsonObject &root)
@@ -867,14 +867,8 @@ void agent_dock_session_controller_t::save_project_state_file()
         storage_path, QStringLiteral("project context file"), &existing_root_loaded);
     const QJsonObject vector_search_root = normalized_project_vector_search_object(
         existing_root_loaded == true ? existing_root : QJsonObject{});
-
-    if (this->active_conversation_id.isEmpty() == true &&
-        this->current_project_mcp_servers.isEmpty() == true &&
-        project_vector_search_has_excludes(vector_search_root) == false)
-    {
-        QFile::remove(storage_path);
-        return;
-    }
+    const bool ignore_global_system_prompt = normalized_ignore_global_system_prompt(
+        existing_root_loaded == true ? existing_root : QJsonObject{});
 
     QJsonObject root;
     root[QStringLiteral("conversationId")] = this->active_conversation_id;
@@ -884,6 +878,7 @@ void agent_dock_session_controller_t::save_project_state_file()
             qtmcp::server_definitions_to_json(this->current_project_mcp_servers);
     }
     root[QStringLiteral("vector_search")] = vector_search_root;
+    root[QStringLiteral("ignoreGlobalSystemPrompt")] = ignore_global_system_prompt;
     Migration::stamp_project_state(root);
     this->mark_local_session_write();
     write_context_json_file(storage_path, root, QStringLiteral("project context file"));

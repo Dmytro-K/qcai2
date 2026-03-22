@@ -20,8 +20,7 @@
 - [x] Optional auto-compact based on prior context token usage
 - [x] Conversation list UI
 - [x] Optional Qdrant-backed vector search
-- [ ] More slash commands: `/clear`, `/diff`
-- [ ] Per-project custom instructions (`.qcai2/rules.md`)
+- [x] Per-project custom instructions (`.qcai2/rules.md`)
 - [ ] Semantic search over chat history
 - [ ] Semantic search over code
 - [x] Multi-turn inline edit

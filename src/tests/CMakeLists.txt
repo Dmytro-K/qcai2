@@ -334,6 +334,22 @@ target_link_libraries(tst_qcai2_request_detailed_log PRIVATE
 )
 qcai2_register_test(qcai2_request_detailed_log tst_qcai2_request_detailed_log)
 
+add_executable(tst_qcai2_prompt_instructions
+    tst_prompt_instructions.cpp
+    ../src/util/prompt_instructions.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_prompt_instructions)
+
+target_include_directories(tst_qcai2_prompt_instructions PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_prompt_instructions PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_prompt_instructions tst_qcai2_prompt_instructions)
+
 add_executable(tst_qcai2_migration
     tst_migration.cpp
     ../src/util/migration.cpp

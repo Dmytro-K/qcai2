@@ -544,13 +544,15 @@ public:
 
     void apply() override
     {
+        settings_t candidate = this->settingsFromUi();
+        candidate.debug_logging = this->debugLoggingCheck->isChecked();
+        candidate.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
+        candidate.system_prompt = this->systemPromptEdit->toPlainText().trimmed();
+        candidate.inline_diff_refinement_enabled = this->inlineDiffRefinementCheck->isChecked();
+        candidate.agent_debug = this->agentDebugCheck->isChecked();
+
         auto &s = settings();
-        s = this->settingsFromUi();
-        s.debug_logging = this->debugLoggingCheck->isChecked();
-        s.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
-        s.system_prompt = this->systemPromptEdit->toPlainText().trimmed();
-        s.inline_diff_refinement_enabled = this->inlineDiffRefinementCheck->isChecked();
-        s.agent_debug = this->agentDebugCheck->isChecked();
+        s = candidate;
         s.save();
 
         logger_t::instance().set_enabled(s.debug_logging);

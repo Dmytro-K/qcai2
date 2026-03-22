@@ -118,6 +118,33 @@ QString sibling_file_path(const QString &storage_path, const QString &suffix)
     return storage_info.dir().filePath(storage_info.completeBaseName() + suffix);
 }
 
+QString project_rules_file_path(const QString &storage_path)
+{
+    const QString storage_dir_path = QFileInfo(storage_path).absolutePath();
+    if (storage_dir_path.isEmpty() == true)
+    {
+        return {};
+    }
+
+    const QString project_dir_path =
+        QDir::cleanPath(QDir(storage_dir_path).filePath(QStringLiteral("..")));
+    return QDir(project_dir_path).filePath(QStringLiteral(".qcai2/rules.md"));
+}
+
+bool normalize_project_prompt_defaults(QJsonObject *root)
+{
+    if (root == nullptr)
+    {
+        return false;
+    }
+
+    const QJsonValue ignore_value = root->value(QStringLiteral("ignoreGlobalSystemPrompt"));
+    const bool ignore_global_system_prompt = ignore_value.toBool(false);
+    const bool already_present = root->contains(QStringLiteral("ignoreGlobalSystemPrompt"));
+    (*root)[QStringLiteral("ignoreGlobalSystemPrompt")] = ignore_global_system_prompt;
+    return already_present == false || ignore_value.isBool() == false;
+}
+
 QString revision_label(const revision_t &revision)
 {
     return revision.valid ? revision.revision_string() : QStringLiteral("unversioned");
@@ -449,6 +476,16 @@ revision_t stored_project_revision(const QJsonObject &root)
 
 bool save_project_root(const QString &storage_path, const QJsonObject &root, QString *error)
 {
+    const QFileInfo file_info(storage_path);
+    if (QDir().mkpath(file_info.absolutePath()) == false)
+    {
+        if (((error != nullptr) == true))
+        {
+            *error = QStringLiteral("Failed to create directory for %1").arg(storage_path);
+        }
+        return false;
+    }
+
     QSaveFile file(storage_path);
     if (file.open(QIODevice::WriteOnly) == false)
     {
@@ -465,6 +502,54 @@ bool save_project_root(const QString &storage_path, const QJsonObject &root, QSt
         if (((error != nullptr) == true))
         {
             *error = QStringLiteral("Failed to commit %1").arg(storage_path);
+        }
+        return false;
+    }
+
+    return true;
+}
+
+bool ensure_project_prompt_defaults(const QString &storage_path, QJsonObject *root, QString *error)
+{
+    const bool root_changed = normalize_project_prompt_defaults(root);
+    const QString rules_path = project_rules_file_path(storage_path);
+    if (rules_path.isEmpty() == true)
+    {
+        return root_changed;
+    }
+
+    QFile file(rules_path);
+    if (file.exists() == true)
+    {
+        return root_changed;
+    }
+
+    const QFileInfo file_info(rules_path);
+    if (QDir().mkpath(file_info.absolutePath()) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to create directory for %1").arg(rules_path);
+        }
+        return false;
+    }
+
+    QSaveFile save_file(rules_path);
+    if (save_file.open(QIODevice::WriteOnly | QIODevice::Text) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to open %1 for writing: %2")
+                         .arg(rules_path, save_file.errorString());
+        }
+        return false;
+    }
+
+    if (save_file.commit() == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to commit %1").arg(rules_path);
         }
         return false;
     }
@@ -659,7 +744,14 @@ bool migrate_project_state(const QString &storage_path, QString *error)
     QFile file(storage_path);
     if (file.exists() == false)
     {
-        return true;
+        QJsonObject root;
+        stamp_project_state(root);
+        if (ensure_project_prompt_defaults(storage_path, &root, error) == false &&
+            error != nullptr && error->isEmpty() == false)
+        {
+            return false;
+        }
+        return save_project_root(storage_path, root, error);
     }
     if (file.open(QIODevice::ReadOnly) == false)
     {
@@ -745,6 +837,12 @@ bool migrate_project_state(const QString &storage_path, QString *error)
     {
         stamp_project_state(root);
         changed = true;
+    }
+
+    changed = ensure_project_prompt_defaults(storage_path, &root, error) || changed;
+    if (error != nullptr && error->isEmpty() == false)
+    {
+        return false;
     }
 
     if (changed == false)
