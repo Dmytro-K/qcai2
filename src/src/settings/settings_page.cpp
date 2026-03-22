@@ -5,6 +5,7 @@
 #include "settings_page.h"
 #include "../../qcai2tr.h"
 #include "../util/logger.h"
+#include "../util/web_tools.h"
 #include "../vector_search/text_embedder.h"
 #include "../vector_search/vector_indexing_manager.h"
 #include "../vector_search/vector_search_service.h"
@@ -150,6 +151,13 @@ class settings_widget_t : public Core::IOptionsPageWidget
         bool debug_logging = false;
         bool detailed_request_logging = false;
         QString system_prompt;
+        bool web_tools_enabled = false;
+        QString web_search_provider;
+        QString web_search_endpoint;
+        QString web_search_api_key;
+        int web_search_max_results = 0;
+        int web_request_timeout_sec = 0;
+        int web_fetch_max_chars = 0;
         bool inline_diff_refinement_enabled = false;
         bool agent_debug = false;
         qtmcp::server_definitions_t mcp_servers;
@@ -219,6 +227,14 @@ public:
         this->debugLoggingCheck = this->ui->debugLoggingCheck;
         this->detailedRequestLoggingCheck = this->ui->detailedRequestLoggingCheck;
         this->systemPromptEdit = this->ui->systemPromptEdit;
+        this->webToolsEnabledCheck = this->ui->webToolsEnabledCheck;
+        this->webSearchProviderCombo = this->ui->webSearchProviderCombo;
+        this->webSearchEndpointEdit = this->ui->webSearchEndpointEdit;
+        this->webSearchApiKeyEdit = this->ui->webSearchApiKeyEdit;
+        this->webSearchMaxResultsSpin = this->ui->webSearchMaxResultsSpin;
+        this->webRequestTimeoutSpin = this->ui->webRequestTimeoutSpin;
+        this->webFetchMaxCharsSpin = this->ui->webFetchMaxCharsSpin;
+        this->webToolsStatusLabel = this->ui->webToolsStatusLabel;
         this->inlineDiffRefinementCheck = this->ui->inlineDiffRefinementCheck;
         this->agentDebugCheck = this->ui->agentDebugCheck;
         this->mcpServersWidget = new mcp_servers_widget_t(this);
@@ -471,6 +487,49 @@ public:
         this->debugLoggingCheck->setChecked(s.debug_logging);
         this->detailedRequestLoggingCheck->setChecked(s.detailed_request_logging);
         this->systemPromptEdit->setPlainText(s.system_prompt);
+        this->webToolsEnabledCheck->setChecked(s.web_tools_enabled);
+        this->webSearchProviderCombo->addItem(tr_t::tr("DuckDuckGo HTML"),
+                                              QStringLiteral("duckduckgo"));
+        this->webSearchProviderCombo->addItem(tr_t::tr("Perplexity API"),
+                                              QStringLiteral("perplexity"));
+        this->webSearchProviderCombo->addItem(tr_t::tr("Brave Search API"),
+                                              QStringLiteral("brave"));
+        this->webSearchProviderCombo->addItem(tr_t::tr("Serper.dev"), QStringLiteral("serper"));
+        const int web_provider_index =
+            this->webSearchProviderCombo->findData(s.web_search_provider);
+        this->webSearchProviderCombo->setCurrentIndex(web_provider_index >= 0 ? web_provider_index
+                                                                              : 0);
+        this->webSearchEndpointEdit->setText(
+            s.web_search_endpoint.trimmed().isEmpty() == true
+                ? default_web_search_endpoint(
+                      this->webSearchProviderCombo->currentData().toString())
+                : s.web_search_endpoint.trimmed());
+        this->webSearchApiKeyEdit->setText(s.web_search_api_key);
+        this->webSearchMaxResultsSpin->setValue(s.web_search_max_results);
+        this->webRequestTimeoutSpin->setValue(s.web_request_timeout_sec);
+        this->webFetchMaxCharsSpin->setValue(s.web_fetch_max_chars);
+        this->webSearchProviderCombo->setProperty(
+            "previousProvider", this->webSearchProviderCombo->currentData().toString());
+        connect(this->webToolsEnabledCheck, &QCheckBox::toggled, this,
+                [this]() { this->refreshWebToolsUiState(); });
+        connect(this->webSearchProviderCombo, qOverload<int>(&QComboBox::currentIndexChanged),
+                this, [this](int) {
+                    const QString previous_provider =
+                        this->webSearchProviderCombo->property("previousProvider").toString();
+                    const QString current_provider =
+                        this->webSearchProviderCombo->currentData().toString();
+                    const QString current_endpoint = this->webSearchEndpointEdit->text().trimmed();
+                    if (current_endpoint.isEmpty() == true ||
+                        current_endpoint == default_web_search_endpoint(previous_provider))
+                    {
+                        this->webSearchEndpointEdit->setText(
+                            default_web_search_endpoint(current_provider));
+                    }
+                    this->webSearchProviderCombo->setProperty("previousProvider",
+                                                              current_provider);
+                    this->refreshWebToolsUiState();
+                });
+        this->refreshWebToolsUiState();
         this->inlineDiffRefinementCheck->setChecked(s.inline_diff_refinement_enabled);
 
         this->agentDebugCheck->setChecked(s.agent_debug);
@@ -524,6 +583,13 @@ public:
         installCheckSettingsDirtyTrigger(this->vectorSearchMaxIndexingThreadsSpin);
         installCheckSettingsDirtyTrigger(this->debugLoggingCheck);
         installCheckSettingsDirtyTrigger(this->detailedRequestLoggingCheck);
+        installCheckSettingsDirtyTrigger(this->webToolsEnabledCheck);
+        installCheckSettingsDirtyTrigger(this->webSearchProviderCombo);
+        installCheckSettingsDirtyTrigger(this->webSearchEndpointEdit);
+        installCheckSettingsDirtyTrigger(this->webSearchApiKeyEdit);
+        installCheckSettingsDirtyTrigger(this->webSearchMaxResultsSpin);
+        installCheckSettingsDirtyTrigger(this->webRequestTimeoutSpin);
+        installCheckSettingsDirtyTrigger(this->webFetchMaxCharsSpin);
         installCheckSettingsDirtyTrigger(this->inlineDiffRefinementCheck);
         installCheckSettingsDirtyTrigger(this->agentDebugCheck);
         // QDoubleSpinBox not supported by installCheckSettingsDirtyTrigger
@@ -532,6 +598,7 @@ public:
                 Utils::checkSettingsDirty);
         connect(this->detailedRequestLoggingCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->systemPromptEdit, &QPlainTextEdit::textChanged, Utils::checkSettingsDirty);
+        connect(this->webToolsEnabledCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->inlineDiffRefinementCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->vectorSearchEnabledCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->mcpServersWidget, &mcp_servers_widget_t::changed, Utils::checkSettingsDirty);
@@ -548,6 +615,13 @@ public:
         candidate.debug_logging = this->debugLoggingCheck->isChecked();
         candidate.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
         candidate.system_prompt = this->systemPromptEdit->toPlainText().trimmed();
+        candidate.web_tools_enabled = this->webToolsEnabledCheck->isChecked();
+        candidate.web_search_provider = this->webSearchProviderCombo->currentData().toString();
+        candidate.web_search_endpoint = this->webSearchEndpointEdit->text().trimmed();
+        candidate.web_search_api_key = this->webSearchApiKeyEdit->text();
+        candidate.web_search_max_results = this->webSearchMaxResultsSpin->value();
+        candidate.web_request_timeout_sec = this->webRequestTimeoutSpin->value();
+        candidate.web_fetch_max_chars = this->webFetchMaxCharsSpin->value();
         candidate.inline_diff_refinement_enabled = this->inlineDiffRefinementCheck->isChecked();
         candidate.agent_debug = this->agentDebugCheck->isChecked();
 
@@ -636,10 +710,44 @@ private:
         s.debug_logging = this->debugLoggingCheck->isChecked();
         s.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
         s.system_prompt = this->systemPromptEdit->toPlainText().trimmed();
+        s.web_tools_enabled = this->webToolsEnabledCheck->isChecked();
+        s.web_search_provider = this->webSearchProviderCombo->currentData().toString();
+        s.web_search_endpoint = this->webSearchEndpointEdit->text().trimmed();
+        s.web_search_api_key = this->webSearchApiKeyEdit->text();
+        s.web_search_max_results = this->webSearchMaxResultsSpin->value();
+        s.web_request_timeout_sec = this->webRequestTimeoutSpin->value();
+        s.web_fetch_max_chars = this->webFetchMaxCharsSpin->value();
         s.inline_diff_refinement_enabled = this->inlineDiffRefinementCheck->isChecked();
         s.agent_debug = this->agentDebugCheck->isChecked();
         s.mcp_servers = this->mcpServersWidget->servers();
         return s;
+    }
+
+    void refreshWebToolsUiState()
+    {
+        const bool enabled = this->webToolsEnabledCheck->isChecked();
+        const QString provider = this->webSearchProviderCombo->currentData().toString();
+        const bool provider_requires_api_key = provider == QStringLiteral("serper") ||
+                                               provider == QStringLiteral("brave") ||
+                                               provider == QStringLiteral("perplexity");
+
+        this->webSearchProviderCombo->setEnabled(enabled);
+        this->webSearchEndpointEdit->setEnabled(enabled);
+        this->webSearchApiKeyEdit->setEnabled(enabled && provider_requires_api_key);
+        this->webSearchMaxResultsSpin->setEnabled(enabled);
+        this->webRequestTimeoutSpin->setEnabled(enabled);
+        this->webFetchMaxCharsSpin->setEnabled(enabled);
+        this->webToolsStatusLabel->setText(
+            enabled == false
+                ? tr_t::tr("Web tools are disabled.")
+                : tr_t::tr("Available to all agent providers, including GitHub Copilot. %1")
+                      .arg(provider_requires_api_key == true
+                               ? (provider == QStringLiteral("perplexity")
+                                      ? tr_t::tr("Perplexity API requires a configured API key.")
+                                  : provider == QStringLiteral("brave")
+                                      ? tr_t::tr("Brave Search API requires a configured API key.")
+                                      : tr_t::tr("Serper.dev requires a configured API key."))
+                               : tr_t::tr("DuckDuckGo HTML works without an API key.")));
     }
 
     void refreshVectorSearchUiState()
@@ -775,6 +883,13 @@ private:
             this->debugLoggingCheck->isChecked(),
             this->detailedRequestLoggingCheck->isChecked(),
             this->systemPromptEdit->toPlainText().trimmed(),
+            this->webToolsEnabledCheck->isChecked(),
+            this->webSearchProviderCombo->currentData().toString(),
+            this->webSearchEndpointEdit->text().trimmed(),
+            this->webSearchApiKeyEdit->text(),
+            this->webSearchMaxResultsSpin->value(),
+            this->webRequestTimeoutSpin->value(),
+            this->webFetchMaxCharsSpin->value(),
             this->inlineDiffRefinementCheck->isChecked(),
             this->agentDebugCheck->isChecked(),
             this->mcpServersWidget->servers(),
@@ -849,6 +964,19 @@ private:
         this->debugLoggingCheck->setChecked(snap.debug_logging);
         this->detailedRequestLoggingCheck->setChecked(snap.detailed_request_logging);
         this->systemPromptEdit->setPlainText(snap.system_prompt);
+        this->webToolsEnabledCheck->setChecked(snap.web_tools_enabled);
+        const int web_provider_index =
+            this->webSearchProviderCombo->findData(snap.web_search_provider);
+        this->webSearchProviderCombo->setCurrentIndex(web_provider_index >= 0 ? web_provider_index
+                                                                              : 0);
+        this->webSearchEndpointEdit->setText(snap.web_search_endpoint);
+        this->webSearchApiKeyEdit->setText(snap.web_search_api_key);
+        this->webSearchMaxResultsSpin->setValue(snap.web_search_max_results);
+        this->webRequestTimeoutSpin->setValue(snap.web_request_timeout_sec);
+        this->webFetchMaxCharsSpin->setValue(snap.web_fetch_max_chars);
+        this->webSearchProviderCombo->setProperty(
+            "previousProvider", this->webSearchProviderCombo->currentData().toString());
+        this->refreshWebToolsUiState();
         this->inlineDiffRefinementCheck->setChecked(snap.inline_diff_refinement_enabled);
         this->agentDebugCheck->setChecked(snap.agent_debug);
         this->mcpServersWidget->set_servers(snap.mcp_servers);
@@ -903,6 +1031,14 @@ private:
     QCheckBox *debugLoggingCheck;
     QCheckBox *detailedRequestLoggingCheck;
     QPlainTextEdit *systemPromptEdit;
+    QCheckBox *webToolsEnabledCheck;
+    QComboBox *webSearchProviderCombo;
+    QLineEdit *webSearchEndpointEdit;
+    QLineEdit *webSearchApiKeyEdit;
+    QSpinBox *webSearchMaxResultsSpin;
+    QSpinBox *webRequestTimeoutSpin;
+    QSpinBox *webFetchMaxCharsSpin;
+    QLabel *webToolsStatusLabel;
     QCheckBox *inlineDiffRefinementCheck;
     QCheckBox *agentDebugCheck;
     mcp_servers_widget_t *mcpServersWidget = nullptr;

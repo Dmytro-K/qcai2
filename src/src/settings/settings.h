@@ -106,6 +106,27 @@ struct settings_t
     /** Optional custom system prompt prepended to agent and ask requests. */
     QString system_prompt;
 
+    /** Enables web_search and web_fetch tools when true. */
+    bool web_tools_enabled = false;
+
+    /** Selected backend identifier for web search requests. */
+    QString web_search_provider = QStringLiteral("duckduckgo");
+
+    /** Configured web search HTTP endpoint. */
+    QString web_search_endpoint = QStringLiteral("https://html.duckduckgo.com/html/");
+
+    /** Optional API key for web search backends that require one. */
+    QString web_search_api_key;
+
+    /** Default number of web search results returned to the agent. */
+    int web_search_max_results = 5;
+
+    /** Shared request timeout for web tools, in seconds. */
+    int web_request_timeout_sec = 20;
+
+    /** Maximum number of fetched characters returned by web_fetch. */
+    int web_fetch_max_chars = 20000;
+
     /** Allows rejected inline diff hunks to trigger a follow-up refinement round. */
     bool inline_diff_refinement_enabled = false;
 

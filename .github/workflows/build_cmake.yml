@@ -96,7 +96,7 @@ jobs:
             COMMAND sudo apt-get update
           )
           execute_process(
-            COMMAND sudo apt-get install -y libgl1-mesa-dev liblzma-dev
+            COMMAND sudo apt-get install -y libgl1-mesa-dev liblzma-dev libsecret-1-0
             RESULT_VARIABLE result
           )
           if (NOT result EQUAL 0)
@@ -242,7 +242,11 @@ jobs:
 
         cmake "${cmake_args[@]}"
         cmake --build build --parallel
-        ctest --test-dir build --output-on-failure
+        if [ "${RUNNER_OS}" = "Linux" ]; then
+          QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+        else
+          ctest --test-dir build --output-on-failure
+        fi
 
         package_root="$PWD/package-root"
         archive_name="${PLUGIN_NAME}-${QT_CREATOR_VERSION}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}"

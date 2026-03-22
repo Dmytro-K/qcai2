@@ -307,6 +307,13 @@ void settings_t::load()
     detailed_request_logging =
         s.value("detailedRequestLogging", detailed_request_logging).toBool();
     system_prompt = s.value("systemPrompt", system_prompt).toString();
+    web_tools_enabled = s.value("webToolsEnabled", web_tools_enabled).toBool();
+    web_search_provider = s.value("webSearchProvider", web_search_provider).toString().trimmed();
+    web_search_endpoint = s.value("webSearchEndpoint", web_search_endpoint).toString().trimmed();
+    web_search_api_key = s.value("webSearchApiKey", web_search_api_key).toString();
+    web_search_max_results = s.value("webSearchMaxResults", web_search_max_results).toInt();
+    web_request_timeout_sec = s.value("webRequestTimeoutSec", web_request_timeout_sec).toInt();
+    web_fetch_max_chars = s.value("webFetchMaxChars", web_fetch_max_chars).toInt();
     inline_diff_refinement_enabled =
         s.value("inlineDiffRefinementEnabled", inline_diff_refinement_enabled).toBool();
     agent_debug = s.value("agentDebug", agent_debug).toBool();
@@ -419,6 +426,13 @@ void settings_t::save() const
     s.setValue("debugLogging", debug_logging);
     s.setValue("detailedRequestLogging", detailed_request_logging);
     s.setValue("systemPrompt", system_prompt);
+    s.setValue("webToolsEnabled", web_tools_enabled);
+    s.setValue("webSearchProvider", web_search_provider);
+    s.setValue("webSearchEndpoint", web_search_endpoint);
+    s.setValue("webSearchApiKey", web_search_api_key);
+    s.setValue("webSearchMaxResults", web_search_max_results);
+    s.setValue("webRequestTimeoutSec", web_request_timeout_sec);
+    s.setValue("webFetchMaxChars", web_fetch_max_chars);
     s.setValue("inlineDiffRefinementEnabled", inline_diff_refinement_enabled);
     s.setValue("agentDebug", agent_debug);
     s.setValue("completionMinChars", completion_min_chars);

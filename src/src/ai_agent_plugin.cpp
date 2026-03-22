@@ -40,6 +40,7 @@
 #include "tools/search_tools.h"
 #include "tools/tool_registry.h"
 #include "tools/vector_search_tools.h"
+#include "tools/web_tools.h"
 #include "util/crash_handler.h"
 #include "util/ide_output_capture.h"
 #include "util/logger.h"
@@ -421,6 +422,8 @@ void ai_agent_plugin_t::register_tools()
     this->tool_registry->register_tool(std::make_shared<create_file_tool_t>());
     this->tool_registry->register_tool(std::make_shared<apply_patch_tool_t>());
     this->tool_registry->register_tool(std::make_shared<search_repo_tool_t>());
+    this->tool_registry->register_tool(std::make_shared<web_search_tool_t>());
+    this->tool_registry->register_tool(std::make_shared<web_fetch_tool_t>());
     this->tool_registry->register_tool(std::make_shared<vector_search_tool_t>());
     this->tool_registry->register_tool(std::make_shared<vector_search_history_tool_t>());
     this->tool_registry->register_tool(std::make_shared<list_directory_tool_t>());

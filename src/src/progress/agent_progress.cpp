@@ -124,6 +124,10 @@ agent_progress_operation_t classify_tool_operation(const QString &tool_name)
     {
         return agent_progress_operation_t::READ;
     }
+    if (normalized.contains(QStringLiteral("fetch")) == true)
+    {
+        return agent_progress_operation_t::READ;
+    }
     if (normalized.contains(QStringLiteral("test")) == true)
     {
         return agent_progress_operation_t::TEST;
@@ -159,6 +163,11 @@ QString progress_label_for_tool(const QString &tool_name, agent_progress_operati
     if (operation == agent_progress_operation_t::READ && normalized == QStringLiteral("read_file"))
     {
         return QStringLiteral("file");
+    }
+    if ((normalized == QStringLiteral("web_search") ||
+         normalized == QStringLiteral("web_fetch")) == true)
+    {
+        return QStringLiteral("web");
     }
     if (operation == agent_progress_operation_t::BUILD ||
         operation == agent_progress_operation_t::TEST ||

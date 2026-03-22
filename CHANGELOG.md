@@ -7,6 +7,7 @@
 - Added an optional multi-turn inline diff refinement flow
 - Added global system prompt
 - Added per-project system prompt
+- Added `web_search` tool with support of DuckDuckGo, Serper.dev, Perplexity API, Brave Search API
 
 ## [0.0.7] - 2026-03-21
 

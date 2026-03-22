@@ -226,6 +226,24 @@ target_link_libraries(tst_qcai2_tool_registry PRIVATE
 )
 qcai2_register_test(qcai2_tool_registry tst_qcai2_tool_registry)
 
+add_executable(tst_qcai2_web_tools
+    tst_web_tools.cpp
+    ../src/util/web_tools.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_web_tools)
+
+target_include_directories(tst_qcai2_web_tools PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_web_tools PRIVATE
+    Qt::Core
+    Qt::Gui
+    Qt::Network
+    Qt::Test
+)
+qcai2_register_test(qcai2_web_tools tst_qcai2_web_tools)
+
 if(FEATURE_CLANGD_ENABLE)
 add_executable(tst_qcai2_clangd_tools
     tst_clangd_tools.cpp

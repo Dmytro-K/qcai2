@@ -590,6 +590,8 @@ add_qtc_plugin(qcai2
     src/src/tools/create_file_tool.cpp
     src/src/tools/search_tools.h
     src/src/tools/search_tools.cpp
+    src/src/tools/web_tools.h
+    src/src/tools/web_tools.cpp
     src/src/tools/vector_search_tools.h
     src/src/tools/vector_search_tools.cpp
     src/src/tools/build_tools.h
@@ -646,6 +648,8 @@ add_qtc_plugin(qcai2
     src/src/util/logger.cpp
     src/src/util/crash_handler.h
     src/src/util/crash_handler.cpp
+    src/src/util/web_tools.h
+    src/src/util/web_tools.cpp
     src/src/settings/settings.h
     src/src/settings/settings.cpp
     src/src/settings/settings_page.h
