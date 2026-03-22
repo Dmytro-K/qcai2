@@ -21,6 +21,7 @@ private slots:
     void renames_conversation();
     void deletes_conversation();
     void writes_hourly_usage_stats_csv();
+    void excludes_superseded_soft_steer_messages_from_prompt_context();
 };
 
 void tst_chat_context_t::stores_artifacts_and_builds_envelope()
@@ -452,6 +453,64 @@ void tst_chat_context_t::writes_hourly_usage_stats_csv()
     QCOMPARE(row.at(14), QStringLiteral("15"));
     QCOMPARE(row.at(15), QStringLiteral("30"));
     QVERIFY(row.at(16).toLongLong() >= 0);
+}
+
+void tst_chat_context_t::excludes_superseded_soft_steer_messages_from_prompt_context()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+    QVERIFY(QDir(temp_dir.path()).mkpath(QStringLiteral(".qcai2")));
+
+    chat_context_manager_t manager;
+    QString error;
+    QVERIFY(manager.set_active_workspace(QStringLiteral("workspace-soft-steer"), temp_dir.path(),
+                                         {}, &error));
+    QVERIFY(error.isEmpty());
+
+    const QString conversation_id =
+        manager.start_new_conversation(QStringLiteral("Soft steer"), &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(conversation_id.isEmpty() == false);
+
+    const QString run_id = manager.begin_run(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("provider"), QStringLiteral("model"),
+        QStringLiteral("medium"), QStringLiteral("medium"), true, {}, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(run_id.isEmpty() == false);
+
+    QVERIFY(manager.append_user_message(run_id, QStringLiteral("Initial request"),
+                                        QStringLiteral("goal"), {}, &error));
+    QVERIFY(error.isEmpty());
+    QVERIFY(manager.append_assistant_message(
+        run_id, QStringLiteral("Superseded draft"), QStringLiteral("model_response"),
+        QJsonObject{{QStringLiteral("status"), QStringLiteral("superseded_by_user_steer")}},
+        &error));
+    QVERIFY(error.isEmpty());
+    QVERIFY(manager.append_user_message(run_id, QStringLiteral("Newest request"),
+                                        QStringLiteral("soft_steer_followup"), {}, &error));
+    QVERIFY(error.isEmpty());
+
+    const context_envelope_t envelope = manager.build_context_envelope(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("System prompt"), {}, 1024, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    QStringList assistant_messages;
+    QStringList user_messages;
+    for (const chat_message_t &message : envelope.provider_messages)
+    {
+        if (message.role == QStringLiteral("assistant"))
+        {
+            assistant_messages.append(message.content);
+        }
+        if (message.role == QStringLiteral("user"))
+        {
+            user_messages.append(message.content);
+        }
+    }
+
+    QVERIFY(assistant_messages.contains(QStringLiteral("Superseded draft")) == false);
+    QVERIFY(user_messages.contains(QStringLiteral("Initial request")));
+    QVERIFY(user_messages.contains(QStringLiteral("Newest request")));
 }
 
 QTEST_MAIN(tst_chat_context_t)

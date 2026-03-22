@@ -1451,6 +1451,10 @@ chat_context_manager_t::select_recent_messages(const context_budget_t &budget,
     for (qsizetype index = messages.size() - 1; index >= 0; --index)
     {
         const context_message_t &message = messages.at(static_cast<int>(index));
+        if (message.include_in_prompt() == false)
+        {
+            continue;
+        }
         if (((usedTokens + message.token_estimate) > budget.recent_message_tokens) == true &&
             (selected.isEmpty() == false))
         {

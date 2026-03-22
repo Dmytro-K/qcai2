@@ -31,6 +31,7 @@ constexpr int k_default_prompt_result_limit = 15000;
 constexpr int k_verbose_tool_prompt_result_limit = 4000;
 constexpr int k_provider_inactivity_timeout_ms = 75000;
 constexpr int k_provider_thinking_inactivity_timeout_ms = 180000;
+const QString k_superseded_by_user_steer_status = QStringLiteral("superseded_by_user_steer");
 
 QString as_indented_code_block(const QString &text)
 {
@@ -152,6 +153,63 @@ QString artifact_kind_for_tool(const QString &tool_name)
         return QStringLiteral("file_snippet");
     }
     return QStringLiteral("tool_output");
+}
+
+QString soft_steer_system_note()
+{
+    return QStringLiteral(
+        "Follow-up user input arrived during the previous in-progress turn. "
+        "Treat any unfinished assistant draft as superseded_by_user_steer, prioritize the newest "
+        "user message(s), and re-plan from the updated user intent instead of continuing the old "
+        "path blindly.");
+}
+
+QString soft_steer_tool_completion_note(const QString &tool_name, const QString &tool_result)
+{
+    return QStringLiteral(
+               "Before the user's follow-up arrived, tool '%1' finished with this result:\n%2\n\n"
+               "Use it only if it is still relevant to the updated request.")
+        .arg(tool_name, as_indented_code_block(tool_result));
+}
+
+QString soft_steer_follow_up_message(const QString &message, const QString &request_context)
+{
+    const QString trimmed_message = message.trimmed();
+    const QString trimmed_context = request_context.trimmed();
+    if (trimmed_context.isEmpty() == true)
+    {
+        return trimmed_message;
+    }
+
+    return QStringLiteral("%1\n\nAdditional follow-up context:\n%2")
+        .arg(trimmed_message, trimmed_context);
+}
+
+QString format_soft_steer_request_log(const QString &message, const QString &request_context,
+                                      const QStringList &linked_files, int index, int total_count)
+{
+    QStringList sections;
+    const QString title =
+        total_count > 1
+            ? QStringLiteral("[pending] Soft steer request %1/%2").arg(index + 1).arg(total_count)
+            : QStringLiteral("[pending] Soft steer request");
+    sections.append(
+        QStringLiteral("%1\n\n%2").arg(title, as_indented_code_block(message.trimmed())));
+
+    const QString trimmed_context = request_context.trimmed();
+    if (trimmed_context.isEmpty() == false)
+    {
+        sections.append(QStringLiteral("Additional context\n\n%1")
+                            .arg(as_indented_code_block(trimmed_context)));
+    }
+
+    if (linked_files.isEmpty() == false)
+    {
+        sections.append(
+            QStringLiteral("Linked files: %1").arg(linked_files.join(QStringLiteral(", "))));
+    }
+
+    return sections.join(QStringLiteral("\n\n"));
 }
 
 }  // namespace
@@ -358,6 +416,9 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
     this->messages.clear();
     this->run_id.clear();
     this->accumulated_usage = {};
+    this->pending_soft_steer_messages.clear();
+    this->soft_steer_pending_flag = false;
+    this->pending_soft_steer_system_note.clear();
     this->pending_provider_responses.clear();
     this->provider_response_dispatch_scheduled = false;
     this->pending_validation_tool_name.clear();
@@ -549,6 +610,49 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
     this->run_next_iteration();
 }
 
+bool agent_controller_t::enqueue_soft_steer_message(const QString &message,
+                                                    const QString &request_context,
+                                                    const QStringList &linked_files)
+{
+    const QString trimmed_message = message.trimmed();
+    if (this->is_running() == false || trimmed_message.isEmpty() == true)
+    {
+        return false;
+    }
+
+    this->pending_soft_steer_messages.append(
+        {trimmed_message, request_context.trimmed(), linked_files});
+    this->soft_steer_pending_flag = true;
+
+    emit this->soft_steer_pending(static_cast<int>(this->pending_soft_steer_messages.size()));
+    emit this->status_changed(
+        QStringLiteral("Soft steer pending (%1 queued follow-up message%2).")
+            .arg(this->pending_soft_steer_messages.size())
+            .arg(this->pending_soft_steer_messages.size() == 1 ? QString() : QStringLiteral("s")));
+
+    if (this->run_state_machine.is_waiting_for_approval() == true ||
+        this->run_state_machine.is_waiting_for_inline_diff_review() == true)
+    {
+        QTimer::singleShot(0, this, [this]() {
+            if (this->is_running() == false || this->soft_steer_pending_flag == false)
+            {
+                return;
+            }
+
+            const QString safe_point =
+                this->run_state_machine.is_waiting_for_inline_diff_review() == true
+                    ? QStringLiteral("inline_diff_review")
+                    : QStringLiteral("approval_wait");
+            if (this->apply_soft_steer_if_pending(safe_point) == true)
+            {
+                this->run_next_iteration();
+            }
+        });
+    }
+
+    return true;
+}
+
 void agent_controller_t::stop()
 {
     if (!this->is_running())
@@ -563,6 +667,9 @@ void agent_controller_t::stop()
     {
         this->provider->cancel();
     }
+    this->pending_soft_steer_messages.clear();
+    this->soft_steer_pending_flag = false;
+    this->pending_soft_steer_system_note.clear();
     this->disarm_provider_watchdog();
     emit this->log_message(QStringLiteral("⏹ Agent stopped by user."));
     this->finalize_persistent_run(
@@ -577,6 +684,14 @@ void agent_controller_t::run_next_iteration()
     if (!this->is_running())
     {
         return;
+    }
+
+    if (this->apply_soft_steer_if_pending(QStringLiteral("before_provider_request")) == true)
+    {
+        if (this->is_running() == false)
+        {
+            return;
+        }
     }
 
     // Check limits
@@ -650,7 +765,21 @@ void agent_controller_t::run_next_iteration()
     const iai_provider_t::progress_callback_t progress_callback =
         std::bind(&agent_controller_t::dispatch_provider_progress, controller, _1);
 
-    this->provider->complete(this->messages, this->model_name, s.temperature, s.max_tokens,
+    QList<chat_message_t> request_messages = this->messages;
+    if (this->pending_soft_steer_system_note.isEmpty() == false)
+    {
+        int insert_index = 0;
+        while (insert_index < request_messages.size() &&
+               request_messages.at(insert_index).role == QStringLiteral("system"))
+        {
+            ++insert_index;
+        }
+        request_messages.insert(insert_index,
+                                {QStringLiteral("system"), this->pending_soft_steer_system_note});
+        this->pending_soft_steer_system_note.clear();
+    }
+
+    this->provider->complete(request_messages, this->model_name, s.temperature, s.max_tokens,
                              this->reasoning_effort, completion_callback, stream_callback,
                              progress_callback);
 }
@@ -712,6 +841,25 @@ void agent_controller_t::handle_response(const QString &response, const QString 
     {
         this->accumulated_usage = accumulate_provider_usage(this->accumulated_usage, usage);
         emit this->provider_usage_available(usage, request_duration_ms);
+    }
+
+    if (this->soft_steer_pending_flag == true)
+    {
+        if (this->detailed_request_log != nullptr)
+        {
+            this->detailed_request_log->record_iteration_output(
+                this->current_iteration, response, {}, k_superseded_by_user_steer_status, {},
+                usage, request_duration_ms);
+        }
+        if (this->apply_soft_steer_if_pending(
+                QStringLiteral("before_assistant_commit"), response,
+                QJsonObject{{QStringLiteral("iteration"), this->current_iteration},
+                            {QStringLiteral("reason"), k_superseded_by_user_steer_status}}) ==
+            true)
+        {
+            this->run_next_iteration();
+            return;
+        }
     }
 
     // Add assistant message to history
@@ -1024,6 +1172,14 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
          name,
          progressLabel,
          {}});
+
+    if (this->apply_soft_steer_if_pending(QStringLiteral("after_tool_execution"), {}, {}, name,
+                                          result) == true)
+    {
+        this->run_next_iteration();
+        return;
+    }
+
     this->pending_validation_tool_name = name;
     this->pending_validation_label = progressLabel;
     QCAI_DEBUG("Agent",
@@ -1098,6 +1254,85 @@ void agent_controller_t::handle_provider_inactivity_timeout()
         QStringLiteral("error"),
         QJsonObject{{QStringLiteral("reason"), QStringLiteral("provider-timeout")}});
     emit this->stopped(QStringLiteral("Provider response timed out."));
+}
+
+bool agent_controller_t::apply_soft_steer_if_pending(const QString &safe_point,
+                                                     const QString &superseded_assistant_output,
+                                                     const QJsonObject &superseded_metadata,
+                                                     const QString &completed_tool_name,
+                                                     const QString &completed_tool_result)
+{
+    if (this->soft_steer_pending_flag == false ||
+        this->pending_soft_steer_messages.isEmpty() == true)
+    {
+        return false;
+    }
+
+    const int queued_message_count = static_cast<int>(this->pending_soft_steer_messages.size());
+    emit this->status_changed(QStringLiteral("Applying follow-up user steer..."));
+
+    if (superseded_assistant_output.trimmed().isEmpty() == false)
+    {
+        QJsonObject metadata = superseded_metadata;
+        metadata[QStringLiteral("status")] = k_superseded_by_user_steer_status;
+        metadata[QStringLiteral("safePoint")] = safe_point;
+        metadata[QStringLiteral("queuedSteerMessages")] = queued_message_count;
+        this->append_assistant_history_message(superseded_assistant_output,
+                                               k_superseded_by_user_steer_status, metadata, false);
+    }
+
+    if (completed_tool_name.isEmpty() == false)
+    {
+        this->append_controller_user_message(
+            soft_steer_tool_completion_note(completed_tool_name, completed_tool_result),
+            QStringLiteral("soft_steer_tool_completion"),
+            QJsonObject{{QStringLiteral("tool"), completed_tool_name},
+                        {QStringLiteral("safePoint"), safe_point},
+                        {QStringLiteral("softSteer"), true}});
+    }
+
+    this->pending_validation_tool_name.clear();
+    this->pending_validation_label.clear();
+    this->pending_approvals.clear();
+    this->pending_final_summary.clear();
+    this->final_diff_preview.clear();
+    emit this->diff_available(QString());
+
+    this->pending_soft_steer_system_note = soft_steer_system_note();
+    QStringList soft_steer_request_logs;
+
+    for (int i = 0; i < this->pending_soft_steer_messages.size(); ++i)
+    {
+        const pending_soft_steer_message_t &queued = this->pending_soft_steer_messages.at(i);
+        soft_steer_request_logs.append(format_soft_steer_request_log(
+            queued.content, queued.request_context, queued.linked_files, i, queued_message_count));
+        this->append_controller_user_message(
+            soft_steer_follow_up_message(queued.content, queued.request_context),
+            QStringLiteral("soft_steer_followup"),
+            QJsonObject{
+                {QStringLiteral("softSteer"), true},
+                {QStringLiteral("status"), QStringLiteral("applied")},
+                {QStringLiteral("safePoint"), safe_point},
+                {QStringLiteral("steerIndex"), i},
+                {QStringLiteral("queuedMessageCount"), queued_message_count},
+                {QStringLiteral("linkedFiles"), QJsonArray::fromStringList(queued.linked_files)}});
+    }
+
+    this->pending_soft_steer_messages.clear();
+    this->soft_steer_pending_flag = false;
+    this->provider_activity_seen = false;
+
+    emit this->soft_steer_applied(queued_message_count);
+    for (const QString &request_log : std::as_const(soft_steer_request_logs))
+    {
+        emit this->log_message(request_log);
+    }
+    QCAI_INFO("Agent",
+              QStringLiteral("Applied soft steer at safe point '%1' with %2 queued follow-up "
+                             "message(s)")
+                  .arg(safe_point)
+                  .arg(queued_message_count));
+    return true;
 }
 
 void agent_controller_t::request_inline_diff_refinement(const QString &accepted_diff,
@@ -1196,9 +1431,13 @@ void agent_controller_t::append_controller_user_message(const QString &content,
 
 void agent_controller_t::append_assistant_history_message(const QString &content,
                                                           const QString &source,
-                                                          const QJsonObject &metadata)
+                                                          const QJsonObject &metadata,
+                                                          bool include_in_prompt)
 {
-    this->messages.append({QStringLiteral("assistant"), content});
+    if (include_in_prompt == true)
+    {
+        this->messages.append({QStringLiteral("assistant"), content});
+    }
     if (this->chat_context_manager != nullptr)
     {
         QString contextError;

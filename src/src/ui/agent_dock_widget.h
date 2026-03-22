@@ -193,6 +193,11 @@ private:
     void flush_streaming_markdown();
 
     /**
+     * Drops buffered streaming markdown without committing it to the Actions Log.
+     */
+    void discard_streaming_markdown();
+
+    /**
      * Returns the combined committed and streaming markdown for the Actions Log.
      */
     QString current_log_markdown() const;

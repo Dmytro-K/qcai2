@@ -708,6 +708,20 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
             &agent_dock_widget_t::on_provider_usage_available);
     connect(this->controller, &agent_controller_t::status_changed, this,
             [this](const QString &status) { this->status_label->setText(status); });
+    connect(this->controller, &agent_controller_t::soft_steer_pending, this,
+            [this](int queued_message_count) {
+                this->status_label->setText(
+                    QStringLiteral("Soft steer pending (%1 queued).").arg(queued_message_count));
+            });
+    connect(this->controller, &agent_controller_t::soft_steer_applied, this,
+            [this](int applied_message_count) {
+                this->discard_streaming_markdown();
+                this->append_stamped_log_entry(
+                    QStringLiteral("↪ Soft steer applied with %1 follow-up message%2.")
+                        .arg(applied_message_count)
+                        .arg(applied_message_count == 1 ? QString() : QStringLiteral("s")));
+                this->status_label->setText(QStringLiteral("Soft steer applied."));
+            });
     connect(this->controller, &agent_controller_t::streaming_token, this,
             [this](const QString &token) {
                 this->streaming_response_raw += token;
@@ -1309,9 +1323,10 @@ void agent_dock_widget_t::setup_ui()
 
 void agent_dock_widget_t::update_run_state(bool running)
 {
-    this->run_btn->setEnabled(!running);
+    this->run_btn->setEnabled(true);
+    this->run_btn->setText(running ? tr("Steer") : tr("Run"));
     this->stop_btn->setEnabled(running);
-    this->goal_edit->setReadOnly(running);
+    this->goal_edit->setReadOnly(false);
     this->mode_combo->setEnabled(!running);
     this->model_combo->setEnabled(!running);
     this->reasoning_combo->setEnabled(!running);
@@ -1383,6 +1398,21 @@ void agent_dock_widget_t::on_run_clicked()
 
     if (this->try_execute_slash_command(goal))
     {
+        return;
+    }
+
+    if (this->controller->is_running() == true)
+    {
+        this->controller->set_request_context(
+            this->linked_files_controller->linked_files_prompt_context(),
+            this->linked_files_controller->effective_linked_files());
+        if (this->controller->enqueue_soft_steer_message(
+                goal, this->linked_files_controller->linked_files_prompt_context(),
+                this->linked_files_controller->effective_linked_files()) == true)
+        {
+            this->goal_edit->clear();
+            this->tabs->setCurrentWidget(this->log_view);
+        }
         return;
     }
 
@@ -1632,6 +1662,21 @@ void agent_dock_widget_t::flush_streaming_markdown()
     this->is_streaming = false;
 }
 
+void agent_dock_widget_t::discard_streaming_markdown()
+{
+    if (this->render_throttle->isActive())
+    {
+        this->render_throttle->stop();
+    }
+
+    this->streaming_markdown.clear();
+    this->streaming_response_raw.clear();
+    this->streaming_rendered_len = 0;
+    this->is_streaming = false;
+    this->last_committed_streaming_markdown.clear();
+    this->render_log_full();
+}
+
 void agent_dock_widget_t::render_log()
 {
     if (this->is_streaming)
@@ -1696,7 +1741,7 @@ void agent_dock_widget_t::on_plan_updated(const QList<plan_step_t> &steps)
 
 void agent_dock_widget_t::on_diff_available(const QString &diff)
 {
-    this->sync_diff_ui(diff, true, true);
+    this->sync_diff_ui(diff, diff.isEmpty() == false, true);
 }
 
 void agent_dock_widget_t::on_approval_requested(int id, const QString &action,

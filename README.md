@@ -21,9 +21,10 @@
 - [x] Conversation list UI
 - [x] Optional Qdrant-backed vector search
 - [x] Per-project custom instructions (`.qcai2/rules.md`)
+- [x] Soft in-flight steering
+- [x] Multi-turn inline edit
 - [ ] Semantic search over chat history
 - [ ] Semantic search over code
-- [x] Multi-turn inline edit
 - [ ] Web search tool
 - [ ] Image/screenshot attachment
 - [ ] Multi-agent orchestration with delegated subtasks and parallel execution

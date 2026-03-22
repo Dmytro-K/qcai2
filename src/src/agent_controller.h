@@ -142,6 +142,17 @@ public:
     void finalize_inline_diff_review();
 
     /**
+     * Queues a follow-up user message for the currently active run without cancelling
+     * the in-flight provider request or tool execution.
+     * @param message User follow-up text.
+     * @param request_context Optional extra context captured for this follow-up.
+     * @param linked_files Linked-file labels associated with this follow-up.
+     * @return True when the message was queued for soft steering.
+     */
+    bool enqueue_soft_steer_message(const QString &message, const QString &request_context = {},
+                                    const QStringList &linked_files = {});
+
+    /**
      * Returns true while a run is active.
      */
     bool is_running() const
@@ -259,6 +270,18 @@ signals:
     void stopped(const QString &summary);
 
     /**
+     * Signals that queued soft-steer follow-up messages are waiting for the next safe point.
+     * @param queued_message_count Number of queued follow-up messages.
+     */
+    void soft_steer_pending(int queued_message_count);
+
+    /**
+     * Signals that queued soft-steer messages were applied at a safe point.
+     * @param applied_message_count Number of queued follow-up messages that were applied.
+     */
+    void soft_steer_applied(int applied_message_count);
+
+    /**
      * Signals a provider or controller error that ended the run.
      * @param error Error text.
      */
@@ -307,6 +330,21 @@ private:
     void handle_provider_inactivity_timeout();
 
     /**
+     * Applies queued soft-steer messages when the run reaches a safe point.
+     * @param safe_point Short identifier of the current safe point for logs/metadata.
+     * @param superseded_assistant_output Provider response that should be marked superseded.
+     * @param superseded_metadata Extra metadata saved with a superseded assistant turn.
+     * @param completed_tool_name Tool that just finished before the steer was applied.
+     * @param completed_tool_result Result returned by the just-finished tool.
+     * @return True when queued steering was applied and the caller should stop the old path.
+     */
+    bool apply_soft_steer_if_pending(const QString &safe_point,
+                                     const QString &superseded_assistant_output = {},
+                                     const QJsonObject &superseded_metadata = {},
+                                     const QString &completed_tool_name = {},
+                                     const QString &completed_tool_result = {});
+
+    /**
      * Persists one controller-authored user message in both prompt state and chat history.
      */
     void append_controller_user_message(const QString &content, const QString &source,
@@ -316,7 +354,8 @@ private:
      * Persists one assistant response in both prompt state and chat history.
      */
     void append_assistant_history_message(const QString &content, const QString &source,
-                                          const QJsonObject &metadata = {});
+                                          const QJsonObject &metadata = {},
+                                          bool include_in_prompt = true);
 
     /**
      * Finalizes the current persistent run record, if any.
@@ -440,6 +479,24 @@ private:
 
     /** Conversation history replayed to the provider every iteration. */
     QList<chat_message_t> messages;
+
+    /** One queued follow-up user message captured during an active run. */
+    struct pending_soft_steer_message_t
+    {
+        QString content;
+        QString request_context;
+        QStringList linked_files;
+    };
+
+    /** Follow-up user messages waiting for the next orchestration safe point. */
+    QList<pending_soft_steer_message_t> pending_soft_steer_messages;
+
+    /** True when at least one queued follow-up message is waiting to supersede the old path. */
+    bool soft_steer_pending_flag = false;
+
+    /** One-shot internal note injected into the next provider request after steering is applied.
+     */
+    QString pending_soft_steer_system_note;
 
     /** Persistent run id backing the current controller run. */
     QString run_id;

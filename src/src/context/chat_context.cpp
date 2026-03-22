@@ -126,6 +126,12 @@ chat_message_t context_message_t::to_chat_message() const
     return {role, content};
 }
 
+bool context_message_t::include_in_prompt() const
+{
+    return metadata.value(QStringLiteral("status")).toString() !=
+           QStringLiteral("superseded_by_user_steer");
+}
+
 bool context_summary_t::is_valid() const
 {
     return !summary_id.isEmpty() && !conversation_id.isEmpty() && end_sequence >= start_sequence;

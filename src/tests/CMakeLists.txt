@@ -111,6 +111,36 @@ target_link_libraries(tst_qcai2_agent_run_state_machine PRIVATE
 )
 qcai2_register_test(qcai2_agent_run_state_machine tst_qcai2_agent_run_state_machine)
 
+add_executable(tst_qcai2_agent_controller_soft_steer
+    tst_agent_controller_soft_steer.cpp
+    ../src/agent_controller.cpp
+    ../src/agent_run_state_machine.cpp
+    ../src/models/agent_messages.cpp
+    ../src/providers/provider_usage.cpp
+    ../src/progress/agent_progress.cpp
+    ../src/progress/provider_progress_adapter.cpp
+    ../src/progress/agent_status.cpp
+    ../src/progress/agent_status_formatter.cpp
+    ../src/progress/agent_status_renderer.cpp
+    ../src/progress/agent_progress_tracker.cpp
+    ../src/tools/tool_registry.cpp
+    ../src/util/logger.cpp
+    ../src/util/json.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_agent_controller_soft_steer)
+
+target_include_directories(tst_qcai2_agent_controller_soft_steer PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/lib/qtmcp/include"
+)
+target_link_libraries(tst_qcai2_agent_controller_soft_steer PRIVATE
+    Qt::Core
+    Qt::StateMachine
+    Qt::Test
+)
+qcai2_register_test(qcai2_agent_controller_soft_steer tst_qcai2_agent_controller_soft_steer)
+
 add_executable(tst_qcai2_chat_context
     tst_chat_context.cpp
     ../src/context/chat_context.h

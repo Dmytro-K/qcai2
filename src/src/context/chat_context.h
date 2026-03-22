@@ -30,6 +30,7 @@ struct context_message_t
 
     QJsonObject to_json() const;
     static context_message_t from_json(const QJsonObject &obj);
+    bool include_in_prompt() const;
     chat_message_t to_chat_message() const;
 };
 
