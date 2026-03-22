@@ -38,6 +38,10 @@ void safety_policy_test_t::requires_approval_enforces_tool_and_diff_limits()
     QCOMPARE(policy.requires_approval(QStringLiteral("read_file"), 1, 3), QString());
     QCOMPARE(policy.requires_approval(QStringLiteral("apply_patch"), 1, 1),
              QStringLiteral("Tool 'apply_patch' modifies files and requires approval."));
+    QCOMPARE(policy.requires_approval(QStringLiteral("debugger_start"), 1, 1),
+             QStringLiteral("Tool 'debugger_start' modifies files and requires approval."));
+    QCOMPARE(policy.requires_approval(QStringLiteral("debugger_continue"), 1, 1),
+             QStringLiteral("Tool 'debugger_continue' modifies files and requires approval."));
     QCOMPARE(policy.requires_approval(QStringLiteral("write_file"), 3, 1),
              QStringLiteral("Too many files changed (3 > 2)."));
     QCOMPARE(policy.requires_approval(QStringLiteral("write_file"), 2, 7),

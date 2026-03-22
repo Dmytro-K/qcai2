@@ -20,6 +20,7 @@ class ai_completion_provider_t;
 class ghost_text_manager_t;
 class copilot_provider_t;
 class ide_output_capture_t;
+class debugger_session_service_t;
 class clangd_service_t;
 class vector_search_service_t;
 
@@ -131,6 +132,9 @@ private:
 
     /** Captures Qt Creator Compile Output and Application Output for agent tools. */
     ide_output_capture_t *output_capture = nullptr;
+
+    /** Shared debugger-session service used by tools, output capture, and UI. */
+    debugger_session_service_t *debugger_service = nullptr;
 
     /** Reusable ClangCodeModel/clangd bridge shared by tools and future features. */
     clangd_service_t *clangd_service = nullptr;

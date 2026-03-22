@@ -94,6 +94,47 @@ target_link_libraries(tst_qcai2_agent_progress PRIVATE
 )
 qcai2_register_test(qcai2_agent_progress tst_qcai2_agent_progress)
 
+add_executable(tst_qcai2_debugger_session_service
+    tst_debugger_session_service.cpp
+    ../src/debugger/debugger_session_service.cpp
+    ../src/util/output_capture_support.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_debugger_session_service)
+
+target_include_directories(tst_qcai2_debugger_session_service PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_debugger_session_service PRIVATE
+    Qt::Core
+    Qt::Test
+    QtCreator::Core
+    QtCreator::Debugger
+)
+qcai2_register_test(qcai2_debugger_session_service tst_qcai2_debugger_session_service)
+
+add_executable(tst_qcai2_debugger_tools
+    tst_debugger_tools.cpp
+    ../src/debugger/debugger_session_service.cpp
+    ../src/tools/debugger_tools.cpp
+    ../src/tools/tool_registry.cpp
+    ../src/util/logger.cpp
+    ../src/util/output_capture_support.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_debugger_tools)
+
+target_include_directories(tst_qcai2_debugger_tools PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_debugger_tools PRIVATE
+    Qt::Core
+    Qt::Test
+    QtCreator::Core
+    QtCreator::Debugger
+)
+qcai2_register_test(qcai2_debugger_tools tst_qcai2_debugger_tools)
+
 add_executable(tst_qcai2_agent_run_state_machine
     tst_agent_run_state_machine.cpp
     ../src/agent_run_state_machine.cpp
@@ -163,6 +204,28 @@ target_link_libraries(tst_qcai2_decision_request_widget PRIVATE
     Qt::Test
 )
 qcai2_register_test(qcai2_decision_request_widget tst_qcai2_decision_request_widget)
+
+add_executable(tst_qcai2_debugger_ui_integration
+    tst_debugger_ui_integration.cpp
+    ../src/debugger/debugger_session_service.cpp
+    ../src/ui/debugger_status_widget.cpp
+    ../src/util/output_capture_support.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_debugger_ui_integration)
+
+target_include_directories(tst_qcai2_debugger_ui_integration PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_debugger_ui_integration PRIVATE
+    Qt::Core
+    Qt::Gui
+    Qt::Widgets
+    Qt::Test
+    QtCreator::Core
+    QtCreator::Debugger
+)
+qcai2_register_test(qcai2_debugger_ui_integration tst_qcai2_debugger_ui_integration)
 
 add_executable(tst_qcai2_agent_controller_soft_steer
     tst_agent_controller_soft_steer.cpp

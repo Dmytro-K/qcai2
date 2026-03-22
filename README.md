@@ -23,9 +23,10 @@
 - [x] Per-project custom instructions (`.qcai2/rules.md`)
 - [x] Soft in-flight steering
 - [x] Multi-turn inline edit
+- [x] Debugger integration
+- [x] Web search tool
 - [ ] Semantic search over chat history
 - [ ] Semantic search over code
-- [ ] Web search tool
 - [ ] Image/screenshot attachment
 - [ ] Multi-agent orchestration with delegated subtasks and parallel execution
 - [ ] Voice input

@@ -22,7 +22,12 @@ safety_policy_t::safety_policy_t(QObject *parent) : QObject(parent)
 
     // Tools that always require user approval
     this->approval_required_tools = {
-        QStringLiteral("apply_patch"),
+        QStringLiteral("apply_patch"),        QStringLiteral("debugger_start"),
+        QStringLiteral("debugger_continue"),  QStringLiteral("debugger_step_over"),
+        QStringLiteral("debugger_step_into"), QStringLiteral("debugger_step_out"),
+        QStringLiteral("debugger_stop"),      QStringLiteral("set_breakpoint"),
+        QStringLiteral("remove_breakpoint"),  QStringLiteral("enable_breakpoint"),
+        QStringLiteral("disable_breakpoint"),
     };
 }
 

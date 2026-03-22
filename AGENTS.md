@@ -16,6 +16,7 @@
 - `src/src/session/` and `src/src/linked_files/` contain dock session state and linked-file context logic.
 - `src/src/context/chat_context_*` owns persistent conversation state under `.qcai2/chat-context/`. Compaction persists summaries there, and future prompt reconstruction must use the latest summary plus only post-summary messages.
 - `src/src/settings/` owns provider/behavior settings. New settings must implement the full settings path in the same patch: load/save, `settingsFromUi()`, snapshot capture/restore, and dirty-state wiring so `Apply` / `Cancel` work immediately.
+- `src/src/debugger/` owns Qt Creator debugger integration. Keep debugger access behind the shared session service and expose it through tools/UI layers instead of reaching into debugger APIs from unrelated modules.
 - `src/tests/` contains focused regression tests. Behavior changes should come with tests.
 
 ## Coding rules
@@ -41,6 +42,7 @@
 - Reuse existing helpers and shared services instead of duplicating logic.
 - Keep docs and user-visible text in sync with behavior changes.
 - Cover behavior changes and new logic with tests.
+- Debugger tools should prefer read-only inspection by default and use approval-gated control or mutation tools for execution-changing actions.
 
 ## Validation
 

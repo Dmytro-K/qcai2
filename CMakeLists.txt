@@ -271,6 +271,7 @@ option(FEATURE_QDRANT_ENABLE "Enable Qdrant vector search integration" OFF)
 
 set(QCAI2_QTCREATOR_COMPONENTS
     Core
+    Debugger
     TextEditor
     ProjectExplorer
 )
@@ -475,6 +476,7 @@ endif()
 
 set(QCAI2_PLUGIN_DEPENDS
     QtCreator::Core
+    QtCreator::Debugger
     QtCreator::TextEditor
     QtCreator::ProjectExplorer
 )
@@ -532,6 +534,8 @@ add_qtc_plugin(qcai2
     src/resources/aiagentplugin.qrc
     src/src/ai_agent_plugin.h
     src/src/ai_agent_plugin.cpp
+    src/src/debugger/debugger_session_service.h
+    src/src/debugger/debugger_session_service.cpp
     src/src/agent_run_state_machine.h
     src/src/agent_run_state_machine.cpp
     src/src/agent_controller.h
@@ -542,6 +546,8 @@ add_qtc_plugin(qcai2
     src/src/ui/auto_hiding_list_widget.cpp
     src/src/ui/decision_request_widget.h
     src/src/ui/decision_request_widget.cpp
+    src/src/ui/debugger_status_widget.h
+    src/src/ui/debugger_status_widget.cpp
     src/src/ui/request_queue.h
     src/src/ui/request_queue.cpp
     src/src/linked_files/agent_dock_linked_files_controller.h
@@ -597,6 +603,8 @@ add_qtc_plugin(qcai2
     src/src/tools/file_tools.cpp
     src/src/tools/create_file_tool.h
     src/src/tools/create_file_tool.cpp
+    src/src/tools/debugger_tools.h
+    src/src/tools/debugger_tools.cpp
     src/src/tools/search_tools.h
     src/src/tools/search_tools.cpp
     src/src/tools/web_tools.h

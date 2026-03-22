@@ -11,6 +11,7 @@
 - Added interactive run steering (Soft in-flight steering)
 - Added request queue (Ctrl+Enter by default)
 - Added structured user decision requests
+- Added Qt Creator debugger tools, including debugger start, status view, and managed breakpoint persistence
 
 ### Changed
 

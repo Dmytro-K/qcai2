@@ -235,6 +235,25 @@ jobs:
         echo "Using Qt6_DIR=${qt6_dir}"
 
         qtc_prefix_path="${qt_prefix};${{ steps.qt_creator.outputs.path }}"
+        windows_test_path=
+
+        if [ "${RUNNER_OS}" = "Windows" ]; then
+          if [ -d /usr/bin ]; then
+            git_usr_bin="/usr/bin"
+          else
+            git_bin_dir="$(dirname "$(command -v git)")"
+            git_usr_bin="$(cd "${git_bin_dir}/../../usr/bin" && pwd)"
+          fi
+          windows_qt_prefix="$(cygpath -u "${qt_prefix}")"
+          windows_qtcreator_path="$(cd "${{ steps.qt_creator.outputs.path }}" && pwd)"
+          windows_qt_bin="$(cygpath -w "${windows_qt_prefix}/bin")"
+          windows_qtcreator_bin="$(cygpath -w "${windows_qtcreator_path}/bin")"
+          windows_qtcreator_lib="$(cygpath -w "${windows_qtcreator_path}/lib/qtcreator")"
+          windows_git_usr_bin="$(cygpath -w "${git_usr_bin}")"
+          windows_inherited_path="$(cygpath -wp "${PATH}")"
+          windows_test_path="${windows_qt_bin};${windows_qtcreator_bin};${windows_qtcreator_lib};${windows_git_usr_bin};${windows_inherited_path}"
+          echo "Using Windows test PATH additions: ${windows_qt_bin} ; ${windows_qtcreator_bin} ; ${windows_qtcreator_lib} ; ${windows_git_usr_bin}"
+        fi
 
         cmake_args=(
           -S .
@@ -260,6 +279,8 @@ jobs:
         cmake --build build --parallel
         if [ "${RUNNER_OS}" = "Linux" ]; then
           QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+        elif [ "${RUNNER_OS}" = "Windows" ]; then
+          cmake -E env "PATH=${windows_test_path}" ctest --test-dir build --output-on-failure
         else
           ctest --test-dir build --output-on-failure
         fi

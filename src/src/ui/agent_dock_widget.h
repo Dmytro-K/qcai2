@@ -3,6 +3,7 @@
 
 #include "../agent_controller.h"
 #include "../commands/slash_command_registry.h"
+#include "../debugger/debugger_session_service.h"
 #include "../diff/inline_diff_manager.h"
 #include "../goal/goal_text_edit.h"
 #include "../goal/linked_files_list_widget.h"
@@ -37,6 +38,7 @@ class agent_dock_session_controller_t;
 class auto_hiding_list_widget_t;
 class chat_context_manager_t;
 class decision_request_widget_t;
+class debugger_status_widget_t;
 
 /**
  * Main dock widget for goal entry, logs, diff review, and approval prompts.
@@ -52,6 +54,7 @@ public:
      */
     explicit agent_dock_widget_t(agent_controller_t *controller,
                                  chat_context_manager_t *chat_context_manager,
+                                 i_debugger_session_service_t *debugger_service,
                                  QWidget *parent = nullptr);
 
     /**
@@ -297,6 +300,9 @@ private:
     /** Controller that owns the active agent run. */
     agent_controller_t *controller;
 
+    /** Shared debugger-session service used by the optional debugger tab. */
+    i_debugger_session_service_t *debugger_service = nullptr;
+
     /** Input controls shown beside the goal editor. */
     QComboBox *project_combo;
     QComboBox *conversation_combo = nullptr;
@@ -311,6 +317,7 @@ private:
     QPushButton *stop_btn;
     QCheckBox *dry_run_check;
     decision_request_widget_t *decision_request_widget = nullptr;
+    debugger_status_widget_t *debugger_status_widget = nullptr;
     auto_hiding_list_widget_t *pending_items_view = nullptr;
 
     /** Views hosted in the tab widget. */

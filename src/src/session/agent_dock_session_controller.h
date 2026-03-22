@@ -18,12 +18,14 @@ namespace qcai2
 
 class agent_dock_widget_t;
 class chat_context_manager_t;
+class i_debugger_session_service_t;
 
 class agent_dock_session_controller_t
 {
 public:
     explicit agent_dock_session_controller_t(agent_dock_widget_t &dock,
-                                             chat_context_manager_t *chat_context_manager);
+                                             chat_context_manager_t *chat_context_manager,
+                                             i_debugger_session_service_t *debugger_service);
     ~agent_dock_session_controller_t();
 
     void save_chat();
@@ -65,6 +67,7 @@ private:
 
     agent_dock_widget_t &dock;
     chat_context_manager_t *chat_context_manager = nullptr;
+    i_debugger_session_service_t *debugger_service = nullptr;
     QString active_project_file_path;
     QString active_conversation_id;
     qtmcp::server_definitions_t current_project_mcp_servers;

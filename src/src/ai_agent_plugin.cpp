@@ -11,6 +11,7 @@
 #include "completion/ai_completion_provider.h"
 #include "completion/ghost_text_manager.h"
 #include "context/chat_context_manager.h"
+#include "debugger/debugger_session_service.h"
 #include "ui/agent_dock_widget.h"
 // completion_trigger_t removed — completion triggers via isActivationCharSequence instead
 #include "context/editor_context.h"
@@ -31,6 +32,7 @@
 #endif
 
 #include "tools/create_file_tool.h"
+#include "tools/debugger_tools.h"
 #include "tools/file_tools.h"
 #include "tools/find_symbol_tool.h"
 #include "tools/git_tools.h"
@@ -71,9 +73,10 @@ class ai_agent_navigation_widget_factory_t final : public INavigationWidgetFacto
 public:
     explicit ai_agent_navigation_widget_factory_t(agent_controller_t *controller,
                                                   chat_context_manager_t *chat_context_manager,
+                                                  debugger_session_service_t *debugger_service,
                                                   QObject *parent = nullptr)
         : INavigationWidgetFactory(), controller(controller),
-          chat_context_manager(chat_context_manager)
+          chat_context_manager(chat_context_manager), debugger_service(debugger_service)
     {
         setParent(parent);
         setDisplayName(tr_t::tr("AI Agent"));
@@ -84,13 +87,15 @@ public:
 private:
     NavigationView createWidget() override
     {
-        auto *widget = new agent_dock_widget_t(this->controller, this->chat_context_manager);
+        auto *widget = new agent_dock_widget_t(this->controller, this->chat_context_manager,
+                                               this->debugger_service);
         widget->setObjectName(QStringLiteral("qcai2.AgentNavigationWidget"));
         return {widget, {}};
     }
 
     agent_controller_t *controller = nullptr;
     chat_context_manager_t *chat_context_manager = nullptr;
+    debugger_session_service_t *debugger_service = nullptr;
 };
 
 ai_agent_plugin_t::ai_agent_plugin_t() = default;
@@ -118,6 +123,7 @@ void ai_agent_plugin_t::initialize()
     this->safety_policy = new safety_policy_t(this);
     this->controller = new agent_controller_t(this);
     this->output_capture = new ide_output_capture_t(this);
+    this->debugger_service = new debugger_session_service_t(this);
     this->vector_search_service = &qcai2::vector_search_service();
     vector_indexing_manager().initialize(this->editor_context, this->chat_context_manager);
 
@@ -138,6 +144,7 @@ void ai_agent_plugin_t::initialize()
 
     // Set up tools and providers
     this->register_tools();
+    this->output_capture->set_debugger_service(this->debugger_service);
     this->output_capture->initialize();
     this->setup_providers();
     QMetaObject::invokeMethod(this, &ai_agent_plugin_t::refresh_copilot_models,
@@ -153,7 +160,7 @@ void ai_agent_plugin_t::initialize()
     this->controller->set_mcp_tool_manager(this->mcp_tool_manager);
     this->controller->set_safety_policy(this->safety_policy);
     this->navigation_widget_factory = new ai_agent_navigation_widget_factory_t(
-        this->controller, this->chat_context_manager, this);
+        this->controller, this->chat_context_manager, this->debugger_service, this);
 
     // Set up AI code completion
     this->completion_provider = new ai_completion_provider_t(this);
@@ -459,6 +466,7 @@ void ai_agent_plugin_t::register_tools()
     this->tool_registry->register_tool(std::make_shared<list_directory_tool_t>());
     this->tool_registry->register_tool(std::make_shared<run_command_tool_t>());
     this->tool_registry->register_tool(std::make_shared<find_symbol_tool_t>());
+    register_debugger_tools(this->tool_registry, this->debugger_service);
 
 #if QCAI2_ENABLE_CLANGD
     register_clangd_query_tools(this->tool_registry, this->clangd_service);

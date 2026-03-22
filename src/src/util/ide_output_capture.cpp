@@ -1,4 +1,5 @@
 #include "ide_output_capture.h"
+#include "../debugger/debugger_session_service.h"
 
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/buildmanager.h>
@@ -135,6 +136,16 @@ QString ide_output_capture_t::application_output_snapshot(int maxLines) const
     return this->application_buffer.last_lines(maxLines);
 }
 
+QString ide_output_capture_t::debugger_output_snapshot(int maxLines) const
+{
+    if (this->debugger_service == nullptr)
+    {
+        return QStringLiteral("Debugger integration is not available.");
+    }
+
+    return this->debugger_service->debugger_output_snapshot(maxLines);
+}
+
 QString ide_output_capture_t::diagnostics_snapshot(int maxItems) const
 {
     QList<captured_diagnostic_t> diagnostics = this->compile_diagnostics;
@@ -144,6 +155,11 @@ QString ide_output_capture_t::diagnostics_snapshot(int maxItems) const
                                    ? this->external_build_output
                                    : this->compile_buffer.text();
         diagnostics = extract_diagnostics_from_text(source);
+    }
+
+    if (diagnostics.isEmpty() == true && this->debugger_service != nullptr)
+    {
+        return this->debugger_service->debugger_diagnostics_snapshot(maxItems);
     }
 
     return format_captured_diagnostics(diagnostics, maxItems);
@@ -160,6 +176,11 @@ void ide_output_capture_t::ingest_external_build_output(const QString &output)
     {
         this->compile_diagnostics = diagnostics;
     }
+}
+
+void ide_output_capture_t::set_debugger_service(i_debugger_session_service_t *debugger_service)
+{
+    this->debugger_service = debugger_service;
 }
 
 void ide_output_capture_t::attach_project(ProjectExplorer::Project *project)

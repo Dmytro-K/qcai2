@@ -19,6 +19,8 @@ class Task;
 namespace qcai2
 {
 
+class i_debugger_session_service_t;
+
 class ide_output_capture_t final : public QObject
 {
     Q_OBJECT
@@ -30,9 +32,11 @@ public:
 
     QString compile_output_snapshot(int max_lines = 200) const;
     QString application_output_snapshot(int max_lines = 200) const;
+    QString debugger_output_snapshot(int max_lines = 200) const;
     QString diagnostics_snapshot(int max_items = 50) const;
 
     void ingest_external_build_output(const QString &output);
+    void set_debugger_service(i_debugger_session_service_t *debugger_service);
 
 private:
     void attach_project(ProjectExplorer::Project *project);
@@ -60,6 +64,7 @@ private:
     bounded_text_buffer_t application_buffer;
     QList<captured_diagnostic_t> compile_diagnostics;
     QString external_build_output;
+    i_debugger_session_service_t *debugger_service = nullptr;
     QTimer run_control_scan_timer;
     bool build_in_progress = false;
 };

@@ -13,6 +13,7 @@
 #include "../util/logger.h"
 #include "../util/migration.h"
 #include "auto_hiding_list_widget.h"
+#include "debugger_status_widget.h"
 #include "decision_request_widget.h"
 #include "ui_agent_dock_widget.h"
 
@@ -687,11 +688,12 @@ void diff_line_number_area_t::mousePressEvent(QMouseEvent *event)
 
 agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
                                          chat_context_manager_t *chat_context_manager,
+                                         i_debugger_session_service_t *debugger_service,
                                          QWidget *parent)
-    : QWidget(parent), controller(controller),
+    : QWidget(parent), controller(controller), debugger_service(debugger_service),
       linked_files_controller(std::make_unique<agent_dock_linked_files_controller_t>(*this)),
-      session_controller(
-          std::make_unique<agent_dock_session_controller_t>(*this, chat_context_manager))
+      session_controller(std::make_unique<agent_dock_session_controller_t>(
+          *this, chat_context_manager, debugger_service))
 {
     this->setup_ui();
 
@@ -1225,6 +1227,8 @@ void agent_dock_widget_t::setup_ui()
     this->log_view->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     this->raw_markdown_view->setFont(QFont(QStringLiteral("monospace"), 9));
     this->debug_log_view->setFont(QFont(QStringLiteral("monospace"), 9));
+    this->debugger_status_widget = new debugger_status_widget_t(this->debugger_service, this);
+    this->tabs->addTab(this->debugger_status_widget, tr("Debugger"));
 
     populate_mode_combo(this->mode_combo);
 
@@ -1752,6 +1756,10 @@ void agent_dock_widget_t::on_log_message(const QString &msg)
     }
 
     this->append_stamped_log_entry(text);
+    if (this->debugger_status_widget != nullptr)
+    {
+        this->debugger_status_widget->refresh();
+    }
 }
 
 void agent_dock_widget_t::on_provider_usage_available(const provider_usage_t &usage,
@@ -1983,6 +1991,10 @@ void agent_dock_widget_t::on_stopped(const QString &summary)
     if (this->decision_request_widget != nullptr)
     {
         this->decision_request_widget->clear_request();
+    }
+    if (this->debugger_status_widget != nullptr)
+    {
+        this->debugger_status_widget->refresh();
     }
     if (this->render_throttle->isActive())
     {

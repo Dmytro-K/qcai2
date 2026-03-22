@@ -2,6 +2,7 @@
 
 #include "agent_dock_session_controller.h"
 
+#include "../debugger/debugger_session_service.h"
 #include "../ui/agent_dock_widget.h"
 
 #include "../context/chat_context_manager.h"
@@ -268,8 +269,9 @@ QString read_context_markdown_journal_file(const QString &path, const QString &d
 }  // namespace
 
 agent_dock_session_controller_t::agent_dock_session_controller_t(
-    agent_dock_widget_t &dock, chat_context_manager_t *chat_context_manager)
-    : dock(dock), chat_context_manager(chat_context_manager),
+    agent_dock_widget_t &dock, chat_context_manager_t *chat_context_manager,
+    i_debugger_session_service_t *debugger_service)
+    : dock(dock), chat_context_manager(chat_context_manager), debugger_service(debugger_service),
       session_file_watcher(std::make_unique<QFileSystemWatcher>()),
       session_reload_timer(std::make_unique<QTimer>())
 {
@@ -405,6 +407,26 @@ void agent_dock_session_controller_t::restore_chat()
                 this->current_project_mcp_servers.clear();
             }
         }
+    }
+
+    if (this->debugger_service != nullptr)
+    {
+        QList<debugger_managed_breakpoint_t> restored_breakpoints;
+        const QJsonObject debugger_root = root.value(QStringLiteral("debugger")).toObject();
+        for (const QJsonValue &value :
+             debugger_root.value(QStringLiteral("managedBreakpoints")).toArray())
+        {
+            if (value.isObject() == true)
+            {
+                const debugger_managed_breakpoint_t breakpoint =
+                    debugger_managed_breakpoint_t::from_json(value.toObject());
+                if (breakpoint.is_valid() == true)
+                {
+                    restored_breakpoints.append(breakpoint);
+                }
+            }
+        }
+        this->debugger_service->set_managed_breakpoints(restored_breakpoints);
     }
 
     this->restore_current_conversation_state_file();
@@ -878,6 +900,17 @@ void agent_dock_session_controller_t::save_project_state_file()
             qtmcp::server_definitions_to_json(this->current_project_mcp_servers);
     }
     root[QStringLiteral("vector_search")] = vector_search_root;
+    if (this->debugger_service != nullptr)
+    {
+        QJsonArray breakpoints_json;
+        for (const debugger_managed_breakpoint_t &breakpoint :
+             this->debugger_service->managed_breakpoints())
+        {
+            breakpoints_json.append(breakpoint.to_json());
+        }
+        root[QStringLiteral("debugger")] =
+            QJsonObject{{QStringLiteral("managedBreakpoints"), breakpoints_json}};
+    }
     root[QStringLiteral("ignoreGlobalSystemPrompt")] = ignore_global_system_prompt;
     Migration::stamp_project_state(root);
     this->mark_local_session_write();
