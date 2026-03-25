@@ -14,26 +14,36 @@ if(NOT NPM_EXECUTABLE)
     message(FATAL_ERROR "npm executable not found; required to install qcai2 sidecar dependencies in ${sidecar_dir}")
 endif()
 
-set(npm_command install --no-audit --no-fund)
-set(npm_command_name "npm install")
+function(run_npm_command result_var stdout_var stderr_var)
+    execute_process(
+        COMMAND "${NPM_EXECUTABLE}" ${ARGN}
+        WORKING_DIRECTORY "${sidecar_dir}"
+        COMMAND_ECHO STDOUT
+        RESULT_VARIABLE npm_result
+        OUTPUT_VARIABLE npm_stdout
+        ERROR_VARIABLE npm_stderr
+    )
+    set(${result_var} "${npm_result}" PARENT_SCOPE)
+    set(${stdout_var} "${npm_stdout}" PARENT_SCOPE)
+    set(${stderr_var} "${npm_stderr}" PARENT_SCOPE)
+endfunction()
+
+set(npm_install_command install --no-audit --no-fund)
+set(npm_install_command_name "npm install")
+
 if(EXISTS "${sidecar_dir}/package-lock.json")
-    set(npm_command ci --no-audit --no-fund)
-    set(npm_command_name "npm ci")
+    message(STATUS
+        "Removing installed qcai2 sidecar package-lock.json before dependency installation in ${sidecar_dir}")
+    file(REMOVE "${sidecar_dir}/package-lock.json")
 endif()
 
-message(STATUS "Installing qcai2 sidecar dependencies in ${sidecar_dir} using ${npm_command_name}")
-execute_process(
-    COMMAND "${NPM_EXECUTABLE}" ${npm_command}
-    WORKING_DIRECTORY "${sidecar_dir}"
-    COMMAND_ECHO STDOUT
-    RESULT_VARIABLE npm_result
-    OUTPUT_VARIABLE npm_stdout
-    ERROR_VARIABLE npm_stderr
-)
+message(STATUS
+    "Installing qcai2 sidecar dependencies in ${sidecar_dir} using ${npm_install_command_name}")
+run_npm_command(npm_result npm_stdout npm_stderr ${npm_install_command})
 
 if(NOT npm_result EQUAL 0)
     message(FATAL_ERROR
-        "${npm_command_name} failed in ${sidecar_dir} with exit code ${npm_result}\n"
+        "Sidecar dependency installation failed in ${sidecar_dir} with exit code ${npm_result}\n"
         "stdout:\n${npm_stdout}\n"
         "stderr:\n${npm_stderr}")
 endif()
