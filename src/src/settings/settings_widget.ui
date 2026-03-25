@@ -980,72 +980,108 @@
          </property>
          <layout class="QFormLayout" name="limitsLayout">
           <item row="0" column="0">
-           <widget class="QLabel" name="maxIterationsLabel">
-            <property name="text">
-             <string>Max iterations:</string>
-            </property>
+            <widget class="QLabel" name="maxIterationsLabel">
+             <property name="toolTip">
+              <string>0 = Unlimited.</string>
+             </property>
+             <property name="text">
+              <string>Max iterations:</string>
+             </property>
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="qcai2::settings_spin_box_t" name="maxIterSpin">
-            <property name="minimum">
-             <number>1</number>
-            </property>
-            <property name="maximum">
-             <number>100</number>
-            </property>
-           </widget>
+            <widget class="qcai2::settings_spin_box_t" name="maxIterSpin">
+             <property name="toolTip">
+              <string>0 = Unlimited.</string>
+             </property>
+             <property name="minimum">
+              <number>0</number>
+             </property>
+             <property name="maximum">
+              <number>100</number>
+             </property>
+             <property name="specialValueText">
+              <string>Unlimited</string>
+             </property>
+            </widget>
           </item>
           <item row="1" column="0">
-           <widget class="QLabel" name="maxToolsLabel">
-            <property name="text">
-             <string>Max tool calls:</string>
-            </property>
+            <widget class="QLabel" name="maxToolsLabel">
+             <property name="toolTip">
+              <string>0 = Unlimited.</string>
+             </property>
+             <property name="text">
+              <string>Max tool calls:</string>
+             </property>
            </widget>
           </item>
           <item row="1" column="1">
-           <widget class="qcai2::settings_spin_box_t" name="maxToolsSpin">
-            <property name="minimum">
-             <number>1</number>
-            </property>
-            <property name="maximum">
-             <number>1000</number>
-            </property>
-           </widget>
+            <widget class="qcai2::settings_spin_box_t" name="maxToolsSpin">
+             <property name="toolTip">
+              <string>0 = Unlimited.</string>
+             </property>
+             <property name="minimum">
+              <number>0</number>
+             </property>
+             <property name="maximum">
+              <number>1000</number>
+             </property>
+             <property name="specialValueText">
+              <string>Unlimited</string>
+             </property>
+            </widget>
           </item>
           <item row="2" column="0">
-           <widget class="QLabel" name="maxDiffLabel">
-            <property name="text">
-             <string>Max diff lines:</string>
-            </property>
+            <widget class="QLabel" name="maxDiffLabel">
+             <property name="toolTip">
+              <string>0 = Unlimited.</string>
+             </property>
+             <property name="text">
+              <string>Max diff lines:</string>
+             </property>
            </widget>
           </item>
           <item row="2" column="1">
-           <widget class="qcai2::settings_spin_box_t" name="maxDiffSpin">
-            <property name="minimum">
-             <number>10</number>
-            </property>
-            <property name="maximum">
-             <number>100000</number>
-            </property>
-           </widget>
+            <widget class="qcai2::settings_spin_box_t" name="maxDiffSpin">
+             <property name="toolTip">
+              <string>0 = Unlimited.</string>
+             </property>
+             <property name="minimum">
+              <number>0</number>
+             </property>
+             <property name="maximum">
+              <number>100000</number>
+             </property>
+             <property name="specialValueText">
+              <string>Unlimited</string>
+             </property>
+            </widget>
           </item>
           <item row="3" column="0">
-           <widget class="QLabel" name="maxFilesLabel">
-            <property name="text">
-             <string>Max changed files:</string>
-            </property>
+            <widget class="QLabel" name="maxFilesLabel">
+             <property name="toolTip">
+              <string>0 = Unlimited.</string>
+             </property>
+             <property name="text">
+              <string>Max changed files:</string>
+             </property>
            </widget>
           </item>
           <item row="3" column="1">
-           <widget class="qcai2::settings_spin_box_t" name="maxFilesSpin">
-            <property name="minimum">
-             <number>1</number>
-            </property>
-            <property name="maximum">
-             <number>1000</number>
-            </property>
-           </widget>
+            <widget class="qcai2::settings_spin_box_t" name="maxFilesSpin">
+             <property name="toolTip">
+              <string>0 = Unlimited.</string>
+             </property>
+             <property name="minimum">
+              <number>0</number>
+             </property>
+             <property name="maximum">
+              <number>1000</number>
+             </property>
+             <property name="specialValueText">
+              <string>Unlimited</string>
+             </property>
+            </widget>
           </item>
          </layout>
         </widget>

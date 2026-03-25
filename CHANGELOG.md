@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.9] - 2026-03-25
+
+### Added
+
+- Added image/screenshot attachment support.
+- Added Unlimited value and reset button for settings Spin Boxes.
+
 ## [0.0.8] - 2026-03-22
 
 ### Added

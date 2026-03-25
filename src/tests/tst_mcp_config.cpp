@@ -15,6 +15,7 @@ class mcp_config_test_t : public QObject
 private slots:
     void server_definitions_round_trip_preserves_known_and_extra_fields();
     void server_definition_from_json_keeps_defaults_when_optional_fields_are_missing();
+    void server_definition_from_json_accepts_zero_timeouts_as_unlimited();
     void server_definition_from_json_rejects_invalid_field_types();
     void server_definitions_from_json_reports_server_specific_errors();
 };
@@ -92,6 +93,19 @@ void mcp_config_test_t::
     QVERIFY(definition.args.isEmpty());
     QVERIFY(definition.env.isEmpty());
     QVERIFY(definition.headers.isEmpty());
+}
+
+void mcp_config_test_t::server_definition_from_json_accepts_zero_timeouts_as_unlimited()
+{
+    const QJsonObject json{{QStringLiteral("startupTimeoutMs"), 0},
+                           {QStringLiteral("requestTimeoutMs"), 0}};
+
+    server_definition_t definition;
+    QString error;
+    QVERIFY2(server_definition_from_json(json, &definition, &error), qPrintable(error));
+
+    QCOMPARE(definition.startup_timeout_ms, 0);
+    QCOMPARE(definition.request_timeout_ms, 0);
 }
 
 void mcp_config_test_t::server_definition_from_json_rejects_invalid_field_types()

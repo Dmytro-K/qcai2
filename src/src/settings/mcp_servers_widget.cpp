@@ -52,8 +52,6 @@ void logMcpSettingsDebug(const QString &serverName, const QString &message)
 }
 
 constexpr auto kMcpProtocolVersionHttp = "2025-03-26";
-constexpr int kStatusProbeTimeoutMs = 10000;
-
 QString expandEnvironmentPlaceholders(const QString &value, const QProcessEnvironment &environment)
 {
     QString resolved = value;
@@ -209,15 +207,6 @@ QJsonObject initializeParamsObject()
                      {QStringLiteral("version"), Migration::current_revision_string()}}}};
 }
 
-int probe_timeout_ms(int configuredTimeoutMs)
-{
-    if (((configuredTimeoutMs <= 0) == true))
-    {
-        return kStatusProbeTimeoutMs;
-    }
-    return std::min(configuredTimeoutMs, kStatusProbeTimeoutMs);
-}
-
 qtmcp::http_transport_config_t
 buildHttpTransportConfig(const QString &serverName, const qtmcp::server_definition_t &definition)
 {
@@ -305,6 +294,7 @@ QString errorPrefixText()
 mcp_servers_widget_t::mcp_servers_widget_t(QWidget *parent) : QWidget(parent)
 {
     const qtmcp::server_definition_t default_server_definition;
+    const QString unlimited_tool_tip = tr("0 = Unlimited.");
 
     auto *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -336,17 +326,29 @@ mcp_servers_widget_t::mcp_servers_widget_t(QWidget *parent) : QWidget(parent)
     this->startup_timeout_spin->setMaximum(600000);
     this->startup_timeout_spin->setSuffix(tr(" ms"));
     this->startup_timeout_spin->set_default_value(default_server_definition.startup_timeout_ms);
+    this->startup_timeout_spin->setSpecialValueText(tr("Unlimited"));
+    this->startup_timeout_spin->setToolTip(unlimited_tool_tip);
     this->request_timeout_spin = new settings_spin_box_t(editorGroup);
     this->request_timeout_spin->setMinimum(0);
     this->request_timeout_spin->setMaximum(600000);
     this->request_timeout_spin->setSuffix(tr(" ms"));
     this->request_timeout_spin->set_default_value(default_server_definition.request_timeout_ms);
+    this->request_timeout_spin->setSpecialValueText(tr("Unlimited"));
+    this->request_timeout_spin->setToolTip(unlimited_tool_tip);
 
     formLayout->addRow(tr("Name:"), this->name_edit);
     formLayout->addRow(QString(), this->enabled_check);
     formLayout->addRow(tr("transport_t:"), this->transport_combo);
     formLayout->addRow(tr("Startup timeout:"), this->startup_timeout_spin);
     formLayout->addRow(tr("Request timeout:"), this->request_timeout_spin);
+    if (QWidget *label = formLayout->labelForField(this->startup_timeout_spin); label != nullptr)
+    {
+        label->setToolTip(unlimited_tool_tip);
+    }
+    if (QWidget *label = formLayout->labelForField(this->request_timeout_spin); label != nullptr)
+    {
+        label->setToolTip(unlimited_tool_tip);
+    }
     editorLayout->addLayout(formLayout);
 
     this->transport_pages = new QStackedWidget(editorGroup);
@@ -1035,8 +1037,8 @@ void mcp_servers_widget_t::test_current_server_connection()
     this->connection_test_server_name = serverName;
     this->connection_test_request_id = 0;
     this->set_http_status(serverName, http_status_kind_t::CHECKING, checkingText());
-    const int startup_timeout_ms = probe_timeout_ms(definition->startup_timeout_ms);
-    const int request_timeout_ms = probe_timeout_ms(definition->request_timeout_ms);
+    const int startup_timeout_ms = definition->startup_timeout_ms;
+    const int request_timeout_ms = definition->request_timeout_ms;
 
     qtmcp::http_transport_config_t transportConfig =
         buildHttpTransportConfig(serverName, *definition);
@@ -1088,7 +1090,7 @@ void mcp_servers_widget_t::test_current_server_connection()
 
             if (this->connection_test_timer != nullptr)
             {
-                this->connection_test_timer->start(request_timeout_ms);
+                this->restart_connection_test_timer(request_timeout_ms);
             }
 
             if (transport->config().oauth_enabled &&
@@ -1178,9 +1180,26 @@ void mcp_servers_widget_t::test_current_server_connection()
 
     if (this->connection_test_timer != nullptr)
     {
-        this->connection_test_timer->start(startup_timeout_ms);
+        this->restart_connection_test_timer(startup_timeout_ms);
     }
     client->start();
+}
+
+void mcp_servers_widget_t::restart_connection_test_timer(int timeout_ms)
+{
+    if (this->connection_test_timer == nullptr)
+    {
+        return;
+    }
+
+    if (timeout_ms > 0)
+    {
+        this->connection_test_timer->start(timeout_ms);
+    }
+    else
+    {
+        this->connection_test_timer->stop();
+    }
 }
 
 void mcp_servers_widget_t::authorize_current_server()

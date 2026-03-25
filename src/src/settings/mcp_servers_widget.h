@@ -74,6 +74,7 @@ private:
     void finish_connection_test(const QString &serverName, http_status_kind_t kind,
                                 const QString &message, bool authorized = false);
     void cleanup_connection_test();
+    void restart_connection_test_timer(int timeout_ms);
     void invalidate_current_server_status();
     void test_current_server_connection();
     void authorize_current_server();

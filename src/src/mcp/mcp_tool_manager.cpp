@@ -478,6 +478,7 @@ public:
         QEventLoop loop;
         QTimer timer;
         timer.setSingleShot(true);
+        const bool timeout_enabled = timeoutMs > 0;
 
         bool connected = false;
         QString failure;
@@ -503,7 +504,10 @@ public:
             });
         QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
 
-        timer.start(timeoutMs);
+        if (timeout_enabled)
+        {
+            timer.start(timeoutMs);
+        }
         client->start();
         if ((connected == false) && failure.isEmpty() && (client->is_connected() == false))
         {
@@ -521,7 +525,9 @@ public:
 
         if (failure.isEmpty())
         {
-            failure = QStringLiteral("Timed out waiting for MCP server startup.");
+            failure = timeout_enabled
+                          ? QStringLiteral("Timed out waiting for MCP server startup.")
+                          : QStringLiteral("MCP server startup finished without a connection.");
         }
         if (error != nullptr)
         {
@@ -553,6 +559,7 @@ public:
         QEventLoop loop;
         QTimer timer;
         timer.setSingleShot(true);
+        const bool timeout_enabled = timeoutMs > 0;
 
         const auto responseConnection =
             QObject::connect(client, &qtmcp::client_t::response_received, &loop,
@@ -599,7 +606,10 @@ public:
             });
         QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
 
-        timer.start(timeoutMs);
+        if (timeout_enabled)
+        {
+            timer.start(timeoutMs);
+        }
         loop.exec();
 
         QObject::disconnect(responseConnection);
@@ -610,9 +620,12 @@ public:
         if (!rpcResult.finished && !rpcResult.protocolError)
         {
             rpcResult.protocolError = true;
-            rpcResult.errorMessage = QStringLiteral("MCP request `%1` timed out after %2 ms.")
-                                         .arg(method)
-                                         .arg(timeoutMs);
+            rpcResult.errorMessage =
+                timeout_enabled
+                    ? QStringLiteral("MCP request `%1` timed out after %2 ms.")
+                          .arg(method)
+                          .arg(timeoutMs)
+                    : QStringLiteral("MCP request `%1` finished without a response.").arg(method);
         }
 
         return rpcResult;

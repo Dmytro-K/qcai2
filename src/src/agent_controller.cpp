@@ -964,7 +964,7 @@ void agent_controller_t::run_next_iteration()
     // Check limits
     const int maxIter = (this->safety_policy != nullptr) ? this->safety_policy->max_iterations()
                                                          : settings().max_iterations;
-    if (this->current_iteration >= maxIter)
+    if (maxIter > 0 && this->current_iteration >= maxIter)
     {
         this->run_state_machine.mark_failed();
         emit this->log_message(QStringLiteral("⚠ Max iterations reached (%1).").arg(maxIter));
@@ -1471,7 +1471,7 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
 
     const int maxCalls = (this->safety_policy != nullptr) ? this->safety_policy->max_tool_calls()
                                                           : settings().max_tool_calls;
-    if (this->current_tool_call_count >= maxCalls)
+    if (maxCalls > 0 && this->current_tool_call_count >= maxCalls)
     {
         this->run_state_machine.mark_failed();
         emit this->log_message(QStringLiteral("⚠ Max tool calls reached (%1).").arg(maxCalls));

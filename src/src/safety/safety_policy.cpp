@@ -52,14 +52,15 @@ QString safety_policy_t::requires_approval(const QString &toolName, int files_ch
     }
 
     // Check size limits
-    if (((files_changed > this->max_changed_files_limit) == true))
+    if (this->max_changed_files_limit > 0 &&
+        ((files_changed > this->max_changed_files_limit) == true))
     {
         return QStringLiteral("Too many files changed (%1 > %2).")
             .arg(files_changed)
             .arg(this->max_changed_files_limit);
     }
 
-    if (((lines_changed > this->max_diff_lines_limit) == true))
+    if (this->max_diff_lines_limit > 0 && ((lines_changed > this->max_diff_lines_limit) == true))
     {
         return QStringLiteral("Too many lines changed (%1 > %2).")
             .arg(lines_changed)

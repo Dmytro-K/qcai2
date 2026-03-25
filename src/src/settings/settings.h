@@ -73,16 +73,16 @@ struct settings_t
      */
     int copilot_completion_timeout_sec = 1200;
 
-    /** Maximum agent loop iterations allowed per request. */
+    /** Maximum agent loop iterations allowed per request. Set to 0 for unlimited iterations. */
     int max_iterations = 8;
 
-    /** Maximum number of tool calls allowed per request. */
+    /** Maximum number of tool calls allowed per request. Set to 0 for unlimited tool calls. */
     int max_tool_calls = 25;
 
-    /** Maximum allowed changed lines before approval is required. */
+    /** Maximum allowed changed lines before approval is required. Set to 0 for no line limit. */
     int max_diff_lines = 300;
 
-    /** Maximum allowed changed files before approval is required. */
+    /** Maximum allowed changed files before approval is required. Set to 0 for no file limit. */
     int max_changed_files = 10;
 
     /** Starts the agent in dry-run mode by default when true. */

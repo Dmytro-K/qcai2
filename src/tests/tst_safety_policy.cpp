@@ -16,6 +16,7 @@ class safety_policy_test_t : public QObject
 private slots:
     void is_command_allowed_accepts_allowlisted_basename_and_absolute_path();
     void requires_approval_enforces_tool_and_diff_limits();
+    void requires_approval_treats_zero_diff_limits_as_unlimited();
     void is_path_safe_accepts_workspace_files_and_rejects_external_or_missing_paths();
 };
 
@@ -46,6 +47,15 @@ void safety_policy_test_t::requires_approval_enforces_tool_and_diff_limits()
              QStringLiteral("Too many files changed (3 > 2)."));
     QCOMPARE(policy.requires_approval(QStringLiteral("write_file"), 2, 7),
              QStringLiteral("Too many lines changed (7 > 5)."));
+}
+
+void safety_policy_test_t::requires_approval_treats_zero_diff_limits_as_unlimited()
+{
+    safety_policy_t policy;
+    policy.set_max_changed_files(0);
+    policy.set_max_diff_lines(0);
+
+    QCOMPARE(policy.requires_approval(QStringLiteral("write_file"), 100, 10000), QString());
 }
 
 void safety_policy_test_t::

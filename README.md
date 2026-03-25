@@ -25,9 +25,10 @@
 - [x] Multi-turn inline edit
 - [x] Debugger integration
 - [x] Web search tool
+- [x] Image/screenshot attachment
+- [ ] Skills
 - [ ] Semantic search over chat history
 - [ ] Semantic search over code
-- [ ] Image/screenshot attachment
 - [ ] Multi-agent orchestration with delegated subtasks and parallel execution
 - [ ] Voice input
 - [ ] Voice output
