@@ -160,6 +160,41 @@ target_link_libraries(tst_qcai2_agent_run_state_machine PRIVATE
 )
 qcai2_register_test(qcai2_agent_run_state_machine tst_qcai2_agent_run_state_machine)
 
+add_executable(tst_qcai2_actions_log_model
+    tst_actions_log_model.cpp
+    ../src/ui/actions_log_model.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_actions_log_model)
+
+target_include_directories(tst_qcai2_actions_log_model PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_actions_log_model PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_actions_log_model tst_qcai2_actions_log_model)
+
+add_executable(tst_qcai2_actions_log_delegate
+    tst_actions_log_delegate.cpp
+    ../src/ui/actions_log_model.cpp
+    ../src/ui/actions_log_delegate.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_actions_log_delegate)
+
+target_include_directories(tst_qcai2_actions_log_delegate PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_actions_log_delegate PRIVATE
+    Qt::Core
+    Qt::Gui
+    Qt::Widgets
+    Qt::Test
+)
+qcai2_register_test(qcai2_actions_log_delegate tst_qcai2_actions_log_delegate)
+
 add_executable(tst_qcai2_request_queue
     tst_request_queue.cpp
     ../src/ui/request_queue.cpp

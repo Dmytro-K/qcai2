@@ -206,19 +206,16 @@
         <property name="bottomMargin">
          <number>0</number>
         </property>
-        <item>
-         <widget class="QTextEdit" name="logView">
-          <property name="styleSheet">
-           <string notr="true">QTextEdit { padding: 8px; }</string>
-          </property>
-          <property name="lineWrapMode">
-           <enum>QTextEdit::LineWrapMode::WidgetWidth</enum>
-          </property>
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
+         <item>
+          <widget class="QListView" name="logView">
+           <property name="alternatingRowColors">
+            <bool>false</bool>
+           </property>
+           <property name="selectionMode">
+            <enum>QAbstractItemView::ExtendedSelection</enum>
+           </property>
+          </widget>
+         </item>
        </layout>
       </widget>
       <widget class="QWidget" name="rawMarkdownPage">

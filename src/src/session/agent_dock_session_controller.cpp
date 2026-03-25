@@ -223,8 +223,9 @@ bool append_context_jsonl_object_file(const QString &path, const QJsonObject &en
     return true;
 }
 
-QString read_context_markdown_journal_file(const QString &path, const QString &description,
-                                           bool *ok = nullptr)
+QStringList read_context_markdown_journal_blocks_file(const QString &path,
+                                                      const QString &description,
+                                                      bool *ok = nullptr)
 {
     QFile file(path);
     if (file.exists() == false)
@@ -275,7 +276,7 @@ QString read_context_markdown_journal_file(const QString &path, const QString &d
     {
         *ok = true;
     }
-    return blocks.join(QStringLiteral("\n\n"));
+    return blocks;
 }
 
 }  // namespace
@@ -1237,7 +1238,8 @@ void agent_dock_session_controller_t::save_current_conversation_state_file()
     }
     root[QStringLiteral("plan")] = plan_json;
 
-    const QString current_log_markdown = this->dock.current_log_markdown();
+    const QStringList current_log_blocks = this->dock.current_log_markdown_blocks();
+    const QString current_log_markdown = current_log_blocks.join(QStringLiteral("\n\n"));
     if (current_log_markdown.trimmed().isEmpty() == true)
     {
         this->mark_local_session_write();
@@ -1246,7 +1248,7 @@ void agent_dock_session_controller_t::save_current_conversation_state_file()
     else if (QFileInfo::exists(conversation_log_path) == false)
     {
         this->mark_local_session_write();
-        this->write_current_conversation_log_markdown(current_log_markdown);
+        this->write_current_conversation_log_blocks(current_log_blocks);
     }
 
     this->mark_local_session_write();
@@ -1309,10 +1311,11 @@ void agent_dock_session_controller_t::restore_current_conversation_state_file()
         }
     }
 
-    const QString restored_log_markdown = this->read_current_conversation_log_markdown();
-    if (restored_log_markdown.isEmpty() == false)
+    const QStringList restored_log_blocks = this->read_current_conversation_log_blocks();
+    if (restored_log_blocks.isEmpty() == false)
     {
-        this->dock.log_markdown = restored_log_markdown;
+        this->dock.log_markdown_blocks = restored_log_blocks;
+        this->dock.log_markdown = restored_log_blocks.join(QStringLiteral("\n\n"));
         int fence_count = 0;
         const auto lines = this->dock.log_markdown.split('\n');
         for (const auto &line : lines)
@@ -1322,11 +1325,13 @@ void agent_dock_session_controller_t::restore_current_conversation_state_file()
                 ++fence_count;
             }
         }
-        if ((fence_count % 2) != 0)
+        if ((fence_count % 2) != 0 && this->dock.log_markdown_blocks.isEmpty() == false)
         {
-            this->dock.log_markdown += QStringLiteral("\n```\n");
+            this->dock.log_markdown_blocks.last() += QStringLiteral("\n```\n");
+            this->dock.log_markdown = this->dock.log_markdown_blocks.join(QStringLiteral("\n\n"));
         }
         this->dock.streaming_markdown.clear();
+        this->dock.streaming_response_raw.clear();
         this->dock.render_log();
     }
 
@@ -1423,15 +1428,20 @@ void agent_dock_session_controller_t::restore_current_conversation_state_file()
     }
 }
 
-QString agent_dock_session_controller_t::read_current_conversation_log_markdown() const
+QStringList
+agent_dock_session_controller_t::read_current_conversation_log_blocks(bool *journal_loaded) const
 {
     const QString journal_path = this->current_conversation_log_journal_file_path();
-    bool journal_loaded = false;
-    const QString journal_markdown = read_context_markdown_journal_file(
-        journal_path, QStringLiteral("conversation log journal file"), &journal_loaded);
-    if (journal_loaded == true)
+    bool loaded = false;
+    const QStringList journal_blocks = read_context_markdown_journal_blocks_file(
+        journal_path, QStringLiteral("conversation log journal file"), &loaded);
+    if (journal_loaded != nullptr)
     {
-        return journal_markdown;
+        *journal_loaded = loaded;
+    }
+    if (loaded == true)
+    {
+        return journal_blocks;
     }
 
     bool conversation_loaded = false;
@@ -1442,11 +1452,18 @@ QString agent_dock_session_controller_t::read_current_conversation_log_markdown(
     {
         return {};
     }
-    return legacy_log_markdown_from_root(root);
+
+    const QString legacy_markdown = legacy_log_markdown_from_root(root);
+    return legacy_markdown.isEmpty() == true ? QStringList{} : QStringList{legacy_markdown};
 }
 
-void agent_dock_session_controller_t::write_current_conversation_log_markdown(
-    const QString &markdown)
+QString agent_dock_session_controller_t::read_current_conversation_log_markdown() const
+{
+    return this->read_current_conversation_log_blocks().join(QStringLiteral("\n\n"));
+}
+
+void agent_dock_session_controller_t::write_current_conversation_log_blocks(
+    const QStringList &markdown_blocks)
 {
     const QString journal_path = this->current_conversation_log_journal_file_path();
     if (journal_path.isEmpty() == true)
@@ -1454,7 +1471,16 @@ void agent_dock_session_controller_t::write_current_conversation_log_markdown(
         return;
     }
 
-    if (markdown.trimmed().isEmpty() == true)
+    QStringList non_empty_blocks;
+    non_empty_blocks.reserve(markdown_blocks.size());
+    for (const QString &block : markdown_blocks)
+    {
+        if (block.trimmed().isEmpty() == false)
+        {
+            non_empty_blocks.append(block);
+        }
+    }
+    if (non_empty_blocks.isEmpty() == true)
     {
         this->mark_local_session_write();
         QFile::remove(journal_path);
@@ -1477,16 +1503,33 @@ void agent_dock_session_controller_t::write_current_conversation_log_markdown(
         return;
     }
 
-    const QByteArray line = QJsonDocument(QJsonObject{{QStringLiteral("markdown"), markdown}})
-                                .toJson(QJsonDocument::Compact) +
-                            '\n';
     this->mark_local_session_write();
-    if (file.write(line) != line.size() || file.commit() == false)
+    for (const QString &block : non_empty_blocks)
+    {
+        const QByteArray line = QJsonDocument(QJsonObject{{QStringLiteral("markdown"), block}})
+                                    .toJson(QJsonDocument::Compact) +
+                                '\n';
+        if (file.write(line) != line.size())
+        {
+            QCAI_WARN(
+                "Dock",
+                QStringLiteral("Failed to write conversation log journal: %1").arg(journal_path));
+            return;
+        }
+    }
+    if (file.commit() == false)
     {
         QCAI_WARN(
             "Dock",
             QStringLiteral("Failed to write conversation log journal: %1").arg(journal_path));
     }
+}
+
+void agent_dock_session_controller_t::write_current_conversation_log_markdown(
+    const QString &markdown)
+{
+    this->write_current_conversation_log_blocks(
+        markdown.trimmed().isEmpty() == true ? QStringList{} : QStringList{markdown});
 }
 
 void agent_dock_session_controller_t::append_current_conversation_log_entry(

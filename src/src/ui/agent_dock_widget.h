@@ -7,6 +7,8 @@
 #include "../diff/inline_diff_manager.h"
 #include "../goal/goal_text_edit.h"
 #include "../goal/linked_files_list_widget.h"
+#include "actions_log_delegate.h"
+#include "actions_log_model.h"
 #include "request_queue.h"
 
 #include <QCheckBox>
@@ -14,12 +16,12 @@
 #include <QElapsedTimer>
 #include <QImage>
 #include <QLabel>
+#include <QListView>
 #include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSplitter>
 #include <QTabWidget>
-#include <QTextEdit>
 #include <QTimer>
 #include <QWidget>
 
@@ -307,6 +309,39 @@ private:
     QString current_log_markdown() const;
 
     /**
+     * Returns the committed log blocks followed by the current streaming preview block, if any.
+     */
+    QStringList current_log_markdown_blocks() const;
+
+    /**
+     * Replaces the raw-markdown debug tab with the current combined Actions Log markdown.
+     */
+    void sync_raw_markdown_view();
+
+    /**
+     * Appends one raw markdown block to the raw-markdown debug tab.
+     * @param markdown_block Block to append.
+     */
+    void append_raw_markdown_block(const QString &markdown_block);
+
+    /**
+     * Scrolls both Actions Log views to the newest entry.
+     */
+    void scroll_log_views_to_bottom();
+
+    /**
+     * Switches the one interactive Actions Log row that hosts a selectable rich-text editor.
+     * @param current Newly current row.
+     * @param previous Previously current row.
+     */
+    void set_actions_log_active_row(const QModelIndex &current, const QModelIndex &previous);
+
+    /**
+     * Restores the interactive Actions Log row after model resets or row insertions.
+     */
+    void restore_actions_log_active_row();
+
+    /**
      * Resets the bottom usage label for a new run or cleared chat state.
      */
     void reset_usage_display(const QString &provider_id = {}, const QString &model_name = {});
@@ -375,8 +410,10 @@ private:
 
     /** Views hosted in the tab widget. */
     QTabWidget *tabs;
+    QWidget *plan_page = nullptr;
+    QWidget *actions_log_page = nullptr;
     QListWidget *plan_list;
-    QTextEdit *log_view;
+    QListView *log_view;
     QPlainTextEdit *raw_markdown_view;
     QPlainTextEdit *diff_view;
     QListWidget *diff_file_list;
@@ -405,6 +442,9 @@ private:
     /** Completed log text already committed to the log view. */
     QString log_markdown;
 
+    /** Committed markdown blocks shown as separate Actions Log rows. */
+    QStringList log_markdown_blocks;
+
     /** Streaming log text buffered until the throttle timer fires. */
     QString streaming_markdown;
 
@@ -414,14 +454,14 @@ private:
     /** Most recent streamed answer already committed into the actions log. */
     QString last_committed_streaming_markdown;
 
-    /** Length of streaming markdown already appended to the log view. */
-    qsizetype streaming_rendered_len = 0;
-
     /** True while the conversations combo is being repopulated programmatically. */
     bool conversation_list_refreshing = false;
 
     /** True while streaming tokens are being appended incrementally. */
     bool is_streaming = false;
+
+    /** Row that should keep the selectable Actions Log editor open, or -1 when none is active. */
+    int actions_log_active_row = -1;
 
     /** Provider identifier and model name for the current run's usage display. */
     QString usage_provider_id;
@@ -451,6 +491,12 @@ private:
 
     /** Short timer that batches frequent log renders while streaming. */
     QTimer *render_throttle;
+
+    /** Per-entry model used by the Actions Log list view. */
+    actions_log_model_t *actions_log_model = nullptr;
+
+    /** Delegate that renders one markdown-backed Actions Log row. */
+    actions_log_delegate_t *actions_log_delegate = nullptr;
 
     /** One-second timer that refreshes the live request duration label. */
     QTimer *request_duration_timer = nullptr;

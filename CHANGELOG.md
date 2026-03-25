@@ -4,8 +4,12 @@
 
 ### Added
 
-- Added image/screenshot attachment support.
-- Added Unlimited value and reset button for settings Spin Boxes.
+- Added image/screenshot attachment support
+- Added Unlimited value and reset button for settings Spin Boxes
+
+### Changed
+
+- Refactored Action Log to improve performance
 
 ## [0.0.8] - 2026-03-22
 

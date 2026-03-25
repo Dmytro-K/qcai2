@@ -82,7 +82,9 @@ private:
     void save_project_state_file();
     void save_current_conversation_state_file();
     void restore_current_conversation_state_file();
+    QStringList read_current_conversation_log_blocks(bool *journal_loaded = nullptr) const;
     QString read_current_conversation_log_markdown() const;
+    void write_current_conversation_log_blocks(const QStringList &markdown_blocks);
     void write_current_conversation_log_markdown(const QString &markdown);
     void mark_local_session_write();
     void refresh_conversation_list();

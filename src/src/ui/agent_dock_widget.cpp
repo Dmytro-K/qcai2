@@ -65,6 +65,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <functional>
 #include <limits>
 
@@ -851,7 +852,6 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
                 if (!this->is_streaming)
                 {
                     this->is_streaming = true;
-                    this->streaming_rendered_len = 0;
                 }
                 if (!this->render_throttle->isActive())
                 {
@@ -1003,16 +1003,114 @@ void agent_dock_widget_t::queue_current_request()
 
 QString agent_dock_widget_t::current_log_markdown() const
 {
-    QString text = this->log_markdown;
-    if (!this->streaming_markdown.isEmpty())
+    return this->current_log_markdown_blocks().join(QStringLiteral("\n\n"));
+}
+
+QStringList agent_dock_widget_t::current_log_markdown_blocks() const
+{
+    QStringList blocks;
+    blocks.reserve(this->log_markdown_blocks.size() +
+                   (this->streaming_markdown.isEmpty() ? 0 : 1));
+    for (const QString &block : std::as_const(this->log_markdown_blocks))
     {
-        if (!text.isEmpty())
-        {
-            text += QStringLiteral("\n\n");
-        }
-        text += this->streaming_markdown;
+        blocks.append(redact_read_file_payloads(block));
     }
-    return redact_read_file_payloads(text);
+    if (this->streaming_markdown.isEmpty() == false)
+    {
+        blocks.append(redact_read_file_payloads(this->streaming_markdown));
+    }
+    return blocks;
+}
+
+void agent_dock_widget_t::sync_raw_markdown_view()
+{
+    this->raw_markdown_view->setPlainText(this->current_log_markdown());
+}
+
+void agent_dock_widget_t::append_raw_markdown_block(const QString &markdown_block)
+{
+    if (markdown_block.trimmed().isEmpty() == true)
+    {
+        return;
+    }
+
+    QTextCursor cursor(this->raw_markdown_view->document());
+    cursor.movePosition(QTextCursor::End);
+    if (this->raw_markdown_view->document()->isEmpty() == false)
+    {
+        cursor.insertText(QStringLiteral("\n\n"));
+    }
+    cursor.insertText(markdown_block);
+}
+
+void agent_dock_widget_t::scroll_log_views_to_bottom()
+{
+    if (this->log_view != nullptr && this->actions_log_model != nullptr &&
+        this->actions_log_model->rowCount() > 0)
+    {
+        this->log_view->scrollToBottom();
+    }
+
+    QTextCursor cursor(this->raw_markdown_view->document());
+    cursor.movePosition(QTextCursor::End);
+    this->raw_markdown_view->setTextCursor(cursor);
+    this->raw_markdown_view->ensureCursorVisible();
+}
+
+void agent_dock_widget_t::set_actions_log_active_row(const QModelIndex &current,
+                                                     const QModelIndex &previous)
+{
+    if (this->log_view == nullptr)
+    {
+        return;
+    }
+
+    if (previous.isValid() == true)
+    {
+        this->log_view->closePersistentEditor(previous);
+    }
+
+    if (current.isValid() == false)
+    {
+        this->actions_log_active_row = -1;
+        return;
+    }
+
+    this->actions_log_active_row = current.row();
+    this->log_view->openPersistentEditor(current);
+}
+
+void agent_dock_widget_t::restore_actions_log_active_row()
+{
+    if (this->log_view == nullptr || this->actions_log_model == nullptr)
+    {
+        return;
+    }
+
+    const int row_count = this->actions_log_model->rowCount();
+    if (row_count <= 0)
+    {
+        this->actions_log_active_row = -1;
+        return;
+    }
+
+    const int target_row = std::clamp(
+        this->actions_log_active_row >= 0 ? this->actions_log_active_row : row_count - 1, 0,
+        row_count - 1);
+    const QModelIndex target_index = this->actions_log_model->index(target_row, 0);
+    if (target_index.isValid() == false)
+    {
+        return;
+    }
+
+    if (this->log_view->currentIndex() != target_index)
+    {
+        this->log_view->setCurrentIndex(target_index);
+        return;
+    }
+
+    this->actions_log_active_row = target_row;
+    this->log_view->openPersistentEditor(target_index);
 }
 
 void agent_dock_widget_t::sync_diff_ui(const QString &diff, bool focusDiffTab,
@@ -1087,14 +1185,15 @@ void agent_dock_widget_t::clear_chat_state()
     this->goal_edit->clear();
     this->linked_files_controller->clear_state();
     this->image_attachments.clear();
-    this->log_view->clear();
+    this->actions_log_model->clear();
     this->raw_markdown_view->clear();
     this->log_markdown.clear();
+    this->log_markdown_blocks.clear();
     this->streaming_markdown.clear();
     this->streaming_response_raw.clear();
     this->last_committed_streaming_markdown.clear();
-    this->streaming_rendered_len = 0;
     this->is_streaming = false;
+    this->actions_log_active_row = -1;
     this->plan_list->clear();
     this->inline_diff_manager->clear_all();
     static_cast<diff_preview_edit_t *>(this->diff_view)->set_diff_text(QString());
@@ -1120,7 +1219,7 @@ void agent_dock_widget_t::clear_chat_state()
     this->update_approval_selection_ui();
     this->apply_patch_btn->setEnabled(false);
     this->revert_patch_btn->setEnabled(false);
-    this->tabs->setCurrentWidget(this->plan_list);
+    this->tabs->setCurrentWidget(this->plan_page);
     this->linked_files_controller->refresh_ui();
     this->refresh_image_attachment_ui();
 }
@@ -1423,6 +1522,8 @@ void agent_dock_widget_t::setup_ui()
     this->stop_btn = this->ui->stopBtn;
     this->dry_run_check = this->ui->dryRunCheck;
     this->tabs = this->ui->tabs;
+    this->plan_page = this->ui->planPage;
+    this->actions_log_page = this->ui->actionsLogPage;
     this->plan_list = this->ui->planList;
     this->log_view = this->ui->logView;
     this->raw_markdown_view = this->ui->rawMarkdownView;
@@ -1544,7 +1645,27 @@ void agent_dock_widget_t::setup_ui()
     this->ui->diffViewPlaceholder->deleteLater();
     this->diff_view = diff_preview;
 
-    this->log_view->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    this->actions_log_model = new actions_log_model_t(this);
+    this->actions_log_delegate = new actions_log_delegate_t(this->log_view);
+    this->log_view->setModel(this->actions_log_model);
+    this->log_view->setItemDelegate(this->actions_log_delegate);
+    this->log_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    this->log_view->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    this->log_view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    this->log_view->setSpacing(2);
+    this->log_view->setUniformItemSizes(false);
+    this->log_view->setWordWrap(true);
+    this->log_view->setResizeMode(QListView::Adjust);
+    this->log_view->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    this->log_view->setStyleSheet(QStringLiteral("QListView { padding: 4px; }"));
+    connect(this->log_view->selectionModel(), &QItemSelectionModel::currentChanged, this,
+            &agent_dock_widget_t::set_actions_log_active_row);
+    connect(this->actions_log_model, &QAbstractItemModel::modelReset, this,
+            &agent_dock_widget_t::restore_actions_log_active_row);
+    connect(this->actions_log_model, &QAbstractItemModel::rowsInserted, this,
+            [this](const QModelIndex &, int, int) { this->restore_actions_log_active_row(); });
+    connect(this->actions_log_model, &QAbstractItemModel::rowsRemoved, this,
+            [this](const QModelIndex &, int, int) { this->restore_actions_log_active_row(); });
     this->raw_markdown_view->setFont(QFont(QStringLiteral("monospace"), 9));
     this->approval_preview_view->setFont(QFont(QStringLiteral("monospace"), 9));
     this->debug_log_view->setFont(QFont(QStringLiteral("monospace"), 9));
@@ -1682,15 +1803,29 @@ void agent_dock_widget_t::setup_ui()
         QObject::connect(select_all_shortcut, &QShortcut::activated, edit,
                          &QPlainTextEdit::selectAll);
     };
-    auto add_copy_shortcut_rich = [](QTextEdit *edit) {
-        auto *copy_shortcut = new QShortcut(QKeySequence::Copy, edit);
+    auto add_copy_shortcut_list = [this](QListView *view) {
+        auto *copy_shortcut = new QShortcut(QKeySequence::Copy, view);
         copy_shortcut->setContext(Qt::WidgetShortcut);
-        QObject::connect(copy_shortcut, &QShortcut::activated, edit, &QTextEdit::copy);
-        auto *select_all_shortcut = new QShortcut(QKeySequence::SelectAll, edit);
+        QObject::connect(copy_shortcut, &QShortcut::activated, view, [this, view]() {
+            if (this->actions_log_model == nullptr || view->selectionModel() == nullptr)
+            {
+                return;
+            }
+
+            const QString selected_markdown = this->actions_log_model->selected_raw_markdown(
+                view->selectionModel()->selectedRows());
+            if (selected_markdown.isEmpty() == true)
+            {
+                return;
+            }
+
+            QGuiApplication::clipboard()->setText(selected_markdown);
+        });
+        auto *select_all_shortcut = new QShortcut(QKeySequence::SelectAll, view);
         select_all_shortcut->setContext(Qt::WidgetShortcut);
-        QObject::connect(select_all_shortcut, &QShortcut::activated, edit, &QTextEdit::selectAll);
+        QObject::connect(select_all_shortcut, &QShortcut::activated, view, &QListView::selectAll);
     };
-    add_copy_shortcut_rich(this->log_view);
+    add_copy_shortcut_list(this->log_view);
     add_copy_shortcut(this->raw_markdown_view);
     add_copy_shortcut(this->diff_view);
     add_copy_shortcut(this->debug_log_view);
@@ -1766,7 +1901,7 @@ bool agent_dock_widget_t::try_execute_slash_command(QString &goal)
         {
             if (this->controller->is_running() == true)
             {
-                this->tabs->setCurrentWidget(this->log_view);
+                this->tabs->setCurrentWidget(this->actions_log_page);
                 this->on_log_message(tr("Stop the current run before starting compaction."));
                 return true;
             }
@@ -1779,7 +1914,7 @@ bool agent_dock_widget_t::try_execute_slash_command(QString &goal)
         return false;
     }
 
-    this->tabs->setCurrentWidget(this->log_view);
+    this->tabs->setCurrentWidget(this->actions_log_page);
 
     if (!result.error_message.isEmpty())
     {
@@ -1872,7 +2007,7 @@ void agent_dock_widget_t::start_request(const queued_request_t &request,
     this->refresh_image_attachment_ui();
 
     this->update_run_state(true);
-    this->tabs->setCurrentWidget(this->log_view);
+    this->tabs->setCurrentWidget(this->actions_log_page);
     this->controller->start(request_to_start.goal, request_to_start.dry_run,
                             request_to_start.run_mode, request_to_start.model_name,
                             request_to_start.reasoning_effort, request_to_start.thinking_level,
@@ -1958,7 +2093,7 @@ void agent_dock_widget_t::on_run_clicked()
             this->goal_edit->clear();
             this->image_attachments.clear();
             this->refresh_image_attachment_ui();
-            this->tabs->setCurrentWidget(this->log_view);
+            this->tabs->setCurrentWidget(this->actions_log_page);
         }
         return;
     }
@@ -1984,7 +2119,7 @@ void agent_dock_widget_t::on_queue_clicked()
 
     if (goal.startsWith(QLatin1Char('/')) == true)
     {
-        this->tabs->setCurrentWidget(this->log_view);
+        this->tabs->setCurrentWidget(this->actions_log_page);
         this->on_log_message(
             tr("Queued requests do not support slash commands. Use Run instead."));
         return;
@@ -1999,7 +2134,7 @@ void agent_dock_widget_t::on_queue_clicked()
     this->goal_edit->clear();
     this->linked_files_controller->clear_state();
     this->linked_files_controller->refresh_ui();
-    this->tabs->setCurrentWidget(this->log_view);
+    this->tabs->setCurrentWidget(this->actions_log_page);
     this->status_label->setText(tr("Queued %1 request(s)").arg(this->request_queue.size()));
     this->on_log_message(QStringLiteral("📥 Queued request: %1").arg(request.display_text()));
     this->session_controller->save_chat();
@@ -2231,10 +2366,15 @@ void agent_dock_widget_t::append_stamped_log_entry(const QString &body)
         this->log_markdown += QStringLiteral("\n\n");
     }
     this->log_markdown += stamped;
+    this->log_markdown_blocks.append(stamped);
     this->session_controller->append_current_conversation_log_entry(stamped);
 
     this->render_throttle->stop();
-    this->render_log_full();
+    const QString visible_stamped = redact_read_file_payloads(stamped);
+    this->actions_log_model->append_committed_entry(visible_stamped,
+                                                    wrap_markdown_payload_blocks(visible_stamped));
+    this->append_raw_markdown_block(visible_stamped);
+    this->scroll_log_views_to_bottom();
 }
 
 void agent_dock_widget_t::flush_streaming_markdown()
@@ -2253,12 +2393,20 @@ void agent_dock_widget_t::flush_streaming_markdown()
             this->log_markdown += QStringLiteral("\n\n");
         }
         this->log_markdown += flushed_markdown;
+        this->log_markdown_blocks.append(flushed_markdown);
         this->session_controller->append_current_conversation_log_entry(flushed_markdown);
+        this->actions_log_model->commit_streaming_entry(
+            flushed_markdown, wrap_markdown_payload_blocks(flushed_markdown));
+    }
+    else
+    {
+        this->actions_log_model->clear_streaming_entry();
     }
     this->streaming_markdown.clear();
     this->streaming_response_raw.clear();
-    this->streaming_rendered_len = 0;
     this->is_streaming = false;
+    this->sync_raw_markdown_view();
+    this->scroll_log_views_to_bottom();
 }
 
 void agent_dock_widget_t::discard_streaming_markdown()
@@ -2270,18 +2418,20 @@ void agent_dock_widget_t::discard_streaming_markdown()
 
     this->streaming_markdown.clear();
     this->streaming_response_raw.clear();
-    this->streaming_rendered_len = 0;
     this->is_streaming = false;
     this->last_committed_streaming_markdown.clear();
-    this->render_log_full();
+    this->actions_log_model->clear_streaming_entry();
+    this->sync_raw_markdown_view();
 }
 
 void agent_dock_widget_t::render_log()
 {
     if (this->is_streaming)
     {
-        this->streaming_rendered_len = this->streaming_markdown.size();
-        this->render_log_full();
+        this->actions_log_model->set_streaming_entry(
+            this->streaming_markdown, wrap_markdown_payload_blocks(this->streaming_markdown));
+        this->sync_raw_markdown_view();
+        this->scroll_log_views_to_bottom();
         return;
     }
 
@@ -2290,40 +2440,28 @@ void agent_dock_widget_t::render_log()
 
 void agent_dock_widget_t::render_log_full()
 {
-    const QString text = this->current_log_markdown();
-    const QString rendered_text = wrap_markdown_payload_blocks(text);
-
-    this->log_view->setMarkdown(rendered_text);
-    this->raw_markdown_view->setPlainText(text);
-
-    // Defer scroll to allow document layout to complete
-    QTimer::singleShot(0, this->log_view, [this]() {
-        QTextCursor cursor = this->log_view->textCursor();
-        cursor.movePosition(QTextCursor::End);
-        this->log_view->setTextCursor(cursor);
-        this->log_view->ensureCursorVisible();
-    });
-    QTimer::singleShot(0, this->raw_markdown_view, [this]() {
-        QTextCursor cursor = this->raw_markdown_view->textCursor();
-        cursor.movePosition(QTextCursor::End);
-        this->raw_markdown_view->setTextCursor(cursor);
-        this->raw_markdown_view->ensureCursorVisible();
-    });
+    const QStringList visible_blocks =
+        this->current_log_markdown_blocks().mid(0, this->log_markdown_blocks.size());
+    QStringList rendered_blocks;
+    rendered_blocks.reserve(visible_blocks.size());
+    for (const QString &block : visible_blocks)
+    {
+        rendered_blocks.append(wrap_markdown_payload_blocks(block));
+    }
+    this->actions_log_model->set_committed_entries(visible_blocks, rendered_blocks);
+    if (this->streaming_markdown.isEmpty() == false)
+    {
+        this->actions_log_model->set_streaming_entry(
+            this->streaming_markdown, wrap_markdown_payload_blocks(this->streaming_markdown));
+    }
+    this->sync_raw_markdown_view();
+    this->scroll_log_views_to_bottom();
 }
 
 void agent_dock_widget_t::render_log_streaming(const QString &new_tokens)
 {
-    // Append new tokens as plain text at the end of the log view
-    QTextCursor cursor(this->log_view->document());
-    cursor.movePosition(QTextCursor::End);
-    cursor.insertText(new_tokens);
-    this->log_view->ensureCursorVisible();
-
-    // Also append to raw markdown view
-    QTextCursor rawCursor(this->raw_markdown_view->document());
-    rawCursor.movePosition(QTextCursor::End);
-    rawCursor.insertText(new_tokens);
-    this->raw_markdown_view->ensureCursorVisible();
+    Q_UNUSED(new_tokens);
+    this->render_log();
 }
 
 void agent_dock_widget_t::on_plan_updated(const QList<plan_step_t> &steps)
@@ -2335,7 +2473,7 @@ void agent_dock_widget_t::on_plan_updated(const QList<plan_step_t> &steps)
             QStringLiteral("%1. %2").arg(step.index + 1).arg(step.description));
     }
     this->session_controller->save_chat();
-    this->tabs->setCurrentWidget(this->plan_list);
+    this->tabs->setCurrentWidget(this->plan_page);
 }
 
 void agent_dock_widget_t::on_diff_available(const QString &diff)
@@ -2491,7 +2629,6 @@ void agent_dock_widget_t::on_stopped(const QString &summary)
     if (!this->streaming_markdown.isEmpty() || !this->streaming_response_raw.isEmpty())
     {
         this->flush_streaming_markdown();
-        this->render_log_full();
     }
     if (this->status_label->text().isEmpty() == true ||
         this->status_label->text() == tr("Ready") ||
@@ -2529,7 +2666,7 @@ void agent_dock_widget_t::submit_decision_option(const QString &request_id,
 {
     if (this->controller->submit_user_decision(request_id, option_id, {}) == true)
     {
-        this->tabs->setCurrentWidget(this->log_view);
+        this->tabs->setCurrentWidget(this->actions_log_page);
     }
 }
 
@@ -2538,7 +2675,7 @@ void agent_dock_widget_t::submit_decision_freeform(const QString &request_id,
 {
     if (this->controller->submit_user_decision(request_id, {}, freeform_text) == true)
     {
-        this->tabs->setCurrentWidget(this->log_view);
+        this->tabs->setCurrentWidget(this->actions_log_page);
     }
 }
 
@@ -2584,13 +2721,13 @@ bool agent_dock_widget_t::eventFilter(QObject *obj, QEvent *event)
         // Ctrl+L — clear log
         if (ke->key() == Qt::Key_L && ((ke->modifiers() & Qt::ControlModifier) != 0u))
         {
-            this->log_view->clear();
+            this->actions_log_model->clear();
             this->raw_markdown_view->clear();
             this->log_markdown.clear();
+            this->log_markdown_blocks.clear();
             this->streaming_markdown.clear();
             this->streaming_response_raw.clear();
             this->last_committed_streaming_markdown.clear();
-            this->streaming_rendered_len = 0;
             this->is_streaming = false;
             this->session_controller->save_chat();
             return true;
