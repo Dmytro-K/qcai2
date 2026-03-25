@@ -163,6 +163,7 @@ qcai2_register_test(qcai2_agent_run_state_machine tst_qcai2_agent_run_state_mach
 add_executable(tst_qcai2_request_queue
     tst_request_queue.cpp
     ../src/ui/request_queue.cpp
+    ../src/models/agent_messages.cpp
 )
 
 qcai2_enable_linker_map(tst_qcai2_request_queue)
@@ -321,6 +322,7 @@ target_include_directories(tst_qcai2_chat_context PRIVATE
 )
 target_link_libraries(tst_qcai2_chat_context PRIVATE
     Qt::Core
+    Qt::Gui
     Qt::Test
 )
 qcai2_register_test(qcai2_chat_context tst_qcai2_chat_context)

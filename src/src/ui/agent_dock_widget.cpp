@@ -15,6 +15,7 @@
 #include "auto_hiding_list_widget.h"
 #include "debugger_status_widget.h"
 #include "decision_request_widget.h"
+#include "image_attachment_preview_strip.h"
 #include "request_duration_formatter.h"
 #include "ui_agent_dock_widget.h"
 
@@ -28,6 +29,8 @@
 #include <QClipboard>
 #include <QColor>
 #include <QDateTime>
+#include <QDesktopServices>
+#include <QDialog>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -49,6 +52,7 @@
 #include <QPainter>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QScrollArea>
 #include <QSet>
 #include <QShortcut>
 #include <QSignalBlocker>
@@ -58,6 +62,7 @@
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextOption>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include <functional>
@@ -351,6 +356,26 @@ QString format_usage_value_for_provider(const QString &provider_id, const provid
 
     const QString summary = format_provider_usage_summary(usage);
     return summary.isEmpty() == true ? QStringLiteral("—") : summary;
+}
+
+void show_fallback_image_dialog(QWidget *parent, const QString &title, const QPixmap &pixmap)
+{
+    auto *dialog = new QDialog(parent);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(title);
+    dialog->resize(900, 700);
+
+    auto *layout = new QVBoxLayout(dialog);
+    layout->setContentsMargins(8, 8, 8, 8);
+
+    auto *scroll_area = new QScrollArea(dialog);
+    scroll_area->setWidgetResizable(true);
+    auto *label = new QLabel(scroll_area);
+    label->setAlignment(Qt::AlignCenter);
+    label->setPixmap(pixmap);
+    scroll_area->setWidget(label);
+    layout->addWidget(scroll_area);
+    dialog->show();
 }
 
 class diff_highlighter_t final : public QSyntaxHighlighter
@@ -1061,6 +1086,7 @@ void agent_dock_widget_t::clear_chat_state()
 {
     this->goal_edit->clear();
     this->linked_files_controller->clear_state();
+    this->image_attachments.clear();
     this->log_view->clear();
     this->raw_markdown_view->clear();
     this->log_markdown.clear();
@@ -1096,6 +1122,7 @@ void agent_dock_widget_t::clear_chat_state()
     this->revert_patch_btn->setEnabled(false);
     this->tabs->setCurrentWidget(this->plan_list);
     this->linked_files_controller->refresh_ui();
+    this->refresh_image_attachment_ui();
 }
 
 void agent_dock_widget_t::refresh_conversation_list()
@@ -1191,6 +1218,160 @@ void agent_dock_widget_t::rename_selected_conversation()
     this->refresh_conversation_list();
 }
 
+void agent_dock_widget_t::import_image_attachment_from_image(const QImage &image)
+{
+    image_attachment_t attachment;
+    QString error;
+    if (this->session_controller->import_image_attachment_from_image(image, &attachment, &error) ==
+        false)
+    {
+        QMessageBox::warning(this, tr("Image Attachment"),
+                             error.isEmpty() ? tr("Failed to attach pasted image.") : error);
+        return;
+    }
+
+    this->image_attachments.append(attachment);
+    this->refresh_image_attachment_ui();
+    this->session_controller->save_chat();
+}
+
+void agent_dock_widget_t::import_image_attachments_from_paths(const QStringList &paths)
+{
+    QStringList non_image_paths;
+    for (const QString &path : paths)
+    {
+        image_attachment_t attachment;
+        QString error;
+        if (this->session_controller->import_image_attachment_from_file(path, &attachment,
+                                                                        &error) == true)
+        {
+            this->image_attachments.append(attachment);
+            continue;
+        }
+
+        if (error.contains(QStringLiteral("not a readable image"), Qt::CaseInsensitive) == true)
+        {
+            non_image_paths.append(path);
+            continue;
+        }
+
+        QMessageBox::warning(this, tr("Image Attachment"),
+                             error.isEmpty() ? tr("Failed to attach dropped image.") : error);
+    }
+
+    if (non_image_paths.isEmpty() == false)
+    {
+        this->linked_files_controller->add_linked_files(non_image_paths);
+    }
+
+    this->refresh_image_attachment_ui();
+    this->session_controller->save_chat();
+}
+
+void agent_dock_widget_t::remove_image_attachment(const QString &attachment_id)
+{
+    for (int index = 0; index < this->image_attachments.size(); ++index)
+    {
+        if (this->image_attachments.at(index).attachment_id != attachment_id)
+        {
+            continue;
+        }
+
+        QString error;
+        if (this->session_controller->remove_image_attachment_file(
+                this->image_attachments.at(index), &error) == false)
+        {
+            QMessageBox::warning(this, tr("Image Attachment"),
+                                 error.isEmpty() ? tr("Failed to remove image attachment.")
+                                                 : error);
+            return;
+        }
+
+        this->image_attachments.removeAt(index);
+        this->refresh_image_attachment_ui();
+        this->session_controller->save_chat();
+        return;
+    }
+}
+
+void agent_dock_widget_t::open_image_attachment(const QString &attachment_id)
+{
+    for (const image_attachment_t &attachment : std::as_const(this->image_attachments))
+    {
+        if (attachment.attachment_id != attachment_id)
+        {
+            continue;
+        }
+
+        const QString absolute_path =
+            this->session_controller->absolute_path_for_image_attachment(attachment);
+        if (absolute_path.isEmpty() == true)
+        {
+            QMessageBox::warning(this, tr("Image Attachment"),
+                                 tr("The selected image attachment path is invalid."));
+            return;
+        }
+
+        if (QDesktopServices::openUrl(QUrl::fromLocalFile(absolute_path)) == true)
+        {
+            return;
+        }
+
+        const QPixmap pixmap(absolute_path);
+        if (pixmap.isNull() == true)
+        {
+            QMessageBox::warning(this, tr("Image Attachment"),
+                                 tr("Failed to open the selected image attachment."));
+            return;
+        }
+
+        show_fallback_image_dialog(this,
+                                   attachment.file_name.trimmed().isEmpty() == true
+                                       ? tr("Image Attachment")
+                                       : attachment.file_name,
+                                   pixmap);
+        return;
+    }
+}
+
+void agent_dock_widget_t::refresh_image_attachment_ui()
+{
+    if (this->image_attachment_strip == nullptr)
+    {
+        return;
+    }
+
+    this->image_attachment_strip->set_attachments(this->image_attachments,
+                                                  this->session_controller->current_project_dir());
+}
+
+QList<image_attachment_t> agent_dock_widget_t::resolve_request_image_attachments(
+    const QList<image_attachment_t> &attachments, QString *error) const
+{
+    QList<image_attachment_t> resolved;
+    resolved.reserve(attachments.size());
+    for (const image_attachment_t &attachment : attachments)
+    {
+        image_attachment_t resolved_attachment = attachment;
+        resolved_attachment.storage_path =
+            this->session_controller->absolute_path_for_image_attachment(attachment);
+        if (resolved_attachment.storage_path.isEmpty() == true ||
+            QFileInfo::exists(resolved_attachment.storage_path) == false)
+        {
+            if (error != nullptr)
+            {
+                *error = tr("Image attachment is missing: %1")
+                             .arg(attachment.file_name.trimmed().isEmpty() == true
+                                      ? attachment.storage_path
+                                      : attachment.file_name);
+            }
+            return {};
+        }
+        resolved.append(resolved_attachment);
+    }
+    return resolved;
+}
+
 void agent_dock_widget_t::delete_selected_conversation()
 {
     if (this->conversation_combo == nullptr || this->conversation_combo->currentIndex() < 0)
@@ -1207,7 +1388,7 @@ void agent_dock_widget_t::delete_selected_conversation()
 
     if (QMessageBox::question(this, tr("Delete Conversation"),
                               tr("Delete the current conversation? This removes its saved "
-                                 "messages and local state."),
+                                 "messages, local state, and stored image attachments."),
                               QMessageBox::Yes | QMessageBox::No,
                               QMessageBox::No) != QMessageBox::Yes)
     {
@@ -1300,11 +1481,14 @@ void agent_dock_widget_t::setup_ui()
     this->linked_files_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
     this->linked_files_view->setVisible(false);
     this->linked_files_view->setContextMenuPolicy(Qt::ActionsContextMenu);
+    this->image_attachment_strip = new image_attachment_preview_strip_t(this);
+    this->image_attachment_strip->setObjectName(QStringLiteral("imageAttachmentStrip"));
     auto *removeLinkedFileAction = new QAction(tr("Remove Linked File"), this->linked_files_view);
     connect(removeLinkedFileAction, &QAction::triggered, this,
             [this]() { this->linked_files_controller->remove_selected_linked_files(); });
     this->linked_files_view->addAction(removeLinkedFileAction);
     this->ui->goalColumn->insertWidget(0, this->linked_files_view);
+    this->ui->goalColumn->insertWidget(1, this->image_attachment_strip);
 
     auto *goal_edit = new goal_text_edit_t(designer_goal_edit->parentWidget());
     goal_edit->setObjectName(designer_goal_edit->objectName());
@@ -1324,10 +1508,11 @@ void agent_dock_widget_t::setup_ui()
         [this]() { return this->linked_files_controller->linked_file_candidates(); }));
     connect(this->goal_edit, &QTextEdit::textChanged, this,
             [this]() { this->linked_files_controller->refresh_ui(); });
-    connect(this->goal_edit, &goal_text_edit_t::files_dropped, this,
-            [this](const QStringList &paths) {
-                this->linked_files_controller->add_linked_files(paths);
-            });
+    connect(
+        this->goal_edit, &goal_text_edit_t::files_dropped, this,
+        [this](const QStringList &paths) { this->import_image_attachments_from_paths(paths); });
+    connect(this->goal_edit, &goal_text_edit_t::image_received, this,
+            &agent_dock_widget_t::import_image_attachment_from_image);
     connect(this->linked_files_view, &QListWidget::itemDoubleClicked, this,
             [this](QListWidgetItem *item) {
                 const QString absolutePath =
@@ -1339,8 +1524,13 @@ void agent_dock_widget_t::setup_ui()
                         Utils::Link(Utils::FilePath::fromString(absolutePath), 0, 0));
                 }
             });
+    connect(this->image_attachment_strip, &image_attachment_preview_strip_t::remove_requested,
+            this, &agent_dock_widget_t::remove_image_attachment);
+    connect(this->image_attachment_strip, &image_attachment_preview_strip_t::open_requested, this,
+            &agent_dock_widget_t::open_image_attachment);
     this->linked_files_view->installEventFilter(this);
     this->linked_files_controller->refresh_ui();
+    this->refresh_image_attachment_ui();
 
     auto *diff_preview = new diff_preview_edit_t(this->ui->diffViewPlaceholder->parentWidget());
     diff_preview->setObjectName(QStringLiteral("diffView"));
@@ -1613,6 +1803,7 @@ queued_request_t agent_dock_widget_t::capture_current_request(const QString &goa
     request.goal = goal.trimmed();
     request.request_context = this->linked_files_controller->linked_files_prompt_context();
     request.linked_files = this->linked_files_controller->effective_linked_files();
+    request.attachments = this->image_attachments;
     request.dry_run = this->dry_run_check->isChecked();
     request.run_mode = this->mode_combo->currentData().toString() == QStringLiteral("ask")
                            ? agent_controller_t::run_mode_t::ASK
@@ -1630,6 +1821,7 @@ void agent_dock_widget_t::start_compaction_request(const QString &compact_goal,
     compaction_request.goal = compact_goal.trimmed();
     compaction_request.request_context.clear();
     compaction_request.linked_files.clear();
+    compaction_request.attachments.clear();
     compaction_request.run_mode = agent_controller_t::run_mode_t::AGENT;
     this->start_request(compaction_request, agent_controller_t::run_options_t{true});
 }
@@ -1643,6 +1835,14 @@ void agent_dock_widget_t::start_request(const queued_request_t &request,
     }
 
     queued_request_t request_to_start = request;
+    QString image_error;
+    const QList<image_attachment_t> resolved_image_attachments =
+        this->resolve_request_image_attachments(request_to_start.attachments, &image_error);
+    if (image_error.isEmpty() == false)
+    {
+        QMessageBox::warning(this, tr("Image Attachment"), image_error);
+        return;
+    }
 
     const auto &s = settings();
     const int prev_input_tokens = this->displayed_usage.input_tokens;
@@ -1663,10 +1863,13 @@ void agent_dock_widget_t::start_request(const queued_request_t &request,
     this->reset_usage_display(settings().provider, request.model_name);
     this->last_committed_streaming_markdown.clear();
     this->controller->set_request_context(request_to_start.request_context,
-                                          request_to_start.linked_files);
+                                          request_to_start.linked_files,
+                                          resolved_image_attachments);
     this->goal_edit->clear();
     this->linked_files_controller->clear_state();
     this->linked_files_controller->refresh_ui();
+    this->image_attachments.clear();
+    this->refresh_image_attachment_ui();
 
     this->update_run_state(true);
     this->tabs->setCurrentWidget(this->log_view);
@@ -1736,14 +1939,25 @@ void agent_dock_widget_t::on_run_clicked()
 
     if (this->controller->is_running() == true)
     {
+        QString image_error;
+        const QList<image_attachment_t> resolved_image_attachments =
+            this->resolve_request_image_attachments(this->image_attachments, &image_error);
+        if (image_error.isEmpty() == false)
+        {
+            QMessageBox::warning(this, tr("Image Attachment"), image_error);
+            return;
+        }
         this->controller->set_request_context(
             this->linked_files_controller->linked_files_prompt_context(),
-            this->linked_files_controller->effective_linked_files());
+            this->linked_files_controller->effective_linked_files(), resolved_image_attachments);
         if (this->controller->enqueue_soft_steer_message(
                 goal, this->linked_files_controller->linked_files_prompt_context(),
-                this->linked_files_controller->effective_linked_files()) == true)
+                this->linked_files_controller->effective_linked_files(),
+                resolved_image_attachments) == true)
         {
             this->goal_edit->clear();
+            this->image_attachments.clear();
+            this->refresh_image_attachment_ui();
             this->tabs->setCurrentWidget(this->log_view);
         }
         return;

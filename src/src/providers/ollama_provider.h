@@ -33,6 +33,8 @@ public:
     {
         return QStringLiteral("Ollama (Local)");
     }
+
+    QString attachment_support_error(const file_attachment_t &attachment) const override;
 };
 
 }  // namespace qcai2

@@ -60,6 +60,13 @@ public:
                   stream_callback_t stream_callback = nullptr,
                   progress_callback_t progress_callback = nullptr) override;
 
+    bool supports_image_input() const override
+    {
+        return true;
+    }
+
+    QString attachment_support_error(const file_attachment_t &attachment) const override;
+
     /**
      * Receives the model list or an error returned by the sidecar.
      * @param models Model identifiers to store.

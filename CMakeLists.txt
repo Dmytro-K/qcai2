@@ -548,6 +548,8 @@ add_qtc_plugin(qcai2
     src/src/ui/decision_request_widget.cpp
     src/src/ui/debugger_status_widget.h
     src/src/ui/debugger_status_widget.cpp
+    src/src/ui/image_attachment_preview_strip.h
+    src/src/ui/image_attachment_preview_strip.cpp
     src/src/ui/request_duration_formatter.h
     src/src/ui/request_duration_formatter.cpp
     src/src/ui/request_queue.h

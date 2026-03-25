@@ -12,6 +12,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QElapsedTimer>
+#include <QImage>
 #include <QLabel>
 #include <QListWidget>
 #include <QPlainTextEdit>
@@ -40,6 +41,7 @@ class auto_hiding_list_widget_t;
 class chat_context_manager_t;
 class decision_request_widget_t;
 class debugger_status_widget_t;
+class image_attachment_preview_strip_t;
 
 /**
  * Main dock widget for goal entry, logs, diff review, and approval prompts.
@@ -217,6 +219,38 @@ private:
     void refresh_pending_items_view();
 
     /**
+     * Imports one pasted clipboard image into the active conversation draft.
+     */
+    void import_image_attachment_from_image(const QImage &image);
+
+    /**
+     * Imports dropped image files while forwarding non-image files to Linked Files.
+     */
+    void import_image_attachments_from_paths(const QStringList &paths);
+
+    /**
+     * Removes one draft image attachment and deletes its stored file.
+     */
+    void remove_image_attachment(const QString &attachment_id);
+
+    /**
+     * Opens one stored image attachment in the system viewer or fallback dialog.
+     */
+    void open_image_attachment(const QString &attachment_id);
+
+    /**
+     * Rebuilds the image-attachment preview strip from the current draft state.
+     */
+    void refresh_image_attachment_ui();
+
+    /**
+     * Resolves stored draft attachment paths into readable absolute file paths for providers.
+     */
+    QList<image_attachment_t>
+    resolve_request_image_attachments(const QList<image_attachment_t> &attachments,
+                                      QString *error = nullptr) const;
+
+    /**
      * Submits one predefined decision option chosen from the decision card.
      * @param request_id Identifier of the pending decision request.
      * @param option_id Identifier of the chosen option.
@@ -325,6 +359,7 @@ private:
     QComboBox *project_combo;
     QComboBox *conversation_combo = nullptr;
     linked_files_list_widget_t *linked_files_view = nullptr;
+    image_attachment_preview_strip_t *image_attachment_strip = nullptr;
     goal_text_edit_t *goal_edit;
     QComboBox *mode_combo;
     QComboBox *model_combo;
@@ -404,6 +439,9 @@ private:
 
     /** FIFO queue of full requests waiting to run after the active one. */
     request_queue_t request_queue;
+
+    /** Draft image attachments currently shown below Linked Files. */
+    QList<image_attachment_t> image_attachments;
 
     /** Approval list items keyed by controller approval id. */
     QMap<int, QListWidgetItem *> approval_items;

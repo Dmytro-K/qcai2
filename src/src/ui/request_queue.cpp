@@ -55,15 +55,29 @@ QString queued_request_t::display_text() const
     {
         text += QStringLiteral("  [%1 linked]").arg(this->linked_files.size());
     }
+    if (this->attachments.isEmpty() == false)
+    {
+        text += QStringLiteral("  [%1 attachments]").arg(this->attachments.size());
+    }
     return text;
 }
 
 QJsonObject queued_request_t::to_json() const
 {
+    QJsonArray attachments_json;
+    for (const file_attachment_t &attachment : this->attachments)
+    {
+        if (attachment.is_valid() == true)
+        {
+            attachments_json.append(attachment.to_json());
+        }
+    }
+
     return QJsonObject{
         {QStringLiteral("goal"), this->goal},
         {QStringLiteral("requestContext"), this->request_context},
         {QStringLiteral("linkedFiles"), QJsonArray::fromStringList(this->linked_files)},
+        {QStringLiteral("attachments"), attachments_json},
         {QStringLiteral("dryRun"), this->dry_run},
         {QStringLiteral("runMode"), run_mode_storage_value(this->run_mode)},
         {QStringLiteral("model"), this->model_name},
@@ -81,6 +95,23 @@ queued_request_t queued_request_t::from_json(const QJsonObject &obj)
         if (value.isString() == true && value.toString().trimmed().isEmpty() == false)
         {
             request.linked_files.append(value.toString().trimmed());
+        }
+    }
+    QJsonArray attachment_values = obj.value(QStringLiteral("attachments")).toArray();
+    if (attachment_values.isEmpty() == true)
+    {
+        attachment_values = obj.value(QStringLiteral("imageAttachments")).toArray();
+    }
+    for (const QJsonValue &value : attachment_values)
+    {
+        if (value.isObject() == false)
+        {
+            continue;
+        }
+        const file_attachment_t attachment = file_attachment_t::from_json(value.toObject());
+        if (attachment.is_valid() == true)
+        {
+            request.attachments.append(attachment);
         }
     }
     request.dry_run = obj.value(QStringLiteral("dryRun")).toBool(true);

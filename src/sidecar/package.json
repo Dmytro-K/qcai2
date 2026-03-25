@@ -6,6 +6,6 @@
   "description": "Node.js sidecar for GitHub Copilot SDK integration with Qcai2 plugin",
   "main": "copilot-sidecar.js",
   "dependencies": {
-    "@github/copilot-sdk": "^0.1.25"
+    "@github/copilot-sdk": "^0.2.0"
   }
 }

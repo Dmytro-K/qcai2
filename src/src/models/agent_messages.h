@@ -11,6 +11,36 @@ namespace qcai2
 {
 
 /**
+ * One local file attachment referenced from a chat request.
+ */
+struct file_attachment_t
+{
+    /** Stable identifier used by the dock UI while editing one request. */
+    QString attachment_id;
+
+    /** User-visible source file name shown in previews and logs. */
+    QString file_name;
+
+    /** Stored local file path for this attachment. */
+    QString storage_path;
+
+    /** MIME type used when serializing the attachment to providers. */
+    QString mime_type;
+
+    /** Returns true when the attachment has enough metadata to be used. */
+    bool is_valid() const;
+
+    /** Serializes the attachment to JSON. */
+    QJsonObject to_json() const;
+
+    /** Restores one attachment from JSON. */
+    static file_attachment_t from_json(const QJsonObject &obj);
+};
+
+/** Backward-compatible alias kept for image-specific UI code. */
+using image_attachment_t = file_attachment_t;
+
+/**
  * One chat message passed to or from a provider.
  */
 struct chat_message_t
@@ -24,6 +54,11 @@ struct chat_message_t
      * Plain text content for the message.
      */
     QString content;
+
+    /**
+     * Optional file attachments supplied alongside the text content.
+     */
+    QList<file_attachment_t> attachments = {};
 
     /**
      * Serializes the message to provider-friendly JSON.

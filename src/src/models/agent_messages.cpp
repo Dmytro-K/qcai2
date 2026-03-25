@@ -160,17 +160,82 @@ QString extract_partial_json_string_field(const QString &raw, const QString &fie
 }  // namespace
 
 // ---------------------------------------------------------------------------
+// file_attachment_t
+// ---------------------------------------------------------------------------
+
+bool file_attachment_t::is_valid() const
+{
+    return this->storage_path.trimmed().isEmpty() == false;
+}
+
+QJsonObject file_attachment_t::to_json() const
+{
+    return QJsonObject{{QStringLiteral("attachmentId"), this->attachment_id},
+                       {QStringLiteral("fileName"), this->file_name},
+                       {QStringLiteral("storagePath"), this->storage_path},
+                       {QStringLiteral("mimeType"), this->mime_type}};
+}
+
+file_attachment_t file_attachment_t::from_json(const QJsonObject &obj)
+{
+    file_attachment_t attachment;
+    attachment.attachment_id = obj.value(QStringLiteral("attachmentId")).toString();
+    attachment.file_name = obj.value(QStringLiteral("fileName")).toString();
+    attachment.storage_path = obj.value(QStringLiteral("storagePath")).toString();
+    attachment.mime_type = obj.value(QStringLiteral("mimeType")).toString();
+    return attachment;
+}
+
+// ---------------------------------------------------------------------------
 // chat_message_t
 // ---------------------------------------------------------------------------
 
 QJsonObject chat_message_t::to_json() const
 {
-    return QJsonObject{{"role", role}, {"content", content}};
+    QJsonObject json{{QStringLiteral("role"), this->role},
+                     {QStringLiteral("content"), this->content}};
+    if (this->attachments.isEmpty() == false)
+    {
+        QJsonArray attachments_json;
+        for (const file_attachment_t &attachment : this->attachments)
+        {
+            if (attachment.is_valid() == true)
+            {
+                attachments_json.append(attachment.to_json());
+            }
+        }
+        if (attachments_json.isEmpty() == false)
+        {
+            json.insert(QStringLiteral("attachments"), attachments_json);
+        }
+    }
+    return json;
 }
 
 chat_message_t chat_message_t::from_json(const QJsonObject &obj)
 {
-    return {obj.value("role").toString(), obj.value("content").toString()};
+    chat_message_t message;
+    message.role = obj.value(QStringLiteral("role")).toString();
+    message.content = obj.value(QStringLiteral("content")).toString();
+    QJsonArray attachment_values = obj.value(QStringLiteral("attachments")).toArray();
+    if (attachment_values.isEmpty() == true)
+    {
+        attachment_values = obj.value(QStringLiteral("imageAttachments")).toArray();
+    }
+    for (const QJsonValue &attachment_value : attachment_values)
+    {
+        if (attachment_value.isObject() == false)
+        {
+            continue;
+        }
+        const file_attachment_t attachment =
+            file_attachment_t::from_json(attachment_value.toObject());
+        if (attachment.is_valid() == true)
+        {
+            message.attachments.append(attachment);
+        }
+    }
+    return message;
 }
 
 // ---------------------------------------------------------------------------

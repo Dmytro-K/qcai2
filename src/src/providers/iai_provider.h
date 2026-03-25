@@ -72,6 +72,24 @@ public:
                           progress_callback_t progress_callback = nullptr) = 0;
 
     /**
+     * Returns true when the provider can accept image attachments in chat messages.
+     */
+    virtual bool supports_image_input() const
+    {
+        return false;
+    }
+
+    /**
+     * Returns an explicit unsupported-reason for one attachment, or an empty string when allowed.
+     */
+    virtual QString attachment_support_error(const file_attachment_t &attachment) const
+    {
+        Q_UNUSED(attachment);
+        return QStringLiteral("The current provider '%1' does not support file attachments.")
+            .arg(this->display_name());
+    }
+
+    /**
      * Cancels any in-flight request owned by the provider.
      */
     virtual void cancel() = 0;

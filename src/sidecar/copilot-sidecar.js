@@ -6,7 +6,7 @@
 // Response: {"id":N,"result":{...}} or {"id":N,"error":"msg"}
 // Streaming: {"id":N,"stream_delta":"text"}
 
-import { CopilotClient } from "@github/copilot-sdk";
+import { CopilotClient, approveAll } from "@github/copilot-sdk";
 
 let client = null;
 
@@ -21,6 +21,24 @@ function send(obj) {
 
 function log(msg) {
     process.stderr.write(`[sidecar] ${msg}\n`);
+}
+
+function approvePermissionRequest(request, invocation) {
+    const details = [];
+    if (typeof request?.toolName === "string" && request.toolName.length > 0) {
+        details.push(`tool=${request.toolName}`);
+    }
+    if (typeof request?.fileName === "string" && request.fileName.length > 0) {
+        details.push(`file=${request.fileName}`);
+    }
+    if (typeof request?.fullCommandText === "string" && request.fullCommandText.length > 0) {
+        details.push(`command=${JSON.stringify(request.fullCommandText)}`);
+    }
+    log(
+        `Permission request: session=${invocation?.sessionId || "unknown"} `
+        + `kind=${request?.kind || "unknown"}${details.length > 0 ? ` ${details.join(" ")}` : ""}; approving`,
+    );
+    return approveAll(request, invocation);
 }
 
 function sendResult(id, result) {
@@ -296,6 +314,7 @@ async function handleComplete(id, params) {
             model: requestedModel,
             streaming: true,
             availableTools: [],
+            onPermissionRequest: approvePermissionRequest,
         };
         if (reasoning_effort)
             sessionOpts.reasoningEffort = reasoning_effort;
@@ -326,11 +345,12 @@ async function handleComplete(id, params) {
             prompt,
             mode: promptMode,
             currentDynamicSystemContents,
+            attachments,
         } = splitMessagesForSession(messages, {
             incremental: sessionLease.created === false,
             previousDynamicSystemContents: sessionLease.previousDynamicSystemContents,
         });
-        log(`Request #${id}: sending prompt (${prompt.length} chars), active=${activeRequests.size}, session=${session.sessionId}, acquisition=${sessionAcquisitionMode}, prompt_mode=${promptMode}`);
+        log(`Request #${id}: sending prompt (${prompt.length} chars), attachments=${attachments.length}, active=${activeRequests.size}, session=${session.sessionId}, acquisition=${sessionAcquisitionMode}, prompt_mode=${promptMode}`);
 
         const seenEventIds = new Set();
         let latestUsage = undefined;
@@ -372,9 +392,10 @@ async function handleComplete(id, params) {
             }
         });
 
+        const messageOptions = attachments.length > 0 ? { prompt, attachments } : { prompt };
         const response = completionTimeoutSec > 0
-            ? await session.sendAndWait({ prompt }, completionTimeoutSec * 1000)
-            : await session.sendAndWait({ prompt });
+            ? await session.sendAndWait(messageOptions, completionTimeoutSec * 1000)
+            : await session.sendAndWait(messageOptions);
         unsubscribe();
         unsubscribeToolStart();
         unsubscribeToolComplete();
@@ -492,6 +513,57 @@ function buildPromptFromParts(parts) {
     }).join("\n");
 }
 
+function normalizeAttachmentsForMessage(message) {
+    const rawAttachments = Array.isArray(message?.attachments)
+        ? message.attachments
+        : (Array.isArray(message?.imageAttachments) ? message.imageAttachments : []);
+    const normalized = [];
+    for (const attachment of rawAttachments) {
+        if (!attachment || typeof attachment !== "object") {
+            continue;
+        }
+        const path = typeof attachment.storagePath === "string" ? attachment.storagePath.trim() : "";
+        if (!path) {
+            continue;
+        }
+        const displayName = typeof attachment.fileName === "string" ? attachment.fileName.trim() : "";
+        normalized.push({
+            type: "file",
+            path,
+            ...(displayName ? { displayName } : {}),
+        });
+    }
+    return normalized;
+}
+
+function dedupeAttachments(attachments) {
+    const result = [];
+    const seen = new Set();
+    for (const attachment of attachments) {
+        const key = JSON.stringify(attachment);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push(attachment);
+    }
+    return result;
+}
+
+function attachmentsForCurrentTurn(parts) {
+    for (let i = parts.length - 1; i >= 0; --i) {
+        const part = parts[i];
+        if (part?.role !== "user") {
+            continue;
+        }
+        if (Array.isArray(part.attachments) === false || part.attachments.length === 0) {
+            continue;
+        }
+        return dedupeAttachments(part.attachments);
+    }
+    return [];
+}
+
 function splitMessagesForSession(messages, options = {}) {
     const incremental = options.incremental === true;
     const previousDynamicSystemContents = Array.isArray(options.previousDynamicSystemContents)
@@ -503,6 +575,7 @@ function splitMessagesForSession(messages, options = {}) {
             prompt: "",
             mode: "empty",
             currentDynamicSystemContents: [],
+            attachments: [],
         };
     }
 
@@ -513,6 +586,7 @@ function splitMessagesForSession(messages, options = {}) {
     for (const msg of messages) {
         const role = msg.role || "user";
         const content = typeof msg.content === "string" ? msg.content : "";
+        const attachments = normalizeAttachmentsForMessage(msg);
         if (!primarySystemConsumed && role === "system") {
             systemMessage = content;
             primarySystemConsumed = true;
@@ -520,23 +594,29 @@ function splitMessagesForSession(messages, options = {}) {
         }
 
         if (role === "system") {
-            fullParts.push({ role, content });
+            fullParts.push({ role, content, attachments });
             if (isDynamicSystemMessage(content) === true) {
-                dynamicSystemParts.push({ role, content });
+                dynamicSystemParts.push({ role, content, attachments });
             }
             continue;
         }
 
-        fullParts.push({ role, content });
+        fullParts.push({ role, content, attachments });
     }
 
     const nonSystemMessages = messages.filter(msg => (msg.role || "user") !== "system");
     if (!systemMessage && nonSystemMessages.length === 1 && (nonSystemMessages[0].role || "user") === "user") {
+        const currentTurnParts = [{
+            role: "user",
+            content: nonSystemMessages[0].content,
+            attachments: normalizeAttachmentsForMessage(nonSystemMessages[0]),
+        }];
         return {
             systemMessage: "",
             prompt: nonSystemMessages[0].content,
             mode: "single_user",
             currentDynamicSystemContents: dynamicSystemParts.map((part) => part.content),
+            attachments: attachmentsForCurrentTurn(currentTurnParts),
         };
     }
 
@@ -556,10 +636,11 @@ function splitMessagesForSession(messages, options = {}) {
         for (let i = lastAssistantIndex + 1; i < messages.length; ++i) {
             const role = messages[i].role || "user";
             const content = typeof messages[i].content === "string" ? messages[i].content : "";
+            const attachments = normalizeAttachmentsForMessage(messages[i]);
             if (role === "system" || content.length === 0) {
                 continue;
             }
-            incrementalConversationParts.push({ role, content });
+            incrementalConversationParts.push({ role, content, attachments });
         }
 
         if (incrementalConversationParts.length === 0) {
@@ -569,12 +650,18 @@ function splitMessagesForSession(messages, options = {}) {
                     && msg.content.length > 0;
             });
             if (fallbackUser) {
-                incrementalConversationParts.push({ role: "user", content: fallbackUser.content });
+                incrementalConversationParts.push({
+                    role: "user",
+                    content: fallbackUser.content,
+                    attachments: normalizeAttachmentsForMessage(fallbackUser),
+                });
             }
         }
 
         if (incrementalConversationParts.length > 0) {
             const prompt = buildPromptFromParts([...changedDynamicSystemParts, ...incrementalConversationParts]);
+            const attachments =
+                attachmentsForCurrentTurn([...changedDynamicSystemParts, ...incrementalConversationParts]);
             return {
                 systemMessage,
                 prompt,
@@ -582,24 +669,33 @@ function splitMessagesForSession(messages, options = {}) {
                     ? "incremental_dynamic"
                     : "incremental_user_only",
                 currentDynamicSystemContents: dynamicSystemParts.map((part) => part.content),
+                attachments,
             };
         }
     }
 
     if (fullParts.length === 1 && nonSystemMessages.length === 1 && (nonSystemMessages[0].role || "user") === "user") {
+        const currentTurnParts = [{
+            role: "user",
+            content: nonSystemMessages[0].content,
+            attachments: normalizeAttachmentsForMessage(nonSystemMessages[0]),
+        }];
         return {
             systemMessage,
             prompt: nonSystemMessages[0].content,
             mode: "single_user",
             currentDynamicSystemContents: dynamicSystemParts.map((part) => part.content),
+            attachments: attachmentsForCurrentTurn(currentTurnParts),
         };
     }
 
+    const attachments = attachmentsForCurrentTurn(fullParts);
     return {
         systemMessage,
         prompt: buildPromptFromParts(fullParts),
         mode: "full",
         currentDynamicSystemContents: dynamicSystemParts.map((part) => part.content),
+        attachments,
     };
 }
 

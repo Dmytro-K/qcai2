@@ -3,6 +3,7 @@
 
 #include "goal_special_handler.h"
 
+#include <QImage>
 #include <QStringList>
 #include <QTextEdit>
 
@@ -15,6 +16,7 @@ class QDragMoveEvent;
 class QDropEvent;
 class QModelIndex;
 class QKeyEvent;
+class QMimeData;
 class QStandardItemModel;
 
 namespace qcai2
@@ -41,8 +43,11 @@ public:
 
 signals:
     void files_dropped(const QStringList &paths);
+    void image_received(const QImage &image);
 
 protected:
+    bool canInsertFromMimeData(const QMimeData *source) const override;
+    void insertFromMimeData(const QMimeData *source) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
     void dropEvent(QDropEvent *event) override;

@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QImage>
 #include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -23,6 +24,7 @@ private slots:
     void writes_hourly_usage_stats_csv();
     void excludes_superseded_soft_steer_messages_from_prompt_context();
     void compact_summary_replaces_pre_compacted_recent_messages();
+    void restores_image_attachments_from_message_metadata();
 };
 
 void tst_chat_context_t::stores_artifacts_and_builds_envelope()
@@ -586,6 +588,50 @@ void tst_chat_context_t::compact_summary_replaces_pre_compacted_recent_messages(
     QVERIFY(assistant_messages.contains(QStringLiteral("Old assistant message")) == false);
     QVERIFY(user_messages.contains(QStringLiteral("New user message")));
     QVERIFY(assistant_messages.contains(QStringLiteral("New assistant message")));
+}
+
+void tst_chat_context_t::restores_image_attachments_from_message_metadata()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+    QVERIFY(QDir(temp_dir.path()).mkpath(QStringLiteral(".qcai2")));
+
+    const QString image_path = QDir(temp_dir.path()).filePath(QStringLiteral("snapshot.png"));
+    QImage image(16, 12, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::red);
+    QVERIFY(image.save(image_path));
+
+    chat_context_manager_t manager;
+    QString error;
+    QVERIFY(manager.set_active_workspace(QStringLiteral("workspace-images"), temp_dir.path(), {},
+                                         &error));
+    QVERIFY(error.isEmpty());
+    const QString conversation_id = manager.start_new_conversation({}, &error);
+    QVERIFY(error.isEmpty());
+    QVERIFY(conversation_id.isEmpty() == false);
+
+    const QString run_id = manager.begin_run(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("provider"), QStringLiteral("model"),
+        QStringLiteral("off"), QStringLiteral("off"), true, {}, &error);
+    QVERIFY(error.isEmpty());
+    QVERIFY(run_id.isEmpty() == false);
+
+    const QJsonObject metadata{
+        {QStringLiteral("imageAttachments"),
+         QJsonArray{image_attachment_t{QStringLiteral("img-1"), QStringLiteral("snapshot.png"),
+                                       image_path, QStringLiteral("image/png")}
+                        .to_json()}}};
+    QVERIFY(manager.append_user_message(run_id, QStringLiteral("See attached screenshot."),
+                                        QStringLiteral("goal"), metadata, &error));
+    QVERIFY(error.isEmpty());
+
+    const context_envelope_t envelope = manager.build_context_envelope(
+        context_request_kind_t::AGENT_CHAT, QStringLiteral("System prompt"), {}, 1024, &error);
+    QVERIFY(error.isEmpty());
+    QVERIFY(envelope.provider_messages.isEmpty() == false);
+    QCOMPARE(envelope.provider_messages.constLast().attachments.size(), 1);
+    QCOMPARE(envelope.provider_messages.constLast().attachments.constFirst().storage_path,
+             image_path);
 }
 
 QTEST_MAIN(tst_chat_context_t)

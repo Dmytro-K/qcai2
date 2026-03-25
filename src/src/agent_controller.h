@@ -111,8 +111,10 @@ public:
      * Sets extra request-specific context, such as linked files, for the next run.
      * @param context Additional prompt context supplied alongside the goal.
      * @param linked_files Display names of linked files for logging.
+     * @param attachments Stored file attachments prepared for the provider.
      */
-    void set_request_context(const QString &context, const QStringList &linked_files = {});
+    void set_request_context(const QString &context, const QStringList &linked_files = {},
+                             const QList<file_attachment_t> &attachments = {});
 
     /**
      * Starts a new run for the requested goal.
@@ -184,10 +186,12 @@ public:
      * @param message User follow-up text.
      * @param request_context Optional extra context captured for this follow-up.
      * @param linked_files Linked-file labels associated with this follow-up.
+     * @param attachments File attachments associated with this follow-up.
      * @return True when the message was queued for soft steering.
      */
     bool enqueue_soft_steer_message(const QString &message, const QString &request_context = {},
-                                    const QStringList &linked_files = {});
+                                    const QStringList &linked_files = {},
+                                    const QList<file_attachment_t> &attachments = {});
 
     /**
      * Returns true while a run is active.
@@ -556,6 +560,9 @@ private:
     /** Linked file labels associated with the pending request. */
     QStringList linked_files;
 
+    /** File attachments associated with the pending request. */
+    QList<file_attachment_t> attachments;
+
     /** Selected interaction mode for the current run. */
     run_mode_t run_mode = run_mode_t::AGENT;
 
@@ -583,6 +590,7 @@ private:
         QString content;
         QString request_context;
         QStringList linked_files;
+        QList<file_attachment_t> attachments;
     };
 
     /** Follow-up user messages waiting for the next orchestration safe point. */

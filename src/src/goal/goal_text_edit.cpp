@@ -34,6 +34,30 @@ goal_text_edit_t::goal_text_edit_t(QWidget *parent) : QTextEdit(parent)
             [this]() { this->refresh_special_state(); });
 }
 
+bool goal_text_edit_t::canInsertFromMimeData(const QMimeData *source) const
+{
+    if (source != nullptr && (source->hasImage() == true || source->hasUrls() == true))
+    {
+        return true;
+    }
+    return QTextEdit::canInsertFromMimeData(source);
+}
+
+void goal_text_edit_t::insertFromMimeData(const QMimeData *source)
+{
+    if (source != nullptr && source->hasImage() == true)
+    {
+        const QImage image = qvariant_cast<QImage>(source->imageData());
+        if (image.isNull() == false)
+        {
+            emit this->image_received(image);
+            return;
+        }
+    }
+
+    QTextEdit::insertFromMimeData(source);
+}
+
 void goal_text_edit_t::add_special_handler(std::unique_ptr<goal_special_handler_t> handler)
 {
     if (((!handler) == true))
@@ -53,7 +77,7 @@ bool goal_text_edit_t::has_completion_popup() const
 
 void goal_text_edit_t::dragEnterEvent(QDragEnterEvent *event)
 {
-    if (event->mimeData()->hasUrls())
+    if (event->mimeData()->hasUrls() == true || event->mimeData()->hasImage() == true)
     {
         event->acceptProposedAction();
         return;
@@ -64,7 +88,7 @@ void goal_text_edit_t::dragEnterEvent(QDragEnterEvent *event)
 
 void goal_text_edit_t::dragMoveEvent(QDragMoveEvent *event)
 {
-    if (event->mimeData()->hasUrls())
+    if (event->mimeData()->hasUrls() == true || event->mimeData()->hasImage() == true)
     {
         event->acceptProposedAction();
         return;
@@ -90,6 +114,17 @@ void goal_text_edit_t::dropEvent(QDropEvent *event)
         if (((!paths.isEmpty()) == true))
         {
             emit this->files_dropped(paths);
+            event->acceptProposedAction();
+            return;
+        }
+    }
+
+    if (event->mimeData()->hasImage() == true)
+    {
+        const QImage image = qvariant_cast<QImage>(event->mimeData()->imageData());
+        if (image.isNull() == false)
+        {
+            emit this->image_received(image);
             event->acceptProposedAction();
             return;
         }

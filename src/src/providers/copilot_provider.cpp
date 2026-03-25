@@ -136,6 +136,12 @@ QString sidecar_install_hint_dir(const QString &scriptPath = {})
 
 }  // namespace
 
+QString copilot_provider_t::attachment_support_error(const file_attachment_t &attachment) const
+{
+    Q_UNUSED(attachment);
+    return {};
+}
+
 /**
  * Creates a Copilot provider with deferred sidecar startup.
  * @param parent Parent QObject that owns this instance.

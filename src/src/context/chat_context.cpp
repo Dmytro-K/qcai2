@@ -123,7 +123,26 @@ context_message_t context_message_t::from_json(const QJsonObject &obj)
 
 chat_message_t context_message_t::to_chat_message() const
 {
-    return {role, content};
+    chat_message_t message{this->role, this->content};
+    QJsonArray attachment_values = this->metadata.value(QStringLiteral("attachments")).toArray();
+    if (attachment_values.isEmpty() == true)
+    {
+        attachment_values = this->metadata.value(QStringLiteral("imageAttachments")).toArray();
+    }
+    for (const QJsonValue &attachment_value : attachment_values)
+    {
+        if (attachment_value.isObject() == false)
+        {
+            continue;
+        }
+        const file_attachment_t attachment =
+            file_attachment_t::from_json(attachment_value.toObject());
+        if (attachment.is_valid() == true)
+        {
+            message.attachments.append(attachment);
+        }
+    }
+    return message;
 }
 
 bool context_message_t::include_in_prompt() const

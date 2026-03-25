@@ -22,14 +22,18 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QImageReader>
+#include <QImageWriter>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMimeDatabase>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
 #include <QSignalBlocker>
 #include <QTimer>
+#include <QUuid>
 
 namespace qcai2
 {
@@ -58,6 +62,14 @@ QString legacy_sanitized_session_file_name(const QString &project_file_path)
     base_name.replace(QRegularExpression(QStringLiteral(R"([^A-Za-z0-9._-])")),
                       QStringLiteral("_"));
     return QStringLiteral("%1.json").arg(base_name);
+}
+
+QString attachment_target_name(const QString &suffix)
+{
+    const QString normalized_suffix =
+        suffix.trimmed().isEmpty() == true ? QStringLiteral("png") : suffix.trimmed().toLower();
+    return QStringLiteral("%1.%2").arg(QUuid::createUuid().toString(QUuid::WithoutBraces),
+                                       normalized_suffix);
 }
 
 void select_effort_value(QComboBox *combo, const QString &value, int fallback_index)
@@ -723,9 +735,15 @@ bool agent_dock_session_controller_t::delete_conversation(const QString &convers
         this->current_conversation_storage_file_path(trimmed_id);
     const QString conversation_log_path =
         this->current_conversation_log_journal_file_path(trimmed_id);
+    const QString conversation_attachments_dir =
+        this->current_conversation_attachments_dir_path(trimmed_id);
     this->mark_local_session_write();
     QFile::remove(conversation_state_path);
     QFile::remove(conversation_log_path);
+    if (conversation_attachments_dir.isEmpty() == false)
+    {
+        QDir(conversation_attachments_dir).removeRecursively();
+    }
 
     const bool deleted_active_conversation = trimmed_id == this->active_conversation_id;
     if (deleted_active_conversation == true)
@@ -797,6 +815,21 @@ QString agent_dock_session_controller_t::current_conversation_log_journal_file_p
     return Migration::conversation_log_journal_file_path(storage_path, resolved_id.trimmed());
 }
 
+QString agent_dock_session_controller_t::current_conversation_attachments_dir_path(
+    const QString &conversation_id) const
+{
+    const QString storage_path = this->current_project_storage_file_path();
+    const QString resolved_id =
+        conversation_id.isEmpty() == true ? this->active_conversation_id : conversation_id;
+    if (storage_path.isEmpty() == true || resolved_id.trimmed().isEmpty() == true)
+    {
+        return {};
+    }
+
+    return QDir(Migration::project_conversations_dir_path(storage_path))
+        .filePath(QStringLiteral("%1.attachments").arg(resolved_id.trimmed()));
+}
+
 QString agent_dock_session_controller_t::legacy_project_storage_file_path() const
 {
     if (this->active_project_file_path.isEmpty())
@@ -864,6 +897,236 @@ QStringList agent_dock_session_controller_t::current_session_watch_paths() const
 QString agent_dock_session_controller_t::current_project_dir() const
 {
     return this->project_dir_for_path(this->active_project_file_path);
+}
+
+QString agent_dock_session_controller_t::absolute_path_for_attachment(
+    const file_attachment_t &attachment) const
+{
+    const QString trimmed_path = attachment.storage_path.trimmed();
+    if (trimmed_path.isEmpty() == true)
+    {
+        return {};
+    }
+
+    const QFileInfo info(trimmed_path);
+    if (info.isAbsolute() == true)
+    {
+        return QDir::cleanPath(info.absoluteFilePath());
+    }
+
+    const QString project_dir = this->current_project_dir();
+    if (project_dir.isEmpty() == true)
+    {
+        return {};
+    }
+
+    return QDir(project_dir).absoluteFilePath(trimmed_path);
+}
+
+QString agent_dock_session_controller_t::absolute_path_for_image_attachment(
+    const image_attachment_t &attachment) const
+{
+    return this->absolute_path_for_attachment(attachment);
+}
+
+bool agent_dock_session_controller_t::import_attachment_from_file(const QString &source_path,
+                                                                  file_attachment_t *attachment,
+                                                                  QString *error)
+{
+    if (attachment == nullptr)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Attachment output is null");
+        }
+        return false;
+    }
+
+    const QString trimmed_source_path = source_path.trimmed();
+    if (trimmed_source_path.isEmpty() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Attachment path is empty");
+        }
+        return false;
+    }
+
+    const QFileInfo source_info(trimmed_source_path);
+    if (source_info.exists() == false || source_info.isFile() == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Attachment file does not exist: %1").arg(trimmed_source_path);
+        }
+        return false;
+    }
+
+    const QString attachments_dir_path = this->current_conversation_attachments_dir_path();
+    const QString project_dir = this->current_project_dir();
+    if (attachments_dir_path.isEmpty() == true || project_dir.isEmpty() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("No active conversation is available for file attachments");
+        }
+        return false;
+    }
+
+    if (QDir().mkpath(attachments_dir_path) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to create attachment directory: %1")
+                         .arg(attachments_dir_path);
+        }
+        return false;
+    }
+
+    const QMimeDatabase mime_db;
+    QString suffix = source_info.suffix().toLower();
+    if (suffix.isEmpty() == true)
+    {
+        const QMimeType source_mime =
+            mime_db.mimeTypeForFile(trimmed_source_path, QMimeDatabase::MatchContent);
+        suffix = source_mime.preferredSuffix().trimmed().toLower();
+        if (suffix.isEmpty() == true)
+        {
+            suffix = QStringLiteral("bin");
+        }
+    }
+    const QString target_path =
+        QDir(attachments_dir_path).filePath(attachment_target_name(suffix));
+    if (QFile::copy(trimmed_source_path, target_path) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to copy attachment into %1").arg(target_path);
+        }
+        return false;
+    }
+
+    attachment->attachment_id = QFileInfo(target_path).completeBaseName();
+    attachment->file_name = source_info.fileName();
+    attachment->storage_path =
+        QDir(project_dir).relativeFilePath(QFileInfo(target_path).absoluteFilePath());
+    attachment->mime_type = mime_db.mimeTypeForFile(target_path).name();
+    return true;
+}
+
+bool agent_dock_session_controller_t::import_image_attachment_from_file(
+    const QString &source_path, image_attachment_t *attachment, QString *error)
+{
+    QImageReader reader(source_path.trimmed());
+    if (reader.canRead() == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("The dropped file is not a readable image: %1")
+                         .arg(source_path.trimmed());
+        }
+        return false;
+    }
+
+    return this->import_attachment_from_file(source_path, attachment, error);
+}
+
+bool agent_dock_session_controller_t::import_image_attachment_from_image(
+    const QImage &image, image_attachment_t *attachment, QString *error)
+{
+    if (attachment == nullptr)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Image attachment output is null");
+        }
+        return false;
+    }
+    if (image.isNull() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Clipboard image is empty");
+        }
+        return false;
+    }
+
+    const QString attachments_dir_path = this->current_conversation_attachments_dir_path();
+    const QString project_dir = this->current_project_dir();
+    if (attachments_dir_path.isEmpty() == true || project_dir.isEmpty() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("No active conversation is available for image attachments");
+        }
+        return false;
+    }
+
+    if (QDir().mkpath(attachments_dir_path) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to create image attachment directory: %1")
+                         .arg(attachments_dir_path);
+        }
+        return false;
+    }
+
+    const QString target_path =
+        QDir(attachments_dir_path).filePath(attachment_target_name(QStringLiteral("png")));
+    QImageWriter writer(target_path, "png");
+    if (writer.write(image) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to save pasted image attachment: %1")
+                         .arg(writer.errorString());
+        }
+        return false;
+    }
+
+    attachment->attachment_id = QFileInfo(target_path).completeBaseName();
+    attachment->file_name = QStringLiteral("pasted-image.png");
+    attachment->storage_path =
+        QDir(project_dir).relativeFilePath(QFileInfo(target_path).absoluteFilePath());
+    attachment->mime_type = QStringLiteral("image/png");
+    return true;
+}
+
+bool agent_dock_session_controller_t::remove_attachment_file(const file_attachment_t &attachment,
+                                                             QString *error)
+{
+    const QString absolute_path = this->absolute_path_for_attachment(attachment);
+    if (absolute_path.isEmpty() == true)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Attachment path is empty");
+        }
+        return false;
+    }
+
+    if (QFileInfo::exists(absolute_path) == false)
+    {
+        return true;
+    }
+
+    this->mark_local_session_write();
+    if (QFile::remove(absolute_path) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = QStringLiteral("Failed to remove attachment: %1").arg(absolute_path);
+        }
+        return false;
+    }
+    return true;
+}
+
+bool agent_dock_session_controller_t::remove_image_attachment_file(
+    const image_attachment_t &attachment, QString *error)
+{
+    return this->remove_attachment_file(attachment, error);
 }
 
 const qtmcp::server_definitions_t &agent_dock_session_controller_t::project_mcp_servers() const
@@ -961,6 +1224,17 @@ void agent_dock_session_controller_t::save_current_conversation_state_file()
         QJsonArray::fromStringList(this->dock.linked_files_controller->manual_linked_files());
     root[QStringLiteral("ignored_linked_files")] =
         QJsonArray::fromStringList(this->dock.linked_files_controller->ignored_linked_files());
+    {
+        QJsonArray attachments_json;
+        for (const image_attachment_t &attachment : this->dock.image_attachments)
+        {
+            if (attachment.is_valid() == true)
+            {
+                attachments_json.append(attachment.to_json());
+            }
+        }
+        root[QStringLiteral("attachments")] = attachments_json;
+    }
     root[QStringLiteral("plan")] = plan_json;
 
     const QString current_log_markdown = this->dock.current_log_markdown();
@@ -1116,6 +1390,30 @@ void agent_dock_session_controller_t::restore_current_conversation_state_file()
         this->dock.linked_files_controller->set_ignored_linked_files(ignored_linked_files_list);
         this->dock.linked_files_controller->invalidate_candidates();
         this->dock.linked_files_controller->refresh_ui();
+        this->dock.image_attachments.clear();
+        QJsonArray attachment_values = root.value(QStringLiteral("attachments")).toArray();
+        if (attachment_values.isEmpty() == true)
+        {
+            attachment_values = root.value(QStringLiteral("imageAttachments")).toArray();
+        }
+        for (const QJsonValue &value : attachment_values)
+        {
+            if (value.isObject() == false)
+            {
+                continue;
+            }
+            const image_attachment_t attachment = image_attachment_t::from_json(value.toObject());
+            if (attachment.is_valid() == false)
+            {
+                continue;
+            }
+            if (QFileInfo::exists(this->absolute_path_for_image_attachment(attachment)) == false)
+            {
+                continue;
+            }
+            this->dock.image_attachments.append(attachment);
+        }
+        this->dock.refresh_image_attachment_ui();
 
         const int tab = root.value(QStringLiteral("activeTab")).toInt(0);
         if (tab >= 0 && tab < this->dock.tabs->count())

@@ -14,6 +14,7 @@ class agent_messages_test_t : public QObject
 
 private slots:
     void chat_message_round_trips_through_json();
+    void chat_message_round_trips_image_attachments();
     void decision_request_round_trips_through_json_and_helpers();
     void parse_plan_builds_indexed_steps_from_strings_and_objects();
     void parse_tool_call_reads_name_and_args();
@@ -40,6 +41,25 @@ void agent_messages_test_t::chat_message_round_trips_through_json()
 
     QCOMPARE(parsed.role, source.role);
     QCOMPARE(parsed.content, source.content);
+}
+
+void agent_messages_test_t::chat_message_round_trips_image_attachments()
+{
+    chat_message_t source;
+    source.role = QStringLiteral("user");
+    source.content = QStringLiteral("Please inspect this screenshot.");
+    source.attachments = {
+        image_attachment_t{QStringLiteral("img-1"), QStringLiteral("screenshot.png"),
+                           QStringLiteral("/tmp/screenshot.png"), QStringLiteral("image/png")}};
+
+    const QJsonObject json = source.to_json();
+    const chat_message_t parsed = chat_message_t::from_json(json);
+
+    QCOMPARE(parsed.attachments.size(), 1);
+    QCOMPARE(parsed.attachments.constFirst().attachment_id, QStringLiteral("img-1"));
+    QCOMPARE(parsed.attachments.constFirst().file_name, QStringLiteral("screenshot.png"));
+    QCOMPARE(parsed.attachments.constFirst().storage_path, QStringLiteral("/tmp/screenshot.png"));
+    QCOMPARE(parsed.attachments.constFirst().mime_type, QStringLiteral("image/png"));
 }
 
 void agent_messages_test_t::decision_request_round_trips_through_json_and_helpers()

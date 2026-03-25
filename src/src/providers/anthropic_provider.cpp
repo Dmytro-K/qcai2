@@ -3,10 +3,13 @@
 #include "../util/json.h"
 #include "../util/logger.h"
 
+#include <QFile>
+#include <QFileInfo>
 #include <QHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMimeDatabase>
 #include <QNetworkRequest>
 #include <QUrl>
 
@@ -17,6 +20,25 @@ namespace qcai2
 
 namespace
 {
+
+QString attachment_display_name(const file_attachment_t &attachment)
+{
+    if (attachment.file_name.trimmed().isEmpty() == false)
+    {
+        return attachment.file_name.trimmed();
+    }
+    return QFileInfo(attachment.storage_path).fileName();
+}
+
+bool is_image_mime_type(const QString &mime_type)
+{
+    return mime_type.startsWith(QStringLiteral("image/"));
+}
+
+bool is_pdf_mime_type(const QString &mime_type)
+{
+    return mime_type == QStringLiteral("application/pdf");
+}
 
 QString anthropicErrorMessage(const QByteArray &data, const QString &fallback)
 {
@@ -50,7 +72,7 @@ QJsonObject anthropicTextBlock(const QString &text, bool cache_control = false)
 }
 
 QJsonArray anthropicMessagesFromChatMessages(const QList<chat_message_t> &messages,
-                                             QJsonArray *system_blocks)
+                                             QJsonArray *system_blocks, QString *error)
 {
     QJsonArray anthropicMessages;
     QJsonArray local_system_blocks;
@@ -58,25 +80,90 @@ QJsonArray anthropicMessagesFromChatMessages(const QList<chat_message_t> &messag
 
     for (const chat_message_t &message : messages)
     {
-        if (message.content.trimmed().isEmpty() == true)
+        if (message.content.trimmed().isEmpty() == true && message.attachments.isEmpty() == true)
         {
             continue;
         }
 
         if (message.role == QStringLiteral("system"))
         {
+            if (message.attachments.isEmpty() == false)
+            {
+                continue;
+            }
             const bool cache_control = cacheable_system_block_count < 4;
             local_system_blocks.append(anthropicTextBlock(message.content, cache_control));
             ++cacheable_system_block_count;
             continue;
         }
 
+        QJsonArray content_blocks;
+        if (message.content.isEmpty() == false)
+        {
+            content_blocks.append(anthropicTextBlock(message.content));
+        }
+        const QMimeDatabase mime_db;
+        for (const file_attachment_t &attachment : message.attachments)
+        {
+            QFile file(attachment.storage_path);
+            if (file.open(QIODevice::ReadOnly) == false)
+            {
+                if (error != nullptr)
+                {
+                    *error = QStringLiteral("Failed to read image attachment: %1")
+                                 .arg(attachment.storage_path);
+                }
+                return {};
+            }
+            const QString mime_type =
+                attachment.mime_type.trimmed().isEmpty() == false
+                    ? attachment.mime_type.trimmed()
+                    : mime_db.mimeTypeForFile(attachment.storage_path).name();
+            if (mime_type.isEmpty() == true)
+            {
+                if (error != nullptr)
+                {
+                    *error = QStringLiteral("Failed to detect image MIME type: %1")
+                                 .arg(attachment.storage_path);
+                }
+                return {};
+            }
+            const QString base64_data = QString::fromLatin1(file.readAll().toBase64());
+            if (is_image_mime_type(mime_type) == true)
+            {
+                content_blocks.append(
+                    QJsonObject{{QStringLiteral("type"), QStringLiteral("image")},
+                                {QStringLiteral("source"),
+                                 QJsonObject{{QStringLiteral("type"), QStringLiteral("base64")},
+                                             {QStringLiteral("media_type"), mime_type},
+                                             {QStringLiteral("data"), base64_data}}}});
+                continue;
+            }
+            if (is_pdf_mime_type(mime_type) == true)
+            {
+                content_blocks.append(
+                    QJsonObject{{QStringLiteral("type"), QStringLiteral("document")},
+                                {QStringLiteral("source"),
+                                 QJsonObject{{QStringLiteral("type"), QStringLiteral("base64")},
+                                             {QStringLiteral("media_type"), mime_type},
+                                             {QStringLiteral("data"), base64_data}}}});
+                continue;
+            }
+            if (error != nullptr)
+            {
+                *error = QStringLiteral(
+                             "The current provider '%1' does not support attachment '%2' (%3).")
+                             .arg(QStringLiteral("Anthropic"), attachment_display_name(attachment),
+                                  mime_type);
+            }
+            return {};
+        }
+
         const QString role = (message.role == QStringLiteral("assistant"))
                                  ? QStringLiteral("assistant")
                                  : QStringLiteral("user");
-        anthropicMessages.append(QJsonObject{
-            {QStringLiteral("role"), role},
-            {QStringLiteral("content"), QJsonArray{anthropicTextBlock(message.content)}}});
+        anthropicMessages.append(QJsonObject{{QStringLiteral("role"), role},
+                                             {QStringLiteral("content"), content_blocks}});
     }
 
     if (system_blocks != nullptr)
@@ -126,6 +213,20 @@ QByteArray ssePayloadForLine(const QByteArray &line)
 
 }  // namespace
 
+QString anthropic_provider_t::attachment_support_error(const file_attachment_t &attachment) const
+{
+    const QString mime_type = attachment.mime_type.trimmed();
+    if (mime_type.startsWith(QStringLiteral("image/")) == true ||
+        mime_type == QStringLiteral("application/pdf"))
+    {
+        return {};
+    }
+    return QStringLiteral("The current provider '%1' supports only image and PDF attachments, but "
+                          "'%2' has MIME type '%3'.")
+        .arg(this->display_name(), attachment_display_name(attachment),
+             mime_type.isEmpty() == false ? mime_type : QStringLiteral("unknown"));
+}
+
 anthropic_provider_t::anthropic_provider_t(QObject *parent) : QObject(parent)
 {
 }
@@ -149,8 +250,14 @@ void anthropic_provider_t::complete(const QList<chat_message_t> &messages, const
     }
 
     QJsonArray system_blocks;
+    QString message_error;
     const QJsonArray anthropicMessages =
-        anthropicMessagesFromChatMessages(messages, &system_blocks);
+        anthropicMessagesFromChatMessages(messages, &system_blocks, &message_error);
+    if (message_error.isEmpty() == false)
+    {
+        callback({}, message_error, {});
+        return;
+    }
 
     QJsonObject body;
     body.insert(QStringLiteral("model"), model);

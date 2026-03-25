@@ -354,10 +354,12 @@ void agent_controller_t::set_safety_policy(safety_policy_t *policy)
 }
 
 void agent_controller_t::set_request_context(const QString &context,
-                                             const QStringList &linked_files)
+                                             const QStringList &linked_files,
+                                             const QList<file_attachment_t> &attachments)
 {
     this->request_context = context;
     this->linked_files = linked_files;
+    this->attachments = attachments;
 }
 
 void agent_controller_t::emit_run_log_message(const QString &message,
@@ -647,6 +649,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                         {QStringLiteral("projectFilePath"), context_snapshot.project_file_path},
                         {QStringLiteral("projectDir"), context_snapshot.project_dir},
                         {QStringLiteral("linkedFileCount"), this->linked_files.size()},
+                        {QStringLiteral("attachmentCount"), this->attachments.size()},
                         {QStringLiteral("mode"), run_mode_label(this->run_mode)},
                         {QStringLiteral("compaction"), this->run_options.is_compaction},
                     };
@@ -677,9 +680,19 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
 
                 if (this->run_options.is_compaction == false && contextError.isEmpty() == true)
                 {
+                    QJsonArray attachments_json;
+                    for (const file_attachment_t &attachment : this->attachments)
+                    {
+                        if (attachment.is_valid() == true)
+                        {
+                            attachments_json.append(attachment.to_json());
+                        }
+                    }
                     const QJsonObject goalMetadata{
                         {QStringLiteral("mode"), run_mode_label(this->run_mode)},
                         {QStringLiteral("linkedFileCount"), this->linked_files.size()},
+                        {QStringLiteral("attachmentCount"), this->attachments.size()},
+                        {QStringLiteral("attachments"), attachments_json},
                     };
                     this->chat_context_manager->append_user_message(
                         this->run_id, goal, QStringLiteral("goal"), goalMetadata, &contextError);
@@ -741,7 +754,7 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
             this->messages.append({QStringLiteral("system"), message});
         }
 
-        this->messages.append({QStringLiteral("user"), goal});
+        this->messages.append({QStringLiteral("user"), goal, this->attachments});
     }
 
     if (this->run_options.is_compaction == true)
@@ -764,6 +777,11 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
                                            .arg(this->linked_files.join(QStringLiteral(", "))),
                                        true);
         }
+        if (this->attachments.isEmpty() == false)
+        {
+            this->emit_run_log_message(
+                QStringLiteral("📎 Attached files: %1").arg(this->attachments.size()), true);
+        }
         for (const QString &message : std::as_const(mcp_refresh_messages))
         {
             emit log_message(message);
@@ -774,7 +792,8 @@ void agent_controller_t::start(const QString &goal, bool dry_run, run_mode_t run
 
 bool agent_controller_t::enqueue_soft_steer_message(const QString &message,
                                                     const QString &request_context,
-                                                    const QStringList &linked_files)
+                                                    const QStringList &linked_files,
+                                                    const QList<file_attachment_t> &attachments)
 {
     const QString trimmed_message = message.trimmed();
     if (this->is_running() == false || trimmed_message.isEmpty() == true)
@@ -783,7 +802,7 @@ bool agent_controller_t::enqueue_soft_steer_message(const QString &message,
     }
 
     this->pending_soft_steer_messages.append(
-        {trimmed_message, request_context.trimmed(), linked_files});
+        {trimmed_message, request_context.trimmed(), linked_files, attachments});
     this->soft_steer_pending_flag = true;
 
     emit this->soft_steer_pending(static_cast<int>(this->pending_soft_steer_messages.size()));
@@ -1029,6 +1048,40 @@ void agent_controller_t::run_next_iteration()
         request_messages.insert(insert_index,
                                 {QStringLiteral("system"), this->pending_soft_steer_system_note});
         this->pending_soft_steer_system_note.clear();
+    }
+
+    QString attachment_error;
+    for (const chat_message_t &message : std::as_const(request_messages))
+    {
+        for (const file_attachment_t &attachment : message.attachments)
+        {
+            const QString provider_attachment_error =
+                this->provider->attachment_support_error(attachment);
+            if (provider_attachment_error.isEmpty() == false)
+            {
+                attachment_error = provider_attachment_error;
+                break;
+            }
+        }
+        if (attachment_error.isEmpty() == false)
+        {
+            break;
+        }
+    }
+    if (attachment_error.isEmpty() == false)
+    {
+        const QString error = attachment_error;
+        this->disarm_provider_watchdog();
+        this->run_state_machine.mark_failed();
+        this->emit_run_log_message(QStringLiteral("❌ %1").arg(error), true);
+        emit this->error_occurred(error);
+        this->finalize_persistent_run(
+            QStringLiteral("error"),
+            QJsonObject{
+                {QStringLiteral("reason"), QStringLiteral("provider-no-attachment-support")},
+                {QStringLiteral("provider"), this->provider->id()}});
+        emit this->stopped(error);
+        return;
     }
 
     this->provider->complete(request_messages, this->model_name, s.temperature, s.max_tokens,
@@ -1705,6 +1758,14 @@ bool agent_controller_t::apply_soft_steer_if_pending(const QString &safe_point,
     for (int i = 0; i < this->pending_soft_steer_messages.size(); ++i)
     {
         const pending_soft_steer_message_t &queued = this->pending_soft_steer_messages.at(i);
+        QJsonArray attachments_json;
+        for (const file_attachment_t &attachment : queued.attachments)
+        {
+            if (attachment.is_valid() == true)
+            {
+                attachments_json.append(attachment.to_json());
+            }
+        }
         soft_steer_request_logs.append(format_soft_steer_request_log(
             queued.content, queued.request_context, queued.linked_files, i, queued_message_count));
         this->append_controller_user_message(
@@ -1716,7 +1777,12 @@ bool agent_controller_t::apply_soft_steer_if_pending(const QString &safe_point,
                 {QStringLiteral("safePoint"), safe_point},
                 {QStringLiteral("steerIndex"), i},
                 {QStringLiteral("queuedMessageCount"), queued_message_count},
-                {QStringLiteral("linkedFiles"), QJsonArray::fromStringList(queued.linked_files)}});
+                {QStringLiteral("linkedFiles"), QJsonArray::fromStringList(queued.linked_files)},
+                {QStringLiteral("attachments"), attachments_json}});
+        if (this->messages.isEmpty() == false)
+        {
+            this->messages.last().attachments = queued.attachments;
+        }
     }
 
     this->pending_soft_steer_messages.clear();
@@ -1816,7 +1882,7 @@ void agent_controller_t::append_controller_user_message(const QString &content,
                                                         const QString &source,
                                                         const QJsonObject &metadata)
 {
-    this->messages.append({QStringLiteral("user"), content});
+    this->messages.append({QStringLiteral("user"), content, {}});
     if (this->chat_context_manager != nullptr)
     {
         QString contextError;
@@ -1837,7 +1903,7 @@ void agent_controller_t::append_assistant_history_message(const QString &content
 {
     if (include_in_prompt == true)
     {
-        this->messages.append({QStringLiteral("assistant"), content});
+        this->messages.append({QStringLiteral("assistant"), content, {}});
     }
     if (this->chat_context_manager != nullptr)
     {

@@ -27,6 +27,9 @@ struct queued_request_t
     /** Linked file labels shown to the user for this request. */
     QStringList linked_files;
 
+    /** File attachments stored for this request. */
+    QList<file_attachment_t> attachments;
+
     /** Dry-run mode captured at queue time. */
     bool dry_run = true;
 

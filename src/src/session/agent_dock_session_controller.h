@@ -5,6 +5,7 @@
 
 #include "../context/chat_context.h"
 
+#include <QImage>
 #include <QString>
 #include <QStringList>
 
@@ -43,12 +44,33 @@ public:
     QString current_project_storage_file_path() const;
     QString current_conversation_storage_file_path(const QString &conversation_id = {}) const;
     QString current_conversation_log_journal_file_path(const QString &conversation_id = {}) const;
+    /** Returns the directory that stores file attachments for one conversation. */
+    QString current_conversation_attachments_dir_path(const QString &conversation_id = {}) const;
     QString legacy_project_storage_file_path() const;
     QStringList current_session_watch_paths() const;
     QString current_project_dir() const;
     QString active_conversation() const;
     const qtmcp::server_definitions_t &project_mcp_servers() const;
     void append_current_conversation_log_entry(const QString &markdown_block);
+    /** Resolves one stored file attachment into an absolute local file path. */
+    QString absolute_path_for_attachment(const file_attachment_t &attachment) const;
+    /** Copies one file into conversation-local attachment storage. */
+    bool import_attachment_from_file(const QString &source_path, file_attachment_t *attachment,
+                                     QString *error = nullptr);
+    /** Deletes one stored attachment file from disk. */
+    bool remove_attachment_file(const file_attachment_t &attachment, QString *error = nullptr);
+    /** Resolves one stored image attachment into an absolute local file path. */
+    QString absolute_path_for_image_attachment(const image_attachment_t &attachment) const;
+    /** Copies one dropped image file into conversation-local storage. */
+    bool import_image_attachment_from_file(const QString &source_path,
+                                           image_attachment_t *attachment,
+                                           QString *error = nullptr);
+    /** Saves one pasted image into conversation-local storage. */
+    bool import_image_attachment_from_image(const QImage &image, image_attachment_t *attachment,
+                                            QString *error = nullptr);
+    /** Deletes one stored image attachment file from disk. */
+    bool remove_image_attachment_file(const image_attachment_t &attachment,
+                                      QString *error = nullptr);
 
     void apply_project_ui_defaults();
     void migrate_legacy_session_files();
