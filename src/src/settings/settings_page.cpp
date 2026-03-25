@@ -11,6 +11,8 @@
 #include "../vector_search/vector_search_service.h"
 #include "mcp_servers_widget.h"
 #include "settings.h"
+#include "settings_double_spin_box.h"
+#include "settings_spin_box.h"
 #include "ui_settings_widget.h"
 
 #include <coreplugin/dialogs/ioptionspage.h>
@@ -20,7 +22,6 @@
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QDoubleSpinBox>
 #include <QFileDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -31,7 +32,6 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
-#include <QSpinBox>
 #include <QTabWidget>
 #include <QVBoxLayout>
 
@@ -179,6 +179,7 @@ public:
         this->ui->setupUi(this);
 
         auto &s = settings();
+        const settings_t defaults;
 
         this->providerCombo = this->ui->providerCombo;
         this->baseUrlCombo = this->ui->baseUrlCombo;
@@ -247,6 +248,23 @@ public:
         this->webToolsStatusLabel = this->ui->webToolsStatusLabel;
         this->inlineDiffRefinementCheck = this->ui->inlineDiffRefinementCheck;
         this->agentDebugCheck = this->ui->agentDebugCheck;
+        this->tempSpin->set_default_value(defaults.temperature);
+        this->maxTokensSpin->set_default_value(defaults.max_tokens);
+        this->copilotCompletionTimeoutSpin->set_default_value(
+            defaults.copilot_completion_timeout_sec);
+        this->maxIterSpin->set_default_value(defaults.max_iterations);
+        this->maxToolsSpin->set_default_value(defaults.max_tool_calls);
+        this->maxDiffSpin->set_default_value(defaults.max_diff_lines);
+        this->maxFilesSpin->set_default_value(defaults.max_changed_files);
+        this->autoCompactThresholdSpin->set_default_value(defaults.auto_compact_threshold_tokens);
+        this->completionMinCharsSpin->set_default_value(defaults.completion_min_chars);
+        this->completionDelayMsSpin->set_default_value(defaults.completion_delay_ms);
+        this->qdrantTimeoutSpin->set_default_value(defaults.qdrant_timeout_sec);
+        this->vectorSearchMaxIndexingThreadsSpin->set_default_value(
+            defaults.vector_search_max_indexing_threads);
+        this->webSearchMaxResultsSpin->set_default_value(defaults.web_search_max_results);
+        this->webRequestTimeoutSpin->set_default_value(defaults.web_request_timeout_sec);
+        this->webFetchMaxCharsSpin->set_default_value(defaults.web_fetch_max_chars);
         this->mcpServersWidget = new mcp_servers_widget_t(this);
         this->mcpServersWidget->set_servers(s.mcp_servers);
         const int vector_search_tab_index =
@@ -348,9 +366,9 @@ public:
         populateEffortCombo(this->thinkingCombo);
         selectEffortValue(this->thinkingCombo, s.thinking_level, 2);
 
-        this->tempSpin->setValue(s.temperature);
+        this->tempSpin->set_value(s.temperature);
 
-        this->maxTokensSpin->setValue(s.max_tokens);
+        this->maxTokensSpin->set_value(s.max_tokens);
 
         // GitHub Copilot (sidecar)
         repopulateEditableCombo(this->copilotModelCombo, model_catalog().copilot_models(),
@@ -363,7 +381,7 @@ public:
 
         this->copilotNodeEdit->setText(s.copilot_node_path);
         this->copilotSidecarEdit->setText(s.copilot_sidecar_path);
-        this->copilotCompletionTimeoutSpin->setValue(s.copilot_completion_timeout_sec);
+        this->copilotCompletionTimeoutSpin->set_value(s.copilot_completion_timeout_sec);
 
         // Local provider settings
         this->localUrlEdit->setText(s.local_base_url);
@@ -389,20 +407,20 @@ public:
         this->ollamaModelCombo->setCurrentText(s.ollama_model);
 
         // Safety
-        this->maxIterSpin->setValue(s.max_iterations);
-        this->maxToolsSpin->setValue(s.max_tool_calls);
-        this->maxDiffSpin->setValue(s.max_diff_lines);
-        this->maxFilesSpin->setValue(s.max_changed_files);
+        this->maxIterSpin->set_value(s.max_iterations);
+        this->maxToolsSpin->set_value(s.max_tool_calls);
+        this->maxDiffSpin->set_value(s.max_diff_lines);
+        this->maxFilesSpin->set_value(s.max_changed_files);
 
         this->dryRunCheck->setChecked(s.dry_run_default);
         this->autoCompactCheck->setChecked(s.auto_compact_enabled);
-        this->autoCompactThresholdSpin->setValue(s.auto_compact_threshold_tokens);
+        this->autoCompactThresholdSpin->set_value(s.auto_compact_threshold_tokens);
 
         this->aiCompletionCheck->setChecked(s.ai_completion_enabled);
 
-        this->completionMinCharsSpin->setValue(s.completion_min_chars);
+        this->completionMinCharsSpin->set_value(s.completion_min_chars);
 
-        this->completionDelayMsSpin->setValue(s.completion_delay_ms);
+        this->completionDelayMsSpin->set_value(s.completion_delay_ms);
 
         if (this->completionModelCombo->lineEdit() != nullptr)
         {
@@ -465,8 +483,8 @@ public:
         this->qdrantClientKeyEdit->setText(s.qdrant_client_key_file);
         this->qdrantAllowSelfSignedCheck->setChecked(
             s.qdrant_allow_self_signed_server_certificate);
-        this->qdrantTimeoutSpin->setValue(s.qdrant_timeout_sec);
-        this->vectorSearchMaxIndexingThreadsSpin->setValue(s.vector_search_max_indexing_threads);
+        this->qdrantTimeoutSpin->set_value(s.qdrant_timeout_sec);
+        this->vectorSearchMaxIndexingThreadsSpin->set_value(s.vector_search_max_indexing_threads);
 
         QObject::connect(
             this->qdrantCaCertificateBrowseButton, &QPushButton::clicked, this, [this]() {
@@ -520,9 +538,9 @@ public:
                       this->webSearchProviderCombo->currentData().toString())
                 : s.web_search_endpoint.trimmed());
         this->webSearchApiKeyEdit->setText(s.web_search_api_key);
-        this->webSearchMaxResultsSpin->setValue(s.web_search_max_results);
-        this->webRequestTimeoutSpin->setValue(s.web_request_timeout_sec);
-        this->webFetchMaxCharsSpin->setValue(s.web_fetch_max_chars);
+        this->webSearchMaxResultsSpin->set_value(s.web_search_max_results);
+        this->webRequestTimeoutSpin->set_value(s.web_request_timeout_sec);
+        this->webFetchMaxCharsSpin->set_value(s.web_fetch_max_chars);
         this->webSearchProviderCombo->setProperty(
             "previousProvider", this->webSearchProviderCombo->currentData().toString());
         connect(this->webToolsEnabledCheck, &QCheckBox::toggled, this,
@@ -559,28 +577,35 @@ public:
         installCheckSettingsDirtyTrigger(this->modelCombo);
         installCheckSettingsDirtyTrigger(this->reasoningCombo);
         installCheckSettingsDirtyTrigger(this->thinkingCombo);
-        installCheckSettingsDirtyTrigger(this->maxTokensSpin);
+        connect(this->maxTokensSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->copilotModelCombo);
         installCheckSettingsDirtyTrigger(this->copilotNodeEdit);
         installCheckSettingsDirtyTrigger(this->copilotSidecarEdit);
-        installCheckSettingsDirtyTrigger(this->copilotCompletionTimeoutSpin);
+        connect(this->copilotCompletionTimeoutSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->localUrlEdit);
         installCheckSettingsDirtyTrigger(this->localEndpointEdit);
         installCheckSettingsDirtyTrigger(this->localSimpleCheck);
         installCheckSettingsDirtyTrigger(this->localHeadersEdit);
         installCheckSettingsDirtyTrigger(this->ollamaUrlEdit);
         installCheckSettingsDirtyTrigger(this->ollamaModelCombo);
-        installCheckSettingsDirtyTrigger(this->maxIterSpin);
-        installCheckSettingsDirtyTrigger(this->maxToolsSpin);
-        installCheckSettingsDirtyTrigger(this->maxDiffSpin);
-        installCheckSettingsDirtyTrigger(this->maxFilesSpin);
+        connect(this->maxIterSpin, &settings_spin_box_t::value_changed, Utils::checkSettingsDirty);
+        connect(this->maxToolsSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
+        connect(this->maxDiffSpin, &settings_spin_box_t::value_changed, Utils::checkSettingsDirty);
+        connect(this->maxFilesSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->dryRunCheck);
         installCheckSettingsDirtyTrigger(this->autoCompactCheck);
-        installCheckSettingsDirtyTrigger(this->autoCompactThresholdSpin);
+        connect(this->autoCompactThresholdSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
         connect(this->autoCompactCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->aiCompletionCheck);
-        installCheckSettingsDirtyTrigger(this->completionMinCharsSpin);
-        installCheckSettingsDirtyTrigger(this->completionDelayMsSpin);
+        connect(this->completionMinCharsSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
+        connect(this->completionDelayMsSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->completionModelCombo);
         installCheckSettingsDirtyTrigger(this->completionThinkingCombo);
         installCheckSettingsDirtyTrigger(this->completionReasoningCombo);
@@ -594,8 +619,10 @@ public:
         installCheckSettingsDirtyTrigger(this->qdrantClientCertificateEdit);
         installCheckSettingsDirtyTrigger(this->qdrantClientKeyEdit);
         installCheckSettingsDirtyTrigger(this->qdrantAllowSelfSignedCheck);
-        installCheckSettingsDirtyTrigger(this->qdrantTimeoutSpin);
-        installCheckSettingsDirtyTrigger(this->vectorSearchMaxIndexingThreadsSpin);
+        connect(this->qdrantTimeoutSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
+        connect(this->vectorSearchMaxIndexingThreadsSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->debugLoggingCheck);
         installCheckSettingsDirtyTrigger(this->detailedRequestLoggingCheck);
         installCheckSettingsDirtyTrigger(this->loadAgentsMdCheck);
@@ -607,13 +634,16 @@ public:
         installCheckSettingsDirtyTrigger(this->webSearchProviderCombo);
         installCheckSettingsDirtyTrigger(this->webSearchEndpointEdit);
         installCheckSettingsDirtyTrigger(this->webSearchApiKeyEdit);
-        installCheckSettingsDirtyTrigger(this->webSearchMaxResultsSpin);
-        installCheckSettingsDirtyTrigger(this->webRequestTimeoutSpin);
-        installCheckSettingsDirtyTrigger(this->webFetchMaxCharsSpin);
+        connect(this->webSearchMaxResultsSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
+        connect(this->webRequestTimeoutSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
+        connect(this->webFetchMaxCharsSpin, &settings_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->inlineDiffRefinementCheck);
         installCheckSettingsDirtyTrigger(this->agentDebugCheck);
-        // QDoubleSpinBox not supported by installCheckSettingsDirtyTrigger
-        connect(this->tempSpin, &QDoubleSpinBox::valueChanged, Utils::checkSettingsDirty);
+        connect(this->tempSpin, &settings_double_spin_box_t::value_changed,
+                Utils::checkSettingsDirty);
         connect(this->completionModelCombo, &QComboBox::currentTextChanged,
                 Utils::checkSettingsDirty);
         connect(this->detailedRequestLoggingCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
@@ -945,13 +975,13 @@ private:
         this->modelCombo->setCurrentText(snap.model_name);
         selectEffortValue(this->reasoningCombo, snap.reasoning_effort, 2);
         selectEffortValue(this->thinkingCombo, snap.thinking_level, 2);
-        this->tempSpin->setValue(snap.temperature);
-        this->maxTokensSpin->setValue(snap.max_tokens);
+        this->tempSpin->set_value(snap.temperature);
+        this->maxTokensSpin->set_value(snap.max_tokens);
 
         this->copilotModelCombo->setCurrentText(snap.copilot_model);
         this->copilotNodeEdit->setText(snap.copilot_node_path);
         this->copilotSidecarEdit->setText(snap.copilot_sidecar_path);
-        this->copilotCompletionTimeoutSpin->setValue(snap.copilot_completion_timeout_sec);
+        this->copilotCompletionTimeoutSpin->set_value(snap.copilot_completion_timeout_sec);
 
         this->localUrlEdit->setText(snap.local_base_url);
         this->localEndpointEdit->setText(snap.local_endpoint_path);
@@ -961,17 +991,17 @@ private:
         this->ollamaUrlEdit->setText(snap.ollama_base_url);
         this->ollamaModelCombo->setCurrentText(snap.ollama_model);
 
-        this->maxIterSpin->setValue(snap.max_iterations);
-        this->maxToolsSpin->setValue(snap.max_tool_calls);
-        this->maxDiffSpin->setValue(snap.max_diff_lines);
-        this->maxFilesSpin->setValue(snap.max_changed_files);
+        this->maxIterSpin->set_value(snap.max_iterations);
+        this->maxToolsSpin->set_value(snap.max_tool_calls);
+        this->maxDiffSpin->set_value(snap.max_diff_lines);
+        this->maxFilesSpin->set_value(snap.max_changed_files);
 
         this->dryRunCheck->setChecked(snap.dry_run_default);
         this->autoCompactCheck->setChecked(snap.auto_compact_enabled);
-        this->autoCompactThresholdSpin->setValue(snap.auto_compact_threshold_tokens);
+        this->autoCompactThresholdSpin->set_value(snap.auto_compact_threshold_tokens);
         this->aiCompletionCheck->setChecked(snap.ai_completion_enabled);
-        this->completionMinCharsSpin->setValue(snap.completion_min_chars);
-        this->completionDelayMsSpin->setValue(snap.completion_delay_ms);
+        this->completionMinCharsSpin->set_value(snap.completion_min_chars);
+        this->completionDelayMsSpin->set_value(snap.completion_delay_ms);
 
         this->completionModelCombo->setCurrentText(snap.completion_model.trimmed());
 
@@ -992,8 +1022,8 @@ private:
         this->qdrantClientKeyEdit->setText(snap.qdrant_client_key_file);
         this->qdrantAllowSelfSignedCheck->setChecked(
             snap.qdrant_allow_self_signed_server_certificate);
-        this->qdrantTimeoutSpin->setValue(snap.qdrant_timeout_sec);
-        this->vectorSearchMaxIndexingThreadsSpin->setValue(
+        this->qdrantTimeoutSpin->set_value(snap.qdrant_timeout_sec);
+        this->vectorSearchMaxIndexingThreadsSpin->set_value(
             snap.vector_search_max_indexing_threads);
         this->refreshVectorSearchUiState();
 
@@ -1013,9 +1043,9 @@ private:
                                                                               : 0);
         this->webSearchEndpointEdit->setText(snap.web_search_endpoint);
         this->webSearchApiKeyEdit->setText(snap.web_search_api_key);
-        this->webSearchMaxResultsSpin->setValue(snap.web_search_max_results);
-        this->webRequestTimeoutSpin->setValue(snap.web_request_timeout_sec);
-        this->webFetchMaxCharsSpin->setValue(snap.web_fetch_max_chars);
+        this->webSearchMaxResultsSpin->set_value(snap.web_search_max_results);
+        this->webRequestTimeoutSpin->set_value(snap.web_request_timeout_sec);
+        this->webFetchMaxCharsSpin->set_value(snap.web_fetch_max_chars);
         this->webSearchProviderCombo->setProperty(
             "previousProvider", this->webSearchProviderCombo->currentData().toString());
         this->refreshWebToolsUiState();
@@ -1033,22 +1063,22 @@ private:
     QComboBox *modelCombo;
     QComboBox *reasoningCombo;
     QComboBox *thinkingCombo;
-    QDoubleSpinBox *tempSpin;
-    QSpinBox *maxTokensSpin;
+    settings_double_spin_box_t *tempSpin;
+    settings_spin_box_t *maxTokensSpin;
     QLineEdit *copilotNodeEdit, *copilotSidecarEdit;
     QComboBox *copilotModelCombo;
-    QSpinBox *copilotCompletionTimeoutSpin;
+    settings_spin_box_t *copilotCompletionTimeoutSpin;
     QLineEdit *localUrlEdit, *localEndpointEdit, *localHeadersEdit;
     QCheckBox *localSimpleCheck;
     QLineEdit *ollamaUrlEdit;
     QComboBox *ollamaModelCombo;
-    QSpinBox *maxIterSpin, *maxToolsSpin, *maxDiffSpin, *maxFilesSpin;
+    settings_spin_box_t *maxIterSpin, *maxToolsSpin, *maxDiffSpin, *maxFilesSpin;
     QCheckBox *dryRunCheck;
     QCheckBox *autoCompactCheck;
-    QSpinBox *autoCompactThresholdSpin;
+    settings_spin_box_t *autoCompactThresholdSpin;
     QCheckBox *aiCompletionCheck;
-    QSpinBox *completionMinCharsSpin;
-    QSpinBox *completionDelayMsSpin;
+    settings_spin_box_t *completionMinCharsSpin;
+    settings_spin_box_t *completionDelayMsSpin;
     QComboBox *completionModelCombo;
     QComboBox *completionThinkingCombo;
     QComboBox *completionReasoningCombo;
@@ -1067,8 +1097,8 @@ private:
     QLineEdit *qdrantClientKeyEdit;
     QPushButton *qdrantClientKeyBrowseButton;
     QCheckBox *qdrantAllowSelfSignedCheck;
-    QSpinBox *qdrantTimeoutSpin;
-    QSpinBox *vectorSearchMaxIndexingThreadsSpin;
+    settings_spin_box_t *qdrantTimeoutSpin;
+    settings_spin_box_t *vectorSearchMaxIndexingThreadsSpin;
     QPushButton *qdrantTestConnectionButton;
     QCheckBox *debugLoggingCheck;
     QCheckBox *detailedRequestLoggingCheck;
@@ -1082,9 +1112,9 @@ private:
     QComboBox *webSearchProviderCombo;
     QLineEdit *webSearchEndpointEdit;
     QLineEdit *webSearchApiKeyEdit;
-    QSpinBox *webSearchMaxResultsSpin;
-    QSpinBox *webRequestTimeoutSpin;
-    QSpinBox *webFetchMaxCharsSpin;
+    settings_spin_box_t *webSearchMaxResultsSpin;
+    settings_spin_box_t *webRequestTimeoutSpin;
+    settings_spin_box_t *webFetchMaxCharsSpin;
     QLabel *webToolsStatusLabel;
     QCheckBox *inlineDiffRefinementCheck;
     QCheckBox *agentDebugCheck;

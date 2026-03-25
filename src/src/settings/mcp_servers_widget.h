@@ -13,7 +13,6 @@ class QLineEdit;
 class QListWidget;
 class QPlainTextEdit;
 class QPushButton;
-class QSpinBox;
 class QStackedWidget;
 class QTimer;
 
@@ -24,6 +23,8 @@ class client_t;
 
 namespace qcai2
 {
+
+class settings_spin_box_t;
 
 class mcp_servers_widget_t final : public QWidget
 {
@@ -104,8 +105,8 @@ private:
     QLabel *http_status_label = nullptr;
     QPushButton *test_connection_button = nullptr;
     QPushButton *authorize_button = nullptr;
-    QSpinBox *startup_timeout_spin = nullptr;
-    QSpinBox *request_timeout_spin = nullptr;
+    settings_spin_box_t *startup_timeout_spin = nullptr;
+    settings_spin_box_t *request_timeout_spin = nullptr;
     QTimer *connection_test_timer = nullptr;
     qtmcp::client_t *connection_test_client = nullptr;
     QString connection_test_server_name;

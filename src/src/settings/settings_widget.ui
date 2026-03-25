@@ -145,7 +145,7 @@
                </widget>
               </item>
               <item row="5" column="1">
-               <widget class="QDoubleSpinBox" name="tempSpin">
+               <widget class="qcai2::settings_double_spin_box_t" name="tempSpin">
                 <property name="decimals">
                  <number>1</number>
                 </property>
@@ -168,7 +168,7 @@
                </widget>
               </item>
               <item row="6" column="1">
-               <widget class="QSpinBox" name="maxTokensSpin">
+               <widget class="qcai2::settings_spin_box_t" name="maxTokensSpin">
                 <property name="minimum">
                  <number>256</number>
                 </property>
@@ -236,7 +236,7 @@
                 </widget>
                </item>
                <item row="3" column="1">
-                <widget class="QSpinBox" name="copilotCompletionTimeoutSpin">
+                <widget class="qcai2::settings_spin_box_t" name="copilotCompletionTimeoutSpin">
                  <property name="minimum">
                   <number>0</number>
                  </property>
@@ -561,7 +561,7 @@
               </widget>
              </item>
               <item row="8" column="1">
-               <widget class="QSpinBox" name="qdrantTimeoutSpin">
+               <widget class="qcai2::settings_spin_box_t" name="qdrantTimeoutSpin">
                <property name="minimum">
                 <number>1</number>
                </property>
@@ -581,7 +581,7 @@
               </widget>
              </item>
              <item row="9" column="1">
-              <widget class="QSpinBox" name="vectorSearchMaxIndexingThreadsSpin">
+              <widget class="qcai2::settings_spin_box_t" name="vectorSearchMaxIndexingThreadsSpin">
                <property name="minimum">
                 <number>1</number>
                </property>
@@ -680,7 +680,7 @@
           </widget>
          </item>
          <item row="3" column="1">
-          <widget class="QSpinBox" name="completionMinCharsSpin">
+          <widget class="qcai2::settings_spin_box_t" name="completionMinCharsSpin">
            <property name="minimum">
             <number>1</number>
            </property>
@@ -700,7 +700,7 @@
           </widget>
          </item>
          <item row="4" column="1">
-          <widget class="QSpinBox" name="completionDelayMsSpin">
+          <widget class="qcai2::settings_spin_box_t" name="completionDelayMsSpin">
            <property name="minimum">
             <number>100</number>
            </property>
@@ -808,7 +808,7 @@
            </widget>
           </item>
           <item row="3" column="1">
-           <widget class="QSpinBox" name="webSearchMaxResultsSpin">
+           <widget class="qcai2::settings_spin_box_t" name="webSearchMaxResultsSpin">
             <property name="minimum">
              <number>1</number>
             </property>
@@ -825,7 +825,7 @@
            </widget>
           </item>
           <item row="4" column="1">
-           <widget class="QSpinBox" name="webRequestTimeoutSpin">
+           <widget class="qcai2::settings_spin_box_t" name="webRequestTimeoutSpin">
             <property name="minimum">
              <number>1</number>
             </property>
@@ -845,7 +845,7 @@
            </widget>
           </item>
           <item row="5" column="1">
-           <widget class="QSpinBox" name="webFetchMaxCharsSpin">
+           <widget class="qcai2::settings_spin_box_t" name="webFetchMaxCharsSpin">
             <property name="minimum">
              <number>512</number>
             </property>
@@ -987,7 +987,7 @@
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="QSpinBox" name="maxIterSpin">
+           <widget class="qcai2::settings_spin_box_t" name="maxIterSpin">
             <property name="minimum">
              <number>1</number>
             </property>
@@ -1004,7 +1004,7 @@
            </widget>
           </item>
           <item row="1" column="1">
-           <widget class="QSpinBox" name="maxToolsSpin">
+           <widget class="qcai2::settings_spin_box_t" name="maxToolsSpin">
             <property name="minimum">
              <number>1</number>
             </property>
@@ -1021,7 +1021,7 @@
            </widget>
           </item>
           <item row="2" column="1">
-           <widget class="QSpinBox" name="maxDiffSpin">
+           <widget class="qcai2::settings_spin_box_t" name="maxDiffSpin">
             <property name="minimum">
              <number>10</number>
             </property>
@@ -1038,7 +1038,7 @@
            </widget>
           </item>
           <item row="3" column="1">
-           <widget class="QSpinBox" name="maxFilesSpin">
+           <widget class="qcai2::settings_spin_box_t" name="maxFilesSpin">
             <property name="minimum">
              <number>1</number>
             </property>
@@ -1117,7 +1117,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QSpinBox" name="autoCompactThresholdSpin">
+             <widget class="qcai2::settings_spin_box_t" name="autoCompactThresholdSpin">
               <property name="minimum">
                <number>1000</number>
               </property>
@@ -1175,6 +1175,18 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>qcai2::settings_spin_box_t</class>
+   <extends>QWidget</extends>
+   <header>src/src/settings/settings_spin_box.h</header>
+  </customwidget>
+  <customwidget>
+   <class>qcai2::settings_double_spin_box_t</class>
+   <extends>QWidget</extends>
+   <header>src/src/settings/settings_double_spin_box.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

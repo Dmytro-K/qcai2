@@ -677,6 +677,12 @@ add_qtc_plugin(qcai2
     src/src/settings/settings_page.cpp
     src/src/settings/mcp_servers_widget.h
     src/src/settings/mcp_servers_widget.cpp
+    src/src/settings/settings_spin_box.h
+    src/src/settings/settings_spin_box.cpp
+    src/src/settings/settings_spin_box.ui
+    src/src/settings/settings_double_spin_box.h
+    src/src/settings/settings_double_spin_box.cpp
+    src/src/settings/settings_double_spin_box.ui
     src/src/settings/settings_widget.ui
     src/src/completion/ai_completion_provider.h
     src/src/completion/ai_completion_provider.cpp

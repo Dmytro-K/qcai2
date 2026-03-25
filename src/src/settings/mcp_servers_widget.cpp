@@ -8,6 +8,7 @@
 #include "../util/logger.h"
 #include "../util/migration.h"
 #include "settings.h"
+#include "settings_spin_box.h"
 
 #include <QBrush>
 #include <QCheckBox>
@@ -27,7 +28,6 @@
 #include <QProcessEnvironment>
 #include <QPushButton>
 #include <QRegularExpression>
-#include <QSpinBox>
 #include <QStackedWidget>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -304,6 +304,8 @@ QString errorPrefixText()
 
 mcp_servers_widget_t::mcp_servers_widget_t(QWidget *parent) : QWidget(parent)
 {
+    const qtmcp::server_definition_t default_server_definition;
+
     auto *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
 
@@ -329,12 +331,16 @@ mcp_servers_widget_t::mcp_servers_widget_t(QWidget *parent) : QWidget(parent)
     this->transport_combo->setEditable(true);
     this->transport_combo->addItems(
         {QStringLiteral("stdio"), QStringLiteral("http"), QStringLiteral("sse")});
-    this->startup_timeout_spin = new QSpinBox(editorGroup);
-    this->startup_timeout_spin->setRange(0, 600000);
+    this->startup_timeout_spin = new settings_spin_box_t(editorGroup);
+    this->startup_timeout_spin->setMinimum(0);
+    this->startup_timeout_spin->setMaximum(600000);
     this->startup_timeout_spin->setSuffix(tr(" ms"));
-    this->request_timeout_spin = new QSpinBox(editorGroup);
-    this->request_timeout_spin->setRange(0, 600000);
+    this->startup_timeout_spin->set_default_value(default_server_definition.startup_timeout_ms);
+    this->request_timeout_spin = new settings_spin_box_t(editorGroup);
+    this->request_timeout_spin->setMinimum(0);
+    this->request_timeout_spin->setMaximum(600000);
     this->request_timeout_spin->setSuffix(tr(" ms"));
+    this->request_timeout_spin->set_default_value(default_server_definition.request_timeout_ms);
 
     formLayout->addRow(tr("Name:"), this->name_edit);
     formLayout->addRow(QString(), this->enabled_check);
@@ -447,28 +453,30 @@ mcp_servers_widget_t::mcp_servers_widget_t(QWidget *parent) : QWidget(parent)
                 }
                 this->invalidate_current_server_status();
             });
-    connect(this->startup_timeout_spin, &QSpinBox::valueChanged, this, [this](int value) {
-        if (this->updating == true)
-        {
-            return;
-        }
-        if (auto *server = this->current_server(); ((server != nullptr) == true))
-        {
-            server->startup_timeout_ms = value;
-        }
-        this->invalidate_current_server_status();
-    });
-    connect(this->request_timeout_spin, &QSpinBox::valueChanged, this, [this](int value) {
-        if (this->updating == true)
-        {
-            return;
-        }
-        if (auto *server = this->current_server(); ((server != nullptr) == true))
-        {
-            server->request_timeout_ms = value;
-        }
-        this->invalidate_current_server_status();
-    });
+    connect(this->startup_timeout_spin, &settings_spin_box_t::value_changed, this,
+            [this](int value) {
+                if (this->updating == true)
+                {
+                    return;
+                }
+                if (auto *server = this->current_server(); ((server != nullptr) == true))
+                {
+                    server->startup_timeout_ms = value;
+                }
+                this->invalidate_current_server_status();
+            });
+    connect(this->request_timeout_spin, &settings_spin_box_t::value_changed, this,
+            [this](int value) {
+                if (this->updating == true)
+                {
+                    return;
+                }
+                if (auto *server = this->current_server(); ((server != nullptr) == true))
+                {
+                    server->request_timeout_ms = value;
+                }
+                this->invalidate_current_server_status();
+            });
     connect(this->command_edit, &QLineEdit::textChanged, this, [this](const QString &text) {
         if (this->updating == true)
         {
@@ -669,8 +677,8 @@ void mcp_servers_widget_t::load_current_server()
         this->transport_combo->addItem(server->transport);
     }
     this->transport_combo->setCurrentText(server->transport);
-    this->startup_timeout_spin->setValue(server->startup_timeout_ms);
-    this->request_timeout_spin->setValue(server->request_timeout_ms);
+    this->startup_timeout_spin->set_value(server->startup_timeout_ms);
+    this->request_timeout_spin->set_value(server->request_timeout_ms);
     this->command_edit->setText(server->command);
     this->args_edit->setPlainText(server->args.join(QLatin1Char('\n')));
     this->env_edit->setPlainText(
@@ -692,8 +700,8 @@ void mcp_servers_widget_t::clear_editors()
     this->name_edit->clear();
     this->enabled_check->setChecked(false);
     this->transport_combo->setCurrentText(QStringLiteral("stdio"));
-    this->startup_timeout_spin->setValue(10000);
-    this->request_timeout_spin->setValue(30000);
+    this->startup_timeout_spin->set_value(10000);
+    this->request_timeout_spin->set_value(30000);
     this->command_edit->clear();
     this->args_edit->clear();
     this->env_edit->clear();

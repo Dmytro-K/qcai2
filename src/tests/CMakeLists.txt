@@ -249,6 +249,27 @@ target_link_libraries(tst_qcai2_decision_request_widget PRIVATE
 )
 qcai2_register_test(qcai2_decision_request_widget tst_qcai2_decision_request_widget)
 
+add_executable(tst_qcai2_settings_spin_box_widgets
+    tst_settings_spin_box_widgets.cpp
+    ../src/settings/settings_spin_box.cpp
+    ../src/settings/settings_spin_box.ui
+    ../src/settings/settings_double_spin_box.cpp
+    ../src/settings/settings_double_spin_box.ui
+)
+
+qcai2_enable_linker_map(tst_qcai2_settings_spin_box_widgets)
+
+target_include_directories(tst_qcai2_settings_spin_box_widgets PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_settings_spin_box_widgets PRIVATE
+    Qt::Core
+    Qt::Gui
+    Qt::Widgets
+    Qt::Test
+)
+qcai2_register_test(qcai2_settings_spin_box_widgets tst_qcai2_settings_spin_box_widgets)
+
 add_executable(tst_qcai2_debugger_ui_integration
     tst_debugger_ui_integration.cpp
     ../src/debugger/debugger_session_service.cpp
