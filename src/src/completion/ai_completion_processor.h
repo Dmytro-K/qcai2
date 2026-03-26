@@ -2,6 +2,9 @@
 
 #include <texteditor/codeassist/iassistprocessor.h>
 
+#include "../progress/agent_progress.h"
+#include "../util/completion_detailed_log.h"
+
 #include <QString>
 #include <memory>
 
@@ -59,9 +62,33 @@ private:
                                              const provider_usage_t &usage);
 
     /**
+     * Safely dispatches one async provider progress event back to the processor.
+     */
+    static void dispatch_progress_event(ai_completion_processor_t *processor,
+                                        const std::shared_ptr<bool> &alive,
+                                        const provider_raw_event_t &event);
+
+    /**
      * Processes one async completion response.
      */
-    void handle_completion_response(int pos, const QString &response, const QString &error);
+    void handle_completion_response(int pos, const QString &response, const QString &error,
+                                    const provider_usage_t &usage);
+
+    /**
+     * Records one provider progress event into the detailed completion log.
+     * @param event Provider progress event to record.
+     */
+    void handle_progress_event(const provider_raw_event_t &event);
+
+    /**
+     * Finalizes and appends the detailed completion log exactly once.
+     * @param status Final request status.
+     * @param response Final provider response text.
+     * @param error Final error text.
+     * @param usage Final provider usage counters.
+     */
+    void finalize_completion_log(const QString &status, const QString &response,
+                                 const QString &error, const provider_usage_t &usage);
 
     /** Non-owning AI backend used for completion requests. */
     iai_provider_t *provider;
@@ -80,6 +107,16 @@ private:
 
     /** Guards callbacks against use-after-free after the processor is destroyed. */
     std::shared_ptr<bool> alive = std::make_shared<bool>(true);
+
+    /** Detailed per-request completion trace written under the launch-specific completion log
+     * directory. */
+    completion_detailed_log_t detailed_log;
+
+    /** True after detailed logging has been initialized for the current request. */
+    bool detailed_log_started = false;
+
+    /** True after the detailed log has been finalized and appended to disk. */
+    bool detailed_log_finished = false;
 };
 
 }  // namespace qcai2

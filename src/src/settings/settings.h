@@ -98,6 +98,9 @@ struct settings_t
     /** Enables AI completion features inside the editor. */
     bool ai_completion_enabled = true;
 
+    /** Appends detailed per-completion Markdown logs into the project `.qcai2/logs` folder. */
+    bool detailed_completion_logging = false;
+
     /** Enables plugin debug logging. */
     bool debug_logging = false;
 
@@ -155,11 +158,21 @@ struct settings_t
     /** Debounce delay for automatic completion requests, in milliseconds. */
     int completion_delay_ms = 500;
 
+    /** Optional provider override for code completion requests; empty follows the agent provider.
+     */
+    QString completion_provider;
+
     /** Optional model override for code completion requests. */
     QString completion_model;
 
+    /** Sends completion thinking instructions when true. */
+    bool completion_send_thinking = false;
+
     /** Completion thinking level: off, low, medium, or high. */
     QString completion_thinking_level = QStringLiteral("off");
+
+    /** Sends completion reasoning effort when true. */
+    bool completion_send_reasoning = true;
 
     /** Completion reasoning effort: off, low, medium, or high. */
     QString completion_reasoning_effort = QStringLiteral("off");

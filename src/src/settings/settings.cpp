@@ -316,6 +316,8 @@ void settings_t::load()
     auto_compact_threshold_tokens =
         s.value("autoCompactThresholdTokens", auto_compact_threshold_tokens).toInt();
     ai_completion_enabled = s.value("aiCompletionEnabled", ai_completion_enabled).toBool();
+    detailed_completion_logging =
+        s.value("detailedCompletionLogging", detailed_completion_logging).toBool();
     debug_logging = s.value("debugLogging", debug_logging).toBool();
     detailed_request_logging =
         s.value("detailedRequestLogging", detailed_request_logging).toBool();
@@ -339,10 +341,15 @@ void settings_t::load()
     agent_debug = s.value("agentDebug", agent_debug).toBool();
     completion_min_chars = s.value("completionMinChars", completion_min_chars).toInt();
     completion_delay_ms = s.value("completionDelayMs", completion_delay_ms).toInt();
+    completion_provider = s.value("completionProvider", completion_provider).toString().trimmed();
     completion_model =
         normalize_model_name(s.value("completionModel", completion_model).toString());
+    completion_send_thinking =
+        s.value("completionSendThinking", completion_send_thinking).toBool();
     completion_thinking_level =
         s.value("completionThinkingLevel", completion_thinking_level).toString();
+    completion_send_reasoning =
+        s.value("completionSendReasoning", completion_send_reasoning).toBool();
     completion_reasoning_effort =
         s.value("completionReasoningEffort", completion_reasoning_effort).toString();
     vector_search_enabled = s.value("vectorSearchEnabled", vector_search_enabled).toBool();
@@ -443,6 +450,7 @@ void settings_t::save() const
     s.setValue("autoCompactEnabled", auto_compact_enabled);
     s.setValue("autoCompactThresholdTokens", auto_compact_threshold_tokens);
     s.setValue("aiCompletionEnabled", ai_completion_enabled);
+    s.setValue("detailedCompletionLogging", detailed_completion_logging);
     s.setValue("debugLogging", debug_logging);
     s.setValue("detailedRequestLogging", detailed_request_logging);
     s.setValue("systemPrompt", system_prompt);
@@ -462,8 +470,11 @@ void settings_t::save() const
     s.setValue("agentDebug", agent_debug);
     s.setValue("completionMinChars", completion_min_chars);
     s.setValue("completionDelayMs", completion_delay_ms);
+    s.setValue("completionProvider", completion_provider);
     s.setValue("completionModel", completion_model);
+    s.setValue("completionSendThinking", completion_send_thinking);
     s.setValue("completionThinkingLevel", completion_thinking_level);
+    s.setValue("completionSendReasoning", completion_send_reasoning);
     s.setValue("completionReasoningEffort", completion_reasoning_effort);
     s.setValue("vectorSearchEnabled", vector_search_enabled);
     s.setValue("vectorSearchProvider", vector_search_provider);

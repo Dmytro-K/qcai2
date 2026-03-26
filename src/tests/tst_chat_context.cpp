@@ -6,6 +6,7 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QRegularExpression>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -22,6 +23,7 @@ private slots:
     void renames_conversation();
     void deletes_conversation();
     void writes_hourly_usage_stats_csv();
+    void emits_active_workspace_changed_signal();
     void excludes_superseded_soft_steer_messages_from_prompt_context();
     void compact_summary_replaces_pre_compacted_recent_messages();
     void restores_image_attachments_from_message_metadata();
@@ -456,6 +458,28 @@ void tst_chat_context_t::writes_hourly_usage_stats_csv()
     QCOMPARE(row.at(14), QStringLiteral("15"));
     QCOMPARE(row.at(15), QStringLiteral("30"));
     QVERIFY(row.at(16).toLongLong() >= 0);
+}
+
+void tst_chat_context_t::emits_active_workspace_changed_signal()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+    QVERIFY(QDir(temp_dir.path()).mkpath(QStringLiteral(".qcai2")));
+
+    chat_context_manager_t manager;
+    QSignalSpy workspace_spy(&manager, &chat_context_manager_t::active_workspace_changed);
+    QVERIFY(workspace_spy.isValid());
+
+    QString error;
+    QVERIFY(manager.set_active_workspace(QStringLiteral("workspace-signal"), temp_dir.path(), {},
+                                         &error));
+    QVERIFY(error.isEmpty());
+    QCOMPARE(workspace_spy.size(), 1);
+
+    const QList<QVariant> arguments = workspace_spy.takeFirst();
+    QCOMPARE(arguments.at(0).toString(), QStringLiteral("workspace-signal"));
+    QCOMPARE(arguments.at(1).toString(), temp_dir.path());
+    QCOMPARE(arguments.at(2).toString(), QString());
 }
 
 void tst_chat_context_t::excludes_superseded_soft_steer_messages_from_prompt_context()

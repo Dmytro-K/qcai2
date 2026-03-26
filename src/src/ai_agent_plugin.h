@@ -3,7 +3,13 @@
 
 #include <extensionsystem/iplugin.h>
 
+#include <QSet>
 #include <functional>
+
+namespace TextEditor
+{
+class BaseTextEditor;
+}
 
 namespace qcai2
 {
@@ -78,6 +84,11 @@ private:
     void queue_current_request();
 
     /**
+     * Triggers qcai2 autocomplete in the current text editor.
+     */
+    void trigger_completion();
+
+    /**
      * Activates the AI Agent sidebar widget, then invokes a callback on it.
      */
     void with_agent_dock_widget(const std::function<void(agent_dock_widget_t *)> &callback);
@@ -86,6 +97,17 @@ private:
      * Instantiates all supported providers and selects the active one.
      */
     void setup_providers();
+
+    /**
+     * Attaches completion services to one text editor instance.
+     * @param text_editor Editor to wire for assist and ghost-text completion.
+     */
+    void attach_completion_to_text_editor(TextEditor::BaseTextEditor *text_editor);
+
+    /**
+     * Writes one startup diagnostics entry describing the loaded plugin build.
+     */
+    void log_startup_diagnostics();
 
     /**
      * Refreshes the cached GitHub Copilot model list asynchronously.
@@ -118,8 +140,11 @@ private:
     /** Provider currently selected in settings. */
     iai_provider_t *current_provider = nullptr;
 
-    /** Provider instances available for chat and completion requests. */
+    /** Provider instances available to chat and agent requests. */
     QList<iai_provider_t *> providers;
+
+    /** Provider instances dedicated to cached completion sessions. */
+    QList<iai_provider_t *> completion_providers;
 
     /** Dedicated handle used to refresh GitHub Copilot model metadata. */
     copilot_provider_t *copilot_provider = nullptr;
@@ -144,6 +169,9 @@ private:
 
     /** Sidebar factory that hosts the AI Agent inside Qt Creator navigation panels. */
     ai_agent_navigation_widget_factory_t *navigation_widget_factory = nullptr;
+
+    /** Workspace roots that already received one startup diagnostics entry in this process. */
+    QSet<QString> startup_diagnostics_logged_workspace_roots;
 };
 
 }  // namespace Internal

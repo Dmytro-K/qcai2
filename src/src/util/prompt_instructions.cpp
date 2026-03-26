@@ -125,6 +125,15 @@ QString project_rules_file_path(const QString &project_root)
     return QDir(project_root).filePath(".qcai2/rules.md");
 }
 
+QString autocomplete_prompt_file_path(const QString &project_root)
+{
+    if (project_root.trimmed().isEmpty())
+    {
+        return {};
+    }
+    return QDir(project_root).filePath(QStringLiteral("AUTOCOMPLETE.md"));
+}
+
 QString project_session_state_file_path(const QString &project_root)
 {
     if (project_root.trimmed().isEmpty())
@@ -203,6 +212,36 @@ QString read_project_rules(const QString &project_root, QString *error)
     return normalized_instruction_text(QString::fromUtf8(file.readAll()));
 }
 
+QString read_autocomplete_prompt(const QString &project_root, QString *error)
+{
+    if (error != nullptr)
+    {
+        error->clear();
+    }
+
+    const QString prompt_path = autocomplete_prompt_file_path(project_root);
+    if (prompt_path.isEmpty())
+    {
+        return {};
+    }
+
+    QFile file(prompt_path);
+    if (file.exists() == false)
+    {
+        return {};
+    }
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text) == false)
+    {
+        if (error != nullptr)
+        {
+            *error = file.errorString();
+        }
+        return {};
+    }
+
+    return normalized_instruction_text(QString::fromUtf8(file.readAll()));
+}
+
 QStringList configured_system_instructions(const QString &project_root,
                                            const prompt_instruction_options_t &options,
                                            QString *error)
@@ -266,6 +305,21 @@ void append_configured_system_instructions(QList<chat_message_t> *messages,
 
     const QStringList instructions = configured_system_instructions(project_root, options, error);
     for (const QString &instruction : instructions)
+    {
+        messages->append(chat_message_t{QStringLiteral("system"), instruction});
+    }
+}
+
+void append_autocomplete_system_instruction(QList<chat_message_t> *messages,
+                                            const QString &project_root, QString *error)
+{
+    if (messages == nullptr)
+    {
+        return;
+    }
+
+    const QString instruction = read_autocomplete_prompt(project_root, error);
+    if (instruction.isEmpty() == false)
     {
         messages->append(chat_message_t{QStringLiteral("system"), instruction});
     }

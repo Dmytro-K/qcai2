@@ -548,8 +548,9 @@ void copilot_provider_t::complete(const QList<chat_message_t> &messages, const Q
     // Always use streaming mode — non-streaming sendAndWait has long delays
     params[QStringLiteral("streaming")] = true;
     params[QStringLiteral("completionTimeoutSec")] = settings().copilot_completion_timeout_sec;
-    if (!reasoning_effort.isEmpty() && reasoning_effort != QStringLiteral("off"))
+    if (reasoning_effort.isEmpty() == false)
     {
+        params[QStringLiteral("reasoningEffort")] = reasoning_effort;
         params[QStringLiteral("reasoning_effort")] = reasoning_effort;
     }
 
@@ -580,6 +581,17 @@ void copilot_provider_t::complete(const QList<chat_message_t> &messages, const Q
     }
     if (progress_callback)
     {
+        progress_callback(
+            {provider_raw_event_kind_t::REQUEST_STARTED,
+             this->id(),
+             QStringLiteral("request.dispatched"),
+             {},
+             QStringLiteral("sidecar_request_id=%1 payload_bytes=%2 session_idle_timeout_ms=%3")
+                 .arg(id)
+                 .arg(payloadSize)
+                 .arg(settings().copilot_completion_timeout_sec > 0
+                          ? QString::number(settings().copilot_completion_timeout_sec * 1000)
+                          : QStringLiteral("none"))});
         this->progress_callbacks.insert(id, progress_callback);
     }
     this->send_request(req);

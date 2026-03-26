@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHash>
+#include <QList>
 #include <QObject>
 #include <QPointer>
 #include <QTimer>
@@ -16,7 +17,23 @@ namespace qcai2
 
 class iai_provider_t;
 class chat_context_manager_t;
+class completion_detailed_log_t;
 struct provider_usage_t;
+
+/**
+ * Stores one frozen completion snapshot captured immediately after user typing.
+ */
+struct pending_completion_snapshot_t
+{
+    /** Cursor position right after the triggering edit. */
+    int cursor_position = 0;
+
+    /** Prefix text captured from the document at trigger time. */
+    QString prefix;
+
+    /** Suffix text captured from the document at trigger time. */
+    QString suffix;
+};
 
 /**
  * Manages debounced inline ghost-text suggestions for attached editors.
@@ -43,6 +60,15 @@ public:
     void set_provider(iai_provider_t *provider)
     {
         this->provider = provider;
+    }
+
+    /**
+     * Sets the provider pool available to ghost-text completion requests.
+     * @param providers Non-owning provider instances dedicated to completion.
+     */
+    void set_providers(const QList<iai_provider_t *> &providers)
+    {
+        this->providers = providers;
     }
 
     /**
@@ -86,25 +112,26 @@ public:
 
 private:
     /**
-     * Safely dispatches one async completion response back to the manager.
+     * Resolves the effective provider for the next ghost-text request.
+     * @return Non-owning provider selected from the completion provider pool.
      */
-    static void dispatch_completion_response(ghost_text_manager_t *manager,
-                                             QPointer<TextEditor::TextEditorWidget> editor,
-                                             int pos, const std::shared_ptr<bool> &alive,
-                                             const QString &response, const QString &error,
-                                             const provider_usage_t &usage);
+    iai_provider_t *resolve_provider() const;
 
     /**
      * Processes one ghost-text completion response.
      */
-    void handle_completion_response(TextEditor::TextEditorWidget *editor, int pos,
-                                    const QString &response, const QString &error);
+    void
+    handle_completion_response(TextEditor::TextEditorWidget *editor, int pos,
+                               const QString &response, const QString &error,
+                               const provider_usage_t &usage,
+                               const std::shared_ptr<completion_detailed_log_t> &detailed_log);
 
     /**
      * Handles editor content changes and restarts the debounce timer.
      * @param editor Editor whose contents changed.
+     * @param cursor_position Cursor position that must remain stable until debounce fires.
      */
-    void on_contents_changed(TextEditor::TextEditorWidget *editor);
+    void on_contents_changed(TextEditor::TextEditorWidget *editor, int cursor_position);
 
     /**
      * Requests a ghost-text completion for the current cursor position.
@@ -122,6 +149,9 @@ private:
     /** Non-owning AI backend used for inline suggestions. */
     iai_provider_t *provider = nullptr;
 
+    /** Non-owning provider pool dedicated to completion requests. */
+    QList<iai_provider_t *> providers;
+
     /** Default model name used when settings do not override it. */
     QString model;
 
@@ -136,6 +166,9 @@ private:
 
     /** Last edit position recorded for each attached editor. */
     QHash<TextEditor::TextEditorWidget *, int> last_edit_positions;
+
+    /** Frozen prompt snapshots captured when a user edit starts a debounce window. */
+    QHash<TextEditor::TextEditorWidget *, pending_completion_snapshot_t> pending_snapshots;
 
     /** Guards async callbacks against use-after-free after destruction. */
     std::shared_ptr<bool> alive = std::make_shared<bool>(true);

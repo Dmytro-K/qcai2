@@ -74,6 +74,12 @@ public:
     QString artifact_directory_path() const;
 
 signals:
+    /**
+     * Emitted after the active workspace context is switched successfully.
+     */
+    void active_workspace_changed(const QString &workspace_id, const QString &workspace_root,
+                                  const QString &conversation_id);
+
     void message_appended(const QString &workspace_id, const QString &workspace_root,
                           const QString &conversation_id, const QString &message_id,
                           const QString &role, const QString &source, const QString &content,

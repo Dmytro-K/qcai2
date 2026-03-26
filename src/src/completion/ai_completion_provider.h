@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QList>
 #include <texteditor/codeassist/completionassistprovider.h>
 
 namespace qcai2
@@ -52,6 +53,15 @@ public:
     }
 
     /**
+     * Sets the provider pool available to completion requests.
+     * @param providers Non-owning provider instances dedicated to completion.
+     */
+    void set_providers(const QList<iai_provider_t *> &providers)
+    {
+        this->providers = providers;
+    }
+
+    /**
      * Sets the default model for completion requests.
      * @param model Model name used when settings do not override it.
      */
@@ -88,8 +98,17 @@ public:
     }
 
 private:
+    /**
+     * Resolves the effective provider for the next completion request.
+     * @return Non-owning provider selected from the completion provider pool.
+     */
+    iai_provider_t *resolve_provider() const;
+
     /** Non-owning AI backend used for completion requests. */
     iai_provider_t *provider = nullptr;
+
+    /** Non-owning provider pool dedicated to completion requests. */
+    QList<iai_provider_t *> providers;
 
     /** Default model name used when no completion-specific model is configured. */
     QString model;

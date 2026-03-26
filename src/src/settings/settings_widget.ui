@@ -626,100 +626,148 @@
          <string>Code Completion</string>
         </attribute>
       <layout class="QVBoxLayout" name="completionLayout">
-       <item>
-        <widget class="QCheckBox" name="aiCompletionCheck">
-         <property name="text">
-          <string>Enable AI code completion in editor</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <layout class="QFormLayout" name="completionFormLayout">
-         <item row="0" column="0">
-          <widget class="QLabel" name="completionModelLabel">
-           <property name="text">
-            <string>Completion model:</string>
-           </property>
-          </widget>
+        <item>
+         <widget class="QCheckBox" name="aiCompletionCheck">
+          <property name="text">
+           <string>Enable AI code completion in editor</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="detailedCompletionLoggingCheck">
+          <property name="toolTip">
+           <string>Write detailed completion lifecycle logs into `.qcai2/logs/completion-log-*/&lt;request-id&gt;.md` for debugging.</string>
+          </property>
+          <property name="text">
+           <string>Detailed completion logging (per-project Markdown file)</string>
+          </property>
+         </widget>
+        </item>
+         <item>
+          <layout class="QFormLayout" name="completionFormLayout">
+           <item row="0" column="0">
+            <widget class="QLabel" name="completionProviderLabel">
+             <property name="text">
+              <string>Completion provider:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="completionProviderCombo"/>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="completionModelLabel">
+             <property name="text">
+              <string>Completion model:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QComboBox" name="completionModelCombo">
+             <property name="editable">
+              <bool>true</bool>
+             </property>
+             <property name="toolTip">
+              <string>Leave empty to use the selected completion provider's default model</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="completionSendThinkingLabel">
+             <property name="text">
+              <string>Thinking:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QCheckBox" name="completionSendThinkingCheck">
+             <property name="text">
+              <string>Send Thinking hint</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QLabel" name="completionThinkingLabel">
+             <property name="text">
+              <string>Thinking level:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QComboBox" name="completionThinkingCombo"/>
+           </item>
+           <item row="4" column="0">
+            <widget class="QLabel" name="completionSendReasoningLabel">
+             <property name="text">
+              <string>Reasoning:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="1">
+            <widget class="QCheckBox" name="completionSendReasoningCheck">
+             <property name="text">
+              <string>Send Reasoning effort</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <widget class="QLabel" name="completionReasoningLabel">
+             <property name="text">
+              <string>Reasoning effort:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="1">
+            <widget class="QComboBox" name="completionReasoningCombo"/>
+           </item>
+           <item row="6" column="0">
+            <widget class="QLabel" name="completionMinCharsLabel">
+             <property name="text">
+              <string>Min characters to trigger:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="1">
+            <widget class="qcai2::settings_spin_box_t" name="completionMinCharsSpin">
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>20</number>
+             </property>
+             <property name="toolTip">
+              <string>Trigger AI completion after typing this many characters</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0">
+            <widget class="QLabel" name="completionDelayLabel">
+             <property name="text">
+              <string>Trigger delay:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="1">
+            <widget class="qcai2::settings_spin_box_t" name="completionDelayMsSpin">
+             <property name="minimum">
+              <number>100</number>
+             </property>
+             <property name="maximum">
+              <number>5000</number>
+             </property>
+             <property name="singleStep">
+              <number>100</number>
+             </property>
+             <property name="suffix">
+              <string> ms</string>
+             </property>
+             <property name="toolTip">
+              <string>Delay before sending completion request</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </item>
-         <item row="0" column="1">
-          <widget class="QComboBox" name="completionModelCombo">
-           <property name="editable">
-            <bool>true</bool>
-           </property>
-           <property name="toolTip">
-            <string>Leave empty to use the same model as the agent</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QLabel" name="completionThinkingLabel">
-           <property name="text">
-            <string>Thinking:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="QComboBox" name="completionThinkingCombo"/>
-         </item>
-         <item row="2" column="0">
-          <widget class="QLabel" name="completionReasoningLabel">
-           <property name="text">
-            <string>Reasoning effort:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QComboBox" name="completionReasoningCombo"/>
-         </item>
-         <item row="3" column="0">
-          <widget class="QLabel" name="completionMinCharsLabel">
-           <property name="text">
-            <string>Min characters to trigger:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="1">
-          <widget class="qcai2::settings_spin_box_t" name="completionMinCharsSpin">
-           <property name="minimum">
-            <number>1</number>
-           </property>
-           <property name="maximum">
-            <number>20</number>
-           </property>
-           <property name="toolTip">
-            <string>Trigger AI completion after typing this many characters</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="0">
-          <widget class="QLabel" name="completionDelayLabel">
-           <property name="text">
-            <string>Trigger delay:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="1">
-          <widget class="qcai2::settings_spin_box_t" name="completionDelayMsSpin">
-           <property name="minimum">
-            <number>100</number>
-           </property>
-           <property name="maximum">
-            <number>5000</number>
-           </property>
-           <property name="singleStep">
-            <number>100</number>
-           </property>
-           <property name="suffix">
-            <string> ms</string>
-           </property>
-           <property name="toolTip">
-            <string>Delay before sending completion request</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
        <item>
         <spacer name="completionBottomSpacer">
          <property name="orientation">

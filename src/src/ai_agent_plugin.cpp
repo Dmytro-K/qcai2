@@ -46,6 +46,7 @@
 #include "util/crash_handler.h"
 #include "util/ide_output_capture.h"
 #include "util/logger.h"
+#include "util/system_diagnostics_log.h"
 #include "vector_search/text_embedder.h"
 #include "vector_search/vector_indexing_manager.h"
 
@@ -56,17 +57,157 @@
 #include <coreplugin/icore.h>
 #include <coreplugin/inavigationwidgetfactory.h>
 #include <coreplugin/navigationwidget.h>
+#include <texteditor/codeassist/assistenums.h>
 #include <texteditor/textdocument.h>
 #include <texteditor/texteditor.h>
 
 #include <QAction>
+#include <QDateTime>
+#include <QFileInfo>
 #include <QMenu>
 #include <QMessageBox>
+
+#if defined(_WIN32)
+#include <windows.h>
+#elif defined(__unix__) || defined(__APPLE__)
+#include <dlfcn.h>
+#endif
 
 using namespace Core;
 
 namespace qcai2::Internal
 {
+
+namespace
+{
+
+QList<iai_provider_t *> create_provider_pool(QObject *owner, const settings_t &settings,
+                                             copilot_provider_t **copilot_provider_out = nullptr)
+{
+    QList<iai_provider_t *> providers;
+
+    auto *openai = new open_ai_compatible_provider_t(owner);
+    openai->set_base_url(settings.base_url);
+    openai->set_api_key(settings.api_key);
+    providers.append(openai);
+
+    auto *anthropic = new anthropic_provider_t(owner);
+    anthropic->set_base_url(settings.base_url);
+    anthropic->set_api_key(settings.api_key);
+    providers.append(anthropic);
+
+    auto *local = new local_http_provider_t(owner);
+    local->set_base_url(settings.local_base_url);
+    local->set_endpoint_path(settings.local_endpoint_path);
+    local->set_simple_mode(settings.local_simple_mode);
+    local->set_api_key(settings.api_key);
+    providers.append(local);
+
+    auto *ollama = new ollama_provider_t(owner);
+    ollama->set_base_url(settings.ollama_base_url);
+    providers.append(ollama);
+
+    auto *copilot = new copilot_provider_t(owner);
+    if (settings.copilot_node_path.isEmpty() == false)
+    {
+        copilot->set_node_path(settings.copilot_node_path);
+    }
+    if (settings.copilot_sidecar_path.isEmpty() == false)
+    {
+        copilot->set_sidecar_path(settings.copilot_sidecar_path);
+    }
+    providers.append(copilot);
+    if (copilot_provider_out != nullptr)
+    {
+        *copilot_provider_out = copilot;
+    }
+
+    return providers;
+}
+
+iai_provider_t *find_provider_by_id(const QList<iai_provider_t *> &providers, const QString &id)
+{
+    for (iai_provider_t *provider : providers)
+    {
+        if (provider != nullptr && provider->id() == id)
+        {
+            return provider;
+        }
+    }
+    return nullptr;
+}
+
+QString current_plugin_module_path()
+{
+#if defined(_WIN32)
+    HMODULE module_handle = nullptr;
+    if (GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCWSTR>(&current_plugin_module_path), &module_handle) == 0 ||
+        module_handle == nullptr)
+    {
+        return {};
+    }
+
+    wchar_t buffer[MAX_PATH];
+    const DWORD length = GetModuleFileNameW(module_handle, buffer, MAX_PATH);
+    if (length == 0)
+    {
+        return {};
+    }
+    return QString::fromWCharArray(buffer, static_cast<int>(length));
+#elif defined(__unix__) || defined(__APPLE__)
+    Dl_info info;
+    if (dladdr(reinterpret_cast<void *>(&current_plugin_module_path), &info) == 0 ||
+        info.dli_fname == nullptr)
+    {
+        return {};
+    }
+    return QString::fromLocal8Bit(info.dli_fname);
+#else
+    return {};
+#endif
+}
+
+QString startup_workspace_root(editor_context_t *editor_context,
+                               chat_context_manager_t *chat_context_manager)
+{
+    if (chat_context_manager != nullptr)
+    {
+        const QString active_workspace_root = chat_context_manager->active_workspace_root();
+        if (active_workspace_root.isEmpty() == false)
+        {
+            return active_workspace_root;
+        }
+    }
+    if (editor_context == nullptr)
+    {
+        return {};
+    }
+
+    const editor_context_t::snapshot_t snapshot = editor_context->capture();
+    if (snapshot.project_dir.isEmpty() == false)
+    {
+        return snapshot.project_dir;
+    }
+    if (snapshot.file_path.isEmpty() == false)
+    {
+        return QFileInfo(snapshot.file_path).absolutePath();
+    }
+
+    const QList<editor_context_t::project_info_t> open_projects = editor_context->open_projects();
+    for (const editor_context_t::project_info_t &project : open_projects)
+    {
+        if (project.project_dir.isEmpty() == false)
+        {
+            return project.project_dir;
+        }
+    }
+
+    return {};
+}
+
+}  // namespace
 
 class ai_agent_navigation_widget_factory_t final : public INavigationWidgetFactory
 {
@@ -118,6 +259,10 @@ void ai_agent_plugin_t::initialize()
     // Create components
     this->editor_context = new editor_context_t(this);
     this->chat_context_manager = new chat_context_manager_t(this);
+    connect(this->chat_context_manager, &chat_context_manager_t::active_workspace_changed, this,
+            [this](const QString &, const QString &, const QString &) {
+                this->log_startup_diagnostics();
+            });
     this->tool_registry = new tool_registry_t(this);
     this->mcp_tool_manager = new mcp_tool_manager_t(this->tool_registry, this);
     this->safety_policy = new safety_policy_t(this);
@@ -164,10 +309,10 @@ void ai_agent_plugin_t::initialize()
 
     // Set up AI code completion
     this->completion_provider = new ai_completion_provider_t(this);
-    this->completion_provider->set_ai_provider(this->current_provider);
+    this->completion_provider->set_providers(this->completion_providers);
     this->completion_provider->set_chat_context_manager(this->chat_context_manager);
     this->completion_provider->set_model(s.model_name);
-    this->completion_provider->set_enabled(s.ai_completion_enabled);
+    this->completion_provider->set_enabled(true);
     QCAI_DEBUG(
         "Plugin",
         QStringLiteral("AI completion: %1, model: %2")
@@ -176,44 +321,52 @@ void ai_agent_plugin_t::initialize()
 
     // Set up ghost-text overlay completion
     this->ghost_text_manager = new ghost_text_manager_t(this);
-    this->ghost_text_manager->set_provider(this->current_provider);
+    this->ghost_text_manager->set_providers(this->completion_providers);
     this->ghost_text_manager->set_chat_context_manager(this->chat_context_manager);
     this->ghost_text_manager->set_model(s.completion_model.isEmpty() ? s.model_name
                                                                      : s.completion_model);
-    this->ghost_text_manager->set_enabled(s.ai_completion_enabled);
+    this->ghost_text_manager->set_enabled(true);
 
     // Attach completion provider to every text editor
-    connect(Core::EditorManager::instance(), &Core::EditorManager::editorOpened, this,
-            [this](Core::IEditor *editor) {
+    connect(
+        Core::EditorManager::instance(), &Core::EditorManager::editorOpened, this,
+        [this](Core::IEditor *editor) {
+            if (auto *text_editor = qobject_cast<TextEditor::BaseTextEditor *>(editor))
+            {
+                // Defer attachment to next event loop iteration to let editor fully init
+                QMetaObject::invokeMethod(
+                    this,
+                    [this, text_editor]() { this->attach_completion_to_text_editor(text_editor); },
+                    Qt::QueuedConnection);
+            }
+        });
+    QMetaObject::invokeMethod(
+        this,
+        [this]() {
+            const QList<Core::IEditor *> visible_editors = Core::EditorManager::visibleEditors();
+            for (Core::IEditor *editor : visible_editors)
+            {
                 if (auto *text_editor = qobject_cast<TextEditor::BaseTextEditor *>(editor))
                 {
-                    // Defer attachment to next event loop iteration to let editor fully init
-                    QMetaObject::invokeMethod(
-                        this,
-                        [this, text_editor]() {
-                            if (auto *doc = text_editor->textDocument())
-                            {
-                                doc->setCompletionAssistProvider(this->completion_provider);
-                                QCAI_DEBUG("Plugin",
-                                           QStringLiteral("Attached AI completion to: %1")
-                                               .arg(doc->filePath().toUrlishString()));
-                                // Attach ghost-text overlay to the editor widget
-                                if (auto *widget = text_editor->editorWidget())
-                                {
-                                    this->ghost_text_manager->attach_to_editor(widget);
-                                }
-                            }
-                        },
-                        Qt::QueuedConnection);
+                    this->attach_completion_to_text_editor(text_editor);
                 }
-            });
+            }
+            if (Core::IEditor *current_editor = Core::EditorManager::currentEditor())
+            {
+                if (auto *text_editor = qobject_cast<TextEditor::BaseTextEditor *>(current_editor))
+                {
+                    this->attach_completion_to_text_editor(text_editor);
+                }
+            }
+        },
+        Qt::QueuedConnection);
 
     // Register settings page
     new settings_page_t;  // auto-registers with Core
 
     // Add menu action to show the agent sidebar
     ActionContainer *menu = ActionManager::createMenu(Constants::menu_id);
-    menu->menu()->setTitle(tr_t::tr("AI Agent"));
+    menu->menu()->setTitle(tr_t::tr("Qcai2"));
     ActionManager::actionContainer(Core::Constants::M_TOOLS)->addMenu(menu);
 
     ActionBuilder(this, Constants::action_id)
@@ -233,10 +386,18 @@ void ai_agent_plugin_t::initialize()
         .setText(tr_t::tr("Queue AI Agent Request"))
         .setDefaultKeySequence(tr_t::tr("Ctrl+Enter"))
         .addOnTriggered(this, &ai_agent_plugin_t::queue_current_request);
+
+    ActionBuilder(this, Constants::trigger_completion_action_id)
+        .addToContainer(Constants::menu_id)
+        .setText(tr_t::tr("Trigger qcai2 Autocomplete"))
+        .setDefaultKeySequence(tr_t::tr("Ctrl+Shift+Space"))
+        .addOnTriggered(this, &ai_agent_plugin_t::trigger_completion);
 }
 
 void ai_agent_plugin_t::extensionsInitialized()
 {
+    this->log_startup_diagnostics();
+
     // Show the navigation widget on startup
     this->show_navigation_widget();
 
@@ -342,6 +503,48 @@ void ai_agent_plugin_t::queue_current_request()
     });
 }
 
+void ai_agent_plugin_t::trigger_completion()
+{
+    if (this->completion_provider == nullptr)
+    {
+        QCAI_WARN("Plugin",
+                  QStringLiteral("Cannot trigger autocomplete: completion provider missing"));
+        return;
+    }
+
+    auto &s = settings();
+    if (s.ai_completion_enabled == false)
+    {
+        QCAI_INFO("Plugin",
+                  QStringLiteral("Skipping manual autocomplete trigger: completion disabled"));
+        return;
+    }
+
+    Core::IEditor *current_editor = Core::EditorManager::currentEditor();
+    auto *text_editor = qobject_cast<TextEditor::BaseTextEditor *>(current_editor);
+    if (text_editor == nullptr)
+    {
+        QCAI_INFO(
+            "Plugin",
+            QStringLiteral(
+                "Skipping manual autocomplete trigger: current editor is not a text editor"));
+        return;
+    }
+
+    TextEditor::TextDocument *text_document = text_editor->textDocument();
+    TextEditor::TextEditorWidget *editor_widget = text_editor->editorWidget();
+    if ((text_document == nullptr) || (editor_widget == nullptr))
+    {
+        QCAI_WARN("Plugin",
+                  QStringLiteral(
+                      "Cannot trigger autocomplete: text editor is missing document or widget"));
+        return;
+    }
+
+    text_document->setCompletionAssistProvider(this->completion_provider);
+    editor_widget->invokeAssist(TextEditor::Completion, this->completion_provider);
+}
+
 void ai_agent_plugin_t::with_agent_dock_widget(
     const std::function<void(agent_dock_widget_t *)> &callback)
 {
@@ -362,59 +565,101 @@ void ai_agent_plugin_t::with_agent_dock_widget(
     QCAI_ERROR("Plugin", QStringLiteral("Failed to activate AI Agent navigation widget"));
 }
 
+void ai_agent_plugin_t::attach_completion_to_text_editor(TextEditor::BaseTextEditor *text_editor)
+{
+    if (text_editor == nullptr)
+    {
+        return;
+    }
+    if (auto *doc = text_editor->textDocument())
+    {
+        doc->setCompletionAssistProvider(this->completion_provider);
+        const QString file_path = doc->filePath().toUrlishString();
+        QString workspace_root =
+            startup_workspace_root(this->editor_context, this->chat_context_manager);
+        if (workspace_root.isEmpty() == true && file_path.isEmpty() == false)
+        {
+            workspace_root = QFileInfo(file_path).absolutePath();
+        }
+        if (workspace_root.isEmpty() == false)
+        {
+            append_system_diagnostics_event(
+                workspace_root, QStringLiteral("Plugin"), QStringLiteral("completion.wired"),
+                QStringLiteral("Wired qcai2 completion services to a text editor."),
+                {QStringLiteral("file=%1").arg(
+                     file_path.isEmpty() == false ? file_path : QStringLiteral("<untitled>")),
+                 QStringLiteral("completion_provider=%1")
+                     .arg(this->completion_provider != nullptr ? QStringLiteral("available")
+                                                               : QStringLiteral("missing")),
+                 QStringLiteral("editor_widget=%1")
+                     .arg(text_editor->editorWidget() != nullptr ? QStringLiteral("available")
+                                                                 : QStringLiteral("missing"))});
+        }
+        QCAI_DEBUG(
+            "Plugin",
+            QStringLiteral("Attached AI completion to: %1").arg(doc->filePath().toUrlishString()));
+        if (auto *widget = text_editor->editorWidget())
+        {
+            this->ghost_text_manager->attach_to_editor(widget);
+        }
+    }
+}
+
+void ai_agent_plugin_t::log_startup_diagnostics()
+{
+    const QString workspace_root =
+        startup_workspace_root(this->editor_context, this->chat_context_manager);
+    if (workspace_root.isEmpty() == true)
+    {
+        return;
+    }
+    if (this->startup_diagnostics_logged_workspace_roots.contains(workspace_root) == true)
+    {
+        return;
+    }
+
+    const QString module_path = current_plugin_module_path();
+    const QFileInfo module_info(module_path);
+    const editor_context_t::snapshot_t snapshot = this->editor_context != nullptr
+                                                      ? this->editor_context->capture()
+                                                      : editor_context_t::snapshot_t{};
+
+    if (append_system_diagnostics_event(
+            workspace_root, QStringLiteral("Plugin"), QStringLiteral("startup.build_info"),
+            QStringLiteral("qcai2 plugin startup diagnostics."),
+            {QStringLiteral("version=%1").arg(QString::fromLatin1(QCAI2_CURRENT_VERSION)),
+             QStringLiteral("build_suffix=%1")
+                 .arg(QString::fromLatin1(QCAI2_CURRENT_BUILD_SUFFIX)),
+             QStringLiteral("compile_timestamp=%1")
+                 .arg(QString::fromLatin1(__DATE__ " " __TIME__)),
+             QStringLiteral("qtcreator_ide_version=%1")
+                 .arg(QString::fromLatin1(QCAI2_QTCREATOR_IDE_VERSION)),
+             QStringLiteral("module_path=%1")
+                 .arg(module_path.isEmpty() == false ? module_path : QStringLiteral("<unknown>")),
+             QStringLiteral("module_last_modified=%1")
+                 .arg(module_info.exists() == true
+                          ? module_info.lastModified().toString(Qt::ISODateWithMs)
+                          : QStringLiteral("<unknown>")),
+             QStringLiteral("workspace_root=%1").arg(workspace_root),
+             QStringLiteral("project_file=%1")
+                 .arg(snapshot.project_file_path.isEmpty() == false
+                          ? snapshot.project_file_path
+                          : QStringLiteral("<none>"))}) == true)
+    {
+        this->startup_diagnostics_logged_workspace_roots.insert(workspace_root);
+    }
+}
+
 void ai_agent_plugin_t::setup_providers()
 {
     auto &s = settings();
     QCAI_DEBUG("Plugin", QStringLiteral("Setting up providers, active: %1").arg(s.provider));
 
-    // OpenAI-compatible
-    auto *openai = new open_ai_compatible_provider_t(this);
-    openai->set_base_url(s.base_url);
-    openai->set_api_key(s.api_key);
-    this->providers.append(openai);
-
-    // Anthropic API
-    auto *anthropic = new anthropic_provider_t(this);
-    anthropic->set_base_url(s.base_url);
-    anthropic->set_api_key(s.api_key);
-    this->providers.append(anthropic);
-
-    // Local HTTP
-    auto *local = new local_http_provider_t(this);
-    local->set_base_url(s.local_base_url);
-    local->set_endpoint_path(s.local_endpoint_path);
-    local->set_simple_mode(s.local_simple_mode);
-    local->set_api_key(s.api_key);
-    this->providers.append(local);
-
-    // Ollama
-    auto *ollama = new ollama_provider_t(this);
-    ollama->set_base_url(s.ollama_base_url);
-    this->providers.append(ollama);
-
-    // GitHub Copilot (Node.js sidecar)
-    auto *copilot = new copilot_provider_t(this);
-    if (!s.copilot_node_path.isEmpty())
-    {
-        copilot->set_node_path(s.copilot_node_path);
-    }
-    if (!s.copilot_sidecar_path.isEmpty())
-    {
-        copilot->set_sidecar_path(s.copilot_sidecar_path);
-    }
-    this->copilot_provider = copilot;
-    this->providers.append(copilot);
+    this->providers = create_provider_pool(this, s, &this->copilot_provider);
+    this->completion_providers = create_provider_pool(this, s);
 
     // Select active provider
-    this->current_provider = nullptr;
-    for (auto *p : this->providers)
-    {
-        if (p->id() == s.provider)
-        {
-            this->current_provider = p;
-            break;
-        }
-    }
+    this->current_provider = find_provider_by_id(this->providers, s.provider);
     if ((this->current_provider == nullptr) && !this->providers.isEmpty())
     {
         this->current_provider = this->providers.first();

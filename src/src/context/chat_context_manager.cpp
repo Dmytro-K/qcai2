@@ -1,5 +1,6 @@
 #include "chat_context_manager.h"
 
+#include "../completion/completion_request_settings.h"
 #include "../settings/settings.h"
 
 #include <QDateTime>
@@ -635,6 +636,9 @@ bool chat_context_manager_t::set_active_workspace(const QString &workspace_id,
         }
     }
 
+    emit this->active_workspace_changed(this->workspace_id, this->workspace_root,
+                                        this->conversation.conversation_id);
+
     return true;
 }
 
@@ -842,12 +846,18 @@ void chat_context_manager_t::sync_workspace_state(const editor_context_t::snapsh
                  settings.dry_run_default == true ? QStringLiteral("true")
                                                   : QStringLiteral("false")),
         QStringLiteral("settings"), 70));
+    const completion_request_settings_t completion_settings =
+        resolve_completion_request_settings(settings);
     items.append(make_memory_item(
         this->workspace_id, QStringLiteral("completion_defaults"), QStringLiteral("preference"),
-        QStringLiteral("model=%1; reasoning=%2; thinking=%3")
-            .arg(settings.completion_model.isEmpty() == true ? settings.model_name
-                                                             : settings.completion_model,
-                 settings.completion_reasoning_effort, settings.completion_thinking_level),
+        QStringLiteral("provider=%1; model=%2; send_reasoning=%3 (%4); send_thinking=%5 (%6)")
+            .arg(completion_settings.provider_id, completion_settings.model,
+                 completion_settings.send_reasoning == true ? QStringLiteral("true")
+                                                            : QStringLiteral("false"),
+                 completion_settings.selected_reasoning_effort,
+                 completion_settings.send_thinking == true ? QStringLiteral("true")
+                                                           : QStringLiteral("false"),
+                 completion_settings.selected_thinking_level),
         QStringLiteral("settings"), 60));
 
     for (memory_item_t &item : items)

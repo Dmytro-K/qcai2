@@ -292,8 +292,10 @@ async function handleComplete(id, params) {
         maxTokens,
         max_tokens,
         streaming,
-        reasoningEffort: reasoning_effort,
     } = params;
+    const reasoning_effort = typeof params?.reasoningEffort === "string"
+        ? params.reasoningEffort.trim()
+        : (typeof params?.reasoning_effort === "string" ? params.reasoning_effort.trim() : "");
     const requestedModel = model || "gpt-5.4";
     const max_output_tokens = Number.isFinite(maxTokens)
         ? Math.max(1, Math.trunc(maxTokens))
@@ -307,6 +309,16 @@ async function handleComplete(id, params) {
     const state = { cancelled: false, session: null, reusable: false, invalidateReusable: false };
     activeRequests.set(id, state);
     sendProgress(id, "request_started", "request.started");
+    sendProgress(
+        id,
+        "request_started",
+        "session.acquire_started",
+        {
+            message:
+                `model=${requestedModel} reasoning_effort=${reasoning_effort || "default"} `
+                + `session_idle_timeout_ms=${completionTimeoutSec > 0 ? completionTimeoutSec * 1000 : 0}`,
+        },
+    );
 
     let session = null;
     try {
@@ -341,6 +353,16 @@ async function handleComplete(id, params) {
         const sessionAcquisitionMode = sessionLease.created
             ? "new"
             : (sessionLease.resumed ? "resumed" : "reused");
+        sendProgress(
+            id,
+            "request_started",
+            "session.acquired",
+            {
+                message:
+                    `session=${session.sessionId} acquisition=${sessionAcquisitionMode} `
+                    + `reusable=${state.reusable ? "yes" : "no"}`,
+            },
+        );
         const {
             prompt,
             mode: promptMode,
@@ -350,6 +372,12 @@ async function handleComplete(id, params) {
             incremental: sessionLease.created === false,
             previousDynamicSystemContents: sessionLease.previousDynamicSystemContents,
         });
+        sendProgress(
+            id,
+            "request_started",
+            "prompt.prepared",
+            { message: `prompt_chars=${prompt.length} attachments=${attachments.length} prompt_mode=${promptMode}` },
+        );
         log(`Request #${id}: sending prompt (${prompt.length} chars), attachments=${attachments.length}, active=${activeRequests.size}, session=${session.sessionId}, acquisition=${sessionAcquisitionMode}, prompt_mode=${promptMode}`);
 
         const seenEventIds = new Set();
@@ -393,9 +421,16 @@ async function handleComplete(id, params) {
         });
 
         const messageOptions = attachments.length > 0 ? { prompt, attachments } : { prompt };
+        sendProgress(
+            id,
+            "request_started",
+            "request.send_started",
+            { message: completionTimeoutSec > 0 ? `timeout_ms=${completionTimeoutSec * 1000}` : "timeout_ms=none" },
+        );
         const response = completionTimeoutSec > 0
             ? await session.sendAndWait(messageOptions, completionTimeoutSec * 1000)
             : await session.sendAndWait(messageOptions);
+        sendProgress(id, "request_started", "request.send_completed");
         unsubscribe();
         unsubscribeToolStart();
         unsubscribeToolComplete();
@@ -416,6 +451,7 @@ async function handleComplete(id, params) {
             // Fetch quota (non-blocking: ignore errors, don't delay response)
             let quota = undefined;
             try {
+                sendProgress(id, "request_started", "quota.fetch_started");
                 const quotaResult = await client.rpc.account.getQuota();
                 const snap = quotaResult?.quotaSnapshots?.premium_interactions;
                 if (snap && typeof snap.remainingPercentage === "number") {
@@ -428,6 +464,7 @@ async function handleComplete(id, params) {
                     };
                     log(`Request #${id} quota: ${JSON.stringify(quota)}`);
                 }
+                sendProgress(id, "request_started", "quota.fetch_completed");
             } catch (qe) {
                 log(`Request #${id} quota fetch skipped: ${qe.message}`);
             }

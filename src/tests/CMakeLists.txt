@@ -359,6 +359,7 @@ qcai2_register_test(qcai2_agent_controller_soft_steer tst_qcai2_agent_controller
 
 add_executable(tst_qcai2_chat_context
     tst_chat_context.cpp
+    ../src/completion/completion_request_settings.cpp
     ../src/context/chat_context.h
     ../src/context/chat_context.cpp
     ../src/context/chat_context_store.h
@@ -615,6 +616,61 @@ target_link_libraries(tst_qcai2_request_detailed_log PRIVATE
     Qt::Test
 )
 qcai2_register_test(qcai2_request_detailed_log tst_qcai2_request_detailed_log)
+
+add_executable(tst_qcai2_completion_detailed_log
+    tst_completion_detailed_log.cpp
+    ../src/util/completion_detailed_log.cpp
+    ../src/util/system_diagnostics_log.cpp
+    ../src/context/chat_context.cpp
+    ../src/models/agent_messages.cpp
+    ../src/progress/agent_progress.cpp
+    ../src/providers/provider_usage.cpp
+    ../src/util/json.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_completion_detailed_log)
+
+target_include_directories(tst_qcai2_completion_detailed_log PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_completion_detailed_log PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_completion_detailed_log tst_qcai2_completion_detailed_log)
+
+add_executable(tst_qcai2_completion_request_settings
+    tst_completion_request_settings.cpp
+    ../src/completion/completion_request_settings.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_completion_request_settings)
+
+target_include_directories(tst_qcai2_completion_request_settings PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/lib/qtmcp/include"
+)
+target_link_libraries(tst_qcai2_completion_request_settings PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_completion_request_settings tst_qcai2_completion_request_settings)
+
+add_executable(tst_qcai2_completion_trigger_utils
+    tst_completion_trigger_utils.cpp
+    ../src/completion/completion_trigger_utils.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_completion_trigger_utils)
+
+target_include_directories(tst_qcai2_completion_trigger_utils PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_completion_trigger_utils PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_completion_trigger_utils tst_qcai2_completion_trigger_utils)
 
 add_executable(tst_qcai2_prompt_instructions
     tst_prompt_instructions.cpp

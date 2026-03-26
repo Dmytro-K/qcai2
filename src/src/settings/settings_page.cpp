@@ -95,6 +95,37 @@ void browse_for_existing_file(QWidget *parent, QLineEdit *line_edit, const QStri
     }
 }
 
+QStringList ollama_model_presets()
+{
+    return {
+        QStringLiteral("llama4"),
+        QStringLiteral("llama3.3"),
+        QStringLiteral("llama3.1"),
+        QStringLiteral("deepseek-r1"),
+        QStringLiteral("deepseek-coder-v2"),
+        QStringLiteral("qwen2.5-coder"),
+        QStringLiteral("mistral"),
+        QStringLiteral("mixtral"),
+        QStringLiteral("gemma2"),
+        QStringLiteral("phi4"),
+        QStringLiteral("codellama"),
+    };
+}
+
+QStringList generic_completion_models()
+{
+    return {
+        QStringLiteral("gpt-5.4-mini"),      QStringLiteral("gpt-5.3-codex"),
+        QStringLiteral("gpt-4.1-nano"),      QStringLiteral("gpt-4.1-mini"),
+        QStringLiteral("gpt-5-mini"),        QStringLiteral("gpt-5.1-codex-mini"),
+        QStringLiteral("gpt-5.1-codex"),     QStringLiteral("gpt-5.2-codex"),
+        QStringLiteral("claude-haiku-4.5"),  QStringLiteral("claude-sonnet-4.6"),
+        QStringLiteral("gemini-3-flash"),    QStringLiteral("gemini-2.5-flash-lite"),
+        QStringLiteral("gemini-2.5-flash"),  QStringLiteral("deepseek-coder"),
+        QStringLiteral("qwen2.5-coder-32b"), QStringLiteral("codellama"),
+    };
+}
+
 }  // namespace
 
 #if QCAI2_FEATURE_QDRANT_ENABLE
@@ -131,10 +162,14 @@ class settings_widget_t : public Core::IOptionsPageWidget
         int max_changed_files = 0;
         bool dry_run_default = false;
         bool ai_completion_enabled = false;
+        bool detailed_completion_logging = false;
         int completion_min_chars = 0;
         int completion_delay_ms = 0;
+        QString completion_provider;
         QString completion_model;
+        bool completion_send_thinking = false;
         QString completion_thinking_level;
+        bool completion_send_reasoning = false;
         QString completion_reasoning_effort;
         bool vector_search_enabled = false;
         QString vector_search_provider;
@@ -207,10 +242,14 @@ public:
         this->autoCompactCheck = this->ui->autoCompactCheck;
         this->autoCompactThresholdSpin = this->ui->autoCompactThresholdSpin;
         this->aiCompletionCheck = this->ui->aiCompletionCheck;
+        this->detailedCompletionLoggingCheck = this->ui->detailedCompletionLoggingCheck;
         this->completionMinCharsSpin = this->ui->completionMinCharsSpin;
         this->completionDelayMsSpin = this->ui->completionDelayMsSpin;
+        this->completionProviderCombo = this->ui->completionProviderCombo;
         this->completionModelCombo = this->ui->completionModelCombo;
+        this->completionSendThinkingCheck = this->ui->completionSendThinkingCheck;
         this->completionThinkingCombo = this->ui->completionThinkingCombo;
+        this->completionSendReasoningCheck = this->ui->completionSendReasoningCheck;
         this->completionReasoningCombo = this->ui->completionReasoningCombo;
         this->vectorSearchEnabledCheck = this->ui->vectorSearchEnabledCheck;
         this->vectorSearchProviderCombo = this->ui->vectorSearchProviderCombo;
@@ -377,6 +416,7 @@ public:
                 [this](const QStringList &models) {
                     repopulateEditableCombo(this->copilotModelCombo, models,
                                             this->copilotModelCombo->currentText());
+                    this->refreshCompletionModelOptions();
                 });
 
         this->copilotNodeEdit->setText(s.copilot_node_path);
@@ -391,19 +431,7 @@ public:
 
         // Ollama
         this->ollamaUrlEdit->setText(s.ollama_base_url);
-        this->ollamaModelCombo->addItems({
-            QStringLiteral("llama4"),
-            QStringLiteral("llama3.3"),
-            QStringLiteral("llama3.1"),
-            QStringLiteral("deepseek-r1"),
-            QStringLiteral("deepseek-coder-v2"),
-            QStringLiteral("qwen2.5-coder"),
-            QStringLiteral("mistral"),
-            QStringLiteral("mixtral"),
-            QStringLiteral("gemma2"),
-            QStringLiteral("phi4"),
-            QStringLiteral("codellama"),
-        });
+        this->ollamaModelCombo->addItems(ollama_model_presets());
         this->ollamaModelCombo->setCurrentText(s.ollama_model);
 
         // Safety
@@ -417,42 +445,43 @@ public:
         this->autoCompactThresholdSpin->set_value(s.auto_compact_threshold_tokens);
 
         this->aiCompletionCheck->setChecked(s.ai_completion_enabled);
+        this->detailedCompletionLoggingCheck->setChecked(s.detailed_completion_logging);
 
         this->completionMinCharsSpin->set_value(s.completion_min_chars);
 
         this->completionDelayMsSpin->set_value(s.completion_delay_ms);
 
+        this->completionProviderCombo->addItem(tr_t::tr("Same as agent"), QString());
+        this->completionProviderCombo->addItem(tr_t::tr("OpenAI-Compatible"),
+                                               QStringLiteral("openai"));
+        this->completionProviderCombo->addItem(tr_t::tr("Anthropic API"),
+                                               QStringLiteral("anthropic"));
+        this->completionProviderCombo->addItem(tr_t::tr("GitHub Copilot"),
+                                               QStringLiteral("copilot"));
+        this->completionProviderCombo->addItem(tr_t::tr("Local HTTP"), QStringLiteral("local"));
+        this->completionProviderCombo->addItem(tr_t::tr("Ollama (Local)"),
+                                               QStringLiteral("ollama"));
+        const int completion_provider_index =
+            this->completionProviderCombo->findData(s.completion_provider);
+        this->completionProviderCombo->setCurrentIndex(
+            completion_provider_index >= 0 ? completion_provider_index : 0);
+
         if (this->completionModelCombo->lineEdit() != nullptr)
         {
             this->completionModelCombo->lineEdit()->setPlaceholderText(
-                tr_t::tr("(Same as agent model)"));
+                tr_t::tr("(Same as selected provider default model)"));
         }
-        this->completionModelCombo->addItems({
-            // Fast/small models suitable for completion
-            QStringLiteral("gpt-5.4-mini"),
-            QStringLiteral("gpt-5.3-codex"),
-            QStringLiteral("gpt-4.1-nano"),
-            QStringLiteral("gpt-4.1-mini"),
-            QStringLiteral("gpt-5-mini"),
-            QStringLiteral("gpt-5.1-codex-mini"),
-            QStringLiteral("gpt-5.1-codex"),
-            QStringLiteral("gpt-5.2-codex"),
-            QStringLiteral("claude-haiku-4.5"),
-            QStringLiteral("claude-sonnet-4.6"),
-            QStringLiteral("gemini-3-flash"),
-            QStringLiteral("gemini-2.5-flash-lite"),
-            QStringLiteral("gemini-2.5-flash"),
-            QStringLiteral("deepseek-coder"),
-            QStringLiteral("qwen2.5-coder-32b"),
-            QStringLiteral("codellama"),
-        });
+        this->refreshCompletionModelOptions();
         this->completionModelCombo->setCurrentText(s.completion_model.trimmed());
 
+        this->completionSendThinkingCheck->setChecked(s.completion_send_thinking);
         populateEffortCombo(this->completionThinkingCombo);
         selectEffortValue(this->completionThinkingCombo, s.completion_thinking_level, 0);
 
+        this->completionSendReasoningCheck->setChecked(s.completion_send_reasoning);
         populateEffortCombo(this->completionReasoningCombo);
         selectEffortValue(this->completionReasoningCombo, s.completion_reasoning_effort, 0);
+        this->refreshCompletionUiState();
 
         this->vectorSearchEnabledCheck->setChecked(s.vector_search_enabled);
         if (k_qdrant_support_enabled == true)
@@ -602,12 +631,16 @@ public:
                 Utils::checkSettingsDirty);
         connect(this->autoCompactCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->aiCompletionCheck);
+        installCheckSettingsDirtyTrigger(this->detailedCompletionLoggingCheck);
         connect(this->completionMinCharsSpin, &settings_spin_box_t::value_changed,
                 Utils::checkSettingsDirty);
         connect(this->completionDelayMsSpin, &settings_spin_box_t::value_changed,
                 Utils::checkSettingsDirty);
+        installCheckSettingsDirtyTrigger(this->completionProviderCombo);
         installCheckSettingsDirtyTrigger(this->completionModelCombo);
+        installCheckSettingsDirtyTrigger(this->completionSendThinkingCheck);
         installCheckSettingsDirtyTrigger(this->completionThinkingCombo);
+        installCheckSettingsDirtyTrigger(this->completionSendReasoningCheck);
         installCheckSettingsDirtyTrigger(this->completionReasoningCombo);
         installCheckSettingsDirtyTrigger(this->vectorSearchEnabledCheck);
         installCheckSettingsDirtyTrigger(this->vectorSearchProviderCombo);
@@ -644,7 +677,19 @@ public:
         installCheckSettingsDirtyTrigger(this->agentDebugCheck);
         connect(this->tempSpin, &settings_double_spin_box_t::value_changed,
                 Utils::checkSettingsDirty);
+        connect(this->providerCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
+                [this]() { this->refreshCompletionModelOptions(); });
+        connect(this->completionProviderCombo, qOverload<int>(&QComboBox::currentIndexChanged),
+                this, [this]() { this->refreshCompletionModelOptions(); });
         connect(this->completionModelCombo, &QComboBox::currentTextChanged,
+                Utils::checkSettingsDirty);
+        connect(this->aiCompletionCheck, &QCheckBox::toggled, this,
+                [this]() { this->refreshCompletionUiState(); });
+        connect(this->completionSendThinkingCheck, &QCheckBox::toggled, this,
+                [this]() { this->refreshCompletionUiState(); });
+        connect(this->completionSendReasoningCheck, &QCheckBox::toggled, this,
+                [this]() { this->refreshCompletionUiState(); });
+        connect(this->detailedCompletionLoggingCheck, &QCheckBox::toggled,
                 Utils::checkSettingsDirty);
         connect(this->detailedRequestLoggingCheck, &QCheckBox::toggled, Utils::checkSettingsDirty);
         connect(this->systemPromptEdit, &QPlainTextEdit::textChanged, Utils::checkSettingsDirty);
@@ -745,10 +790,14 @@ private:
         s.auto_compact_enabled = this->autoCompactCheck->isChecked();
         s.auto_compact_threshold_tokens = this->autoCompactThresholdSpin->value();
         s.ai_completion_enabled = this->aiCompletionCheck->isChecked();
+        s.detailed_completion_logging = this->detailedCompletionLoggingCheck->isChecked();
         s.completion_min_chars = this->completionMinCharsSpin->value();
         s.completion_delay_ms = this->completionDelayMsSpin->value();
+        s.completion_provider = this->completionProviderCombo->currentData().toString();
         s.completion_model = this->completionModelCombo->currentText().trimmed();
+        s.completion_send_thinking = this->completionSendThinkingCheck->isChecked();
         s.completion_thinking_level = this->completionThinkingCombo->currentData().toString();
+        s.completion_send_reasoning = this->completionSendReasoningCheck->isChecked();
         s.completion_reasoning_effort = this->completionReasoningCombo->currentData().toString();
         s.vector_search_enabled = this->vectorSearchEnabledCheck->isChecked();
         s.vector_search_provider = this->vectorSearchProviderCombo->currentData().toString();
@@ -782,6 +831,52 @@ private:
         s.agent_debug = this->agentDebugCheck->isChecked();
         s.mcp_servers = this->mcpServersWidget->servers();
         return s;
+    }
+
+    QString effectiveCompletionProviderForUi() const
+    {
+        const QString completion_provider =
+            this->completionProviderCombo->currentData().toString();
+        return completion_provider.isEmpty() == false
+                   ? completion_provider
+                   : this->providerCombo->currentData().toString();
+    }
+
+    void refreshCompletionModelOptions()
+    {
+        const QString provider_id = this->effectiveCompletionProviderForUi();
+        const QString current_text = this->completionModelCombo->currentText().trimmed();
+        QStringList items;
+        if (provider_id == QStringLiteral("copilot"))
+        {
+            items = model_catalog().copilot_models();
+        }
+        else if (provider_id == QStringLiteral("ollama"))
+        {
+            items = ollama_model_presets();
+        }
+        else
+        {
+            items = generic_completion_models();
+        }
+
+        repopulateEditableCombo(this->completionModelCombo, items, current_text);
+    }
+
+    void refreshCompletionUiState()
+    {
+        const bool completion_enabled = this->aiCompletionCheck->isChecked();
+        this->detailedCompletionLoggingCheck->setEnabled(completion_enabled);
+        this->completionProviderCombo->setEnabled(completion_enabled);
+        this->completionModelCombo->setEnabled(completion_enabled);
+        this->completionMinCharsSpin->setEnabled(completion_enabled);
+        this->completionDelayMsSpin->setEnabled(completion_enabled);
+        this->completionSendThinkingCheck->setEnabled(completion_enabled);
+        this->completionThinkingCombo->setEnabled(completion_enabled &&
+                                                  this->completionSendThinkingCheck->isChecked());
+        this->completionSendReasoningCheck->setEnabled(completion_enabled);
+        this->completionReasoningCombo->setEnabled(
+            completion_enabled && this->completionSendReasoningCheck->isChecked());
     }
 
     void refreshWebToolsUiState()
@@ -924,10 +1019,14 @@ private:
             this->maxFilesSpin->value(),
             this->dryRunCheck->isChecked(),
             this->aiCompletionCheck->isChecked(),
+            this->detailedCompletionLoggingCheck->isChecked(),
             this->completionMinCharsSpin->value(),
             this->completionDelayMsSpin->value(),
+            this->completionProviderCombo->currentData().toString(),
             this->completionModelCombo->currentText().trimmed(),
+            this->completionSendThinkingCheck->isChecked(),
             this->completionThinkingCombo->currentData().toString(),
+            this->completionSendReasoningCheck->isChecked(),
             this->completionReasoningCombo->currentData().toString(),
             this->vectorSearchEnabledCheck->isChecked(),
             this->vectorSearchProviderCombo->currentData().toString(),
@@ -1000,13 +1099,22 @@ private:
         this->autoCompactCheck->setChecked(snap.auto_compact_enabled);
         this->autoCompactThresholdSpin->set_value(snap.auto_compact_threshold_tokens);
         this->aiCompletionCheck->setChecked(snap.ai_completion_enabled);
+        this->detailedCompletionLoggingCheck->setChecked(snap.detailed_completion_logging);
         this->completionMinCharsSpin->set_value(snap.completion_min_chars);
         this->completionDelayMsSpin->set_value(snap.completion_delay_ms);
+        const int completion_provider_index =
+            this->completionProviderCombo->findData(snap.completion_provider);
+        this->completionProviderCombo->setCurrentIndex(
+            completion_provider_index >= 0 ? completion_provider_index : 0);
+        this->refreshCompletionModelOptions();
 
         this->completionModelCombo->setCurrentText(snap.completion_model.trimmed());
 
+        this->completionSendThinkingCheck->setChecked(snap.completion_send_thinking);
         selectEffortValue(this->completionThinkingCombo, snap.completion_thinking_level, 0);
+        this->completionSendReasoningCheck->setChecked(snap.completion_send_reasoning);
         selectEffortValue(this->completionReasoningCombo, snap.completion_reasoning_effort, 0);
+        this->refreshCompletionUiState();
 
         this->vectorSearchEnabledCheck->setChecked(snap.vector_search_enabled);
         const int vector_provider_index =
@@ -1077,10 +1185,14 @@ private:
     QCheckBox *autoCompactCheck;
     settings_spin_box_t *autoCompactThresholdSpin;
     QCheckBox *aiCompletionCheck;
+    QCheckBox *detailedCompletionLoggingCheck;
     settings_spin_box_t *completionMinCharsSpin;
     settings_spin_box_t *completionDelayMsSpin;
+    QComboBox *completionProviderCombo;
     QComboBox *completionModelCombo;
+    QCheckBox *completionSendThinkingCheck;
     QComboBox *completionThinkingCombo;
+    QCheckBox *completionSendReasoningCheck;
     QComboBox *completionReasoningCombo;
     QCheckBox *vectorSearchEnabledCheck;
     QComboBox *vectorSearchProviderCombo;

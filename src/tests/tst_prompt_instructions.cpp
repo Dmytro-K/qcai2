@@ -62,6 +62,8 @@ private slots:
     void disabled_standard_ai_instruction_sources_are_skipped();
     void omits_global_prompt_when_project_requests_it();
     void appends_system_messages_in_order();
+    void autocomplete_uses_only_autocomplete_md();
+    void autocomplete_missing_file_is_non_fatal();
 };
 
 namespace
@@ -235,6 +237,49 @@ void tst_prompt_instructions_t::appends_system_messages_in_order()
     QCOMPARE(messages.at(1).content, QStringLiteral("Global prompt"));
     QCOMPARE(messages.at(2).role, QStringLiteral("system"));
     QCOMPARE(messages.at(2).content, QStringLiteral("Project rules"));
+}
+
+void tst_prompt_instructions_t::autocomplete_uses_only_autocomplete_md()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+
+    QVERIFY(write_text_file(project_rules_file_path(temp_dir.path()),
+                            QStringLiteral("Project rules")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.md")),
+                            QStringLiteral("Agent instructions")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AUTOCOMPLETE.md")),
+                            QStringLiteral("  Autocomplete-only instructions  ")));
+
+    QList<chat_message_t> messages{{QStringLiteral("user"), QStringLiteral("goal")}};
+    QString error;
+    append_autocomplete_system_instruction(&messages, temp_dir.path(), &error);
+
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(messages.size(), 2);
+    QCOMPARE(messages.at(0).role, QStringLiteral("user"));
+    QCOMPARE(messages.at(1).role, QStringLiteral("system"));
+    QCOMPARE(messages.at(1).content, QStringLiteral("Autocomplete-only instructions"));
+}
+
+void tst_prompt_instructions_t::autocomplete_missing_file_is_non_fatal()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.md")),
+                            QStringLiteral("Agent instructions")));
+
+    QList<chat_message_t> messages{{QStringLiteral("user"), QStringLiteral("goal")}};
+    QString error;
+    append_autocomplete_system_instruction(&messages, temp_dir.path(), &error);
+
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(messages.size(), 1);
+    QCOMPARE(messages.at(0).role, QStringLiteral("user"));
+    QCOMPARE(messages.at(0).content, QStringLiteral("goal"));
+    QCOMPARE(read_autocomplete_prompt(temp_dir.path(), &error), QString());
+    QVERIFY2(error.isEmpty(), qPrintable(error));
 }
 
 QTEST_MAIN(tst_prompt_instructions_t)
