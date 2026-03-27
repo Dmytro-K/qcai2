@@ -402,6 +402,7 @@ if(QCAI2_ENABLE_COVERAGE AND NOT WITH_TESTS)
 endif()
 
 add_subdirectory(lib/qtmcp)
+add_subdirectory(lib/qompi)
 
 if(FEATURE_QDRANT_ENABLE)
     find_package(ZLIB REQUIRED)
