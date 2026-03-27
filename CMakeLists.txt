@@ -993,7 +993,6 @@ set(SRC_IDE
     .github/workflows/README.md
     .github/workflows/build_cmake.yml
     AGENTS.md
-    AUTOCOMPLETE.md
     LICENSE
     README.md
     CHANGELOG.md
