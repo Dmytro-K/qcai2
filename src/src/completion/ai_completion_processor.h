@@ -4,15 +4,23 @@
 
 #include "../progress/agent_progress.h"
 #include "../util/completion_detailed_log.h"
+#include "completion_request_settings.h"
 
 #include <QString>
 #include <memory>
+
+namespace qompi
+{
+class completion_operation_t;
+class completion_session_t;
+}  // namespace qompi
 
 namespace qcai2
 {
 
 class iai_provider_t;
 class chat_context_manager_t;
+class clangd_service_t;
 struct provider_usage_t;
 
 /**
@@ -27,7 +35,9 @@ public:
      * @param model Model name used for the request.
      */
     ai_completion_processor_t(iai_provider_t *provider,
-                              chat_context_manager_t *chat_context_manager, const QString &model);
+                              chat_context_manager_t *chat_context_manager,
+                              clangd_service_t *clangd_service, const QString &model,
+                              completion_engine_kind_t engine_kind);
 
     /**
      * Marks the processor as no longer alive for async callbacks.
@@ -52,7 +62,7 @@ protected:
      */
     TextEditor::IAssistProposal *perform() override;
 
-private:
+public:
     /**
      * Safely dispatches an async provider completion back to the processor.
      */
@@ -68,6 +78,14 @@ private:
                                         const std::shared_ptr<bool> &alive,
                                         const provider_raw_event_t &event);
 
+    /**
+     * Records one qompi bridge debug event into the detailed completion log.
+     * @param stage Stable qompi stage identifier.
+     * @param message Human-readable diagnostics payload.
+     */
+    void record_qompi_debug_event(const QString &stage, const QString &message);
+
+private:
     /**
      * Processes one async completion response.
      */
@@ -99,6 +117,12 @@ private:
     /** Shared persistent chat context used for lightweight completion retrieval. */
     chat_context_manager_t *chat_context_manager = nullptr;
 
+    /** Shared clangd service used for local semantic completion context. */
+    clangd_service_t *clangd_service = nullptr;
+
+    /** Selected completion engine implementation for this request. */
+    completion_engine_kind_t engine_kind = completion_engine_kind_t::LEGACY;
+
     /** True while an async request is in flight. */
     bool request_running = false;
 
@@ -123,6 +147,12 @@ private:
 
     /** Suffix snapshot used to build the current request. */
     QString request_suffix;
+
+    /** One-shot qompi session used when the qompi completion engine is selected. */
+    std::shared_ptr<qompi::completion_session_t> qompi_session;
+
+    /** Inflight qompi operation used for cancellation and lifecycle tracking. */
+    std::shared_ptr<qompi::completion_operation_t> qompi_operation;
 };
 
 }  // namespace qcai2

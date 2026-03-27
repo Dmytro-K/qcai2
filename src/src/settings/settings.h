@@ -158,6 +158,9 @@ struct settings_t
     /** Debounce delay for automatic completion requests, in milliseconds. */
     int completion_delay_ms = 500;
 
+    /** Selected completion engine implementation: `legacy` or `qompi`. */
+    QString completion_engine = QStringLiteral("legacy");
+
     /** Optional provider override for code completion requests; empty follows the agent provider.
      */
     QString completion_provider;
@@ -176,6 +179,53 @@ struct settings_t
 
     /** Completion reasoning effort: off, low, medium, or high. */
     QString completion_reasoning_effort = QStringLiteral("off");
+
+    /** Optional completion-only remote API base URL override. Empty inherits Providers settings.
+     */
+    QString completion_base_url;
+
+    /** Optional completion-only API key override. Empty inherits Providers settings. */
+    QString completion_api_key;
+
+    /** Optional completion-only Local HTTP base URL override. Empty inherits Providers settings.
+     */
+    QString completion_local_base_url;
+
+    /** Optional completion-only Local HTTP endpoint override. Empty inherits Providers settings.
+     */
+    QString completion_local_endpoint_path;
+
+    /** Optional completion-only Local HTTP header override. Empty inherits Providers settings. */
+    QString completion_local_custom_headers;
+
+    /** Optional completion-only Ollama base URL override. Empty inherits Providers settings. */
+    QString completion_ollama_base_url;
+
+    /** Optional completion-only Copilot Node path override. Empty inherits Providers settings. */
+    QString completion_copilot_node_path;
+
+    /** Optional completion-only Copilot sidecar path override. Empty inherits Providers settings.
+     */
+    QString completion_copilot_sidecar_path;
+
+    /** Optional provider override for qompi completion requests; empty follows the agent provider.
+     */
+    QString qompi_completion_provider;
+
+    /** Optional model override for qompi completion requests. */
+    QString qompi_completion_model;
+
+    /** Sends qompi completion thinking instructions when true. */
+    bool qompi_completion_send_thinking = false;
+
+    /** Qompi completion thinking level: off, low, medium, or high. */
+    QString qompi_completion_thinking_level = QStringLiteral("off");
+
+    /** Sends qompi completion reasoning effort when true. */
+    bool qompi_completion_send_reasoning = true;
+
+    /** Qompi completion reasoning effort: off, low, medium, or high. */
+    QString qompi_completion_reasoning_effort = QStringLiteral("off");
 
     /** Enables vector search features when true. */
     bool vector_search_enabled = false;

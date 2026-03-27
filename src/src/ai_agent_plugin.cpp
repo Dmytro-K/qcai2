@@ -46,6 +46,7 @@
 #include "util/crash_handler.h"
 #include "util/ide_output_capture.h"
 #include "util/logger.h"
+#include "util/project_root_resolver.h"
 #include "util/system_diagnostics_log.h"
 #include "vector_search/text_embedder.h"
 #include "vector_search/vector_indexing_manager.h"
@@ -192,7 +193,7 @@ QString startup_workspace_root(editor_context_t *editor_context,
     }
     if (snapshot.file_path.isEmpty() == false)
     {
-        return QFileInfo(snapshot.file_path).absolutePath();
+        return project_root_for_file_path(snapshot.file_path);
     }
 
     const QList<editor_context_t::project_info_t> open_projects = editor_context->open_projects();
@@ -311,6 +312,7 @@ void ai_agent_plugin_t::initialize()
     this->completion_provider = new ai_completion_provider_t(this);
     this->completion_provider->set_providers(this->completion_providers);
     this->completion_provider->set_chat_context_manager(this->chat_context_manager);
+    this->completion_provider->set_clangd_service(this->clangd_service);
     this->completion_provider->set_model(s.model_name);
     this->completion_provider->set_enabled(true);
     QCAI_DEBUG(
@@ -323,6 +325,7 @@ void ai_agent_plugin_t::initialize()
     this->ghost_text_manager = new ghost_text_manager_t(this);
     this->ghost_text_manager->set_providers(this->completion_providers);
     this->ghost_text_manager->set_chat_context_manager(this->chat_context_manager);
+    this->ghost_text_manager->set_clangd_service(this->clangd_service);
     this->ghost_text_manager->set_model(s.completion_model.isEmpty() ? s.model_name
                                                                      : s.completion_model);
     this->ghost_text_manager->set_enabled(true);
@@ -575,12 +578,8 @@ void ai_agent_plugin_t::attach_completion_to_text_editor(TextEditor::BaseTextEdi
     {
         doc->setCompletionAssistProvider(this->completion_provider);
         const QString file_path = doc->filePath().toUrlishString();
-        QString workspace_root =
+        const QString workspace_root =
             startup_workspace_root(this->editor_context, this->chat_context_manager);
-        if (workspace_root.isEmpty() == true && file_path.isEmpty() == false)
-        {
-            workspace_root = QFileInfo(file_path).absolutePath();
-        }
         if (workspace_root.isEmpty() == false)
         {
             append_system_diagnostics_event(

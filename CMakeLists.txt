@@ -697,10 +697,16 @@ add_qtc_plugin(qcai2
     src/src/completion/ai_completion_provider.cpp
     src/src/completion/completion_trigger_utils.h
     src/src/completion/completion_trigger_utils.cpp
+    src/src/completion/completion_clang_context.h
+    src/src/completion/completion_clang_context.cpp
     src/src/completion/completion_response_utils.h
     src/src/completion/completion_response_utils.cpp
     src/src/completion/completion_request_settings.h
     src/src/completion/completion_request_settings.cpp
+    src/src/completion/completion_connection_utils.h
+    src/src/completion/completion_connection_utils.cpp
+    src/src/completion/qompi_provider_backend_adapter.h
+    src/src/completion/qompi_provider_backend_adapter.cpp
     src/src/completion/ai_completion_processor.h
     src/src/completion/ai_completion_processor.cpp
     src/src/completion/ghost_text_manager.h
@@ -710,7 +716,7 @@ add_qtc_plugin(qcai2
 )
 
 qcai2_enable_linker_map(qcai2)
-target_link_libraries(qcai2 PRIVATE qcai2_libarchive qcai2_version_info qtmcp::qtmcp)
+target_link_libraries(qcai2 PRIVATE qcai2_libarchive qcai2_version_info qtmcp::qtmcp qompi_core)
 if(FEATURE_QDRANT_ENABLE)
     target_link_libraries(qcai2 PRIVATE qcai2_qdrant_http)
 endif()

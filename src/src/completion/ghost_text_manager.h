@@ -4,8 +4,14 @@
 #include <QList>
 #include <QObject>
 #include <QPointer>
+#include <QString>
 #include <QTimer>
 #include <memory>
+
+namespace qompi
+{
+class completion_session_t;
+}  // namespace qompi
 
 namespace TextEditor
 {
@@ -17,6 +23,7 @@ namespace qcai2
 
 class iai_provider_t;
 class chat_context_manager_t;
+class clangd_service_t;
 class completion_detailed_log_t;
 struct provider_usage_t;
 
@@ -102,6 +109,15 @@ public:
     }
 
     /**
+     * Sets the shared clangd service used for local semantic completion context.
+     * @param service Reusable clangd integration service.
+     */
+    void set_clangd_service(clangd_service_t *service)
+    {
+        this->clangd_service = service;
+    }
+
+    /**
      * Enables or disables ghost-text suggestions.
      * @param enabled True to allow suggestion requests.
      */
@@ -122,7 +138,7 @@ public:
      */
     void attach_to_editor(TextEditor::TextEditorWidget *editor);
 
-private:
+public:
     /**
      * Resolves the effective provider for the next ghost-text request.
      * @return Non-owning provider selected from the completion provider pool.
@@ -170,6 +186,7 @@ private:
                                     const std::shared_ptr<completion_detailed_log_t> &detailed_log,
                                     bool final_update);
 
+private:
     /**
      * Removes wrapper markup from a model response.
      * @param raw Raw completion text returned by the provider.
@@ -190,6 +207,9 @@ private:
     /** Shared persistent chat context used for lightweight completion retrieval. */
     chat_context_manager_t *chat_context_manager = nullptr;
 
+    /** Shared clangd service used for local semantic completion context. */
+    clangd_service_t *clangd_service = nullptr;
+
     /** Enables or disables inline suggestions globally. */
     bool enabled = true;
 
@@ -201,6 +221,13 @@ private:
 
     /** Frozen prompt snapshots captured when a user edit starts a debounce window. */
     QHash<TextEditor::TextEditorWidget *, pending_completion_snapshot_t> pending_snapshots;
+
+    /** Reusable qompi sessions keyed by editor for latest-wins ghost-text requests. */
+    QHash<TextEditor::TextEditorWidget *, std::shared_ptr<qompi::completion_session_t>>
+        qompi_sessions;
+
+    /** Provider identifier bound to each reusable qompi session. */
+    QHash<TextEditor::TextEditorWidget *, QString> qompi_session_provider_ids;
 
     /** Guards async callbacks against use-after-free after destruction. */
     std::shared_ptr<bool> alive = std::make_shared<bool>(true);

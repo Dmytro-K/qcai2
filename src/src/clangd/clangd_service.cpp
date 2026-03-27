@@ -24,12 +24,14 @@
 #include <QEventLoop>
 #include <QFile>
 #include <QHash>
+#include <QPointer>
 #include <QScopeGuard>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTimer>
 
+#include <memory>
 #include <variant>
 
 namespace qcai2
@@ -468,40 +470,48 @@ run_request(LanguageClient::Client *client, const typename RequestType::Paramete
         return std::nullopt;
     }
 
-    typename RequestType::Response response;
-    bool received = false;
+    struct request_state_t
+    {
+        std::optional<typename RequestType::Response> response;
+        bool received = false;
+    };
+
+    const auto state = std::make_shared<request_state_t>();
 
     QEventLoop loop;
+    QPointer<QEventLoop> loop_guard(&loop);
     QTimer timer;
     timer.setSingleShot(true);
     QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
     QObject::connect(client, &QObject::destroyed, &loop, &QEventLoop::quit);
 
     RequestType request(params);
-    request.setResponseCallback(
-        [&response, &received, &loop](const typename RequestType::Response &reply) {
-            response = reply;
-            received = true;
-            loop.quit();
-        });
+    request.setResponseCallback([state, loop_guard](const typename RequestType::Response &reply) {
+        state->response = reply;
+        state->received = true;
+        if (loop_guard.isNull() == false)
+        {
+            loop_guard->quit();
+        }
+    });
     client->sendMessage(request);
 
     timer.start(qMax(1, timeout_ms));
     loop.exec();
 
-    if (received == false)
+    if (state->received == false || state->response.has_value() == false)
     {
         set_error(error, QStringLiteral("Timed out while waiting for clangd response."));
         return std::nullopt;
     }
 
-    if (response.error().has_value() == true)
+    if (state->response->error().has_value() == true)
     {
-        set_error(error, response.error()->toString());
+        set_error(error, state->response->error()->toString());
         return std::nullopt;
     }
 
-    return response;
+    return state->response;
 }
 
 QList<clangd_link_t> links_from_goto_result(LanguageClient::Client *client,
@@ -1060,9 +1070,15 @@ std::optional<clangd_link_t> clangd_service_t::switch_decl_def(const clangd_loca
     const CppEditor::CursorInEditor cursor_in_editor(cursor, location.file_path, nullptr,
                                                      document);
 
-    bool received = false;
-    clangd_link_t result;
+    struct switch_decl_def_state_t
+    {
+        bool received = false;
+        clangd_link_t result;
+    };
+
+    const auto state = std::make_shared<switch_decl_def_state_t>();
     QEventLoop loop;
+    QPointer<QEventLoop> loop_guard(&loop);
     QTimer timer;
     timer.setSingleShot(true);
     QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
@@ -1070,27 +1086,30 @@ std::optional<clangd_link_t> clangd_service_t::switch_decl_def(const clangd_loca
 
     CppEditor::CppModelManager::switchDeclDef(
         cursor_in_editor,
-        [&result, &received, &loop](const Utils::Link &link) {
+        [state, loop_guard](const Utils::Link &link) {
             if (link.hasValidTarget() == true)
             {
-                result = link_from_utils_link(link);
+                state->result = link_from_utils_link(link);
             }
-            received = true;
-            loop.quit();
+            state->received = true;
+            if (loop_guard.isNull() == false)
+            {
+                loop_guard->quit();
+            }
         },
         CppEditor::CppModelManager::Backend::Best);
 
     timer.start(k_default_timeout_ms);
     loop.exec();
 
-    if (received == false || result.is_valid() == false)
+    if (state->received == false || state->result.is_valid() == false)
     {
         set_error(error,
                   QStringLiteral("clangd did not return a related declaration/definition."));
         return std::nullopt;
     }
 
-    return result;
+    return state->result;
 }
 
 QList<clangd_link_t> clangd_service_t::find_references(const clangd_location_t &location,

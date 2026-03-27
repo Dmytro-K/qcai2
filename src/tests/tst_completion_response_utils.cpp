@@ -35,6 +35,21 @@ private slots:
     void normalize_response_rejects_control_keyword_replacement();
 
     /**
+     * FIM-style responses may include extra inline indentation before valid multiline code.
+     */
+    void normalize_response_accepts_multiline_fim_insertion();
+
+    /**
+     * Completion prompts should use one fill-in-the-middle representation for all models.
+     */
+    void build_completion_prompt_uses_fim_markers();
+
+    /**
+     * Inline suggestion layout should track multiline extents for Qt Creator rendering.
+     */
+    void measure_completion_text_extent_tracks_multiline_text();
+
+    /**
      * Inline ghost-text suggestions must preserve the already typed line prefix and suffix.
      */
     void build_inline_completion_text_preserves_existing_line_text();
@@ -77,6 +92,46 @@ void tst_completion_response_utils_t::normalize_response_rejects_control_keyword
     QCOMPARE(normalize_completion_response(
                  QStringLiteral("this->pending_requests[id] = {callback};"), prefix, {}),
              QString());
+}
+
+void tst_completion_response_utils_t::normalize_response_accepts_multiline_fim_insertion()
+{
+    const QString prefix = QStringLiteral("previous_line\n    for");
+    QCOMPARE(normalize_completion_response(
+                 QStringLiteral("        (const auto &message : messages)\n"
+                                "    {\n"
+                                "        req[QStringLiteral(\"message\")] = message.to_json();\n"
+                                "    }"),
+                 prefix, QStringLiteral("\nnext_line")),
+             QStringLiteral(" (const auto &message : messages)\n"
+                            "    {\n"
+                            "        req[QStringLiteral(\"message\")] = message.to_json();\n"
+                            "    }"));
+}
+
+void tst_completion_response_utils_t::build_completion_prompt_uses_fim_markers()
+{
+    const QString prompt =
+        build_completion_prompt(QStringLiteral("file.cpp"), QStringLiteral("prefix_line\n    for"),
+                                QStringLiteral("\nnext_line"));
+    QVERIFY(prompt.contains(QStringLiteral("<fim_prefix>")));
+    QVERIFY(prompt.contains(QStringLiteral("<fim_suffix>")));
+    QVERIFY(prompt.contains(QStringLiteral("<fim_middle>")));
+    QVERIFY(prompt.contains(QStringLiteral("Current line before cursor:")));
+    QVERIFY(prompt.contains(QStringLiteral("    for")));
+}
+
+void tst_completion_response_utils_t::measure_completion_text_extent_tracks_multiline_text()
+{
+    const completion_text_extent_t single_line_extent =
+        measure_completion_text_extent(QStringLiteral("    for (;;)"), 4);
+    QCOMPARE(single_line_extent.end_line_offset, 0);
+    QCOMPARE(single_line_extent.end_column, 16);
+
+    const completion_text_extent_t multiline_extent = measure_completion_text_extent(
+        QStringLiteral("    for (...)\n    {\n        body();\n    }"), 4);
+    QCOMPARE(multiline_extent.end_line_offset, 3);
+    QCOMPARE(multiline_extent.end_column, 5);
 }
 
 void tst_completion_response_utils_t::build_inline_completion_text_preserves_existing_line_text()

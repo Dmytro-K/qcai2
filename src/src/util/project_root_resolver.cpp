@@ -1,5 +1,6 @@
 #include "project_root_resolver.h"
 
+#include <extensionsystem/pluginmanager.h>
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectmanager.h>
 #include <utils/filepath.h>
@@ -22,6 +23,12 @@ QString project_root_for_file_path(const QString &file_path)
         return {};
     }
 
+    if (ExtensionSystem::PluginManager::instance() == nullptr ||
+        ProjectExplorer::ProjectManager::instance() == nullptr)
+    {
+        return {};
+    }
+
     const auto projects =
         ProjectExplorer::ProjectManager::projectsForFile(Utils::FilePath::fromString(file_path));
     if (!projects.isEmpty() && projects.first() != nullptr)
@@ -29,7 +36,7 @@ QString project_root_for_file_path(const QString &file_path)
         return projects.first()->projectDirectory().toUrlishString();
     }
 
-    return file_info.absolutePath();
+    return {};
 }
 
 }  // namespace qcai2

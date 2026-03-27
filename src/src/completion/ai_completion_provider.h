@@ -8,6 +8,7 @@ namespace qcai2
 
 class iai_provider_t;
 class chat_context_manager_t;
+class clangd_service_t;
 
 /**
  * Provides AI-powered code completions for editor assist requests.
@@ -80,6 +81,15 @@ public:
     }
 
     /**
+     * Sets the shared clangd service used for local semantic completion context.
+     * @param service Reusable clangd integration service.
+     */
+    void set_clangd_service(clangd_service_t *service)
+    {
+        this->clangd_service = service;
+    }
+
+    /**
      * Enables or disables AI completion.
      * @param enabled True to allow this provider to create processors.
      */
@@ -115,6 +125,9 @@ private:
 
     /** Shared persistent chat context used for lightweight completion context. */
     chat_context_manager_t *chat_context_manager = nullptr;
+
+    /** Shared clangd service used for local semantic completion context. */
+    clangd_service_t *clangd_service = nullptr;
 
     /** Enables or disables the provider. */
     bool enabled = true;

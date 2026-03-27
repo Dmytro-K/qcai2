@@ -3,6 +3,7 @@
 */
 
 #include "ghost_text_manager.h"
+#include "../clangd/clangd_service.h"
 #include "../context/chat_context_manager.h"
 #include "../models/agent_messages.h"
 #include "../providers/iai_provider.h"
@@ -12,16 +13,22 @@
 #include "../util/project_root_resolver.h"
 #include "../util/prompt_instructions.h"
 #include "../util/system_diagnostics_log.h"
+#include "completion_clang_context.h"
+#include "completion_connection_utils.h"
 #include "completion_request_settings.h"
 #include "completion_response_utils.h"
 #include "completion_trigger_utils.h"
+#include "qompi_provider_backend_adapter.h"
+
+#include <qompi/completion_session.h>
+#include <qompi/completion_sink.h>
+#include <qompi/completion_types.h>
 
 #include <texteditor/textdocument.h>
 #include <texteditor/texteditor.h>
 #include <texteditor/textsuggestion.h>
 #include <utils/textutils.h>
 
-#include <QFileInfo>
 #include <QMetaObject>
 #include <QTextCursor>
 #include <QTextDocument>
@@ -38,6 +45,16 @@ namespace
 {
 
 std::atomic<int> s_next_completion_request_id{1};
+
+std::string to_std_string(const QString &value)
+{
+    return value.toUtf8().toStdString();
+}
+
+QString from_std_string(const std::string &value)
+{
+    return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
+}
 
 bool runtime_completion_diagnostics_enabled()
 {
@@ -69,7 +86,7 @@ diagnostics_workspace_root_for_file_path(const QString &file_path,
         return project_root;
     }
 
-    return QFileInfo(file_path).absolutePath();
+    return {};
 }
 
 QString diagnostics_text_excerpt(QString text)
@@ -169,6 +186,88 @@ void record_streaming_stage(const std::shared_ptr<completion_detailed_log_t> &de
     detailed_log->record_stage(QStringLiteral("local"), stage, message);
 }
 
+class ghost_text_qompi_sink_t final : public qompi::completion_sink_t
+{
+public:
+    ghost_text_qompi_sink_t(ghost_text_manager_t *owner,
+                            QPointer<TextEditor::TextEditorWidget> editor, int pos, QString prefix,
+                            QString suffix, std::shared_ptr<bool> alive,
+                            std::shared_ptr<completion_detailed_log_t> detailed_log)
+        : owner(owner), editor(std::move(editor)), pos(pos), prefix(std::move(prefix)),
+          suffix(std::move(suffix)), alive(std::move(alive)), detailed_log(std::move(detailed_log))
+    {
+    }
+
+    void on_chunk(const qompi::completion_chunk_t &chunk) override
+    {
+        if (*this->alive == false || this->editor.isNull() == true)
+        {
+            return;
+        }
+
+        provider_usage_t usage;
+        if (this->owner->show_completion_suggestion(
+                this->editor.data(), this->pos, this->prefix, this->suffix,
+                from_std_string(chunk.stable_text), usage, this->detailed_log, false) == false)
+        {
+            return;
+        }
+        record_streaming_stage(
+            this->detailed_log, QStringLiteral("streaming.partial_ready"),
+            QStringLiteral("rendered_chars=%1").arg(from_std_string(chunk.stable_text).length()));
+    }
+
+    void on_debug_event(const std::string &stage, const std::string &message) override
+    {
+        if (this->detailed_log == nullptr)
+        {
+            return;
+        }
+        this->detailed_log->record_stage(QStringLiteral("qompi"), from_std_string(stage),
+                                         from_std_string(message));
+    }
+
+    void on_completed(const qompi::completion_result_t &result) override
+    {
+        if (*this->alive == false || this->editor.isNull() == true)
+        {
+            finalize_detailed_completion_log(this->detailed_log, QStringLiteral("abandoned"),
+                                             from_std_string(result.text),
+                                             QStringLiteral("Editor destroyed before completion "
+                                                            "callback."),
+                                             {});
+            return;
+        }
+
+        provider_usage_t usage;
+        this->owner->handle_completion_response(this->editor.data(), this->pos, this->prefix,
+                                                this->suffix, from_std_string(result.text),
+                                                QString(), usage, this->detailed_log);
+    }
+
+    void on_failed(const qompi::completion_error_t &error) override
+    {
+        if (*this->alive == false || this->editor.isNull() == true)
+        {
+            return;
+        }
+
+        provider_usage_t usage;
+        this->owner->handle_completion_response(
+            this->editor.data(), this->pos, this->prefix, this->suffix, QString(),
+            from_std_string(error.message), usage, this->detailed_log);
+    }
+
+private:
+    ghost_text_manager_t *owner = nullptr;
+    QPointer<TextEditor::TextEditorWidget> editor;
+    int pos = 0;
+    QString prefix;
+    QString suffix;
+    std::shared_ptr<bool> alive;
+    std::shared_ptr<completion_detailed_log_t> detailed_log;
+};
+
 }  // namespace
 
 ghost_text_manager_t::ghost_text_manager_t(QObject *parent) : QObject(parent)
@@ -188,13 +287,23 @@ iai_provider_t *ghost_text_manager_t::resolve_provider() const
             find_provider_by_id(this->providers, completion_settings.provider_id);
         resolved != nullptr)
     {
+        apply_completion_connection_settings(resolved,
+                                             resolve_completion_connection_settings(settings()));
         return resolved;
     }
     if (this->provider != nullptr)
     {
+        apply_completion_connection_settings(this->provider,
+                                             resolve_completion_connection_settings(settings()));
         return this->provider;
     }
-    return this->providers.isEmpty() == false ? this->providers.first() : nullptr;
+    if (this->providers.isEmpty() == false)
+    {
+        apply_completion_connection_settings(this->providers.first(),
+                                             resolve_completion_connection_settings(settings()));
+        return this->providers.first();
+    }
+    return nullptr;
 }
 
 void ghost_text_manager_t::set_enabled(bool enabled)
@@ -297,6 +406,8 @@ void ghost_text_manager_t::attach_to_editor(TextEditor::TextEditorWidget *editor
         }
         this->last_edit_positions.remove(editor);
         this->pending_snapshots.remove(editor);
+        this->qompi_sessions.remove(editor);
+        this->qompi_session_provider_ids.remove(editor);
     });
 
     QCAI_DEBUG("GhostText", QStringLiteral("Attached to editor"));
@@ -487,11 +598,14 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
     const QString suffix = snapshot.suffix;
     const QString fileName = file_name.isEmpty() == false ? file_name : QStringLiteral("untitled");
     const QString project_root = project_root_for_file_path(fileName);
-    const QString log_workspace_root =
-        project_root.isEmpty() == false ? project_root : QFileInfo(fileName).absolutePath();
+    const QString log_workspace_root = project_root;
 
     const completion_request_settings_t completion_settings =
         resolve_completion_request_settings(s);
+    const completion_connection_settings_t connection_settings =
+        resolve_completion_connection_settings(s);
+    const QString connection_summary =
+        describe_completion_connection_settings(connection_settings);
     const QString model = completion_settings.model;
     const bool detailed_completion_logging_enabled = s.detailed_completion_logging;
     const QString completion_request_id =
@@ -506,13 +620,15 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
          QStringLiteral("project_root=%1").arg(project_root),
          QStringLiteral("workspace_root=%1").arg(log_workspace_root),
          QStringLiteral("file=%1").arg(fileName),
-         QStringLiteral("provider=%1").arg(provider->id()),
-         QStringLiteral("model=%1").arg(model)});
+         QStringLiteral("provider=%1").arg(provider->id()), QStringLiteral("model=%1").arg(model),
+         QStringLiteral("connection=%1").arg(connection_summary)});
 
     const QString prompt = build_completion_prompt(fileName, prefix, suffix);
 
     QList<chat_message_t> messages;
     QString instruction_error;
+    QString clang_completion_context;
+    QString clang_completion_context_error;
     QString completion_context;
     QString completion_context_error;
     const QString autocomplete_instruction =
@@ -525,6 +641,19 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
     else if (autocomplete_instruction.isEmpty() == false)
     {
         messages.append({QStringLiteral("system"), autocomplete_instruction});
+    }
+    clang_completion_context = build_completion_clang_context_block(
+        this->clangd_service,
+        editor->textDocument() != nullptr ? editor->textDocument()->filePath() : Utils::FilePath(),
+        editor->document(), pos, &clang_completion_context_error);
+    if (clang_completion_context_error.isEmpty() == false)
+    {
+        QCAI_WARN("GhostText", QStringLiteral("Failed to build clang completion context: %1")
+                                   .arg(clang_completion_context_error));
+    }
+    else if (clang_completion_context.isEmpty() == false)
+    {
+        messages.append({QStringLiteral("system"), clang_completion_context});
     }
     std::shared_ptr<completion_detailed_log_t> detailed_log;
     if (this->chat_context_manager != nullptr)
@@ -587,6 +716,23 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
                                        QStringLiteral("instructions.empty"),
                                        QStringLiteral("AUTOCOMPLETE.md not found"));
         }
+        if (clang_completion_context_error.isEmpty() == false)
+        {
+            detailed_log->record_stage(QStringLiteral("local"),
+                                       QStringLiteral("clang_context.error"),
+                                       clang_completion_context_error);
+        }
+        else if (clang_completion_context.isEmpty() == false)
+        {
+            detailed_log->record_stage(
+                QStringLiteral("local"), QStringLiteral("clang_context.loaded"),
+                QStringLiteral("chars=%1").arg(clang_completion_context.size()));
+        }
+        else
+        {
+            detailed_log->record_stage(QStringLiteral("local"),
+                                       QStringLiteral("clang_context.empty"));
+        }
         if (this->chat_context_manager != nullptr)
         {
             if (completion_context_error.isEmpty() == false)
@@ -609,15 +755,20 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
         }
         detailed_log->record_stage(
             QStringLiteral("local"), QStringLiteral("completion.settings"),
-            QStringLiteral("provider=%1 model=%2 send_reasoning=%3 selected_reasoning=%4 "
-                           "send_thinking=%5 selected_thinking=%6")
-                .arg(provider->id(), model,
+            QStringLiteral("engine=%1 provider=%2 model=%3 send_reasoning=%4 "
+                           "selected_reasoning=%5 send_thinking=%6 selected_thinking=%7")
+                .arg(completion_settings.engine_kind == completion_engine_kind_t::QOMPI
+                         ? QStringLiteral("qompi")
+                         : QStringLiteral("legacy"),
+                     provider->id(), model,
                      completion_settings.send_reasoning == true ? QStringLiteral("on")
                                                                 : QStringLiteral("off"),
                      completion_settings.selected_reasoning_effort,
                      completion_settings.send_thinking == true ? QStringLiteral("on")
                                                                : QStringLiteral("off"),
                      completion_settings.selected_thinking_level));
+        detailed_log->record_stage(QStringLiteral("local"),
+                                   QStringLiteral("completion.connection"), connection_summary);
         detailed_log->record_stage(
             QStringLiteral("local"), QStringLiteral("prompt.ready"),
             QStringLiteral("messages=%1 prompt_chars=%2").arg(messages.size()).arg(prompt.size()));
@@ -635,6 +786,72 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
 
     const auto alive = this->alive;
     const QPointer<TextEditor::TextEditorWidget> editorGuard(editor);
+    if (completion_settings.engine_kind == completion_engine_kind_t::QOMPI)
+    {
+        qompi::completion_request_t request;
+        request.request_id = to_std_string(completion_request_id);
+        request.prefix = to_std_string(prefix);
+        request.suffix = to_std_string(suffix);
+        request.file_path = to_std_string(fileName);
+        request.user_prompt = to_std_string(prompt);
+        request.trigger_kind = qompi::completion_trigger_kind_t::AUTOMATIC;
+        for (const chat_message_t &message : messages)
+        {
+            if (message.role == QStringLiteral("system"))
+            {
+                request.system_context_blocks.push_back(to_std_string(message.content));
+            }
+        }
+
+        qompi::completion_options_t options;
+        options.model = to_std_string(model);
+        options.thinking_level = to_std_string(completion_settings.selected_thinking_level);
+        options.reasoning_effort =
+            to_std_string(completion_reasoning_effort_to_send(completion_settings));
+        const qompi::provider_profile_t provider_profile =
+            create_qompi_provider_profile(provider, model);
+        const qompi::resolved_completion_config_t resolved_config =
+            qompi::resolve_completion_config(provider_profile, request, std::move(options));
+
+        const QString provider_id = provider->id();
+        if (this->qompi_session_provider_ids.value(editor) != provider_id ||
+            this->qompi_sessions.contains(editor) == false)
+        {
+            this->qompi_sessions.insert(editor, qompi::create_latest_wins_completion_session(
+                                                    create_qompi_provider_backend(provider)));
+            this->qompi_session_provider_ids.insert(editor, provider_id);
+        }
+        if (detailed_log != nullptr)
+        {
+            detailed_log->record_stage(
+                QStringLiteral("local"), QStringLiteral("qompi.dispatch_started"),
+                QStringLiteral("provider=%1 model=%2 reasoning=%3 thinking=%4 "
+                               "streaming=%5 cancellation=%6 stop_words=%7 max_output_tokens=%8")
+                    .arg(provider->id(), from_std_string(resolved_config.model_id),
+                         resolved_config.options.reasoning_effort.empty() == true
+                             ? QStringLiteral("-")
+                             : from_std_string(resolved_config.options.reasoning_effort),
+                         resolved_config.options.thinking_level.empty() == true
+                             ? QStringLiteral("-")
+                             : from_std_string(resolved_config.options.thinking_level),
+                         resolved_config.capabilities.supports_streaming == true
+                             ? QStringLiteral("on")
+                             : QStringLiteral("off"),
+                         resolved_config.capabilities.supports_cancellation == true
+                             ? QStringLiteral("on")
+                             : QStringLiteral("off"),
+                         QString::number(resolved_config.stop_policy.stop_words.size()),
+                         resolved_config.options.max_output_tokens.has_value() == true
+                             ? QString::number(resolved_config.options.max_output_tokens.value())
+                             : QStringLiteral("-")));
+        }
+        const auto sink = std::make_shared<ghost_text_qompi_sink_t>(this, editorGuard, pos, prefix,
+                                                                    suffix, alive, detailed_log);
+        this->qompi_sessions.value(editor)->request_completion(request, resolved_config.options,
+                                                               sink);
+        return;
+    }
+
     const auto streaming_state = std::make_shared<streaming_completion_state_t>();
     const iai_provider_t::completion_callback_t completion_callback =
         [this, editorGuard, pos, prefix, suffix, alive, detailed_log, streaming_state](
@@ -794,8 +1011,10 @@ bool ghost_text_manager_t::show_completion_suggestion(
     }
 
     Utils::Text::Position range_begin{line, range_start_column};
-    Utils::Text::Position range_end{line,
-                                    range_start_column + static_cast<int>(suggestion_text.size())};
+    const completion_text_extent_t suggestion_extent =
+        measure_completion_text_extent(suggestion_text, range_start_column);
+    Utils::Text::Position range_end{line + suggestion_extent.end_line_offset,
+                                    suggestion_extent.end_column};
     Utils::Text::Position text_pos{line, col};
     Utils::Text::Range range{range_begin, range_end};
     TextEditor::TextSuggestion::Data data{range, text_pos, suggestion_text};
@@ -812,11 +1031,13 @@ bool ghost_text_manager_t::show_completion_suggestion(
                                        ? QStringLiteral("proposal.ready")
                                        : QStringLiteral("streaming.proposal.updated"),
                                    QStringLiteral("completion_chars=%1 suggestion_chars=%2 "
-                                                  "line_prefix_chars=%3 line_suffix_chars=%4")
+                                                  "line_prefix_chars=%3 line_suffix_chars=%4 "
+                                                  "suggestion_lines=%5")
                                        .arg(completion.length())
                                        .arg(suggestion_text.length())
                                        .arg(line_prefix.length())
-                                       .arg(line_suffix.length()));
+                                       .arg(line_suffix.length())
+                                       .arg(suggestion_extent.end_line_offset + 1));
     }
     return true;
 }

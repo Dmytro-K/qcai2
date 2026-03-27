@@ -8,6 +8,7 @@
 #include "../settings/settings.h"
 #include "../util/logger.h"
 #include "ai_completion_processor.h"
+#include "completion_connection_utils.h"
 #include "completion_request_settings.h"
 #include "completion_trigger_utils.h"
 
@@ -48,13 +49,23 @@ iai_provider_t *ai_completion_provider_t::resolve_provider() const
             find_provider_by_id(this->providers, completion_settings.provider_id);
         resolved != nullptr)
     {
+        apply_completion_connection_settings(resolved,
+                                             resolve_completion_connection_settings(settings()));
         return resolved;
     }
     if (this->provider != nullptr)
     {
+        apply_completion_connection_settings(this->provider,
+                                             resolve_completion_connection_settings(settings()));
         return this->provider;
     }
-    return this->providers.isEmpty() == false ? this->providers.first() : nullptr;
+    if (this->providers.isEmpty() == false)
+    {
+        apply_completion_connection_settings(this->providers.first(),
+                                             resolve_completion_connection_settings(settings()));
+        return this->providers.first();
+    }
+    return nullptr;
 }
 
 TextEditor::IAssistProcessor *ai_completion_provider_t::createProcessor(
@@ -74,7 +85,8 @@ TextEditor::IAssistProcessor *ai_completion_provider_t::createProcessor(
         QStringLiteral("createProcessor: provider='%1' completionProvider='%2' model='%3'")
             .arg(provider->id(), completion_settings.provider_id, completion_settings.model));
     return new ai_completion_processor_t(provider, this->chat_context_manager,
-                                         completion_settings.model);
+                                         this->clangd_service, completion_settings.model,
+                                         completion_settings.engine_kind);
 }
 
 int ai_completion_provider_t::activationCharSequenceLength() const

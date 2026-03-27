@@ -112,6 +112,24 @@ QStringList ollama_model_presets()
     };
 }
 
+QStringList remote_api_base_url_presets()
+{
+    return {
+        QStringLiteral("https://api.openai.com"),
+        QStringLiteral("https://api.anthropic.com"),
+        QStringLiteral("https://generativelanguage.googleapis.com"),
+        QStringLiteral("https://api.x.ai"),
+        QStringLiteral("https://api.deepseek.com"),
+        QStringLiteral("https://api.mistral.ai"),
+        QStringLiteral("https://api.groq.com/openai"),
+        QStringLiteral("https://openrouter.ai/api"),
+        QStringLiteral("https://api.together.xyz"),
+        QStringLiteral("https://api.fireworks.ai/inference"),
+        QStringLiteral("http://localhost:1234"),
+        QStringLiteral("http://localhost:8080"),
+    };
+}
+
 QStringList generic_completion_models()
 {
     return {
@@ -165,12 +183,27 @@ class settings_widget_t : public Core::IOptionsPageWidget
         bool detailed_completion_logging = false;
         int completion_min_chars = 0;
         int completion_delay_ms = 0;
+        QString completion_engine;
         QString completion_provider;
         QString completion_model;
         bool completion_send_thinking = false;
         QString completion_thinking_level;
         bool completion_send_reasoning = false;
         QString completion_reasoning_effort;
+        QString completion_base_url;
+        QString completion_api_key;
+        QString completion_local_base_url;
+        QString completion_local_endpoint_path;
+        QString completion_local_custom_headers;
+        QString completion_ollama_base_url;
+        QString completion_copilot_node_path;
+        QString completion_copilot_sidecar_path;
+        QString qompi_completion_provider;
+        QString qompi_completion_model;
+        bool qompi_completion_send_thinking = false;
+        QString qompi_completion_thinking_level;
+        bool qompi_completion_send_reasoning = false;
+        QString qompi_completion_reasoning_effort;
         bool vector_search_enabled = false;
         QString vector_search_provider;
         QString qdrant_url;
@@ -243,14 +276,96 @@ public:
         this->autoCompactThresholdSpin = this->ui->autoCompactThresholdSpin;
         this->aiCompletionCheck = this->ui->aiCompletionCheck;
         this->detailedCompletionLoggingCheck = this->ui->detailedCompletionLoggingCheck;
+        this->completionBehaviorGroup = this->ui->completionBehaviorGroup;
         this->completionMinCharsSpin = this->ui->completionMinCharsSpin;
         this->completionDelayMsSpin = this->ui->completionDelayMsSpin;
+        this->completionEngineCombo = this->ui->completionEngineCombo;
+        this->legacyCompletionGroup = this->ui->legacyCompletionGroup;
         this->completionProviderCombo = this->ui->completionProviderCombo;
         this->completionModelCombo = this->ui->completionModelCombo;
         this->completionSendThinkingCheck = this->ui->completionSendThinkingCheck;
         this->completionThinkingCombo = this->ui->completionThinkingCombo;
         this->completionSendReasoningCheck = this->ui->completionSendReasoningCheck;
         this->completionReasoningCombo = this->ui->completionReasoningCombo;
+        this->qompiCompletionGroup = this->ui->qompiCompletionGroup;
+        this->qompiCompletionProviderCombo = this->ui->qompiCompletionProviderCombo;
+        this->qompiCompletionModelCombo = this->ui->qompiCompletionModelCombo;
+        this->qompiCompletionSendThinkingCheck = this->ui->qompiCompletionSendThinkingCheck;
+        this->qompiCompletionThinkingCombo = this->ui->qompiCompletionThinkingCombo;
+        this->qompiCompletionSendReasoningCheck = this->ui->qompiCompletionSendReasoningCheck;
+        this->qompiCompletionReasoningCombo = this->ui->qompiCompletionReasoningCombo;
+        this->completionConnectionGroup =
+            new QGroupBox(tr_t::tr("Active completion connection overrides"), this);
+        this->completionConnectionInfoLabel = new QLabel(this->completionConnectionGroup);
+        this->completionConnectionInfoLabel->setWordWrap(true);
+        auto *completion_connection_layout = new QVBoxLayout(this->completionConnectionGroup);
+        completion_connection_layout->addWidget(this->completionConnectionInfoLabel);
+        this->completionRemoteConnectionGroup =
+            new QGroupBox(tr_t::tr("Remote API (OpenAI-compatible / Anthropic)"),
+                          this->completionConnectionGroup);
+        auto *completion_remote_layout = new QFormLayout(this->completionRemoteConnectionGroup);
+        this->completionConnectionBaseUrlCombo =
+            new QComboBox(this->completionRemoteConnectionGroup);
+        this->completionConnectionBaseUrlCombo->setEditable(true);
+        this->completionConnectionApiKeyEdit =
+            new QLineEdit(this->completionRemoteConnectionGroup);
+        this->completionConnectionApiKeyEdit->setEchoMode(QLineEdit::Password);
+        completion_remote_layout->addRow(tr_t::tr("Base URL:"),
+                                         this->completionConnectionBaseUrlCombo);
+        completion_remote_layout->addRow(tr_t::tr("API Key:"),
+                                         this->completionConnectionApiKeyEdit);
+        completion_connection_layout->addWidget(this->completionRemoteConnectionGroup);
+        this->completionCopilotConnectionGroup =
+            new QGroupBox(tr_t::tr("GitHub Copilot connection"), this->completionConnectionGroup);
+        auto *completion_copilot_layout = new QFormLayout(this->completionCopilotConnectionGroup);
+        this->completionConnectionCopilotNodeEdit =
+            new QLineEdit(this->completionCopilotConnectionGroup);
+        this->completionConnectionCopilotNodeEdit->setPlaceholderText(
+            tr_t::tr("Leave empty to inherit Providers / default `node`"));
+        this->completionConnectionCopilotSidecarEdit =
+            new QLineEdit(this->completionCopilotConnectionGroup);
+        this->completionConnectionCopilotSidecarEdit->setPlaceholderText(
+            tr_t::tr("Leave empty to inherit Providers / auto-detect"));
+        completion_copilot_layout->addRow(tr_t::tr("Node path:"),
+                                          this->completionConnectionCopilotNodeEdit);
+        completion_copilot_layout->addRow(tr_t::tr("Sidecar path:"),
+                                          this->completionConnectionCopilotSidecarEdit);
+        completion_connection_layout->addWidget(this->completionCopilotConnectionGroup);
+        this->completionLocalConnectionGroup =
+            new QGroupBox(tr_t::tr("Local HTTP connection"), this->completionConnectionGroup);
+        auto *completion_local_layout = new QFormLayout(this->completionLocalConnectionGroup);
+        this->completionConnectionLocalUrlEdit =
+            new QLineEdit(this->completionLocalConnectionGroup);
+        this->completionConnectionLocalEndpointEdit =
+            new QLineEdit(this->completionLocalConnectionGroup);
+        this->completionConnectionLocalHeadersEdit =
+            new QLineEdit(this->completionLocalConnectionGroup);
+        this->completionConnectionLocalUrlEdit->setPlaceholderText(
+            tr_t::tr("Leave empty to inherit Providers"));
+        this->completionConnectionLocalEndpointEdit->setPlaceholderText(
+            tr_t::tr("Leave empty to inherit Providers"));
+        this->completionConnectionLocalHeadersEdit->setPlaceholderText(
+            tr_t::tr("Leave empty to inherit Providers"));
+        completion_local_layout->addRow(tr_t::tr("Base URL:"),
+                                        this->completionConnectionLocalUrlEdit);
+        completion_local_layout->addRow(tr_t::tr("Endpoint:"),
+                                        this->completionConnectionLocalEndpointEdit);
+        completion_local_layout->addRow(tr_t::tr("Headers:"),
+                                        this->completionConnectionLocalHeadersEdit);
+        completion_connection_layout->addWidget(this->completionLocalConnectionGroup);
+        this->completionOllamaConnectionGroup =
+            new QGroupBox(tr_t::tr("Ollama connection"), this->completionConnectionGroup);
+        auto *completion_ollama_layout = new QFormLayout(this->completionOllamaConnectionGroup);
+        this->completionConnectionOllamaUrlEdit =
+            new QLineEdit(this->completionOllamaConnectionGroup);
+        this->completionConnectionOllamaUrlEdit->setPlaceholderText(
+            tr_t::tr("Leave empty to inherit Providers"));
+        completion_ollama_layout->addRow(tr_t::tr("Base URL:"),
+                                         this->completionConnectionOllamaUrlEdit);
+        completion_connection_layout->addWidget(this->completionOllamaConnectionGroup);
+        completion_connection_layout->addStretch();
+        this->ui->completionLayout->insertWidget(this->ui->completionLayout->count() - 1,
+                                                 this->completionConnectionGroup);
         this->vectorSearchEnabledCheck = this->ui->vectorSearchEnabledCheck;
         this->vectorSearchProviderCombo = this->ui->vectorSearchProviderCombo;
         this->vectorSearchStatusLabel = this->ui->vectorSearchStatusLabel;
@@ -326,22 +441,12 @@ public:
 
         // OpenAI settings
         // Base URL combo: editable, with popular providers
-        this->baseUrlCombo->addItems({
-            QStringLiteral("https://api.openai.com"),
-            QStringLiteral("https://api.anthropic.com"),
-            QStringLiteral("https://generativelanguage.googleapis.com"),
-            QStringLiteral("https://api.x.ai"),
-            QStringLiteral("https://api.deepseek.com"),
-            QStringLiteral("https://api.mistral.ai"),
-            QStringLiteral("https://api.groq.com/openai"),
-            QStringLiteral("https://openrouter.ai/api"),
-            QStringLiteral("https://api.together.xyz"),
-            QStringLiteral("https://api.fireworks.ai/inference"),
-            QStringLiteral("http://localhost:1234"),
-            QStringLiteral("http://localhost:8080"),
-        });
+        this->baseUrlCombo->addItems(remote_api_base_url_presets());
         this->baseUrlCombo->setCurrentText(s.base_url);
         this->apiKeyEdit->setText(s.api_key);
+        this->completionConnectionBaseUrlCombo->addItems(remote_api_base_url_presets());
+        this->completionConnectionBaseUrlCombo->setCurrentText(s.completion_base_url);
+        this->completionConnectionApiKeyEdit->setText(s.completion_api_key);
 
         // Model combo: editable, with presets
         this->modelCombo->addItems({
@@ -417,22 +522,29 @@ public:
                     repopulateEditableCombo(this->copilotModelCombo, models,
                                             this->copilotModelCombo->currentText());
                     this->refreshCompletionModelOptions();
+                    this->refreshQompiCompletionModelOptions();
                 });
 
         this->copilotNodeEdit->setText(s.copilot_node_path);
         this->copilotSidecarEdit->setText(s.copilot_sidecar_path);
         this->copilotCompletionTimeoutSpin->set_value(s.copilot_completion_timeout_sec);
+        this->completionConnectionCopilotNodeEdit->setText(s.completion_copilot_node_path);
+        this->completionConnectionCopilotSidecarEdit->setText(s.completion_copilot_sidecar_path);
 
         // Local provider settings
         this->localUrlEdit->setText(s.local_base_url);
         this->localEndpointEdit->setText(s.local_endpoint_path);
         this->localSimpleCheck->setChecked(s.local_simple_mode);
         this->localHeadersEdit->setText(s.local_custom_headers);
+        this->completionConnectionLocalUrlEdit->setText(s.completion_local_base_url);
+        this->completionConnectionLocalEndpointEdit->setText(s.completion_local_endpoint_path);
+        this->completionConnectionLocalHeadersEdit->setText(s.completion_local_custom_headers);
 
         // Ollama
         this->ollamaUrlEdit->setText(s.ollama_base_url);
         this->ollamaModelCombo->addItems(ollama_model_presets());
         this->ollamaModelCombo->setCurrentText(s.ollama_model);
+        this->completionConnectionOllamaUrlEdit->setText(s.completion_ollama_base_url);
 
         // Safety
         this->maxIterSpin->set_value(s.max_iterations);
@@ -450,6 +562,13 @@ public:
         this->completionMinCharsSpin->set_value(s.completion_min_chars);
 
         this->completionDelayMsSpin->set_value(s.completion_delay_ms);
+
+        this->completionEngineCombo->addItem(tr_t::tr("Legacy"), QStringLiteral("legacy"));
+        this->completionEngineCombo->addItem(tr_t::tr("Qompi"), QStringLiteral("qompi"));
+        const int completion_engine_index =
+            this->completionEngineCombo->findData(s.completion_engine);
+        this->completionEngineCombo->setCurrentIndex(
+            completion_engine_index >= 0 ? completion_engine_index : 0);
 
         this->completionProviderCombo->addItem(tr_t::tr("Same as agent"), QString());
         this->completionProviderCombo->addItem(tr_t::tr("OpenAI-Compatible"),
@@ -481,6 +600,37 @@ public:
         this->completionSendReasoningCheck->setChecked(s.completion_send_reasoning);
         populateEffortCombo(this->completionReasoningCombo);
         selectEffortValue(this->completionReasoningCombo, s.completion_reasoning_effort, 0);
+
+        this->qompiCompletionProviderCombo->addItem(tr_t::tr("Same as agent"), QString());
+        this->qompiCompletionProviderCombo->addItem(tr_t::tr("OpenAI-Compatible"),
+                                                    QStringLiteral("openai"));
+        this->qompiCompletionProviderCombo->addItem(tr_t::tr("Anthropic API"),
+                                                    QStringLiteral("anthropic"));
+        this->qompiCompletionProviderCombo->addItem(tr_t::tr("GitHub Copilot"),
+                                                    QStringLiteral("copilot"));
+        this->qompiCompletionProviderCombo->addItem(tr_t::tr("Local HTTP"),
+                                                    QStringLiteral("local"));
+        this->qompiCompletionProviderCombo->addItem(tr_t::tr("Ollama (Local)"),
+                                                    QStringLiteral("ollama"));
+        const int qompi_completion_provider_index =
+            this->qompiCompletionProviderCombo->findData(s.qompi_completion_provider);
+        this->qompiCompletionProviderCombo->setCurrentIndex(
+            qompi_completion_provider_index >= 0 ? qompi_completion_provider_index : 0);
+        if (this->qompiCompletionModelCombo->lineEdit() != nullptr)
+        {
+            this->qompiCompletionModelCombo->lineEdit()->setPlaceholderText(
+                tr_t::tr("(Same as selected qompi provider default model)"));
+        }
+        this->refreshQompiCompletionModelOptions();
+        this->qompiCompletionModelCombo->setCurrentText(s.qompi_completion_model.trimmed());
+        this->qompiCompletionSendThinkingCheck->setChecked(s.qompi_completion_send_thinking);
+        populateEffortCombo(this->qompiCompletionThinkingCombo);
+        selectEffortValue(this->qompiCompletionThinkingCombo, s.qompi_completion_thinking_level,
+                          0);
+        this->qompiCompletionSendReasoningCheck->setChecked(s.qompi_completion_send_reasoning);
+        populateEffortCombo(this->qompiCompletionReasoningCombo);
+        selectEffortValue(this->qompiCompletionReasoningCombo, s.qompi_completion_reasoning_effort,
+                          0);
         this->refreshCompletionUiState();
 
         this->vectorSearchEnabledCheck->setChecked(s.vector_search_enabled);
@@ -636,12 +786,27 @@ public:
                 Utils::checkSettingsDirty);
         connect(this->completionDelayMsSpin, &settings_spin_box_t::value_changed,
                 Utils::checkSettingsDirty);
+        installCheckSettingsDirtyTrigger(this->completionEngineCombo);
         installCheckSettingsDirtyTrigger(this->completionProviderCombo);
         installCheckSettingsDirtyTrigger(this->completionModelCombo);
+        installCheckSettingsDirtyTrigger(this->completionConnectionBaseUrlCombo);
+        installCheckSettingsDirtyTrigger(this->completionConnectionApiKeyEdit);
+        installCheckSettingsDirtyTrigger(this->completionConnectionCopilotNodeEdit);
+        installCheckSettingsDirtyTrigger(this->completionConnectionCopilotSidecarEdit);
+        installCheckSettingsDirtyTrigger(this->completionConnectionLocalUrlEdit);
+        installCheckSettingsDirtyTrigger(this->completionConnectionLocalEndpointEdit);
+        installCheckSettingsDirtyTrigger(this->completionConnectionLocalHeadersEdit);
+        installCheckSettingsDirtyTrigger(this->completionConnectionOllamaUrlEdit);
         installCheckSettingsDirtyTrigger(this->completionSendThinkingCheck);
         installCheckSettingsDirtyTrigger(this->completionThinkingCombo);
         installCheckSettingsDirtyTrigger(this->completionSendReasoningCheck);
         installCheckSettingsDirtyTrigger(this->completionReasoningCombo);
+        installCheckSettingsDirtyTrigger(this->qompiCompletionProviderCombo);
+        installCheckSettingsDirtyTrigger(this->qompiCompletionModelCombo);
+        installCheckSettingsDirtyTrigger(this->qompiCompletionSendThinkingCheck);
+        installCheckSettingsDirtyTrigger(this->qompiCompletionThinkingCombo);
+        installCheckSettingsDirtyTrigger(this->qompiCompletionSendReasoningCheck);
+        installCheckSettingsDirtyTrigger(this->qompiCompletionReasoningCombo);
         installCheckSettingsDirtyTrigger(this->vectorSearchEnabledCheck);
         installCheckSettingsDirtyTrigger(this->vectorSearchProviderCombo);
         installCheckSettingsDirtyTrigger(this->qdrantUrlEdit);
@@ -678,16 +843,36 @@ public:
         connect(this->tempSpin, &settings_double_spin_box_t::value_changed,
                 Utils::checkSettingsDirty);
         connect(this->providerCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
-                [this]() { this->refreshCompletionModelOptions(); });
+                [this]() {
+                    this->refreshCompletionModelOptions();
+                    this->refreshQompiCompletionModelOptions();
+                    this->refreshCompletionUiState();
+                });
         connect(this->completionProviderCombo, qOverload<int>(&QComboBox::currentIndexChanged),
-                this, [this]() { this->refreshCompletionModelOptions(); });
+                this, [this]() {
+                    this->refreshCompletionModelOptions();
+                    this->refreshCompletionUiState();
+                });
+        connect(this->qompiCompletionProviderCombo,
+                qOverload<int>(&QComboBox::currentIndexChanged), this, [this]() {
+                    this->refreshQompiCompletionModelOptions();
+                    this->refreshCompletionUiState();
+                });
         connect(this->completionModelCombo, &QComboBox::currentTextChanged,
                 Utils::checkSettingsDirty);
+        connect(this->qompiCompletionModelCombo, &QComboBox::currentTextChanged,
+                Utils::checkSettingsDirty);
         connect(this->aiCompletionCheck, &QCheckBox::toggled, this,
+                [this]() { this->refreshCompletionUiState(); });
+        connect(this->completionEngineCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
                 [this]() { this->refreshCompletionUiState(); });
         connect(this->completionSendThinkingCheck, &QCheckBox::toggled, this,
                 [this]() { this->refreshCompletionUiState(); });
         connect(this->completionSendReasoningCheck, &QCheckBox::toggled, this,
+                [this]() { this->refreshCompletionUiState(); });
+        connect(this->qompiCompletionSendThinkingCheck, &QCheckBox::toggled, this,
+                [this]() { this->refreshCompletionUiState(); });
+        connect(this->qompiCompletionSendReasoningCheck, &QCheckBox::toggled, this,
                 [this]() { this->refreshCompletionUiState(); });
         connect(this->detailedCompletionLoggingCheck, &QCheckBox::toggled,
                 Utils::checkSettingsDirty);
@@ -793,12 +978,33 @@ private:
         s.detailed_completion_logging = this->detailedCompletionLoggingCheck->isChecked();
         s.completion_min_chars = this->completionMinCharsSpin->value();
         s.completion_delay_ms = this->completionDelayMsSpin->value();
+        s.completion_engine = this->completionEngineCombo->currentData().toString();
         s.completion_provider = this->completionProviderCombo->currentData().toString();
         s.completion_model = this->completionModelCombo->currentText().trimmed();
         s.completion_send_thinking = this->completionSendThinkingCheck->isChecked();
         s.completion_thinking_level = this->completionThinkingCombo->currentData().toString();
         s.completion_send_reasoning = this->completionSendReasoningCheck->isChecked();
         s.completion_reasoning_effort = this->completionReasoningCombo->currentData().toString();
+        s.completion_base_url = this->completionConnectionBaseUrlCombo->currentText().trimmed();
+        s.completion_api_key = this->completionConnectionApiKeyEdit->text();
+        s.completion_local_base_url = this->completionConnectionLocalUrlEdit->text().trimmed();
+        s.completion_local_endpoint_path =
+            this->completionConnectionLocalEndpointEdit->text().trimmed();
+        s.completion_local_custom_headers =
+            this->completionConnectionLocalHeadersEdit->text().trimmed();
+        s.completion_ollama_base_url = this->completionConnectionOllamaUrlEdit->text().trimmed();
+        s.completion_copilot_node_path =
+            this->completionConnectionCopilotNodeEdit->text().trimmed();
+        s.completion_copilot_sidecar_path =
+            this->completionConnectionCopilotSidecarEdit->text().trimmed();
+        s.qompi_completion_provider = this->qompiCompletionProviderCombo->currentData().toString();
+        s.qompi_completion_model = this->qompiCompletionModelCombo->currentText().trimmed();
+        s.qompi_completion_send_thinking = this->qompiCompletionSendThinkingCheck->isChecked();
+        s.qompi_completion_thinking_level =
+            this->qompiCompletionThinkingCombo->currentData().toString();
+        s.qompi_completion_send_reasoning = this->qompiCompletionSendReasoningCheck->isChecked();
+        s.qompi_completion_reasoning_effort =
+            this->qompiCompletionReasoningCombo->currentData().toString();
         s.vector_search_enabled = this->vectorSearchEnabledCheck->isChecked();
         s.vector_search_provider = this->vectorSearchProviderCombo->currentData().toString();
         s.qdrant_url = this->qdrantUrlEdit->text().trimmed();
@@ -842,6 +1048,22 @@ private:
                    : this->providerCombo->currentData().toString();
     }
 
+    QString effectiveQompiCompletionProviderForUi() const
+    {
+        const QString completion_provider =
+            this->qompiCompletionProviderCombo->currentData().toString();
+        return completion_provider.isEmpty() == false
+                   ? completion_provider
+                   : this->providerCombo->currentData().toString();
+    }
+
+    QString activeCompletionProviderForUi() const
+    {
+        return this->completionEngineCombo->currentData().toString() == QStringLiteral("qompi")
+                   ? this->effectiveQompiCompletionProviderForUi()
+                   : this->effectiveCompletionProviderForUi();
+    }
+
     void refreshCompletionModelOptions()
     {
         const QString provider_id = this->effectiveCompletionProviderForUi();
@@ -863,10 +1085,37 @@ private:
         repopulateEditableCombo(this->completionModelCombo, items, current_text);
     }
 
+    void refreshQompiCompletionModelOptions()
+    {
+        const QString provider_id = this->effectiveQompiCompletionProviderForUi();
+        const QString current_text = this->qompiCompletionModelCombo->currentText().trimmed();
+        QStringList items;
+        if (provider_id == QStringLiteral("copilot"))
+        {
+            items = model_catalog().copilot_models();
+        }
+        else if (provider_id == QStringLiteral("ollama"))
+        {
+            items = ollama_model_presets();
+        }
+        else
+        {
+            items = generic_completion_models();
+        }
+
+        repopulateEditableCombo(this->qompiCompletionModelCombo, items, current_text);
+    }
+
     void refreshCompletionUiState()
     {
         const bool completion_enabled = this->aiCompletionCheck->isChecked();
+        const QString active_provider = this->activeCompletionProviderForUi();
         this->detailedCompletionLoggingCheck->setEnabled(completion_enabled);
+        this->completionEngineCombo->setEnabled(completion_enabled);
+        this->completionBehaviorGroup->setEnabled(completion_enabled);
+        this->legacyCompletionGroup->setEnabled(completion_enabled);
+        this->qompiCompletionGroup->setEnabled(completion_enabled);
+        this->completionConnectionGroup->setEnabled(completion_enabled);
         this->completionProviderCombo->setEnabled(completion_enabled);
         this->completionModelCombo->setEnabled(completion_enabled);
         this->completionMinCharsSpin->setEnabled(completion_enabled);
@@ -877,6 +1126,30 @@ private:
         this->completionSendReasoningCheck->setEnabled(completion_enabled);
         this->completionReasoningCombo->setEnabled(
             completion_enabled && this->completionSendReasoningCheck->isChecked());
+        this->qompiCompletionProviderCombo->setEnabled(completion_enabled);
+        this->qompiCompletionModelCombo->setEnabled(completion_enabled);
+        this->qompiCompletionSendThinkingCheck->setEnabled(completion_enabled);
+        this->qompiCompletionThinkingCombo->setEnabled(
+            completion_enabled && this->qompiCompletionSendThinkingCheck->isChecked());
+        this->qompiCompletionSendReasoningCheck->setEnabled(completion_enabled);
+        this->qompiCompletionReasoningCombo->setEnabled(
+            completion_enabled && this->qompiCompletionSendReasoningCheck->isChecked());
+        this->completionConnectionInfoLabel->setText(
+            tr_t::tr("These overrides apply only to the currently active completion engine (`%1`) "
+                     "and its effective provider (`%2`). Leave fields empty to inherit the main "
+                     "`Providers` settings.")
+                .arg(this->completionEngineCombo->currentText(), active_provider.isEmpty() == false
+                                                                     ? active_provider
+                                                                     : QStringLiteral("none")));
+        const bool remote_provider = active_provider == QStringLiteral("openai") ||
+                                     active_provider == QStringLiteral("anthropic");
+        this->completionRemoteConnectionGroup->setVisible(completion_enabled && remote_provider);
+        this->completionCopilotConnectionGroup->setVisible(
+            completion_enabled && active_provider == QStringLiteral("copilot"));
+        this->completionLocalConnectionGroup->setVisible(
+            completion_enabled && active_provider == QStringLiteral("local"));
+        this->completionOllamaConnectionGroup->setVisible(
+            completion_enabled && active_provider == QStringLiteral("ollama"));
     }
 
     void refreshWebToolsUiState()
@@ -1022,12 +1295,27 @@ private:
             this->detailedCompletionLoggingCheck->isChecked(),
             this->completionMinCharsSpin->value(),
             this->completionDelayMsSpin->value(),
+            this->completionEngineCombo->currentData().toString(),
             this->completionProviderCombo->currentData().toString(),
             this->completionModelCombo->currentText().trimmed(),
             this->completionSendThinkingCheck->isChecked(),
             this->completionThinkingCombo->currentData().toString(),
             this->completionSendReasoningCheck->isChecked(),
             this->completionReasoningCombo->currentData().toString(),
+            this->completionConnectionBaseUrlCombo->currentText().trimmed(),
+            this->completionConnectionApiKeyEdit->text(),
+            this->completionConnectionLocalUrlEdit->text().trimmed(),
+            this->completionConnectionLocalEndpointEdit->text().trimmed(),
+            this->completionConnectionLocalHeadersEdit->text().trimmed(),
+            this->completionConnectionOllamaUrlEdit->text().trimmed(),
+            this->completionConnectionCopilotNodeEdit->text().trimmed(),
+            this->completionConnectionCopilotSidecarEdit->text().trimmed(),
+            this->qompiCompletionProviderCombo->currentData().toString(),
+            this->qompiCompletionModelCombo->currentText().trimmed(),
+            this->qompiCompletionSendThinkingCheck->isChecked(),
+            this->qompiCompletionThinkingCombo->currentData().toString(),
+            this->qompiCompletionSendReasoningCheck->isChecked(),
+            this->qompiCompletionReasoningCombo->currentData().toString(),
             this->vectorSearchEnabledCheck->isChecked(),
             this->vectorSearchProviderCombo->currentData().toString(),
             this->qdrantUrlEdit->text().trimmed(),
@@ -1102,6 +1390,10 @@ private:
         this->detailedCompletionLoggingCheck->setChecked(snap.detailed_completion_logging);
         this->completionMinCharsSpin->set_value(snap.completion_min_chars);
         this->completionDelayMsSpin->set_value(snap.completion_delay_ms);
+        const int completion_engine_index =
+            this->completionEngineCombo->findData(snap.completion_engine);
+        this->completionEngineCombo->setCurrentIndex(
+            completion_engine_index >= 0 ? completion_engine_index : 0);
         const int completion_provider_index =
             this->completionProviderCombo->findData(snap.completion_provider);
         this->completionProviderCombo->setCurrentIndex(
@@ -1114,6 +1406,27 @@ private:
         selectEffortValue(this->completionThinkingCombo, snap.completion_thinking_level, 0);
         this->completionSendReasoningCheck->setChecked(snap.completion_send_reasoning);
         selectEffortValue(this->completionReasoningCombo, snap.completion_reasoning_effort, 0);
+        this->completionConnectionBaseUrlCombo->setCurrentText(snap.completion_base_url);
+        this->completionConnectionApiKeyEdit->setText(snap.completion_api_key);
+        this->completionConnectionLocalUrlEdit->setText(snap.completion_local_base_url);
+        this->completionConnectionLocalEndpointEdit->setText(snap.completion_local_endpoint_path);
+        this->completionConnectionLocalHeadersEdit->setText(snap.completion_local_custom_headers);
+        this->completionConnectionOllamaUrlEdit->setText(snap.completion_ollama_base_url);
+        this->completionConnectionCopilotNodeEdit->setText(snap.completion_copilot_node_path);
+        this->completionConnectionCopilotSidecarEdit->setText(
+            snap.completion_copilot_sidecar_path);
+        const int qompi_completion_provider_index =
+            this->qompiCompletionProviderCombo->findData(snap.qompi_completion_provider);
+        this->qompiCompletionProviderCombo->setCurrentIndex(
+            qompi_completion_provider_index >= 0 ? qompi_completion_provider_index : 0);
+        this->refreshQompiCompletionModelOptions();
+        this->qompiCompletionModelCombo->setCurrentText(snap.qompi_completion_model.trimmed());
+        this->qompiCompletionSendThinkingCheck->setChecked(snap.qompi_completion_send_thinking);
+        selectEffortValue(this->qompiCompletionThinkingCombo, snap.qompi_completion_thinking_level,
+                          0);
+        this->qompiCompletionSendReasoningCheck->setChecked(snap.qompi_completion_send_reasoning);
+        selectEffortValue(this->qompiCompletionReasoningCombo,
+                          snap.qompi_completion_reasoning_effort, 0);
         this->refreshCompletionUiState();
 
         this->vectorSearchEnabledCheck->setChecked(snap.vector_search_enabled);
@@ -1186,14 +1499,38 @@ private:
     settings_spin_box_t *autoCompactThresholdSpin;
     QCheckBox *aiCompletionCheck;
     QCheckBox *detailedCompletionLoggingCheck;
+    QGroupBox *completionBehaviorGroup;
     settings_spin_box_t *completionMinCharsSpin;
     settings_spin_box_t *completionDelayMsSpin;
+    QComboBox *completionEngineCombo;
+    QGroupBox *legacyCompletionGroup;
     QComboBox *completionProviderCombo;
     QComboBox *completionModelCombo;
     QCheckBox *completionSendThinkingCheck;
     QComboBox *completionThinkingCombo;
     QCheckBox *completionSendReasoningCheck;
     QComboBox *completionReasoningCombo;
+    QGroupBox *completionConnectionGroup;
+    QLabel *completionConnectionInfoLabel;
+    QGroupBox *completionRemoteConnectionGroup;
+    QComboBox *completionConnectionBaseUrlCombo;
+    QLineEdit *completionConnectionApiKeyEdit;
+    QGroupBox *completionCopilotConnectionGroup;
+    QLineEdit *completionConnectionCopilotNodeEdit;
+    QLineEdit *completionConnectionCopilotSidecarEdit;
+    QGroupBox *completionLocalConnectionGroup;
+    QLineEdit *completionConnectionLocalUrlEdit;
+    QLineEdit *completionConnectionLocalEndpointEdit;
+    QLineEdit *completionConnectionLocalHeadersEdit;
+    QGroupBox *completionOllamaConnectionGroup;
+    QLineEdit *completionConnectionOllamaUrlEdit;
+    QGroupBox *qompiCompletionGroup;
+    QComboBox *qompiCompletionProviderCombo;
+    QComboBox *qompiCompletionModelCombo;
+    QCheckBox *qompiCompletionSendThinkingCheck;
+    QComboBox *qompiCompletionThinkingCombo;
+    QCheckBox *qompiCompletionSendReasoningCheck;
+    QComboBox *qompiCompletionReasoningCombo;
     QCheckBox *vectorSearchEnabledCheck;
     QComboBox *vectorSearchProviderCombo;
     QLabel *vectorSearchStatusLabel;

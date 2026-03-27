@@ -3,6 +3,7 @@
 */
 
 #include "ai_completion_processor.h"
+#include "../clangd/clangd_service.h"
 #include "../context/chat_context_manager.h"
 #include "../models/agent_messages.h"
 #include "../providers/iai_provider.h"
@@ -11,16 +12,22 @@
 #include "../util/project_root_resolver.h"
 #include "../util/prompt_instructions.h"
 #include "../util/system_diagnostics_log.h"
+#include "completion_clang_context.h"
+#include "completion_connection_utils.h"
 #include "completion_request_settings.h"
 #include "completion_response_utils.h"
+#include "qompi_provider_backend_adapter.h"
+
+#include <qompi/completion_session.h>
+#include <qompi/completion_sink.h>
+#include <qompi/completion_types.h>
 
 #include <texteditor/codeassist/assistinterface.h>
 #include <texteditor/codeassist/assistproposalitem.h>
 #include <texteditor/codeassist/genericproposal.h>
 
+#include <QPointer>
 #include <QTextDocument>
-
-#include <QFileInfo>
 
 #include <atomic>
 #include <functional>
@@ -47,12 +54,79 @@ QList<completion_log_prompt_part_t> completion_prompt_parts(const QList<chat_mes
     return parts;
 }
 
+std::string to_std_string(const QString &value)
+{
+    return value.toUtf8().toStdString();
+}
+
+QString from_std_string(const std::string &value)
+{
+    return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
+}
+
+class processor_qompi_sink_t final : public qompi::completion_sink_t
+{
+public:
+    processor_qompi_sink_t(ai_completion_processor_t *processor, int pos,
+                           std::shared_ptr<bool> alive)
+        : processor(processor), pos(pos), alive(std::move(alive))
+    {
+    }
+
+    void on_chunk(const qompi::completion_chunk_t &chunk) override
+    {
+        Q_UNUSED(chunk);
+    }
+
+    void on_debug_event(const std::string &stage, const std::string &message) override
+    {
+        if (*this->alive == false || this->processor == nullptr)
+        {
+            return;
+        }
+        this->processor->record_qompi_debug_event(from_std_string(stage),
+                                                  from_std_string(message));
+    }
+
+    void on_completed(const qompi::completion_result_t &result) override
+    {
+        if (*this->alive == false)
+        {
+            return;
+        }
+        provider_usage_t usage;
+        ai_completion_processor_t::dispatch_completion_response(
+            this->processor, this->pos, this->alive, from_std_string(result.text), QString(),
+            usage);
+    }
+
+    void on_failed(const qompi::completion_error_t &error) override
+    {
+        if (*this->alive == false)
+        {
+            return;
+        }
+        provider_usage_t usage;
+        ai_completion_processor_t::dispatch_completion_response(
+            this->processor, this->pos, this->alive, QString(), from_std_string(error.message),
+            usage);
+    }
+
+private:
+    ai_completion_processor_t *processor = nullptr;
+    int pos = 0;
+    std::shared_ptr<bool> alive;
+};
+
 }  // namespace
 
 ai_completion_processor_t::ai_completion_processor_t(iai_provider_t *provider,
                                                      chat_context_manager_t *chat_context_manager,
-                                                     const QString &model)
-    : provider(provider), model(model), chat_context_manager(chat_context_manager)
+                                                     clangd_service_t *clangd_service,
+                                                     const QString &model,
+                                                     const completion_engine_kind_t engine_kind)
+    : provider(provider), model(model), chat_context_manager(chat_context_manager),
+      clangd_service(clangd_service), engine_kind(engine_kind)
 {
 }
 
@@ -76,6 +150,10 @@ void ai_completion_processor_t::cancel()
 {
     this->cancelled = true;
     this->request_running = false;
+    if (this->qompi_operation != nullptr)
+    {
+        this->qompi_operation->cancel();
+    }
     this->finalize_completion_log(QStringLiteral("cancelled"), {}, QStringLiteral("Cancelled"),
                                   {});
     // Don't call this->provider_->cancel() — it can trigger synchronous callbacks
@@ -101,8 +179,7 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
     const QString suffix = iface->textAt(pos, k_context_after);
     const QString file_name = iface->filePath().toUrlishString();
     const QString project_root = project_root_for_file_path(file_name);
-    const QString log_workspace_root =
-        project_root.isEmpty() == false ? project_root : QFileInfo(file_name).absolutePath();
+    const QString log_workspace_root = project_root;
 
     // Build FIM (fill-in-the-middle) prompt
     const QString prompt = build_completion_prompt(file_name, prefix, suffix);
@@ -110,9 +187,15 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
     const auto &s = settings();
     const completion_request_settings_t completion_settings =
         resolve_completion_request_settings(s);
+    const completion_connection_settings_t connection_settings =
+        resolve_completion_connection_settings(s);
+    const QString connection_summary =
+        describe_completion_connection_settings(connection_settings);
     const QString thinking_instruction = completion_thinking_instruction(completion_settings);
     QList<chat_message_t> messages;
     QString instruction_error;
+    QString clang_completion_context;
+    QString clang_completion_context_error;
     QString completion_context;
     QString completion_context_error;
     const bool detailed_completion_logging_enabled = s.detailed_completion_logging;
@@ -129,7 +212,8 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
          QStringLiteral("workspace_root=%1").arg(log_workspace_root),
          QStringLiteral("file=%1").arg(file_name),
          QStringLiteral("provider=%1").arg(this->provider->id()),
-         QStringLiteral("model=%1").arg(this->model)});
+         QStringLiteral("model=%1").arg(this->model),
+         QStringLiteral("connection=%1").arg(connection_summary)});
     const QString autocomplete_instruction =
         read_autocomplete_prompt(project_root, &instruction_error);
     if (instruction_error.isEmpty() == false)
@@ -140,6 +224,18 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
     else if (autocomplete_instruction.isEmpty() == false)
     {
         messages.append({QStringLiteral("system"), autocomplete_instruction});
+    }
+    clang_completion_context = build_completion_clang_context_block(
+        this->clangd_service, iface->filePath(), iface->textDocument(), pos,
+        &clang_completion_context_error);
+    if (clang_completion_context_error.isEmpty() == false)
+    {
+        QCAI_WARN("Completion", QStringLiteral("Failed to build clang completion context: %1")
+                                    .arg(clang_completion_context_error));
+    }
+    else if (clang_completion_context.isEmpty() == false)
+    {
+        messages.append({QStringLiteral("system"), clang_completion_context});
     }
     if (this->chat_context_manager != nullptr)
     {
@@ -203,6 +299,23 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
                                             QStringLiteral("instructions.empty"),
                                             QStringLiteral("AUTOCOMPLETE.md not found"));
         }
+        if (clang_completion_context_error.isEmpty() == false)
+        {
+            this->detailed_log.record_stage(QStringLiteral("local"),
+                                            QStringLiteral("clang_context.error"),
+                                            clang_completion_context_error);
+        }
+        else if (clang_completion_context.isEmpty() == false)
+        {
+            this->detailed_log.record_stage(
+                QStringLiteral("local"), QStringLiteral("clang_context.loaded"),
+                QStringLiteral("chars=%1").arg(clang_completion_context.size()));
+        }
+        else
+        {
+            this->detailed_log.record_stage(QStringLiteral("local"),
+                                            QStringLiteral("clang_context.empty"));
+        }
         if (this->chat_context_manager != nullptr)
         {
             if (completion_context_error.isEmpty() == false)
@@ -225,15 +338,20 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
         }
         this->detailed_log.record_stage(
             QStringLiteral("local"), QStringLiteral("completion.settings"),
-            QStringLiteral("provider=%1 model=%2 send_reasoning=%3 selected_reasoning=%4 "
-                           "send_thinking=%5 selected_thinking=%6")
-                .arg(this->provider->id(), this->model,
+            QStringLiteral("engine=%1 provider=%2 model=%3 send_reasoning=%4 "
+                           "selected_reasoning=%5 send_thinking=%6 selected_thinking=%7")
+                .arg(this->engine_kind == completion_engine_kind_t::QOMPI
+                         ? QStringLiteral("qompi")
+                         : QStringLiteral("legacy"),
+                     this->provider->id(), this->model,
                      completion_settings.send_reasoning == true ? QStringLiteral("on")
                                                                 : QStringLiteral("off"),
                      completion_settings.selected_reasoning_effort,
                      completion_settings.send_thinking == true ? QStringLiteral("on")
                                                                : QStringLiteral("off"),
                      completion_settings.selected_thinking_level));
+        this->detailed_log.record_stage(
+            QStringLiteral("local"), QStringLiteral("completion.connection"), connection_summary);
         this->detailed_log.record_stage(
             QStringLiteral("local"), QStringLiteral("prompt.ready"),
             QStringLiteral("messages=%1 prompt_chars=%2").arg(messages.size()).arg(prompt.size()));
@@ -261,6 +379,65 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
 
     using namespace std::placeholders;
     const auto alive = this->alive;
+    if (this->engine_kind == completion_engine_kind_t::QOMPI)
+    {
+        qompi::completion_request_t request;
+        request.request_id = to_std_string(completion_request_id);
+        request.prefix = to_std_string(prefix);
+        request.suffix = to_std_string(suffix);
+        request.file_path = to_std_string(file_name);
+        request.user_prompt = to_std_string(prompt);
+        request.trigger_kind = qompi::completion_trigger_kind_t::MANUAL;
+        for (const chat_message_t &message : messages)
+        {
+            if (message.role == QStringLiteral("system"))
+            {
+                request.system_context_blocks.push_back(to_std_string(message.content));
+            }
+        }
+
+        qompi::completion_options_t options;
+        options.model = to_std_string(this->model);
+        options.thinking_level = to_std_string(completion_settings.selected_thinking_level);
+        options.reasoning_effort =
+            to_std_string(completion_reasoning_effort_to_send(completion_settings));
+        const qompi::provider_profile_t provider_profile =
+            create_qompi_provider_profile(this->provider, this->model);
+        const qompi::resolved_completion_config_t resolved_config =
+            qompi::resolve_completion_config(provider_profile, request, std::move(options));
+
+        this->qompi_session = qompi::create_latest_wins_completion_session(
+            create_qompi_provider_backend(this->provider));
+        const auto sink = std::make_shared<processor_qompi_sink_t>(this, pos, alive);
+        if (this->detailed_log_started == true)
+        {
+            this->detailed_log.record_stage(
+                QStringLiteral("local"), QStringLiteral("qompi.dispatch_started"),
+                QStringLiteral("provider=%1 model=%2 reasoning=%3 thinking=%4 "
+                               "streaming=%5 cancellation=%6 stop_words=%7 max_output_tokens=%8")
+                    .arg(this->provider->id(), from_std_string(resolved_config.model_id),
+                         resolved_config.options.reasoning_effort.empty() == true
+                             ? QStringLiteral("-")
+                             : from_std_string(resolved_config.options.reasoning_effort),
+                         resolved_config.options.thinking_level.empty() == true
+                             ? QStringLiteral("-")
+                             : from_std_string(resolved_config.options.thinking_level),
+                         resolved_config.capabilities.supports_streaming == true
+                             ? QStringLiteral("on")
+                             : QStringLiteral("off"),
+                         resolved_config.capabilities.supports_cancellation == true
+                             ? QStringLiteral("on")
+                             : QStringLiteral("off"),
+                         QString::number(resolved_config.stop_policy.stop_words.size()),
+                         resolved_config.options.max_output_tokens.has_value() == true
+                             ? QString::number(resolved_config.options.max_output_tokens.value())
+                             : QStringLiteral("-")));
+        }
+        this->qompi_operation =
+            this->qompi_session->request_completion(request, resolved_config.options, sink);
+        return nullptr;
+    }
+
     const iai_provider_t::completion_callback_t completion_callback = std::bind(
         &ai_completion_processor_t::dispatch_completion_response, this, pos, alive, _1, _2, _3);
     const iai_provider_t::progress_callback_t progress_callback =
@@ -300,6 +477,16 @@ void ai_completion_processor_t::dispatch_progress_event(ai_completion_processor_
     }
 
     processor->handle_progress_event(event);
+}
+
+void ai_completion_processor_t::record_qompi_debug_event(const QString &stage,
+                                                         const QString &message)
+{
+    if (this->detailed_log_started == false)
+    {
+        return;
+    }
+    this->detailed_log.record_stage(QStringLiteral("qompi"), stage, message);
 }
 
 void ai_completion_processor_t::handle_completion_response(int pos, const QString &response,

@@ -10,6 +10,18 @@ namespace qcai2
 {
 
 /**
+ * Describes the rendered extent of one completion text relative to its starting column.
+ */
+struct completion_text_extent_t
+{
+    /** Number of extra lines added by the text. */
+    int end_line_offset = 0;
+
+    /** Column of the final cursor position after the text is laid out. */
+    int end_column = 0;
+};
+
+/**
  * Returns the current-line text before the cursor.
  * @param prefix Full prompt prefix captured before the cursor.
  * @return Text from the last newline up to the cursor.
@@ -24,7 +36,7 @@ QString current_line_prefix_before_cursor(const QString &prefix);
 QString current_line_suffix_after_cursor(const QString &suffix);
 
 /**
- * Builds one line-focused completion prompt that asks for insertion-only output.
+ * Builds one fill-in-the-middle completion prompt that asks for insertion-only output.
  * @param file_name Source file being completed.
  * @param prefix Full prompt prefix captured before the cursor.
  * @param suffix Full prompt suffix captured after the cursor.
@@ -52,6 +64,14 @@ QString normalize_completion_response(const QString &raw_response, const QString
  */
 QString build_inline_completion_text(const QString &prefix, const QString &completion,
                                      const QString &suffix);
+
+/**
+ * Measures the final line/column extent of one rendered completion text.
+ * @param text Full suggestion text passed to the inline suggestion API.
+ * @param start_column Column where the text starts on the first line.
+ * @return Final line offset and end column after rendering the text.
+ */
+completion_text_extent_t measure_completion_text_extent(const QString &text, int start_column);
 
 /**
  * Returns the stable prefix of one streaming completion suitable for partial inline display.

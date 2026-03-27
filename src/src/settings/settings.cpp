@@ -341,6 +341,7 @@ void settings_t::load()
     agent_debug = s.value("agentDebug", agent_debug).toBool();
     completion_min_chars = s.value("completionMinChars", completion_min_chars).toInt();
     completion_delay_ms = s.value("completionDelayMs", completion_delay_ms).toInt();
+    completion_engine = s.value("completionEngine", completion_engine).toString().trimmed();
     completion_provider = s.value("completionProvider", completion_provider).toString().trimmed();
     completion_model =
         normalize_model_name(s.value("completionModel", completion_model).toString());
@@ -352,6 +353,38 @@ void settings_t::load()
         s.value("completionSendReasoning", completion_send_reasoning).toBool();
     completion_reasoning_effort =
         s.value("completionReasoningEffort", completion_reasoning_effort).toString();
+    completion_base_url = s.value("completionBaseUrl", completion_base_url).toString().trimmed();
+    completion_api_key = s.value("completionApiKey", completion_api_key).toString();
+    completion_local_base_url =
+        s.value("completionLocalBaseUrl", completion_local_base_url).toString().trimmed();
+    completion_local_endpoint_path =
+        s.value("completionLocalEndpointPath", completion_local_endpoint_path)
+            .toString()
+            .trimmed();
+    completion_local_custom_headers =
+        s.value("completionLocalCustomHeaders", completion_local_custom_headers)
+            .toString()
+            .trimmed();
+    completion_ollama_base_url =
+        s.value("completionOllamaBaseUrl", completion_ollama_base_url).toString().trimmed();
+    completion_copilot_node_path =
+        s.value("completionCopilotNodePath", completion_copilot_node_path).toString().trimmed();
+    completion_copilot_sidecar_path =
+        s.value("completionCopilotSidecarPath", completion_copilot_sidecar_path)
+            .toString()
+            .trimmed();
+    qompi_completion_provider =
+        s.value("qompiCompletionProvider", qompi_completion_provider).toString().trimmed();
+    qompi_completion_model =
+        normalize_model_name(s.value("qompiCompletionModel", qompi_completion_model).toString());
+    qompi_completion_send_thinking =
+        s.value("qompiCompletionSendThinking", qompi_completion_send_thinking).toBool();
+    qompi_completion_thinking_level =
+        s.value("qompiCompletionThinkingLevel", qompi_completion_thinking_level).toString();
+    qompi_completion_send_reasoning =
+        s.value("qompiCompletionSendReasoning", qompi_completion_send_reasoning).toBool();
+    qompi_completion_reasoning_effort =
+        s.value("qompiCompletionReasoningEffort", qompi_completion_reasoning_effort).toString();
     vector_search_enabled = s.value("vectorSearchEnabled", vector_search_enabled).toBool();
     vector_search_provider =
         s.value("vectorSearchProvider", vector_search_provider).toString().trimmed();
@@ -470,12 +503,27 @@ void settings_t::save() const
     s.setValue("agentDebug", agent_debug);
     s.setValue("completionMinChars", completion_min_chars);
     s.setValue("completionDelayMs", completion_delay_ms);
+    s.setValue("completionEngine", completion_engine);
     s.setValue("completionProvider", completion_provider);
     s.setValue("completionModel", completion_model);
     s.setValue("completionSendThinking", completion_send_thinking);
     s.setValue("completionThinkingLevel", completion_thinking_level);
     s.setValue("completionSendReasoning", completion_send_reasoning);
     s.setValue("completionReasoningEffort", completion_reasoning_effort);
+    s.setValue("completionBaseUrl", completion_base_url);
+    s.setValue("completionApiKey", completion_api_key);
+    s.setValue("completionLocalBaseUrl", completion_local_base_url);
+    s.setValue("completionLocalEndpointPath", completion_local_endpoint_path);
+    s.setValue("completionLocalCustomHeaders", completion_local_custom_headers);
+    s.setValue("completionOllamaBaseUrl", completion_ollama_base_url);
+    s.setValue("completionCopilotNodePath", completion_copilot_node_path);
+    s.setValue("completionCopilotSidecarPath", completion_copilot_sidecar_path);
+    s.setValue("qompiCompletionProvider", qompi_completion_provider);
+    s.setValue("qompiCompletionModel", qompi_completion_model);
+    s.setValue("qompiCompletionSendThinking", qompi_completion_send_thinking);
+    s.setValue("qompiCompletionThinkingLevel", qompi_completion_thinking_level);
+    s.setValue("qompiCompletionSendReasoning", qompi_completion_send_reasoning);
+    s.setValue("qompiCompletionReasoningEffort", qompi_completion_reasoning_effort);
     s.setValue("vectorSearchEnabled", vector_search_enabled);
     s.setValue("vectorSearchProvider", vector_search_provider);
     s.setValue("qdrantUrl", qdrant_url);

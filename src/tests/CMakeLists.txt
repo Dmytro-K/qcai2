@@ -682,12 +682,127 @@ qcai2_enable_linker_map(tst_qcai2_completion_response_utils)
 
 target_include_directories(tst_qcai2_completion_response_utils PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/lib/qompi/include"
 )
 target_link_libraries(tst_qcai2_completion_response_utils PRIVATE
     Qt::Core
     Qt::Test
+    qompi_core
 )
 qcai2_register_test(qcai2_completion_response_utils tst_qcai2_completion_response_utils)
+
+add_executable(tst_qcai2_qompi_completion_session
+    tst_qompi_completion_session.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_qompi_completion_session)
+
+target_link_libraries(tst_qcai2_qompi_completion_session PRIVATE
+    Qt::Core
+    Qt::Test
+    qompi_core
+)
+qcai2_register_test(qcai2_qompi_completion_session tst_qcai2_qompi_completion_session)
+
+add_executable(tst_qcai2_qompi_completion_policy
+    tst_qompi_completion_policy.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_qompi_completion_policy)
+
+target_link_libraries(tst_qcai2_qompi_completion_policy PRIVATE
+    Qt::Core
+    Qt::Test
+    qompi_core
+)
+qcai2_register_test(qcai2_qompi_completion_policy tst_qcai2_qompi_completion_policy)
+
+add_executable(tst_qcai2_qompi_completion_profiles
+    tst_qompi_completion_profiles.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_qompi_completion_profiles)
+
+target_link_libraries(tst_qcai2_qompi_completion_profiles PRIVATE
+    Qt::Core
+    Qt::Test
+    qompi_core
+)
+qcai2_register_test(qcai2_qompi_completion_profiles tst_qcai2_qompi_completion_profiles)
+
+add_executable(tst_qcai2_qompi_qt_completion_session
+    tst_qompi_qt_completion_session.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_qompi_qt_completion_session)
+
+target_link_libraries(tst_qcai2_qompi_qt_completion_session PRIVATE
+    Qt::Core
+    Qt::Test
+    qompi_qt
+)
+qcai2_register_test(qcai2_qompi_qt_completion_session tst_qcai2_qompi_qt_completion_session)
+
+add_executable(tst_qcai2_qompi_provider_backend_adapter
+    tst_qompi_provider_backend_adapter.cpp
+    ../src/completion/qompi_provider_backend_adapter.cpp
+    ../src/progress/agent_progress.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_qompi_provider_backend_adapter)
+
+target_include_directories(tst_qcai2_qompi_provider_backend_adapter PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/lib/qompi/include"
+)
+target_link_libraries(tst_qcai2_qompi_provider_backend_adapter PRIVATE
+    Qt::Core
+    Qt::Test
+    qompi_core
+)
+qcai2_register_test(qcai2_qompi_provider_backend_adapter
+                    tst_qcai2_qompi_provider_backend_adapter)
+
+add_executable(tst_qcai2_project_root_resolver
+    tst_project_root_resolver.cpp
+    ../src/util/project_root_resolver.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_project_root_resolver)
+
+target_include_directories(tst_qcai2_project_root_resolver PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_project_root_resolver PRIVATE
+    Qt::Core
+    Qt::Test
+    QtCreator::ExtensionSystem
+    QtCreator::ProjectExplorer
+    QtCreator::Utils
+)
+qcai2_register_test(qcai2_project_root_resolver tst_qcai2_project_root_resolver)
+
+if(FEATURE_CLANGD_ENABLE)
+add_executable(tst_qcai2_completion_clang_context
+    tst_completion_clang_context.cpp
+    ../src/clangd/clangd_service.cpp
+    ../src/completion/completion_clang_context.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_completion_clang_context)
+
+target_include_directories(tst_qcai2_completion_clang_context PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_completion_clang_context PRIVATE
+    Qt::Core
+    Qt::Gui
+    Qt::Test
+    QtCreator::ClangCodeModel
+    QtCreator::Utils
+)
+qcai2_register_test(qcai2_completion_clang_context tst_qcai2_completion_clang_context)
+endif()
 
 add_executable(tst_qcai2_prompt_instructions
     tst_prompt_instructions.cpp
