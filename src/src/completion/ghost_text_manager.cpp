@@ -13,6 +13,7 @@
 #include "../util/prompt_instructions.h"
 #include "../util/system_diagnostics_log.h"
 #include "completion_request_settings.h"
+#include "completion_response_utils.h"
 #include "completion_trigger_utils.h"
 
 #include <texteditor/textdocument.h>
@@ -156,6 +157,16 @@ void finalize_detailed_completion_log(
             {QStringLiteral("status=%1").arg(status),
              QStringLiteral("target_path=%1").arg(detailed_log->log_file_path())});
     }
+}
+
+void record_streaming_stage(const std::shared_ptr<completion_detailed_log_t> &detailed_log,
+                            const QString &stage, const QString &message)
+{
+    if (detailed_log == nullptr)
+    {
+        return;
+    }
+    detailed_log->record_stage(QStringLiteral("local"), stage, message);
 }
 
 }  // namespace
@@ -498,13 +509,7 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
          QStringLiteral("provider=%1").arg(provider->id()),
          QStringLiteral("model=%1").arg(model)});
 
-    const QString prompt =
-        QStringLiteral("You are a code completion engine. Complete the code at the cursor "
-                       "position marked <CURSOR>.\n"
-                       "File: %1\n"
-                       "Return ONLY the completion text, no explanation, no markdown.\n\n"
-                       "```\n%2<CURSOR>%3\n```")
-            .arg(fileName, prefix, suffix);
+    const QString prompt = build_completion_prompt(fileName, prefix, suffix);
 
     QList<chat_message_t> messages;
     QString instruction_error;
@@ -630,8 +635,9 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
 
     const auto alive = this->alive;
     const QPointer<TextEditor::TextEditorWidget> editorGuard(editor);
+    const auto streaming_state = std::make_shared<streaming_completion_state_t>();
     const iai_provider_t::completion_callback_t completion_callback =
-        [this, editorGuard, pos, alive, detailed_log](
+        [this, editorGuard, pos, prefix, suffix, alive, detailed_log, streaming_state](
             const QString &response, const QString &error, const provider_usage_t &usage) {
             if (*alive == false)
             {
@@ -650,16 +656,55 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
                     usage);
                 return;
             }
-            this->handle_completion_response(editorGuard.data(), pos, response, error, usage,
-                                             detailed_log);
+            this->handle_completion_response(editorGuard.data(), pos, prefix, suffix, response,
+                                             error, usage, detailed_log);
         };
+    const iai_provider_t::stream_callback_t stream_callback = [alive](const QString &delta) {
+        Q_UNUSED(alive);
+        Q_UNUSED(delta);
+    };
     const iai_provider_t::progress_callback_t progress_callback =
-        [alive, detailed_log](const provider_raw_event_t &event) {
-            if (*alive == false || detailed_log == nullptr)
+        [this, alive, editorGuard, pos, prefix, suffix, detailed_log,
+         streaming_state](const provider_raw_event_t &event) {
+            if (*alive == false)
             {
                 return;
             }
-            detailed_log->record_provider_event(event);
+            if (detailed_log != nullptr)
+            {
+                detailed_log->record_provider_event(event);
+            }
+            if (event.kind != provider_raw_event_kind_t::MESSAGE_DELTA || event.message.isEmpty())
+            {
+                return;
+            }
+            if (editorGuard.isNull() == true)
+            {
+                return;
+            }
+
+            streaming_state->accumulated_completion += event.message;
+            const QString normalized_completion = normalize_completion_response(
+                streaming_state->accumulated_completion, prefix, suffix);
+            const QString stable_completion =
+                stable_streaming_completion_prefix(normalized_completion);
+            if (stable_completion.isEmpty() == true ||
+                stable_completion == streaming_state->last_rendered_completion)
+            {
+                return;
+            }
+            if (this->show_completion_suggestion(editorGuard.data(), pos, prefix, suffix,
+                                                 stable_completion, {}, detailed_log,
+                                                 false) == false)
+            {
+                return;
+            }
+
+            streaming_state->last_rendered_completion = stable_completion;
+            record_streaming_stage(detailed_log, QStringLiteral("streaming.partial_ready"),
+                                   QStringLiteral("completion_chars=%1 rendered_chars=%2")
+                                       .arg(normalized_completion.length())
+                                       .arg(stable_completion.length()));
         };
     if (detailed_log != nullptr)
     {
@@ -669,12 +714,13 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
     }
     provider->complete(messages, model, 0.0, 128,
                        completion_reasoning_effort_to_send(completion_settings),
-                       completion_callback, nullptr, progress_callback);
+                       completion_callback, stream_callback, progress_callback);
 }
 
 void ghost_text_manager_t::handle_completion_response(
-    TextEditor::TextEditorWidget *editor, int pos, const QString &response, const QString &error,
-    const provider_usage_t &usage, const std::shared_ptr<completion_detailed_log_t> &detailed_log)
+    TextEditor::TextEditorWidget *editor, int pos, const QString &prefix, const QString &suffix,
+    const QString &response, const QString &error, const provider_usage_t &usage,
+    const std::shared_ptr<completion_detailed_log_t> &detailed_log)
 {
     if (detailed_log != nullptr)
     {
@@ -692,7 +738,7 @@ void ghost_text_manager_t::handle_completion_response(
         return;
     }
 
-    const QString completion = this->clean_completion(response);
+    const QString completion = this->clean_completion(response, prefix, suffix);
     if (completion.isEmpty() == true)
     {
         finalize_detailed_completion_log(detailed_log, QStringLiteral("empty_response"), response,
@@ -700,23 +746,59 @@ void ghost_text_manager_t::handle_completion_response(
         return;
     }
 
+    if (this->show_completion_suggestion(editor, pos, prefix, suffix, completion, usage,
+                                         detailed_log, true) == false)
+    {
+        return;
+    }
+
+    finalize_detailed_completion_log(detailed_log, QStringLiteral("success"), completion, {},
+                                     usage);
+}
+
+bool ghost_text_manager_t::show_completion_suggestion(
+    TextEditor::TextEditorWidget *editor, int pos, const QString &prefix, const QString &suffix,
+    const QString &completion, const provider_usage_t &usage,
+    const std::shared_ptr<completion_detailed_log_t> &detailed_log, const bool final_update)
+{
     if (editor->textCursor().position() != pos)
     {
-        finalize_detailed_completion_log(
-            detailed_log, QStringLiteral("stale_cursor"), completion,
-            QStringLiteral("Cursor moved before ghost-text completion "
-                           "was shown."),
-            usage);
-        return;
+        if (final_update == true)
+        {
+            finalize_detailed_completion_log(
+                detailed_log, QStringLiteral("stale_cursor"), completion,
+                QStringLiteral("Cursor moved before ghost-text completion "
+                               "was shown."),
+                usage);
+        }
+        return false;
     }
 
     QTextCursor tc = editor->textCursor();
     const int line = tc.blockNumber() + 1;
     const int col = tc.positionInBlock();
+    const QString line_prefix = current_line_prefix_before_cursor(prefix);
+    const QString line_suffix = current_line_suffix_after_cursor(suffix);
+    const QString suggestion_text = build_inline_completion_text(prefix, completion, suffix);
+    const int range_start_column = col - static_cast<int>(line_prefix.size());
+    if (range_start_column < 0)
+    {
+        if (final_update == true)
+        {
+            finalize_detailed_completion_log(
+                detailed_log, QStringLiteral("stale_cursor"), completion,
+                QStringLiteral("Current line prefix length exceeded the live cursor column."),
+                usage);
+        }
+        return false;
+    }
 
-    Utils::Text::Position textPos{line, col};
-    Utils::Text::Range range{textPos, textPos};
-    TextEditor::TextSuggestion::Data data{range, textPos, completion};
+    Utils::Text::Position range_begin{line, range_start_column};
+    Utils::Text::Position range_end{line,
+                                    range_start_column + static_cast<int>(suggestion_text.size())};
+    Utils::Text::Position text_pos{line, col};
+    Utils::Text::Range range{range_begin, range_end};
+    TextEditor::TextSuggestion::Data data{range, text_pos, suggestion_text};
 
     editor->insertSuggestion(
         std::make_unique<TextEditor::TextSuggestion>(data, editor->document()));
@@ -725,32 +807,24 @@ void ghost_text_manager_t::handle_completion_response(
                QStringLiteral("Showing suggestion: %1 chars").arg(completion.length()));
     if (detailed_log != nullptr)
     {
-        detailed_log->record_stage(QStringLiteral("local"), QStringLiteral("proposal.ready"),
-                                   QStringLiteral("completion_chars=%1 suggestion_chars=%2")
+        detailed_log->record_stage(QStringLiteral("local"),
+                                   final_update == true
+                                       ? QStringLiteral("proposal.ready")
+                                       : QStringLiteral("streaming.proposal.updated"),
+                                   QStringLiteral("completion_chars=%1 suggestion_chars=%2 "
+                                                  "line_prefix_chars=%3 line_suffix_chars=%4")
                                        .arg(completion.length())
-                                       .arg(completion.length()));
+                                       .arg(suggestion_text.length())
+                                       .arg(line_prefix.length())
+                                       .arg(line_suffix.length()));
     }
-    finalize_detailed_completion_log(detailed_log, QStringLiteral("success"), completion, {},
-                                     usage);
+    return true;
 }
 
-QString ghost_text_manager_t::clean_completion(const QString &raw)
+QString ghost_text_manager_t::clean_completion(const QString &raw, const QString &prefix,
+                                               const QString &suffix)
 {
-    QString text = raw.trimmed();
-    if (((text.startsWith(QStringLiteral("```"))) == true))
-    {
-        qsizetype firstNl = text.indexOf(QLatin1Char('\n'));
-        if (firstNl >= 0)
-        {
-            text = text.mid(firstNl + 1);
-        }
-        if (((text.endsWith(QStringLiteral("```"))) == true))
-        {
-            text.chop(3);
-        }
-        text = text.trimmed();
-    }
-    return text;
+    return normalize_completion_response(raw, prefix, suffix);
 }
 
 }  // namespace qcai2

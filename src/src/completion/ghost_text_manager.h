@@ -36,6 +36,18 @@ struct pending_completion_snapshot_t
 };
 
 /**
+ * Tracks one in-flight streaming ghost-text response.
+ */
+struct streaming_completion_state_t
+{
+    /** Accumulated insertion-only streamed text from MESSAGE_DELTA events. */
+    QString accumulated_completion;
+
+    /** Last stable insertion-only prefix already rendered into the editor suggestion. */
+    QString last_rendered_completion;
+};
+
+/**
  * Manages debounced inline ghost-text suggestions for attached editors.
  */
 class ghost_text_manager_t : public QObject
@@ -122,6 +134,7 @@ private:
      */
     void
     handle_completion_response(TextEditor::TextEditorWidget *editor, int pos,
+                               const QString &prefix, const QString &suffix,
                                const QString &response, const QString &error,
                                const provider_usage_t &usage,
                                const std::shared_ptr<completion_detailed_log_t> &detailed_log);
@@ -140,11 +153,30 @@ private:
     void request_completion(TextEditor::TextEditorWidget *editor);
 
     /**
+     * Shows one inline suggestion for either a partial or final completion.
+     * @param editor Editor that owns the suggestion.
+     * @param pos Cursor position frozen when the request started.
+     * @param prefix Frozen prefix used to build the request.
+     * @param suffix Frozen suffix used to build the request.
+     * @param completion Normalized insertion-only completion text to render.
+     * @param usage Provider usage metadata used for final error/status reporting.
+     * @param detailed_log Detailed completion log for this request.
+     * @param final_update True when this is the final completion callback.
+     * @return True when the suggestion was rendered successfully.
+     */
+    bool show_completion_suggestion(TextEditor::TextEditorWidget *editor, int pos,
+                                    const QString &prefix, const QString &suffix,
+                                    const QString &completion, const provider_usage_t &usage,
+                                    const std::shared_ptr<completion_detailed_log_t> &detailed_log,
+                                    bool final_update);
+
+    /**
      * Removes wrapper markup from a model response.
      * @param raw Raw completion text returned by the provider.
      * @return Clean text ready to display inline.
      */
-    static QString clean_completion(const QString &raw);
+    static QString clean_completion(const QString &raw, const QString &prefix,
+                                    const QString &suffix);
 
     /** Non-owning AI backend used for inline suggestions. */
     iai_provider_t *provider = nullptr;

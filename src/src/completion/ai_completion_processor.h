@@ -117,6 +117,12 @@ private:
 
     /** True after the detailed log has been finalized and appended to disk. */
     bool detailed_log_finished = false;
+
+    /** Prefix snapshot used to build the current request. */
+    QString request_prefix;
+
+    /** Suffix snapshot used to build the current request. */
+    QString request_suffix;
 };
 
 }  // namespace qcai2

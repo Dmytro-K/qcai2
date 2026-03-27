@@ -672,6 +672,23 @@ target_link_libraries(tst_qcai2_completion_trigger_utils PRIVATE
 )
 qcai2_register_test(qcai2_completion_trigger_utils tst_qcai2_completion_trigger_utils)
 
+add_executable(tst_qcai2_completion_response_utils
+    tst_completion_response_utils.cpp
+    ../src/completion/completion_trigger_utils.cpp
+    ../src/completion/completion_response_utils.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_completion_response_utils)
+
+target_include_directories(tst_qcai2_completion_response_utils PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_completion_response_utils PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_completion_response_utils tst_qcai2_completion_response_utils)
+
 add_executable(tst_qcai2_prompt_instructions
     tst_prompt_instructions.cpp
     ../src/util/prompt_instructions.cpp

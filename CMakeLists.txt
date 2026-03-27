@@ -696,6 +696,8 @@ add_qtc_plugin(qcai2
     src/src/completion/ai_completion_provider.cpp
     src/src/completion/completion_trigger_utils.h
     src/src/completion/completion_trigger_utils.cpp
+    src/src/completion/completion_response_utils.h
+    src/src/completion/completion_response_utils.cpp
     src/src/completion/completion_request_settings.h
     src/src/completion/completion_request_settings.cpp
     src/src/completion/ai_completion_processor.h
@@ -903,7 +905,7 @@ endif()
 
 qcai2_collect_target_cpp_sources(QCAI2_CLANG_TIDY_SOURCES qcai2)
 set(QCAI2_CLANG_ANALYZER_BUILD_TARGETS qcai2)
-foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_agent_messages tst_qcai2_provider_usage tst_qcai2_agent_progress tst_qcai2_agent_run_state_machine tst_qcai2_actions_log_model tst_qcai2_actions_log_delegate tst_qcai2_decision_request_widget tst_qcai2_chat_context tst_qcai2_slash_commands tst_qcai2_safety_policy tst_qcai2_mcp_config tst_qcai2_tool_registry tst_qcai2_completion_detailed_log tst_qcai2_migration)
+foreach(qcai2_test_target IN ITEMS tst_qcai2_json tst_qcai2_toolcall tst_qcai2_agent_messages tst_qcai2_provider_usage tst_qcai2_agent_progress tst_qcai2_agent_run_state_machine tst_qcai2_actions_log_model tst_qcai2_actions_log_delegate tst_qcai2_decision_request_widget tst_qcai2_chat_context tst_qcai2_slash_commands tst_qcai2_safety_policy tst_qcai2_mcp_config tst_qcai2_tool_registry tst_qcai2_completion_detailed_log tst_qcai2_completion_response_utils tst_qcai2_migration)
     if(TARGET ${qcai2_test_target})
         qcai2_collect_target_cpp_sources(qcai2_test_sources ${qcai2_test_target})
         list(APPEND QCAI2_CLANG_TIDY_SOURCES ${qcai2_test_sources})

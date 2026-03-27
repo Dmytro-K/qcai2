@@ -61,6 +61,20 @@ int typed_fragment_end_offset(const QString &inserted_text)
     return 0;
 }
 
+int typed_fragment_trigger_column(const QString &inserted_text,
+                                  const int trigger_column_after_insert)
+{
+    const int fragment_end_offset = typed_fragment_end_offset(inserted_text);
+    if (fragment_end_offset <= 0)
+    {
+        return trigger_column_after_insert;
+    }
+
+    const int trailing_whitespace_chars =
+        static_cast<int>(inserted_text.size()) - fragment_end_offset;
+    return qMax(0, trigger_column_after_insert - trailing_whitespace_chars);
+}
+
 bool should_auto_trigger_completion(const QString &line_text, const int cursor_column,
                                     const int completion_min_chars)
 {

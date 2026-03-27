@@ -12,6 +12,7 @@
 #include "../util/prompt_instructions.h"
 #include "../util/system_diagnostics_log.h"
 #include "completion_request_settings.h"
+#include "completion_response_utils.h"
 
 #include <texteditor/codeassist/assistinterface.h>
 #include <texteditor/codeassist/assistproposalitem.h>
@@ -104,13 +105,7 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
         project_root.isEmpty() == false ? project_root : QFileInfo(file_name).absolutePath();
 
     // Build FIM (fill-in-the-middle) prompt
-    const QString prompt =
-        QStringLiteral("You are a code completion engine. Complete the code at the cursor "
-                       "position marked <CURSOR>.\n"
-                       "File: %1\n"
-                       "Return ONLY the completion text, no explanation, no markdown.\n\n"
-                       "```\n%2<CURSOR>%3\n```")
-            .arg(file_name, prefix, suffix);
+    const QString prompt = build_completion_prompt(file_name, prefix, suffix);
 
     const auto &s = settings();
     const completion_request_settings_t completion_settings =
@@ -254,6 +249,8 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
     }
 
     this->request_running = true;
+    this->request_prefix = prefix;
+    this->request_suffix = suffix;
     QCAI_DEBUG("Completion",
                QStringLiteral(
                    "Requesting completion at pos %1 in %2 (prefix: %3 chars, suffix: %4 chars)")
@@ -340,20 +337,8 @@ void ai_completion_processor_t::handle_completion_response(int pos, const QStrin
         return;
     }
 
-    QString completion = response.trimmed();
-    if (completion.startsWith(QStringLiteral("```")))
-    {
-        const qsizetype first_nl = completion.indexOf(QLatin1Char('\n'));
-        if (first_nl >= 0)
-        {
-            completion = completion.mid(first_nl + 1);
-        }
-        if (completion.endsWith(QStringLiteral("```")))
-        {
-            completion.chop(3);
-        }
-        completion = completion.trimmed();
-    }
+    const QString completion =
+        normalize_completion_response(response, this->request_prefix, this->request_suffix);
 
     if (completion.isEmpty() == true)
     {
