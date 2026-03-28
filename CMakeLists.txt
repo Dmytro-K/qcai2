@@ -8,6 +8,7 @@ project(qcai2)
 include(GNUInstallDirs)
 include(ExternalProject)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/qcai2-global-parameters.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/qcai2-precompiled-headers.cmake")
 
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION.txt" QCAI2_VERSION_FILE_LINES
     REGEX "^[ \t]*[^# \t].*$")
@@ -405,6 +406,10 @@ endif()
 add_subdirectory(lib/qtmcp)
 add_subdirectory(lib/qompi)
 
+qcai2_apply_network_precompiled_headers(qtmcp)
+qcai2_apply_qompi_core_precompiled_headers(qompi_core)
+qcai2_apply_qompi_qt_precompiled_headers(qompi_qt)
+
 if(FEATURE_QDRANT_ENABLE)
     find_package(ZLIB REQUIRED)
 
@@ -424,6 +429,7 @@ if(FEATURE_QDRANT_ENABLE)
         PRIVATE
             ZLIB::ZLIB
     )
+    qcai2_apply_network_precompiled_headers(qcai2_qdrant_http)
 endif()
 
 if(WITH_TESTS)
@@ -719,6 +725,7 @@ add_qtc_plugin(qcai2
 )
 
 qcai2_enable_linker_map(qcai2)
+qcai2_apply_core_precompiled_headers(qcai2)
 target_link_libraries(qcai2 PRIVATE qcai2_libarchive qcai2_version_info qtmcp::qtmcp qompi_core)
 if(FEATURE_QDRANT_ENABLE)
     target_link_libraries(qcai2 PRIVATE qcai2_qdrant_http)
