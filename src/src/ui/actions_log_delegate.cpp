@@ -13,6 +13,7 @@
 #include <QFrame>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QShortcut>
 #include <QStyle>
 #include <QTextBrowser>
 #include <QTextDocument>
@@ -73,6 +74,14 @@ void configure_editor(QTextBrowser *editor)
     editor->setContextMenuPolicy(Qt::DefaultContextMenu);
     editor->setStyleSheet(
         QStringLiteral("QTextBrowser { background: transparent; border: none; }"));
+
+    auto *copy_shortcut = new QShortcut(QKeySequence::Copy, editor);
+    copy_shortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(copy_shortcut, &QShortcut::activated, editor, &QTextBrowser::copy);
+
+    auto *select_all_shortcut = new QShortcut(QKeySequence::SelectAll, editor);
+    select_all_shortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(select_all_shortcut, &QShortcut::activated, editor, &QTextBrowser::selectAll);
 }
 
 QString anchor_at_position(const QStyleOptionViewItem &option, const QModelIndex &index,
