@@ -196,6 +196,7 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
     QString instruction_error;
     QString clang_completion_context;
     QString clang_completion_context_error;
+    QStringList clang_completion_context_trace;
     QString completion_context;
     QString completion_context_error;
     const bool detailed_completion_logging_enabled = s.detailed_completion_logging;
@@ -227,7 +228,8 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
     }
     clang_completion_context = build_completion_clang_context_block(
         this->clangd_service, iface->filePath(), iface->textDocument(), pos,
-        &clang_completion_context_error);
+        &clang_completion_context_error,
+        detailed_completion_logging_enabled == true ? &clang_completion_context_trace : nullptr);
     if (clang_completion_context_error.isEmpty() == false)
     {
         QCAI_WARN("Completion", QStringLiteral("Failed to build clang completion context: %1")
@@ -315,6 +317,12 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
         {
             this->detailed_log.record_stage(QStringLiteral("local"),
                                             QStringLiteral("clang_context.empty"));
+        }
+        if (clang_completion_context_trace.isEmpty() == false)
+        {
+            this->detailed_log.record_stage(
+                QStringLiteral("local"), QStringLiteral("clang_context.trace"),
+                clang_completion_context_trace.join(QLatin1Char('\n')));
         }
         if (this->chat_context_manager != nullptr)
         {

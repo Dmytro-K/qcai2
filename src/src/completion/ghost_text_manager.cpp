@@ -629,6 +629,7 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
     QString instruction_error;
     QString clang_completion_context;
     QString clang_completion_context_error;
+    QStringList clang_completion_context_trace;
     QString completion_context;
     QString completion_context_error;
     const QString autocomplete_instruction =
@@ -645,7 +646,8 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
     clang_completion_context = build_completion_clang_context_block(
         this->clangd_service,
         editor->textDocument() != nullptr ? editor->textDocument()->filePath() : Utils::FilePath(),
-        editor->document(), pos, &clang_completion_context_error);
+        editor->document(), pos, &clang_completion_context_error,
+        detailed_completion_logging_enabled == true ? &clang_completion_context_trace : nullptr);
     if (clang_completion_context_error.isEmpty() == false)
     {
         QCAI_WARN("GhostText", QStringLiteral("Failed to build clang completion context: %1")
@@ -732,6 +734,12 @@ void ghost_text_manager_t::request_completion(TextEditor::TextEditorWidget *edit
         {
             detailed_log->record_stage(QStringLiteral("local"),
                                        QStringLiteral("clang_context.empty"));
+        }
+        if (clang_completion_context_trace.isEmpty() == false)
+        {
+            detailed_log->record_stage(QStringLiteral("local"),
+                                       QStringLiteral("clang_context.trace"),
+                                       clang_completion_context_trace.join(QLatin1Char('\n')));
         }
         if (this->chat_context_manager != nullptr)
         {

@@ -45,6 +45,11 @@ private slots:
     void normalize_response_extracts_fenced_completion_body();
 
     /**
+     * A suffix match may consume the full generated completion without underflowing normalization.
+     */
+    void normalize_response_handles_full_suffix_overlap();
+
+    /**
      * Inline completion expansion must preserve the current-line suffix.
      */
     void build_inline_completion_text_preserves_line_context();
@@ -116,6 +121,12 @@ void tst_qompi_completion_policy_t::normalize_response_extracts_fenced_completio
                  "previous_line\n    for", "\nnext_line",
                  "Here is the completion:\n```cpp\n (const auto &message : messages)\n```")),
              QStringLiteral(" (const auto &message : messages)"));
+}
+
+void tst_qompi_completion_policy_t::normalize_response_handles_full_suffix_overlap()
+{
+    QCOMPARE(QString::fromStdString(normalize_completion_response("call(", ");", ");")),
+             QString());
 }
 
 void tst_qompi_completion_policy_t::build_inline_completion_text_preserves_line_context()

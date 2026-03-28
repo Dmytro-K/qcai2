@@ -361,7 +361,10 @@ std::string normalize_completion_response(const std::string &prefix, const std::
     const int suffix_overlap = largest_suffix_prefix_overlap(completion, line_suffix);
     if (suffix_overlap > 0)
     {
-        completion.resize(completion.size() - static_cast<std::size_t>(suffix_overlap));
+        const std::size_t suffix_overlap_size = static_cast<std::size_t>(suffix_overlap);
+        const std::size_t trimmed_size =
+            suffix_overlap_size >= completion.size() ? 0 : completion.size() - suffix_overlap_size;
+        completion.resize(trimmed_size);
     }
     completion = normalize_leading_inline_whitespace(std::move(completion), line_prefix);
 

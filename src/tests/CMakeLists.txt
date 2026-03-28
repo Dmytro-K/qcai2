@@ -7,6 +7,7 @@ function(qcai2_register_test test_name target_name)
             COMMAND_EXPAND_LISTS
         )
     endif()
+    qcai2_apply_test_precompiled_headers(${target_name})
     add_test(NAME ${test_name} COMMAND ${target_name})
     set_property(GLOBAL APPEND PROPERTY QCAI2_TEST_TARGETS ${target_name})
 endfunction()

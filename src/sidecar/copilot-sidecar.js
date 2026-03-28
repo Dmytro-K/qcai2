@@ -7,6 +7,7 @@
 // Streaming: {"id":N,"stream_delta":"text"}
 
 import { CopilotClient, approveAll } from "@github/copilot-sdk";
+import { pathToFileURL } from "node:url";
 
 let client = null;
 
@@ -246,6 +247,35 @@ async function acquireSession(sessionOpts) {
     });
 }
 
+export function isStatelessCompletionPrompt(messages) {
+    if (Array.isArray(messages) === false || messages.length === 0) {
+        return false;
+    }
+
+    return messages.some((message) => {
+        if (!message || typeof message !== "object") {
+            return false;
+        }
+        const role = typeof message.role === "string" ? message.role : "user";
+        const content = typeof message.content === "string" ? message.content : "";
+        if (role !== "user" || content.length === 0) {
+            return false;
+        }
+
+        return content.startsWith("You are a code completion engine.")
+            && content.includes("<fim_prefix>")
+            && content.includes("<fim_middle>");
+    });
+}
+
+export function shouldReuseSessionForComplete(messages, params = {}) {
+    if (params?.reuseSession === false) {
+        return false;
+    }
+
+    return isStatelessCompletionPrompt(messages) === false;
+}
+
 // ── Handlers ───────────────────────────────────────────────────
 
 let clientStarting = null; // promise for in-progress start
@@ -305,6 +335,7 @@ async function handleComplete(id, params) {
         : (Number.isFinite(params?.completionTimeoutSec)
             ? Math.max(0, Math.trunc(params.completionTimeoutSec))
             : 1200);
+    const reuseSession = shouldReuseSessionForComplete(messages, params);
 
     const state = { cancelled: false, session: null, reusable: false, invalidateReusable: false };
     activeRequests.set(id, state);
@@ -337,7 +368,15 @@ async function handleComplete(id, params) {
             sessionOpts.systemMessage = { mode: "replace", content: systemMessage };
         }
         log(`Request #${id}: acquiring session model=${requestedModel} reasoning_effort=${reasoning_effort || "default"} session_idle_timeout=${completionTimeoutSec > 0 ? `${completionTimeoutSec}s` : "none"}`);
-        const sessionLease = await acquireSession(sessionOpts);
+        const sessionLease = reuseSession
+            ? await acquireSession(sessionOpts)
+            : {
+                session: await client.createSession(sessionOpts),
+                reusable: false,
+                created: true,
+                resumed: false,
+                previousDynamicSystemContents: [],
+            };
         session = sessionLease.session;
         state.session = session;
         state.reusable = sessionLease.reusable;
@@ -353,6 +392,9 @@ async function handleComplete(id, params) {
         const sessionAcquisitionMode = sessionLease.created
             ? "new"
             : (sessionLease.resumed ? "resumed" : "reused");
+        if (reuseSession === false) {
+            log(`Request #${id}: created ephemeral stateless completion session ${session.sessionId}`);
+        }
         sendProgress(
             id,
             "request_started",
@@ -898,16 +940,24 @@ function processBuffer() {
     }
 }
 
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => {
-    inputBuffer += chunk;
-    processBuffer();
-});
+function startStdioServer() {
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => {
+        inputBuffer += chunk;
+        processBuffer();
+    });
 
-process.stdin.on("end", () => {
-    if (client) client.stop().catch(() => {});
-    process.exit(0);
-});
+    process.stdin.on("end", () => {
+        if (client) client.stop().catch(() => {});
+        process.exit(0);
+    });
 
-// Signal readiness
-send({ id: 0, result: { status: "sidecar_ready" } });
+    send({ id: 0, result: { status: "sidecar_ready" } });
+}
+
+const launchedAsScript = process.argv[1]
+    && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (launchedAsScript) {
+    startStdioServer();
+}

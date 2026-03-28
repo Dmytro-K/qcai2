@@ -1239,9 +1239,13 @@ clangd_service_t::document_symbols(const Utils::FilePath &file_path, QString *er
     auto *client = client_for_file_path(file_path);
     if (client == nullptr)
     {
-        set_error(
-            error,
-            QStringLiteral("ClangCodeModel does not have an active clangd client for this file."));
+        client = workspace_client();
+    }
+    if (client == nullptr)
+    {
+        set_error(error, QStringLiteral(
+                             "ClangCodeModel does not have an active clangd workspace client for "
+                             "this file."));
         return symbols;
     }
 
