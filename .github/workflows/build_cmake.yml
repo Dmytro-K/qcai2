@@ -26,6 +26,7 @@ jobs:
     runs-on: ${{ matrix.config.os }}
     outputs:
         tag: ${{ steps.git.outputs.tag }}
+        artifact_version: ${{ steps.git.outputs.artifact_version }}
     strategy:
       fail-fast: false
       matrix:
@@ -80,15 +81,50 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Checkout submodules
+    - name: Resolve build metadata
       id: git
       shell: cmake -P {0}
       run: |
-        if (${{github.ref}} MATCHES "tags/v(.*)")
-            file(APPEND "$ENV{GITHUB_OUTPUT}" "tag=${CMAKE_MATCH_1}")
-        else()
-            file(APPEND "$ENV{GITHUB_OUTPUT}" "tag=${{github.run_id}}")
+        set(qcai2_workspace "$ENV{GITHUB_WORKSPACE}")
+        if(qcai2_workspace STREQUAL "")
+          message(FATAL_ERROR "GITHUB_WORKSPACE is empty.")
         endif()
+        file(TO_CMAKE_PATH "${qcai2_workspace}" qcai2_workspace)
+
+        set(qcai2_github_ref "$ENV{GITHUB_REF}")
+        set(qcai2_github_sha "$ENV{GITHUB_SHA}")
+        set(qcai2_github_run_id "$ENV{GITHUB_RUN_ID}")
+
+        file(STRINGS "${qcai2_workspace}/VERSION.txt" qcai2_version_lines
+          REGEX "^[ \t]*[^# \t].*$")
+        list(GET qcai2_version_lines 0 qcai2_version_raw)
+        string(STRIP "${qcai2_version_raw}" qcai2_version_full)
+
+        if(NOT qcai2_version_full MATCHES "^([0-9]+\\.[0-9]+\\.[0-9]+)(-[0-9]+)$")
+          message(FATAL_ERROR
+            "VERSION.txt must contain a revision like 0.0.4-002, got: ${qcai2_version_full}")
+        endif()
+
+        set(qcai2_short_sha "${qcai2_github_sha}")
+        if(NOT qcai2_short_sha STREQUAL "")
+          string(SUBSTRING "${qcai2_short_sha}" 0 8 qcai2_short_sha)
+        endif()
+
+        set(qcai2_artifact_version "${qcai2_version_full}")
+        if(NOT qcai2_github_ref MATCHES "^refs/tags/v")
+          if(qcai2_short_sha STREQUAL "")
+            message(FATAL_ERROR "GITHUB_SHA is empty for a non-release build.")
+          endif()
+          set(qcai2_artifact_version "${qcai2_version_full}-g${qcai2_short_sha}")
+        endif()
+
+        if(qcai2_github_ref MATCHES "^refs/tags/v(.*)")
+            file(APPEND "$ENV{GITHUB_OUTPUT}" "tag=${CMAKE_MATCH_1}\n")
+        else()
+            file(APPEND "$ENV{GITHUB_OUTPUT}" "tag=${qcai2_github_run_id}\n")
+        endif()
+        file(APPEND "$ENV{GITHUB_OUTPUT}" "version_full=${qcai2_version_full}\n")
+        file(APPEND "$ENV{GITHUB_OUTPUT}" "artifact_version=${qcai2_artifact_version}\n")
 
     - name: Download Ninja and CMake
       uses: lukka/get-cmake@latest
@@ -336,7 +372,7 @@ jobs:
         fi
 
         package_root="$PWD/package-root"
-        archive_name="${PLUGIN_NAME}-${QT_CREATOR_VERSION}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}"
+        archive_name="${PLUGIN_NAME}-${{ steps.git.outputs.artifact_version }}-qtcreator-${QT_CREATOR_VERSION}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}"
 
         rm -rf "$package_root"
         cmake --install build --prefix "$package_root"
@@ -349,8 +385,8 @@ jobs:
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        path: ./${{ env.PLUGIN_NAME }}-${{ env.QT_CREATOR_VERSION }}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}
-        name: ${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}
+        path: ./${{ env.PLUGIN_NAME }}-${{ steps.git.outputs.artifact_version }}-qtcreator-${{ env.QT_CREATOR_VERSION }}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}
+        name: ${{ env.PLUGIN_NAME}}-${{ steps.git.outputs.artifact_version }}-qtcreator-${{ env.QT_CREATOR_VERSION }}-${{ matrix.config.artifact }}.${{ matrix.config.archive_ext }}
 
 
   release:
@@ -421,10 +457,6 @@ jobs:
         tag_name: v${{ needs.build.outputs.tag }}
         body_path: release-notes.md
         files: |
-          release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Linux-arm64.tar.xz
-          release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Linux-x64.tar.xz
-          release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-macOS-universal.zip
-          release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Windows-arm64.zip
-          release/${{ env.PLUGIN_NAME}}-${{ env.QT_CREATOR_VERSION }}-Windows-x64.zip
+          release/*
         draft: false
         prerelease: false
