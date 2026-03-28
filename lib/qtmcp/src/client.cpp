@@ -14,14 +14,14 @@ namespace qtmcp
 namespace
 {
 
-constexpr int k_max_logged_json_chars = 2000;
+constexpr int logged_json_chars_max = 2000;
 
 QString format_json_for_log(const QJsonObject &message)
 {
     QString json = QString::fromUtf8(QJsonDocument(message).toJson(QJsonDocument::Compact));
-    if (json.size() > k_max_logged_json_chars)
+    if (json.size() > logged_json_chars_max)
     {
-        json = json.left(k_max_logged_json_chars);
+        json = json.left(logged_json_chars_max);
         json += QStringLiteral("... [truncated]");
     }
     return json;

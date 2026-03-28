@@ -121,9 +121,9 @@ QString conversation_display_title(const conversation_record_t &conversation)
     return QObject::tr("Untitled Conversation");
 }
 
-constexpr int k_approval_preview_role = Qt::UserRole + 1;
-constexpr int k_approval_pending_role = Qt::UserRole + 2;
-constexpr int k_approval_inline_role = Qt::UserRole + 3;
+constexpr int approval_preview_role = Qt::UserRole + 1;
+constexpr int approval_pending_role = Qt::UserRole + 2;
+constexpr int approval_inline_role = Qt::UserRole + 3;
 
 struct inline_approval_diff_t
 {
@@ -910,7 +910,7 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
                     approval_id, accepted_diff, rejected_diff);
                 if (resolved == true && item != nullptr)
                 {
-                    item->setData(k_approval_pending_role, false);
+                    item->setData(approval_pending_role, false);
                     item->setText(item->text() + (accepted_diff.trimmed().isEmpty() == true
                                                       ? QStringLiteral(" ❌")
                                                       : (rejected_diff.trimmed().isEmpty() == true
@@ -2523,9 +2523,9 @@ void agent_dock_widget_t::update_approval_selection_ui()
         return;
     }
 
-    const QString preview = item->data(k_approval_preview_role).toString();
-    const bool pending = item->data(k_approval_pending_role).toBool();
-    const bool inline_review = item->data(k_approval_inline_role).toBool();
+    const QString preview = item->data(approval_preview_role).toString();
+    const bool pending = item->data(approval_pending_role).toBool();
+    const bool inline_review = item->data(approval_inline_role).toBool();
 
     QString visible_preview = preview;
     if (inline_review == true && pending == true)
@@ -2548,15 +2548,15 @@ void agent_dock_widget_t::resolve_selected_approval(bool approved)
     }
 
     const int approval_id = item->data(Qt::UserRole).toInt();
-    const bool pending = item->data(k_approval_pending_role).toBool();
-    const bool inline_review = item->data(k_approval_inline_role).toBool();
+    const bool pending = item->data(approval_pending_role).toBool();
+    const bool inline_review = item->data(approval_inline_role).toBool();
     if (pending == false || inline_review == true)
     {
         this->update_approval_selection_ui();
         return;
     }
 
-    item->setData(k_approval_pending_role, false);
+    item->setData(approval_pending_role, false);
     item->setText(item->text() +
                   (approved == true ? QStringLiteral(" ✅") : QStringLiteral(" ❌")));
     this->approval_items.remove(approval_id);
@@ -2585,10 +2585,10 @@ void agent_dock_widget_t::on_approval_requested(int id, const QString &action,
 
     auto *item = new QListWidgetItem(QStringLiteral("[#%1] %2 — %3").arg(id).arg(action, reason));
     item->setData(Qt::UserRole, id);
-    item->setData(k_approval_preview_role,
+    item->setData(approval_preview_role,
                   has_inline_review == true ? inline_diff.full_diff : preview);
-    item->setData(k_approval_pending_role, true);
-    item->setData(k_approval_inline_role, has_inline_review);
+    item->setData(approval_pending_role, true);
+    item->setData(approval_inline_role, has_inline_review);
     item->setToolTip(preview);
     this->approval_list->addItem(item);
     this->approval_items[id] = item;

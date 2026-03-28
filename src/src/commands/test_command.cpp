@@ -14,7 +14,7 @@ namespace qcai2
 namespace
 {
 
-constexpr qsizetype k_max_selected_chars = 8000;
+constexpr qsizetype selected_chars_max = 8000;
 
 QString language_hint_for_file(const QString &file_path)
 {
@@ -59,9 +59,9 @@ void test_command(const slash_command_invocation_t &invocation,
         code.replace(QChar(0x2029), QLatin1Char('\n'));
         code.replace(QChar(0x2028), QLatin1Char('\n'));
 
-        if (code.size() > k_max_selected_chars)
+        if (code.size() > selected_chars_max)
         {
-            code.truncate(k_max_selected_chars);
+            code.truncate(selected_chars_max);
         }
     }
 

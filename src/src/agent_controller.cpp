@@ -27,11 +27,11 @@ namespace qcai2
 namespace
 {
 
-constexpr int k_default_prompt_result_limit = 15000;
-constexpr int k_verbose_tool_prompt_result_limit = 4000;
-constexpr int k_provider_inactivity_timeout_ms = 75000;
-constexpr int k_provider_thinking_inactivity_timeout_ms = 180000;
-const QString k_superseded_by_user_steer_status = QStringLiteral("superseded_by_user_steer");
+constexpr int default_prompt_result_limit = 15000;
+constexpr int verbose_tool_prompt_result_limit = 4000;
+constexpr int provider_inactivity_timeout_ms = 75000;
+constexpr int provider_thinking_inactivity_timeout_ms = 180000;
+const QString superseded_by_user_steer_status = QStringLiteral("superseded_by_user_steer");
 
 QString as_indented_code_block(const QString &text)
 {
@@ -125,10 +125,10 @@ int prompt_result_limit_for_tool(const QString &name)
         name == QStringLiteral("show_application_output") ||
         name == QStringLiteral("show_diagnostics"))
     {
-        return k_verbose_tool_prompt_result_limit;
+        return verbose_tool_prompt_result_limit;
     }
 
-    return k_default_prompt_result_limit;
+    return default_prompt_result_limit;
 }
 
 bool is_enabled_effort(const QString &level)
@@ -319,7 +319,7 @@ agent_controller_t::agent_controller_t(QObject *parent) : QObject(parent), run_s
 {
     qRegisterMetaType<agent_decision_request_t>();
     this->provider_watchdog.setSingleShot(true);
-    this->provider_watchdog.setInterval(k_provider_inactivity_timeout_ms);
+    this->provider_watchdog.setInterval(provider_inactivity_timeout_ms);
     connect(&this->provider_watchdog, &QTimer::timeout, this,
             &agent_controller_t::handle_provider_inactivity_timeout);
 }
@@ -1160,14 +1160,13 @@ void agent_controller_t::handle_response(const QString &response, const QString 
         if (this->detailed_request_log != nullptr)
         {
             this->detailed_request_log->record_iteration_output(
-                this->current_iteration, response, {}, k_superseded_by_user_steer_status, {},
-                usage, request_duration_ms);
+                this->current_iteration, response, {}, superseded_by_user_steer_status, {}, usage,
+                request_duration_ms);
         }
         if (this->apply_soft_steer_if_pending(
                 QStringLiteral("before_assistant_commit"), response,
                 QJsonObject{{QStringLiteral("iteration"), this->current_iteration},
-                            {QStringLiteral("reason"), k_superseded_by_user_steer_status}}) ==
-            true)
+                            {QStringLiteral("reason"), superseded_by_user_steer_status}}) == true)
         {
             this->run_next_iteration();
             return;
@@ -1660,8 +1659,8 @@ void agent_controller_t::arm_provider_watchdog()
         const bool thinkingEnabled = !this->thinking_level.isEmpty() &&
                                      this->thinking_level != QStringLiteral("off") &&
                                      this->thinking_level != QStringLiteral("none");
-        const int timeoutMs = thinkingEnabled ? k_provider_thinking_inactivity_timeout_ms
-                                              : k_provider_inactivity_timeout_ms;
+        const int timeoutMs = thinkingEnabled ? provider_thinking_inactivity_timeout_ms
+                                              : provider_inactivity_timeout_ms;
         this->provider_watchdog.setInterval(timeoutMs);
         this->provider_watchdog.start();
     }
@@ -1726,11 +1725,11 @@ bool agent_controller_t::apply_soft_steer_if_pending(const QString &safe_point,
     if (superseded_assistant_output.trimmed().isEmpty() == false)
     {
         QJsonObject metadata = superseded_metadata;
-        metadata[QStringLiteral("status")] = k_superseded_by_user_steer_status;
+        metadata[QStringLiteral("status")] = superseded_by_user_steer_status;
         metadata[QStringLiteral("safePoint")] = safe_point;
         metadata[QStringLiteral("queuedSteerMessages")] = queued_message_count;
         this->append_assistant_history_message(superseded_assistant_output,
-                                               k_superseded_by_user_steer_status, metadata, false);
+                                               superseded_by_user_steer_status, metadata, false);
     }
 
     if (completed_tool_name.isEmpty() == false)

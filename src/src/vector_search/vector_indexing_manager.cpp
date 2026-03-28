@@ -45,11 +45,11 @@ namespace qcai2
 namespace
 {
 
-constexpr int k_upsert_batch_size = 24;
-constexpr int k_max_indexed_file_size_bytes = 512 * 1024;
-constexpr int k_index_state_version = 1;
-const Utils::Id k_vector_index_progress_id("QCAI2.VectorIndex");
-const QString k_embedder_version = QStringLiteral("hashing-256-v1");
+constexpr int upsert_batch_size = 24;
+constexpr int indexed_file_size_bytes_max = 512 * 1024;
+constexpr int index_state_version = 1;
+const Utils::Id vector_index_progress_id("QCAI2.VectorIndex");
+const QString embedder_version = QStringLiteral("hashing-256-v1");
 
 QJsonArray float_list_to_json_array(const QList<float> &values)
 {
@@ -442,7 +442,7 @@ void vector_indexing_manager_t::start_next_job()
         : job.kind == job_kind_t::FILE         ? QStringLiteral("Updating vector index for %1")
                                                      .arg(QFileInfo(job.file_path).fileName())
                                                : QStringLiteral("Indexing chat history");
-    Core::ProgressManager::addTask(future_interface->future(), title, k_vector_index_progress_id,
+    Core::ProgressManager::addTask(future_interface->future(), title, vector_index_progress_id,
                                    Core::ProgressManager::KeepOnFinish);
 
     this->current_job_watcher = new QFutureWatcher<void>(this);
@@ -656,7 +656,7 @@ bool vector_indexing_manager_t::is_excluded_by_session_config(const QString &fil
 bool vector_indexing_manager_t::is_indexable_text_file(const QFileInfo &file_info)
 {
     if (file_info.exists() == false || file_info.isFile() == false ||
-        file_info.size() > k_max_indexed_file_size_bytes)
+        file_info.size() > indexed_file_size_bytes_max)
     {
         return false;
     }
@@ -733,7 +733,7 @@ vector_indexing_manager_t::load_index_state(const QString &workspace_root)
     }
 
     const QJsonObject root = document.object();
-    if (root.value(QStringLiteral("version")).toInt() != k_index_state_version)
+    if (root.value(QStringLiteral("version")).toInt() != index_state_version)
     {
         return state;
     }
@@ -783,7 +783,7 @@ bool vector_indexing_manager_t::write_index_state(const QString &workspace_root,
     }
 
     const QJsonObject root{
-        {QStringLiteral("version"), k_index_state_version},
+        {QStringLiteral("version"), index_state_version},
         {QStringLiteral("backendBaseUrl"), state.backend_base_url},
         {QStringLiteral("collectionName"), state.collection_name},
         {QStringLiteral("embedderVersion"), state.embedder_version},
@@ -819,7 +819,7 @@ bool vector_indexing_manager_t::state_matches_backend(const index_state_t &state
 {
     return state.backend_base_url == settings.qdrant_url.trimmed() &&
            state.collection_name == settings.qdrant_collection_name.trimmed() &&
-           state.embedder_version == k_embedder_version;
+           state.embedder_version == embedder_version;
 }
 
 QString vector_indexing_manager_t::file_point_id(const QString &workspace_root,
@@ -896,7 +896,7 @@ vector_indexing_manager_t::run_full_workspace_job(const job_t &job, const settin
     const bool full_reset = state_matches_backend(index_state, settings) == false;
     index_state.backend_base_url = settings.qdrant_url.trimmed();
     index_state.collection_name = settings.qdrant_collection_name.trimmed();
-    index_state.embedder_version = k_embedder_version;
+    index_state.embedder_version = embedder_version;
 
     QStringList current_files;
     current_files.reserve(job.project_files.size());
@@ -1159,9 +1159,9 @@ vector_indexing_manager_t::run_full_workspace_job(const job_t &job, const settin
                 for (const QJsonValue &point : prepared.points)
                 {
                     batch_points.append(point);
-                    if (batch_points.size() >= k_upsert_batch_size &&
+                    if (batch_points.size() >= upsert_batch_size &&
                         flush_points(backend.get(), &batch_points,
-                                     text_embedder_t::k_embedding_dimensions,
+                                     text_embedder_t::embedding_dimensions,
                                      &backend_error) == false)
                     {
                         result.error = backend_error;
@@ -1169,7 +1169,7 @@ vector_indexing_manager_t::run_full_workspace_job(const job_t &job, const settin
                     }
                 }
                 if (flush_points(backend.get(), &batch_points,
-                                 text_embedder_t::k_embedding_dimensions, &backend_error) == false)
+                                 text_embedder_t::embedding_dimensions, &backend_error) == false)
                 {
                     result.error = backend_error;
                     return result;
@@ -1228,15 +1228,15 @@ vector_indexing_manager_t::run_full_workspace_job(const job_t &job, const settin
                                    vector, message.workspace_id, job.workspace_root,
                                    message.conversation_id, message.message_id, message.role,
                                    message.source, message.created_at, chunks.at(index)));
-            if (batch_points.size() >= k_upsert_batch_size &&
-                flush_points(backend.get(), &batch_points, text_embedder_t::k_embedding_dimensions,
+            if (batch_points.size() >= upsert_batch_size &&
+                flush_points(backend.get(), &batch_points, text_embedder_t::embedding_dimensions,
                              &backend_error) == false)
             {
                 result.error = backend_error;
                 return result;
             }
         }
-        if (flush_points(backend.get(), &batch_points, text_embedder_t::k_embedding_dimensions,
+        if (flush_points(backend.get(), &batch_points, text_embedder_t::embedding_dimensions,
                          &backend_error) == false)
         {
             result.error = backend_error;
@@ -1286,7 +1286,7 @@ vector_indexing_manager_t::run_file_job(const job_t &job, const settings_t &sett
     const QStringList exclude_prefixes = load_vector_search_excludes(job.workspace_root);
     index_state.backend_base_url = settings.qdrant_url.trimmed();
     index_state.collection_name = settings.qdrant_collection_name.trimmed();
-    index_state.embedder_version = k_embedder_version;
+    index_state.embedder_version = embedder_version;
 
     const QFileInfo file_info(job.file_path);
     if (backend->delete_points(
@@ -1325,7 +1325,7 @@ vector_indexing_manager_t::run_file_job(const job_t &job, const settings_t &sett
                                           job.workspace_root, job.file_path, relative_path,
                                           chunks.at(index)));
         }
-        if (backend->upsert_points(points, text_embedder_t::k_embedding_dimensions,
+        if (backend->upsert_points(points, text_embedder_t::embedding_dimensions,
                                    &backend_error) == false)
         {
             result.error = backend_error;
@@ -1400,7 +1400,7 @@ vector_indexing_manager_t::run_history_job(const job_t &job, const settings_t &s
             chunks.at(index)));
     }
 
-    if (backend->upsert_points(points, text_embedder_t::k_embedding_dimensions, &backend_error) ==
+    if (backend->upsert_points(points, text_embedder_t::embedding_dimensions, &backend_error) ==
         false)
     {
         result.error = backend_error;

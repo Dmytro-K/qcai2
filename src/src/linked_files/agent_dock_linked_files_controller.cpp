@@ -343,7 +343,7 @@ QString agent_dock_linked_files_controller_t::linked_files_prompt_context() cons
 
     context += QStringLiteral("\nUse these linked files as explicit request context.\n");
 
-    static constexpr qsizetype k_max_total_chars = 60000;
+    static constexpr qsizetype total_chars_max = 60000;
     qsizetype used_chars = 0;
     for (const QString &path : linked_files)
     {
@@ -355,7 +355,7 @@ QString agent_dock_linked_files_controller_t::linked_files_prompt_context() cons
         }
 
         QString content = QString::fromUtf8(file.readAll());
-        const qsizetype remaining = k_max_total_chars - used_chars;
+        const qsizetype remaining = total_chars_max - used_chars;
         if (remaining <= 0)
         {
             break;

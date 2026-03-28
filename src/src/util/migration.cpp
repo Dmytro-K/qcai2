@@ -37,12 +37,12 @@ namespace
 #error "QCAI2_CURRENT_BUILD_SUFFIX must be provided by CMake."
 #endif
 
-constexpr auto k_global_revision_key = "settingsRevision";
+constexpr auto global_revision_key = "settingsRevision";
 
-constexpr auto k_project_revision_key = "storageRevision";
+constexpr auto project_revision_key = "storageRevision";
 
-constexpr auto k_current_version = QCAI2_CURRENT_VERSION;
-constexpr auto k_current_build_suffix = QCAI2_CURRENT_BUILD_SUFFIX;
+constexpr auto current_version_value = QCAI2_CURRENT_VERSION;
+constexpr auto current_build_suffix_value = QCAI2_CURRENT_BUILD_SUFFIX;
 
 struct archive_entry_data_t
 {
@@ -57,8 +57,8 @@ struct archive_write_context_t
 
 revision_t current_revision_impl()
 {
-    return parse_revision(QString::fromLatin1(k_current_version),
-                          QString::fromLatin1(k_current_build_suffix));
+    return parse_revision(QString::fromLatin1(current_version_value),
+                          QString::fromLatin1(current_build_suffix_value));
 }
 
 int compare(const revision_t &lhs, const revision_t &rhs)
@@ -537,12 +537,12 @@ bool create_project_state_backup(const QString &storage_path, const revision_t &
 
 revision_t stored_global_revision(QSettings &settings)
 {
-    return parse_revision(settings.value(k_global_revision_key).toString());
+    return parse_revision(settings.value(global_revision_key).toString());
 }
 
 revision_t stored_project_revision(const QJsonObject &root)
 {
-    return parse_revision(root.value(QLatin1StringView(k_project_revision_key)).toString());
+    return parse_revision(root.value(QLatin1StringView(project_revision_key)).toString());
 }
 
 bool save_project_root(const QString &storage_path, const QJsonObject &root, QString *error)
@@ -664,12 +664,12 @@ revision_t current_revision()
 
 QString current_version_string()
 {
-    return QString::fromLatin1(k_current_version);
+    return QString::fromLatin1(current_version_value);
 }
 
 QString current_build_suffix()
 {
-    return QString::fromLatin1(k_current_build_suffix);
+    return QString::fromLatin1(current_build_suffix_value);
 }
 
 QString current_revision_string()
@@ -763,7 +763,7 @@ bool is_older(const revision_t &lhs, const revision_t &rhs)
 
 void stamp_global_settings(QSettings &settings)
 {
-    settings.setValue(k_global_revision_key, current_revision_string());
+    settings.setValue(global_revision_key, current_revision_string());
 }
 
 bool migrate_global_settings(QSettings &settings, QString *error)

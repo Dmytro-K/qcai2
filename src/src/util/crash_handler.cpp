@@ -24,7 +24,7 @@ namespace qcai2
 {
 
 /** Maximum number of stack frames captured for a crash report. */
-static constexpr int k_max_frames = 64;
+static constexpr int frames_max = 64;
 
 /**
  * @brief Returns a readable label for a signal number.
@@ -116,11 +116,11 @@ static void write_crash_file(int sig, void **frames, int frame_count)
 static void crash_signal_handler(int sig)
 {
     // Capture stack trace
-    void *frames[k_max_frames];
+    void *frames[frames_max];
     int frame_count = 0;
 
 #ifdef Q_OS_UNIX
-    frame_count = backtrace(frames, k_max_frames);
+    frame_count = backtrace(frames, frames_max);
 #endif
 
     write_crash_file(sig, frames, frame_count);

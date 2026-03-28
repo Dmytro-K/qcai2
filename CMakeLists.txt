@@ -7,6 +7,7 @@ project(qcai2)
 
 include(GNUInstallDirs)
 include(ExternalProject)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/qcai2-global-parameters.cmake")
 
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION.txt" QCAI2_VERSION_FILE_LINES
     REGEX "^[ \t]*[^# \t].*$")
@@ -722,6 +723,7 @@ target_link_libraries(qcai2 PRIVATE qcai2_libarchive qcai2_version_info qtmcp::q
 if(FEATURE_QDRANT_ENABLE)
     target_link_libraries(qcai2 PRIVATE qcai2_qdrant_http)
 endif()
+qcai2_apply_global_parameters(qcai2)
 
 set(QCAI2_PLUGIN_INSTALL_DIR "plugins/${IDE_VERSION}")
 set(QCAI2_SIDECAR_INSTALL_DIR "${QCAI2_PLUGIN_INSTALL_DIR}/qcai2/sidecar")

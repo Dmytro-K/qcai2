@@ -7,8 +7,8 @@
 namespace qcai2
 {
 
-static constexpr int k_default_max_results = 20;
-static constexpr int k_max_results_cap = 100;
+static constexpr int default_result_count = 20;
+static constexpr int results_cap_max = 100;
 
 /**
  * Returns the JSON schema for find_symbol arguments.
@@ -33,14 +33,14 @@ QString find_symbol_tool_t::execute(const QJsonObject &args, const QString & /*w
         return QStringLiteral("Error: 'query' argument is required.");
     }
 
-    int max_results = args.value("max_results").toInt(k_default_max_results);
+    int max_results = args.value("max_results").toInt(default_result_count);
     if (max_results < 1)
     {
         max_results = 1;
     }
-    if (max_results > k_max_results_cap)
+    if (max_results > results_cap_max)
     {
-        max_results = k_max_results_cap;
+        max_results = results_cap_max;
     }
 
     // Use AllSymbols matchers to search across classes, functions, enums etc.

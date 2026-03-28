@@ -16,7 +16,7 @@ struct text_chunk_t
 class text_embedder_t
 {
 public:
-    static constexpr int k_embedding_dimensions = 256;
+    static constexpr int embedding_dimensions = 256;
 
     QList<float> embed_text(const QString &text) const;
     QList<text_chunk_t> chunk_text(const QString &text, int max_chunk_chars = 1400,

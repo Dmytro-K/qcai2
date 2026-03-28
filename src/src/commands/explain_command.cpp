@@ -13,7 +13,7 @@ namespace qcai2
 namespace
 {
 
-constexpr qsizetype k_max_selected_chars = 8000;
+constexpr qsizetype selected_chars_max = 8000;
 
 QString language_hint_for_file(const QString &file_path)
 {
@@ -71,9 +71,9 @@ void explain_command(const slash_command_invocation_t &invocation,
     code.replace(QChar(0x2028), QLatin1Char('\n'));
 
     bool truncated = false;
-    if (code.size() > k_max_selected_chars)
+    if (code.size() > selected_chars_max)
     {
-        code.truncate(k_max_selected_chars);
+        code.truncate(selected_chars_max);
         truncated = true;
     }
 
@@ -91,8 +91,8 @@ void explain_command(const slash_command_invocation_t &invocation,
     prompt += QStringLiteral(":\n\n```%1\n%2\n```").arg(lang, code);
     if (truncated)
     {
-        prompt += QStringLiteral("\n\n*(selection truncated to %1 characters)*")
-                      .arg(k_max_selected_chars);
+        prompt +=
+            QStringLiteral("\n\n*(selection truncated to %1 characters)*").arg(selected_chars_max);
     }
 
     if (context.goal_override != nullptr)

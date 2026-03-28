@@ -38,7 +38,7 @@ void logger_t::log(level_t level, const QString &category, const QString &messag
     {
         QMutexLocker lock(&this->mutex);
         this->retained_entries.append(entry);
-        if (((this->retained_entries.size() > k_max_entries) == true))
+        if (((this->retained_entries.size() > entries_max) == true))
         {
             this->retained_entries.removeFirst();
         }

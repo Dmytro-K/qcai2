@@ -93,10 +93,10 @@ QString diagnostics_text_excerpt(QString text)
 {
     text.replace(QLatin1Char('\n'), QStringLiteral("\\n"));
     text.replace(QLatin1Char('\r'), QStringLiteral("\\r"));
-    constexpr int k_max_excerpt_chars = 80;
-    if (text.size() > k_max_excerpt_chars)
+    constexpr int diagnostics_excerpt_chars_max = QCAI2_GHOST_TEXT_DIAGNOSTICS_EXCERPT_CHARS_MAX;
+    if (text.size() > diagnostics_excerpt_chars_max)
     {
-        text = text.left(k_max_excerpt_chars) + QStringLiteral("...");
+        text = text.left(diagnostics_excerpt_chars_max) + QStringLiteral("...");
     }
     return text;
 }

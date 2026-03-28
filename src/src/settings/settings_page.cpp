@@ -147,9 +147,9 @@ QStringList generic_completion_models()
 }  // namespace
 
 #if QCAI2_FEATURE_QDRANT_ENABLE
-constexpr bool k_qdrant_support_enabled = true;
+constexpr bool qdrant_support_enabled = true;
 #else
-constexpr bool k_qdrant_support_enabled = false;
+constexpr bool qdrant_support_enabled = false;
 #endif
 
 class settings_widget_t : public Core::IOptionsPageWidget
@@ -634,7 +634,7 @@ public:
         this->refreshCompletionUiState();
 
         this->vectorSearchEnabledCheck->setChecked(s.vector_search_enabled);
-        if (k_qdrant_support_enabled == true)
+        if (qdrant_support_enabled == true)
         {
             this->vectorSearchProviderCombo->addItem(tr_t::tr("Qdrant"), QStringLiteral("qdrant"));
             this->vectorSearchStatusLabel->clear();
@@ -920,9 +920,9 @@ public:
         this->refreshVectorSearchStatusFromService();
 
         QString error;
-        if ((k_qdrant_support_enabled == true) && (s.vector_search_enabled == true) &&
+        if ((qdrant_support_enabled == true) && (s.vector_search_enabled == true) &&
             ((vector_search_service().verify_connection(&error) == false) ||
-             (vector_search_service().ensure_collection(text_embedder_t::k_embedding_dimensions,
+             (vector_search_service().ensure_collection(text_embedder_t::embedding_dimensions,
                                                         &error) == false)))
         {
             QMessageBox::warning(
@@ -1181,7 +1181,7 @@ private:
 
     void refreshVectorSearchUiState()
     {
-        const bool provider_available = k_qdrant_support_enabled;
+        const bool provider_available = qdrant_support_enabled;
         const bool enabled = this->vectorSearchEnabledCheck->isChecked();
         const bool qdrant_selected =
             this->vectorSearchProviderCombo->currentData().toString() == QStringLiteral("qdrant");
@@ -1195,7 +1195,7 @@ private:
     {
         const auto &service = vector_search_service();
 
-        if (k_qdrant_support_enabled == false)
+        if (qdrant_support_enabled == false)
         {
             this->vectorSearchStatusLabel->setText(tr_t::tr(
                 "Qdrant support was disabled at build time (`FEATURE_QDRANT_ENABLE=OFF`)."));
@@ -1231,7 +1231,7 @@ private:
     {
         const settings_t candidate = this->settingsFromUi();
         vector_search_service().apply_settings(candidate);
-        if (k_qdrant_support_enabled == false)
+        if (qdrant_support_enabled == false)
         {
             this->refreshVectorSearchStatusFromService();
             return;
@@ -1239,7 +1239,7 @@ private:
         QString error;
         if (vector_search_service().verify_connection(&error) == true)
         {
-            if (vector_search_service().ensure_collection(text_embedder_t::k_embedding_dimensions,
+            if (vector_search_service().ensure_collection(text_embedder_t::embedding_dimensions,
                                                           &error) == false)
             {
                 this->refreshVectorSearchStatusFromService();

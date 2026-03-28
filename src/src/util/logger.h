@@ -143,7 +143,7 @@ private:
     bool enabled = false;
 
     /** @brief Maximum retained log entries. */
-    static constexpr int k_max_entries = 5000;
+    static constexpr int entries_max = 5000;
 };
 
 /** @brief Shortcut for the process-wide logger singleton. */

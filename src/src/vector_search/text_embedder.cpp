@@ -61,7 +61,7 @@ QStringList text_embedder_t::tokenize(const QString &text)
 QList<float> text_embedder_t::embed_text(const QString &text) const
 {
     QList<float> embedding;
-    embedding.fill(0.0F, k_embedding_dimensions);
+    embedding.fill(0.0F, embedding_dimensions);
 
     const QStringList tokens = tokenize(text);
     if (tokens.isEmpty() == true)
@@ -85,8 +85,7 @@ QList<float> text_embedder_t::embed_text(const QString &text) const
         for (const QString &feature : features)
         {
             const quint64 hash = token_hash(feature);
-            const int index =
-                static_cast<int>(hash % static_cast<quint64>(k_embedding_dimensions));
+            const int index = static_cast<int>(hash % static_cast<quint64>(embedding_dimensions));
             const float direction = (hash & (1ULL << 8)) == 0 ? 1.0F : -1.0F;
             embedding[index] += direction;
         }

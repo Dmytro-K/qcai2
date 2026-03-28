@@ -697,6 +697,7 @@ add_executable(tst_qcai2_completion_response_utils
 )
 
 qcai2_enable_linker_map(tst_qcai2_completion_response_utils)
+qcai2_apply_global_parameters(tst_qcai2_completion_response_utils)
 
 target_include_directories(tst_qcai2_completion_response_utils PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
@@ -808,6 +809,7 @@ add_executable(tst_qcai2_completion_clang_context
 )
 
 qcai2_enable_linker_map(tst_qcai2_completion_clang_context)
+qcai2_apply_global_parameters(tst_qcai2_completion_clang_context)
 
 target_include_directories(tst_qcai2_completion_clang_context PRIVATE
     "${CMAKE_SOURCE_DIR}/src"

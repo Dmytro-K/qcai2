@@ -17,10 +17,10 @@ namespace qcai2
 namespace
 {
 
-constexpr int k_max_function_snippet_lines = 24;
-constexpr int k_max_function_snippet_chars = 1200;
-constexpr int k_max_class_snippet_lines = 500;
-constexpr int k_max_class_snippet_chars = 20000;
+constexpr int function_snippet_lines_max = QCAI2_COMPLETION_FUNCTION_SNIPPET_LINES_MAX;
+constexpr int function_snippet_chars_max = QCAI2_COMPLETION_FUNCTION_SNIPPET_CHARS_MAX;
+constexpr int class_snippet_lines_max = QCAI2_COMPLETION_CLASS_SNIPPET_LINES_MAX;
+constexpr int class_snippet_chars_max = QCAI2_COMPLETION_CLASS_SNIPPET_CHARS_MAX;
 
 bool is_function_like(const clangd_document_symbol_t &symbol)
 {
@@ -392,8 +392,8 @@ QString build_completion_clang_context_block(clangd_service_t *service,
         }
 
         const QString function_body = extract_short_completion_symbol_snippet(
-            document, function_symbol->range, k_max_function_snippet_lines,
-            k_max_function_snippet_chars);
+            document, function_symbol->range, function_snippet_lines_max,
+            function_snippet_chars_max);
         if (function_body.isEmpty() == false)
         {
             sections.append(QStringLiteral("Current function body (short)\n~~~~text\n%1\n~~~~")

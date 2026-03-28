@@ -27,8 +27,8 @@ QString from_std_string(const std::string &value)
 
 QString around_cursor_prefix_context(const QString &prefix)
 {
-    constexpr int k_max_context_chars = 1200;
-    QString context = prefix.right(k_max_context_chars);
+    constexpr int prefix_context_chars_max = QCAI2_COMPLETION_PREFIX_CONTEXT_CHARS_MAX;
+    QString context = prefix.right(prefix_context_chars_max);
     if (context.size() < prefix.size())
     {
         const qsizetype first_newline = context.indexOf(QLatin1Char('\n'));
@@ -42,8 +42,8 @@ QString around_cursor_prefix_context(const QString &prefix)
 
 QString around_cursor_suffix_context(const QString &suffix)
 {
-    constexpr int k_max_context_chars = 400;
-    QString context = suffix.left(k_max_context_chars);
+    constexpr int suffix_context_chars_max = QCAI2_COMPLETION_SUFFIX_CONTEXT_CHARS_MAX;
+    QString context = suffix.left(suffix_context_chars_max);
     if (context.size() < suffix.size())
     {
         const qsizetype last_newline = context.lastIndexOf(QLatin1Char('\n'));

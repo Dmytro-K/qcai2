@@ -35,8 +35,8 @@
 namespace qcai2
 {
 
-static const int k_context_before = 2000;  // chars before cursor
-static const int k_context_after = 500;    // chars after cursor
+static const int context_before_chars = 2000;  // chars before cursor
+static const int context_after_chars = 500;    // chars after cursor
 
 namespace
 {
@@ -174,9 +174,9 @@ TextEditor::IAssistProposal *ai_completion_processor_t::perform()
     }
 
     const int pos = iface->position();
-    const int start_before = qMax(0, pos - k_context_before);
+    const int start_before = qMax(0, pos - context_before_chars);
     const QString prefix = iface->textAt(start_before, pos - start_before);
-    const QString suffix = iface->textAt(pos, k_context_after);
+    const QString suffix = iface->textAt(pos, context_after_chars);
     const QString file_name = iface->filePath().toUrlishString();
     const QString project_root = project_root_for_file_path(file_name);
     const QString log_workspace_root = project_root;

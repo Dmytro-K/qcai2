@@ -40,7 +40,7 @@ namespace qcai2
 namespace
 {
 
-constexpr int k_default_timeout_ms = 1500;
+constexpr int default_timeout_ms = 1500;
 
 bool set_error(QString *error, const QString &message)
 {
@@ -452,7 +452,7 @@ markup_or_string_to_text(const std::optional<LanguageServerProtocol::MarkupOrStr
 template <typename RequestType>
 std::optional<typename RequestType::Response>
 run_request(LanguageClient::Client *client, const typename RequestType::Parameters &params,
-            QString *error, int timeout_ms = k_default_timeout_ms)
+            QString *error, int timeout_ms = default_timeout_ms)
 {
     if (client == nullptr)
     {
@@ -1099,7 +1099,7 @@ std::optional<clangd_link_t> clangd_service_t::switch_decl_def(const clangd_loca
         },
         CppEditor::CppModelManager::Backend::Best);
 
-    timer.start(k_default_timeout_ms);
+    timer.start(default_timeout_ms);
     loop.exec();
 
     if (state->received == false || state->result.is_valid() == false)

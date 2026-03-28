@@ -15,7 +15,7 @@ namespace qcai2
 namespace
 {
 
-constexpr auto k_actions_log_file_scheme = "qcai2-open-file";
+constexpr auto actions_log_file_scheme = "qcai2-open-file";
 
 Qt::CaseSensitivity canonical_path_case_sensitivity()
 {
@@ -71,7 +71,7 @@ bool is_fence_delimiter_line(const QString &line)
 QString make_internal_link(const QString &display_text, const QString &path, int line, int column)
 {
     QUrl url;
-    url.setScheme(QLatin1StringView(k_actions_log_file_scheme));
+    url.setScheme(QLatin1StringView(actions_log_file_scheme));
     url.setPath(QStringLiteral("/open"));
 
     QUrlQuery query;
@@ -174,7 +174,7 @@ QString linkify_actions_log_file_references(const QString &markdown)
 
 std::optional<actions_log_file_link_t> parse_actions_log_file_link(const QUrl &url)
 {
-    if (url.scheme() != QLatin1StringView(k_actions_log_file_scheme))
+    if (url.scheme() != QLatin1StringView(actions_log_file_scheme))
     {
         return std::nullopt;
     }

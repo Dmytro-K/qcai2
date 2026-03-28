@@ -423,7 +423,7 @@ void ai_agent_plugin_t::extensionsInitialized()
                     return;
                 }
                 if (this->vector_search_service->ensure_collection(
-                        text_embedder_t::k_embedding_dimensions, &error) == false)
+                        text_embedder_t::embedding_dimensions, &error) == false)
                 {
                     QCAI_WARN(
                         "Plugin",

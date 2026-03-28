@@ -39,16 +39,16 @@ namespace qtmcp
 namespace
 {
 
-constexpr int k_max_logged_payload_chars = 2000;
+constexpr int logged_payload_chars_max = 2000;
 
 QString format_payload_for_log(const QByteArray &payload)
 {
     QString text = QString::fromUtf8(payload);
     text.replace(QLatin1Char('\n'), QStringLiteral("\\n"));
     text.replace(QLatin1Char('\r'), QStringLiteral("\\r"));
-    if (text.size() > k_max_logged_payload_chars)
+    if (text.size() > logged_payload_chars_max)
     {
-        text = text.left(k_max_logged_payload_chars);
+        text = text.left(logged_payload_chars_max);
         text += QStringLiteral("... [truncated]");
     }
     return text;
@@ -326,7 +326,7 @@ QMap<QString, QString> parse_bearer_challenge_parameters(const QByteArray &www_a
 
 #if QTMCP_HAS_NETWORKAUTH
 
-constexpr int k_o_auth_interactive_timeout_ms = 5 * 60 * 1000;
+constexpr int o_auth_interactive_timeout_ms = 5 * 60 * 1000;
 
 QUrl authorization_base_url(const QUrl &endpoint)
 {
@@ -1446,7 +1446,7 @@ bool http_transport_t::refresh_access_token()
 
     timer.start(this->transport_config.request_timeout_ms > 0
                     ? this->transport_config.request_timeout_ms
-                    : k_o_auth_interactive_timeout_ms);
+                    : o_auth_interactive_timeout_ms);
     oauth.refreshTokens();
     loop.exec(QEventLoop::ExcludeUserInputEvents);
 
@@ -1671,7 +1671,7 @@ bool http_transport_t::run_authorization_code_grant()
                      });
     QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
 
-    timer.start(k_o_auth_interactive_timeout_ms);
+    timer.start(o_auth_interactive_timeout_ms);
     emit log_message(
         QStringLiteral("Starting OAuth authorization code flow: clientIdConfigured=%1 "
                        "clientSecretConfigured=%2 scopes=%3")

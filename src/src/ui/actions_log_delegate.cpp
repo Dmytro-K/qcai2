@@ -25,8 +25,8 @@ namespace qcai2
 namespace
 {
 
-constexpr int k_horizontal_padding = 8;
-constexpr int k_vertical_padding = 6;
+constexpr int horizontal_padding = 8;
+constexpr int vertical_padding = 6;
 
 void configure_document(QTextDocument *document, const QStyleOptionViewItem &option,
                         const QString &markdown, int text_width)
@@ -94,13 +94,13 @@ QString anchor_at_position(const QStyleOptionViewItem &option, const QModelIndex
     }
 
     QStyleOptionViewItem style_option(option);
-    const int text_width = qMax(0, style_option.rect.width() - (k_horizontal_padding * 2));
+    const int text_width = qMax(0, style_option.rect.width() - (horizontal_padding * 2));
     QTextDocument document;
     configure_document(&document, style_option, markdown, text_width);
 
     const QPoint relative_position =
-        position - QPoint(style_option.rect.left() + k_horizontal_padding,
-                          style_option.rect.top() + k_vertical_padding);
+        position - QPoint(style_option.rect.left() + horizontal_padding,
+                          style_option.rect.top() + vertical_padding);
     if (relative_position.x() < 0 || relative_position.y() < 0)
     {
         return {};
@@ -123,8 +123,8 @@ QSize actions_log_delegate_t::sizeHint(const QStyleOptionViewItem &option,
     QTextDocument document;
     configure_document(&document, option, markdown, text_width);
     const QSizeF document_size = document.documentLayout()->documentSize();
-    return QSize(qMax(0, text_width + (k_horizontal_padding * 2)),
-                 qCeil(document_size.height()) + (k_vertical_padding * 2));
+    return QSize(qMax(0, text_width + (horizontal_padding * 2)),
+                 qCeil(document_size.height()) + (vertical_padding * 2));
 }
 
 void actions_log_delegate_t::paint(QPainter *painter, const QStyleOptionViewItem &option,
@@ -152,10 +152,10 @@ void actions_log_delegate_t::paint(QPainter *painter, const QStyleOptionViewItem
 
     painter->save();
     painter->setClipRect(style_option.rect);
-    painter->translate(style_option.rect.left() + k_horizontal_padding,
-                       style_option.rect.top() + k_vertical_padding);
+    painter->translate(style_option.rect.left() + horizontal_padding,
+                       style_option.rect.top() + vertical_padding);
     document.drawContents(
-        painter, QRectF(0, 0, text_width, style_option.rect.height() - (k_vertical_padding * 2)));
+        painter, QRectF(0, 0, text_width, style_option.rect.height() - (vertical_padding * 2)));
     painter->restore();
 }
 
@@ -201,8 +201,8 @@ void actions_log_delegate_t::updateEditorGeometry(QWidget *editor,
         return;
     }
 
-    editor->setGeometry(option.rect.adjusted(k_horizontal_padding, k_vertical_padding,
-                                             -k_horizontal_padding, -k_vertical_padding));
+    editor->setGeometry(option.rect.adjusted(horizontal_padding, vertical_padding,
+                                             -horizontal_padding, -vertical_padding));
     if (auto *text_browser = qobject_cast<QTextBrowser *>(editor))
     {
         text_browser->document()->setTextWidth(qMax(0, text_browser->viewport()->width()));
@@ -224,7 +224,7 @@ int actions_log_delegate_t::text_width_for_option(const QStyleOptionViewItem &op
         }
     }
 
-    return qMax(0, width - (k_horizontal_padding * 2));
+    return qMax(0, width - (horizontal_padding * 2));
 }
 
 bool actions_log_delegate_t::editorEvent(QEvent *event, QAbstractItemModel *model,

@@ -261,7 +261,7 @@ private slots:
 
         QString error;
         QVERIFY(service.verify_connection(&error));
-        QVERIFY(service.ensure_collection(text_embedder_t::k_embedding_dimensions, &error));
+        QVERIFY(service.ensure_collection(text_embedder_t::embedding_dimensions, &error));
         QVERIFY(error.isEmpty());
         QVERIFY(server.collection_create_requested());
         QVERIFY(service.is_available());
@@ -278,7 +278,7 @@ private slots:
 
         QString error;
         QVERIFY(service.verify_connection(&error));
-        QVERIFY(!service.ensure_collection(text_embedder_t::k_embedding_dimensions, &error));
+        QVERIFY(!service.ensure_collection(text_embedder_t::embedding_dimensions, &error));
         QVERIFY(error.contains(QStringLiteral("auto-creation is disabled")));
         QVERIFY(!service.is_available());
         QVERIFY(!server.collection_create_requested());

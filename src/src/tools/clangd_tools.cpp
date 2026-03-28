@@ -22,8 +22,8 @@ namespace qcai2
 namespace
 {
 
-constexpr int k_default_max_results = 25;
-constexpr int k_max_results_cap = 200;
+constexpr int default_result_count = 25;
+constexpr int results_cap_max = 200;
 
 bool set_error(QString *error, const QString &message)
 {
@@ -41,9 +41,9 @@ QString error_result(const QString &message)
         .arg(text.isEmpty() == true ? QStringLiteral("request failed") : text);
 }
 
-int bounded_max_results(const QJsonObject &args, int default_value = k_default_max_results)
+int bounded_max_results(const QJsonObject &args, int default_value = default_result_count)
 {
-    return qBound(1, args.value("max_results").toInt(default_value), k_max_results_cap);
+    return qBound(1, args.value("max_results").toInt(default_value), results_cap_max);
 }
 
 std::optional<Utils::FilePath> resolve_file_path(const QJsonObject &args, const QString &work_dir,
