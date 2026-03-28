@@ -12,6 +12,7 @@
 #include "../util/diff.h"
 #include "../util/logger.h"
 #include "../util/migration.h"
+#include "actions_log_links.h"
 #include "auto_hiding_list_widget.h"
 #include "debugger_status_widget.h"
 #include "decision_request_widget.h"
@@ -1647,6 +1648,8 @@ void agent_dock_widget_t::setup_ui()
 
     this->actions_log_model = new actions_log_model_t(this);
     this->actions_log_delegate = new actions_log_delegate_t(this->log_view);
+    this->actions_log_delegate->set_link_activated_handler(
+        [this](const QString &href) { this->open_actions_log_link(href); });
     this->log_view->setModel(this->actions_log_model);
     this->log_view->setItemDelegate(this->actions_log_delegate);
     this->log_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -2371,10 +2374,38 @@ void agent_dock_widget_t::append_stamped_log_entry(const QString &body)
 
     this->render_throttle->stop();
     const QString visible_stamped = redact_read_file_payloads(stamped);
-    this->actions_log_model->append_committed_entry(visible_stamped,
-                                                    wrap_markdown_payload_blocks(visible_stamped));
+    this->actions_log_model->append_committed_entry(
+        visible_stamped, this->render_actions_log_markdown(visible_stamped));
     this->append_raw_markdown_block(visible_stamped);
     this->scroll_log_views_to_bottom();
+}
+
+QString agent_dock_widget_t::render_actions_log_markdown(const QString &markdown) const
+{
+    return linkify_actions_log_file_references(wrap_markdown_payload_blocks(markdown));
+}
+
+void agent_dock_widget_t::open_actions_log_link(const QString &href)
+{
+    const std::optional<actions_log_file_link_t> link = parse_actions_log_file_link(QUrl(href));
+    if (link.has_value() == false)
+    {
+        return;
+    }
+
+    const QString absolute_path =
+        resolve_actions_log_file_link_path(*link, this->session_controller->current_project_dir());
+    if (absolute_path.isEmpty() == true)
+    {
+        QMessageBox::warning(
+            this, tr("Unable to open file"),
+            tr("Could not resolve '%1' to an existing file in the current project context.")
+                .arg(link->path));
+        return;
+    }
+
+    Core::EditorManager::openEditorAt(
+        Utils::Link(Utils::FilePath::fromString(absolute_path), link->line, link->column));
 }
 
 void agent_dock_widget_t::flush_streaming_markdown()
@@ -2396,7 +2427,7 @@ void agent_dock_widget_t::flush_streaming_markdown()
         this->log_markdown_blocks.append(flushed_markdown);
         this->session_controller->append_current_conversation_log_entry(flushed_markdown);
         this->actions_log_model->commit_streaming_entry(
-            flushed_markdown, wrap_markdown_payload_blocks(flushed_markdown));
+            flushed_markdown, this->render_actions_log_markdown(flushed_markdown));
     }
     else
     {
@@ -2429,7 +2460,7 @@ void agent_dock_widget_t::render_log()
     if (this->is_streaming)
     {
         this->actions_log_model->set_streaming_entry(
-            this->streaming_markdown, wrap_markdown_payload_blocks(this->streaming_markdown));
+            this->streaming_markdown, this->render_actions_log_markdown(this->streaming_markdown));
         this->sync_raw_markdown_view();
         this->scroll_log_views_to_bottom();
         return;
@@ -2446,13 +2477,13 @@ void agent_dock_widget_t::render_log_full()
     rendered_blocks.reserve(visible_blocks.size());
     for (const QString &block : visible_blocks)
     {
-        rendered_blocks.append(wrap_markdown_payload_blocks(block));
+        rendered_blocks.append(this->render_actions_log_markdown(block));
     }
     this->actions_log_model->set_committed_entries(visible_blocks, rendered_blocks);
     if (this->streaming_markdown.isEmpty() == false)
     {
         this->actions_log_model->set_streaming_entry(
-            this->streaming_markdown, wrap_markdown_payload_blocks(this->streaming_markdown));
+            this->streaming_markdown, this->render_actions_log_markdown(this->streaming_markdown));
     }
     this->sync_raw_markdown_view();
     this->scroll_log_views_to_bottom();

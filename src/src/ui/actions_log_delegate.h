@@ -5,6 +5,8 @@
 
 #include <QStyledItemDelegate>
 
+#include <functional>
+
 namespace qcai2
 {
 
@@ -63,6 +65,23 @@ public:
     void updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option,
                               const QModelIndex &index) const override;
 
+    /**
+     * Handles clicks on markdown anchors painted directly inside list rows.
+     * @param event Mouse event forwarded by the view.
+     * @param model Backing model for the row.
+     * @param option View style and geometry hints.
+     * @param index Row index that received the event.
+     * @return True when the event activated an internal link.
+     */
+    bool editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option,
+                     const QModelIndex &index) override;
+
+    /**
+     * Sets the callback invoked when one rendered Actions Log link is activated.
+     * @param handler Callback that receives the clicked href string.
+     */
+    void set_link_activated_handler(std::function<void(const QString &href)> handler);
+
 private:
     /**
      * Returns the usable markdown text width for one row.
@@ -70,6 +89,9 @@ private:
      * @return Usable text width in device-independent pixels.
      */
     int text_width_for_option(const QStyleOptionViewItem &option) const;
+
+    /** Callback invoked when one rendered Actions Log link is activated. */
+    std::function<void(const QString &href)> link_activated_handler;
 };
 
 }  // namespace qcai2

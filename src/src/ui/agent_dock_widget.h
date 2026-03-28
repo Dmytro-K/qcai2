@@ -294,6 +294,20 @@ private:
     void append_stamped_log_entry(const QString &body);
 
     /**
+     * Returns the rendered Actions Log markdown used by the rich-text view.
+     * This keeps raw markdown/debug storage unchanged while adding view-only decorations.
+     * @param markdown Raw markdown block stored in the log.
+     * @return Rendered markdown block with payload wrapping and clickable file links.
+     */
+    QString render_actions_log_markdown(const QString &markdown) const;
+
+    /**
+     * Opens one clicked Actions Log file-location link in the editor.
+     * @param href Internal href emitted by the Actions Log renderer.
+     */
+    void open_actions_log_link(const QString &href);
+
+    /**
      * Commits buffered streaming markdown into the persistent log buffer.
      */
     void flush_streaming_markdown();

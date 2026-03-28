@@ -4,12 +4,14 @@
 
 #include "actions_log_delegate.h"
 
+#include "actions_log_links.h"
 #include "actions_log_model.h"
 
 #include <QAbstractItemView>
 #include <QAbstractTextDocumentLayout>
 #include <QApplication>
 #include <QFrame>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QStyle>
 #include <QTextBrowser>
@@ -66,10 +68,36 @@ void configure_editor(QTextBrowser *editor)
     editor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     editor->setOpenExternalLinks(false);
     editor->setOpenLinks(false);
-    editor->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+    editor->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard |
+                                    Qt::LinksAccessibleByMouse | Qt::LinksAccessibleByKeyboard);
     editor->setContextMenuPolicy(Qt::DefaultContextMenu);
     editor->setStyleSheet(
         QStringLiteral("QTextBrowser { background: transparent; border: none; }"));
+}
+
+QString anchor_at_position(const QStyleOptionViewItem &option, const QModelIndex &index,
+                           const QPoint &position)
+{
+    const QString markdown = index.data(actions_log_model_t::RENDERED_MARKDOWN_ROLE).toString();
+    if (markdown.isEmpty() == true)
+    {
+        return {};
+    }
+
+    QStyleOptionViewItem style_option(option);
+    const int text_width = qMax(0, style_option.rect.width() - (k_horizontal_padding * 2));
+    QTextDocument document;
+    configure_document(&document, style_option, markdown, text_width);
+
+    const QPoint relative_position =
+        position - QPoint(style_option.rect.left() + k_horizontal_padding,
+                          style_option.rect.top() + k_vertical_padding);
+    if (relative_position.x() < 0 || relative_position.y() < 0)
+    {
+        return {};
+    }
+
+    return document.documentLayout()->anchorAt(relative_position);
 }
 
 }  // namespace
@@ -130,6 +158,12 @@ QWidget *actions_log_delegate_t::createEditor(QWidget *parent, const QStyleOptio
 
     auto *editor = new QTextBrowser(parent);
     configure_editor(editor);
+    QObject::connect(editor, &QTextBrowser::anchorClicked, editor, [this](const QUrl &url) {
+        if (this->link_activated_handler)
+        {
+            this->link_activated_handler(url.toString());
+        }
+    });
     return editor;
 }
 
@@ -182,6 +216,52 @@ int actions_log_delegate_t::text_width_for_option(const QStyleOptionViewItem &op
     }
 
     return qMax(0, width - (k_horizontal_padding * 2));
+}
+
+bool actions_log_delegate_t::editorEvent(QEvent *event, QAbstractItemModel *model,
+                                         const QStyleOptionViewItem &option,
+                                         const QModelIndex &index)
+{
+    Q_UNUSED(model);
+
+    if (event == nullptr)
+    {
+        return false;
+    }
+
+    if (event->type() != QEvent::MouseButtonRelease)
+    {
+        return QStyledItemDelegate::editorEvent(event, model, option, index);
+    }
+
+    const auto *mouse_event = dynamic_cast<QMouseEvent *>(event);
+    if (mouse_event == nullptr || mouse_event->button() != Qt::LeftButton)
+    {
+        return QStyledItemDelegate::editorEvent(event, model, option, index);
+    }
+
+    const QString anchor = anchor_at_position(option, index, mouse_event->pos());
+    if (anchor.isEmpty() == true)
+    {
+        return QStyledItemDelegate::editorEvent(event, model, option, index);
+    }
+
+    if (parse_actions_log_file_link(QUrl(anchor)).has_value() == false)
+    {
+        return QStyledItemDelegate::editorEvent(event, model, option, index);
+    }
+
+    if (this->link_activated_handler)
+    {
+        this->link_activated_handler(anchor);
+    }
+    return true;
+}
+
+void actions_log_delegate_t::set_link_activated_handler(
+    std::function<void(const QString &href)> handler)
+{
+    this->link_activated_handler = std::move(handler);
 }
 
 }  // namespace qcai2
