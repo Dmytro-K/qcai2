@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.10] - 2026-03-28
+
+### Added
+
+- Added file links in Actions Log
+
+### Changed
+
+- Fixed class extract for autocomplete
+- Fixed copy to clipboard in Actions Log
+
 ## [0.0.9] - 2026-03-25
 
 ### Added
