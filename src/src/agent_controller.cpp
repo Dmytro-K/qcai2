@@ -1784,11 +1784,7 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
     ++this->current_tool_call_count;
     const agent_progress_operation_t operation = classify_tool_operation(name);
     const QString progressLabel = progress_label_for_tool(name, operation);
-    const bool suppressReadFileLog = (name == QStringLiteral("read_file"));
-    if (!suppressReadFileLog)
-    {
-        emit this->log_message(format_tool_execution_log(name, args));
-    }
+    emit this->log_message(format_tool_execution_log(name, args));
     QCAI_DEBUG(
         "Agent",
         QStringLiteral("Tool call #%1: %2, args: %3")
@@ -1876,10 +1872,7 @@ void agent_controller_t::execute_tool(const QString &name, const QJsonObject &ar
                 QStringLiteral("⚠ Failed to persist tool output context: %1").arg(contextError));
         }
     }
-    if (!suppressReadFileLog)
-    {
-        emit this->log_message(format_tool_result_log(result));
-    }
+    emit this->log_message(format_tool_result_log(result));
 
     if (this->apply_soft_steer_if_pending(QStringLiteral("after_tool_execution"), {}, {}, name,
                                           result) == true)

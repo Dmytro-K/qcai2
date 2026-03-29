@@ -8,6 +8,7 @@
 
 - Fixed Copilot completion no-timeout setting
 - Run autocompation between iterations
+- Fix read_file show in Actions Log
 
 ## [0.0.10] - 2026-03-28
 

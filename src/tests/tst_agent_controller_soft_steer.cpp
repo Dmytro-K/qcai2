@@ -204,9 +204,16 @@ public:
 class static_result_tool_t final : public i_tool_t
 {
 public:
+    explicit static_result_tool_t(
+        const QString &tool_name = QStringLiteral("static_result_tool"),
+        const QString &tool_result = QStringLiteral("static-tool-result"))
+        : tool_name(tool_name), tool_result(tool_result)
+    {
+    }
+
     QString name() const override
     {
-        return QStringLiteral("static_result_tool");
+        return this->tool_name;
     }
 
     QString description() const override
@@ -222,10 +229,14 @@ public:
     QString execute(const QJsonObject & /*args*/, const QString & /*work_dir*/) override
     {
         ++this->execute_count;
-        return QStringLiteral("static-tool-result");
+        return this->tool_result;
     }
 
     int execute_count = 0;
+
+private:
+    QString tool_name;
+    QString tool_result;
 };
 
 }  // namespace
@@ -734,6 +745,7 @@ private slots:
     void decision_double_submit_is_blocked();
     void compaction_persists_summary_without_chat_history_or_stream_echo();
     void mid_run_auto_compaction_rebuilds_prompt_and_continues();
+    void read_file_tool_call_is_logged();
 };
 
 void tst_agent_controller_soft_steer_t::init()
@@ -1500,6 +1512,44 @@ void tst_agent_controller_soft_steer_t::mid_run_auto_compaction_rebuilds_prompt_
     QVERIFY(contains_text(visible_logs, QStringLiteral("🗜 Compaction started.")));
     QVERIFY(contains_text(visible_logs, QStringLiteral("🗜 Compaction completed.")));
     QVERIFY(contains_text(visible_logs, QStringLiteral("hidden compact draft")) == false);
+}
+
+void tst_agent_controller_soft_steer_t::read_file_tool_call_is_logged()
+{
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    auto tool = std::make_shared<static_result_tool_t>(QStringLiteral("read_file"),
+                                                       QStringLiteral("file contents"));
+    registry.register_tool(tool);
+
+    QSignalSpy log_spy(&controller, &agent_controller_t::log_message);
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+
+    controller.start(QStringLiteral("Inspect a file"), true, agent_controller_t::run_mode_t::AGENT,
+                     QStringLiteral("fake-model"), QStringLiteral("off"), QStringLiteral("off"));
+    QCOMPARE(provider.requests.size(), 1);
+
+    provider.finish(QStringLiteral(
+        "{\"type\":\"tool_call\",\"name\":\"read_file\",\"args\":{\"path\":\"src/src/"
+        "agent_controller.cpp\"}}"));
+
+    QTRY_COMPARE(provider.requests.size(), 2);
+    QCOMPARE(tool->execute_count, 1);
+
+    QStringList visible_logs;
+    for (const QList<QVariant> &entry : log_spy)
+    {
+        visible_logs.append(entry.at(0).toString());
+    }
+    QVERIFY(contains_text(visible_logs, QStringLiteral("**Tool:** `read_file`")));
+    QVERIFY(contains_text(visible_logs, QStringLiteral("agent_controller.cpp")));
+
+    provider.finish(QStringLiteral("{\"type\":\"final\",\"summary\":\"Done\",\"diff\":\"\"}"));
+    QTRY_COMPARE(stopped_spy.count(), 1);
 }
 
 }  // namespace qcai2
