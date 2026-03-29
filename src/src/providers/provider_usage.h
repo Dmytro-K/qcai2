@@ -28,6 +28,7 @@ struct provider_usage_t
 
     bool has_any() const;
     int resolved_total_tokens() const;
+    int uncached_input_tokens() const;
 };
 
 provider_usage_t provider_usage_from_response_object(const QJsonObject &response_object);

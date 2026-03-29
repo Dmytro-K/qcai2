@@ -509,7 +509,8 @@ bool agent_controller_t::should_start_mid_run_auto_compaction() const
            this->mid_run_compaction_in_progress == false && s.auto_compact_enabled == true &&
            s.auto_compact_threshold_tokens > 0 && this->chat_context_manager != nullptr &&
            this->run_id.isEmpty() == false &&
-           this->last_provider_request_usage.input_tokens >= s.auto_compact_threshold_tokens;
+           this->last_provider_request_usage.uncached_input_tokens() >=
+               s.auto_compact_threshold_tokens;
 }
 
 bool agent_controller_t::start_mid_run_auto_compaction()

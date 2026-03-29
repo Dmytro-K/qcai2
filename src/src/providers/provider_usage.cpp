@@ -74,6 +74,16 @@ int provider_usage_t::resolved_total_tokens() const
     return -1;
 }
 
+int provider_usage_t::uncached_input_tokens() const
+{
+    if (input_tokens < 0)
+    {
+        return -1;
+    }
+
+    return qMax(0, input_tokens - qMax(cached_input_tokens, 0));
+}
+
 provider_usage_t provider_usage_from_response_object(const QJsonObject &response_object)
 {
     QJsonObject usage_object = response_object.value(QStringLiteral("usage")).toObject();

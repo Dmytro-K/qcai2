@@ -745,6 +745,7 @@ private slots:
     void decision_double_submit_is_blocked();
     void compaction_persists_summary_without_chat_history_or_stream_echo();
     void mid_run_auto_compaction_rebuilds_prompt_and_continues();
+    void cached_input_tokens_do_not_retrigger_mid_run_compaction();
     void read_file_tool_call_is_logged();
 };
 
@@ -1512,6 +1513,68 @@ void tst_agent_controller_soft_steer_t::mid_run_auto_compaction_rebuilds_prompt_
     QVERIFY(contains_text(visible_logs, QStringLiteral("🗜 Compaction started.")));
     QVERIFY(contains_text(visible_logs, QStringLiteral("🗜 Compaction completed.")));
     QVERIFY(contains_text(visible_logs, QStringLiteral("hidden compact draft")) == false);
+}
+
+void tst_agent_controller_soft_steer_t::cached_input_tokens_do_not_retrigger_mid_run_compaction()
+{
+    test_settings.auto_compact_enabled = true;
+    test_settings.auto_compact_threshold_tokens = 50;
+
+    fake_provider_t provider;
+    tool_registry_t registry;
+    chat_context_manager_t chat_context_manager;
+    editor_context_t editor_context;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+    controller.set_chat_context_manager(&chat_context_manager);
+    controller.set_editor_context(&editor_context);
+
+    test_editor_snapshot.project_dir = QStringLiteral("/tmp/project");
+    test_editor_snapshot.project_file_path = QStringLiteral("/tmp/project/project.qtc");
+    test_editor_snapshot.file_path = QStringLiteral("/tmp/project/src/main.cpp");
+
+    auto tool = std::make_shared<static_result_tool_t>();
+    registry.register_tool(tool);
+
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+
+    controller.start(QStringLiteral("Need a two-step answer"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    QCOMPARE(provider.requests.size(), 1);
+
+    context_envelope_t compaction_envelope;
+    compaction_envelope.provider_messages = {
+        {QStringLiteral("system"), QStringLiteral("compaction envelope marker")},
+        {QStringLiteral("user"), QStringLiteral("compaction request marker")},
+    };
+    queued_context_envelopes.append(compaction_envelope);
+
+    context_envelope_t rebuilt_envelope;
+    rebuilt_envelope.provider_messages = {
+        {QStringLiteral("system"), QStringLiteral("rebuilt prompt marker")},
+        {QStringLiteral("user"), QStringLiteral("rebuilt user marker")},
+    };
+    queued_context_envelopes.append(rebuilt_envelope);
+
+    provider.finish(
+        QStringLiteral("{\"type\":\"tool_call\",\"name\":\"static_result_tool\",\"args\":{}}"), {},
+        provider_usage_t{120, 12, 0, 0, 0, -1.0, -1, -1});
+
+    QTRY_COMPARE(provider.requests.size(), 2);
+    QCOMPARE(tool->execute_count, 1);
+
+    provider.finish(QStringLiteral(
+        "{\"type\":\"final\",\"summary\":\"## Compacted\\n- important fact\\n\",\"diff\":\"\"}"));
+
+    QTRY_COMPARE(provider.requests.size(), 3);
+
+    provider.finish(QStringLiteral("{\"type\":\"final\",\"summary\":\"Done\",\"diff\":\"\"}"), {},
+                    provider_usage_t{120, 12, 0, 0, 90, -1.0, -1, -1});
+
+    QTRY_COMPARE(stopped_spy.count(), 1);
+    QCOMPARE(provider.requests.size(), 3);
 }
 
 void tst_agent_controller_soft_steer_t::read_file_tool_call_is_logged()

@@ -26,6 +26,7 @@
 #include <utils/filepath.h>
 #include <utils/link.h>
 
+#include <QAbstractScrollArea>
 #include <QAction>
 #include <QClipboard>
 #include <QColor>

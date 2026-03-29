@@ -13,6 +13,7 @@ class provider_usage_test_t : public QObject
 private slots:
     void provider_usage_from_response_object_reads_open_ai_usage_shapes();
     void provider_usage_from_response_object_reads_direct_top_level_fields();
+    void uncached_input_tokens_excludes_cached_prefix();
     void format_provider_usage_summary_omits_missing_fields_and_derives_total();
     void format_provider_usage_summary_appends_duration();
     void format_provider_usage_summary_supports_duration_only();
@@ -55,6 +56,20 @@ void provider_usage_test_t::provider_usage_from_response_object_reads_direct_top
     QCOMPARE(usage.reasoning_tokens, 4);
     QCOMPARE(usage.cached_input_tokens, 10);
     QCOMPARE(usage.resolved_total_tokens(), 105);
+}
+
+void provider_usage_test_t::uncached_input_tokens_excludes_cached_prefix()
+{
+    provider_usage_t usage;
+    usage.input_tokens = 80;
+    usage.cached_input_tokens = 70;
+    QCOMPARE(usage.uncached_input_tokens(), 10);
+
+    usage.cached_input_tokens = 120;
+    QCOMPARE(usage.uncached_input_tokens(), 0);
+
+    usage.input_tokens = -1;
+    QCOMPARE(usage.uncached_input_tokens(), -1);
 }
 
 void provider_usage_test_t::format_provider_usage_summary_omits_missing_fields_and_derives_total()
