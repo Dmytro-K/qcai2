@@ -550,6 +550,8 @@ add_qtc_plugin(qcai2
     src/src/agent_controller.cpp
     src/src/ui/agent_dock_widget.h
     src/src/ui/agent_dock_widget.cpp
+    src/src/ui/diff_preview_navigation.h
+    src/src/ui/diff_preview_navigation.cpp
     src/src/ui/actions_log_model.h
     src/src/ui/actions_log_model.cpp
     src/src/ui/actions_log_links.h
@@ -720,6 +722,8 @@ add_qtc_plugin(qcai2
     src/src/completion/ai_completion_processor.cpp
     src/src/completion/ghost_text_manager.h
     src/src/completion/ghost_text_manager.cpp
+    src/src/diff/diff_hunk_anchor.h
+    src/src/diff/diff_hunk_anchor.cpp
     src/src/diff/inline_diff_manager.h
     src/src/diff/inline_diff_manager.cpp
 )
