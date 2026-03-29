@@ -3,6 +3,7 @@
 
 #include <QList>
 #include <QObject>
+#include <QPointer>
 #include <QSet>
 #include <QString>
 
@@ -11,9 +12,19 @@
 
 namespace TextEditor
 {
+class BaseTextEditor;
 class EmbeddedWidgetInterface;
+class TextDocument;
 class TextMark;
+class TextEditorWidget;
 }  // namespace TextEditor
+
+class QWidget;
+
+namespace Core
+{
+class IEditor;
+}
 
 namespace qcai2
 {
@@ -182,6 +193,15 @@ signals:
     void all_resolved();
 
 private:
+    struct widget_handle_entry_t
+    {
+        QPointer<Core::IEditor> editor;
+        QPointer<TextEditor::TextEditorWidget> editor_widget;
+        QPointer<TextEditor::TextDocument> document;
+        QPointer<QWidget> widget;
+        std::unique_ptr<TextEditor::EmbeddedWidgetInterface> handle;
+    };
+
     /**
      * Parsed hunk plus its optional gutter marker.
      */
@@ -194,7 +214,7 @@ private:
         TextEditor::TextMark *mark = nullptr;
 
         /** Inline widgets inserted into open editor instances for this hunk. */
-        std::vector<std::unique_ptr<TextEditor::EmbeddedWidgetInterface>> widget_handles;
+        std::vector<widget_handle_entry_t> widget_handles;
     };
 
     /**
@@ -206,8 +226,114 @@ private:
     /**
      * Creates the gutter marker and actions for one hunk entry.
      * @param index Index value.
+     * @param attach_widgets When true, also recreates inline preview widgets for open editors.
      */
-    void create_marker(int index);
+    void create_marker(int index, bool attach_widgets = true);
+
+    /**
+     * Adds the inline preview widget for one hunk into one opened editor that
+     * exposes a TextEditorWidget.
+     * @param index Hunk index.
+     * @param editor Opened editor instance.
+     */
+    void attach_hunk_widget(int index, Core::IEditor *editor);
+
+    /**
+     * Reattaches inline preview widgets when a matching editor is opened later.
+     * @param editor Newly opened editor instance.
+     */
+    void attach_widgets_for_editor(Core::IEditor *editor);
+
+    /**
+     * Starts tracking one text document so inline diff state can react safely to
+     * document reloads.
+     * @param document Text document that hosts diff markers.
+     */
+    void track_document(TextEditor::TextDocument *document);
+
+    /**
+     * Returns true when one file still has at least one unresolved hunk.
+     * @param file_path Relative file path to inspect.
+     */
+    bool has_unresolved_hunks_for_file(const QString &file_path) const;
+
+    /**
+     * Temporarily hides inline annotations while one or more tracked documents
+     * are reloading so Qt Creator does not render stale annotation state.
+     * @param file_path Relative file path currently entering reload.
+     */
+    void suspend_annotations_for_reload(const QString &file_path);
+
+    /**
+     * Restores inline annotations after reload-safe cleanup finished.
+     * @param file_path Relative file path whose reload lifecycle finished.
+     */
+    void resume_annotations_after_reload(const QString &file_path);
+
+    /**
+     * Removes inline widgets attached to one text document before reload mutates
+     * the underlying block layout.
+     * @param document Text document being reloaded.
+     */
+    void detach_widgets_for_document(TextEditor::TextDocument *document);
+
+    /**
+     * Recreates inline widgets for one text document after reload completed.
+     * @param document Text document that finished reloading.
+     */
+    void reattach_widgets_for_document(TextEditor::TextDocument *document);
+
+    /**
+     * Removes inline widgets for all unresolved hunks that belong to one file.
+     * @param file_path Relative file path whose widgets should be removed.
+     */
+    void detach_widgets_for_file(const QString &file_path);
+
+    /**
+     * Recreates inline widgets for all unresolved hunks that belong to one file.
+     * @param file_path Relative file path whose widgets should be recreated.
+     */
+    void reattach_widgets_for_file(const QString &file_path);
+
+    /**
+     * Removes gutter marks for all unresolved hunks that belong to one file.
+     * @param file_path Relative file path whose marks should be removed.
+     */
+    void detach_marks_for_file(const QString &file_path);
+
+    /**
+     * Recreates gutter marks for all unresolved hunks that belong to one file.
+     * @param file_path Relative file path whose marks should be recreated.
+     */
+    void reattach_marks_for_file(const QString &file_path);
+
+    /**
+     * Invalidates unresolved hunks for one file after an external document reload made
+     * their anchors and patch context stale.
+     * @param file_path Relative file path whose unresolved hunks should be rejected.
+     */
+    void invalidate_hunks_for_file(const QString &file_path);
+
+    /**
+     * Returns the best anchor line for one hunk in the current partially-applied
+     * document state.
+     * @param index Hunk index.
+     */
+    int current_document_anchor_line(int index) const;
+
+    /**
+     * Repositions unresolved marks for one file after earlier accepted hunks changed
+     * the current document line offsets.
+     * @param file_path Relative file path of the affected file.
+     */
+    void refresh_marks_for_file(const QString &file_path);
+
+    /**
+     * Synchronously removes one embedded preview widget so Qt Creator no longer keeps
+     * stale block-layout references around reload or hunk resolution.
+     * @param entry Stored handle entry to clear.
+     */
+    static void destroy_widget_handle(widget_handle_entry_t &entry);
 
     /**
      * Builds a unified diff from the provided hunk indexes.
@@ -229,6 +355,25 @@ private:
 
     /** Project directory used to resolve relative file paths. */
     QString project_dir;
+
+    /** Text documents currently tracked for reload-safe inline widget lifecycle. */
+    std::vector<QPointer<TextEditor::TextDocument>> tracked_documents;
+
+    /** Files whose unresolved gutter marks must be recreated after the next document reload. */
+    QSet<QString> pending_mark_reattach_files;
+
+    /** Files whose unresolved hunks must be invalidated after an external reload finishes. */
+    QSet<QString> pending_external_reload_invalidation_files;
+
+    /** Files whose reload currently keeps inline annotations temporarily hidden. */
+    QSet<QString> reload_annotation_hidden_files;
+
+    /** Tracks whether this manager hid annotations itself and must restore them later. */
+    bool annotations_hidden_by_reload = false;
+
+    /** Monotonic counter incremented on each show_diff call to discard stale reload invalidations.
+     */
+    int diff_generation = 0;
 };
 
 }  // namespace qcai2

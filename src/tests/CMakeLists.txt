@@ -247,6 +247,38 @@ target_link_libraries(tst_qcai2_request_duration_formatter PRIVATE
 )
 qcai2_register_test(qcai2_request_duration_formatter tst_qcai2_request_duration_formatter)
 
+add_executable(tst_qcai2_diff_preview_navigation
+    tst_diff_preview_navigation.cpp
+    ../src/ui/diff_preview_navigation.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_diff_preview_navigation)
+
+target_include_directories(tst_qcai2_diff_preview_navigation PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_diff_preview_navigation PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_diff_preview_navigation tst_qcai2_diff_preview_navigation)
+
+add_executable(tst_qcai2_diff_hunk_anchor
+    tst_diff_hunk_anchor.cpp
+    ../src/diff/diff_hunk_anchor.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_diff_hunk_anchor)
+
+target_include_directories(tst_qcai2_diff_hunk_anchor PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_diff_hunk_anchor PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_diff_hunk_anchor tst_qcai2_diff_hunk_anchor)
+
 add_executable(tst_qcai2_file_tools
     tst_file_tools.cpp
     ../src/tools/file_tools.cpp

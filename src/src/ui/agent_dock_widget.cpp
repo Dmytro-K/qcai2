@@ -16,10 +16,12 @@
 #include "auto_hiding_list_widget.h"
 #include "debugger_status_widget.h"
 #include "decision_request_widget.h"
+#include "diff_preview_navigation.h"
 #include "image_attachment_preview_strip.h"
 #include "request_duration_formatter.h"
 #include "ui_agent_dock_widget.h"
 
+#include <coreplugin/coreconstants.h>
 #include <coreplugin/editormanager/editormanager.h>
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectmanager.h>
@@ -55,6 +57,7 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSet>
 #include <QShortcut>
 #include <QSignalBlocker>
@@ -80,6 +83,12 @@ namespace
 int bounded_int(qsizetype value)
 {
     return static_cast<int>(std::min(value, qsizetype(std::numeric_limits<int>::max())));
+}
+
+Utils::Id diff_editor_id_for_file_path(const Utils::FilePath &file_path)
+{
+    Q_UNUSED(file_path);
+    return Utils::Id(Core::Constants::K_DEFAULT_TEXT_EDITOR_ID);
 }
 
 QStringList open_ai_agent_models()
@@ -472,6 +481,8 @@ public:
                 &diff_preview_edit_t::update_line_number_area_width);
         connect(this, &QPlainTextEdit::updateRequest, this,
                 &diff_preview_edit_t::update_line_number_area);
+        this->setMouseTracking(true);
+        this->viewport()->setMouseTracking(true);
         this->update_line_number_area_width(0);
     }
 
@@ -488,7 +499,13 @@ public:
 
     void set_diff_text(const QString &diff)
     {
+        this->set_diff_text(diff, QString());
+    }
+
+    void set_diff_text(const QString &diff, const QString &project_dir)
+    {
         setPlainText(diff);
+        this->navigation_targets = build_diff_preview_navigation_targets(diff, project_dir);
         this->recalculate_approvals();
         this->notify_approval_changed();
         this->line_number_area->update();
@@ -498,6 +515,11 @@ public:
     {
         this->approval_changed_callback = std::move(callback);
         this->notify_approval_changed();
+    }
+
+    void set_navigation_callback(std::function<void(const QString &, int)> callback)
+    {
+        this->navigation_callback = std::move(callback);
     }
 
     QString approved_diff() const
@@ -698,6 +720,37 @@ public:
     }
 
 protected:
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        this->update_navigation_cursor(event->pos());
+        QPlainTextEdit::mouseMoveEvent(event);
+    }
+
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        if (event->button() == Qt::LeftButton)
+        {
+            const diff_preview_navigation_target_t target =
+                this->navigation_target_for_position(event->pos());
+            if (target.is_valid() == true &&
+                static_cast<bool>(this->navigation_callback) == true &&
+                this->is_position_over_navigable_text(event->pos()) == true)
+            {
+                this->navigation_callback(target.absolute_file_path, target.line);
+                event->accept();
+                return;
+            }
+        }
+
+        QPlainTextEdit::mousePressEvent(event);
+    }
+
+    void leaveEvent(QEvent *event) override
+    {
+        this->viewport()->unsetCursor();
+        QPlainTextEdit::leaveEvent(event);
+    }
+
     void resizeEvent(QResizeEvent *event) override
     {
         QPlainTextEdit::resizeEvent(event);
@@ -707,6 +760,55 @@ protected:
     }
 
 private:
+    bool is_position_over_navigable_text(const QPoint &position) const
+    {
+        const diff_preview_navigation_target_t target =
+            this->navigation_target_for_position(position);
+        if (target.is_valid() == false || static_cast<bool>(this->navigation_callback) == false)
+        {
+            return false;
+        }
+
+        const QTextCursor cursor = this->cursorForPosition(position);
+        const QTextBlock block = cursor.block();
+        if (block.isValid() == false || block.layout() == nullptr ||
+            block.layout()->lineCount() == 0)
+        {
+            return false;
+        }
+
+        const QTextLine line = block.layout()->lineAt(0);
+        const QRectF block_rect = blockBoundingGeometry(block).translated(contentOffset());
+        const qreal line_top = block_rect.top() + line.y();
+        const qreal line_bottom = line_top + line.height();
+        if (position.y() < line_top || position.y() >= line_bottom)
+        {
+            return false;
+        }
+
+        const qreal line_left = block_rect.left() + line.x();
+        const qreal line_right = line_left + line.naturalTextWidth();
+        return position.x() >= line_left && position.x() <= line_right;
+    }
+
+    diff_preview_navigation_target_t navigation_target_for_position(const QPoint &position) const
+    {
+        const QTextCursor cursor = this->cursorForPosition(position);
+        const int preview_line = cursor.block().blockNumber() + 1;
+        return this->navigation_targets.value(preview_line);
+    }
+
+    void update_navigation_cursor(const QPoint &position)
+    {
+        if (this->is_position_over_navigable_text(position) == true)
+        {
+            this->viewport()->setCursor(Qt::PointingHandCursor);
+            return;
+        }
+
+        this->viewport()->unsetCursor();
+    }
+
     void update_line_number_area_width(int)
     {
         setViewportMargins(this->line_number_area_width(), 0, 0, 0);
@@ -781,6 +883,8 @@ private:
     QSet<int> approvable_lines;
     QSet<int> approved_lines;
     std::function<void(qsizetype, qsizetype)> approval_changed_callback;
+    QHash<int, diff_preview_navigation_target_t> navigation_targets;
+    std::function<void(const QString &, int)> navigation_callback;
 };
 
 diff_line_number_area_t::diff_line_number_area_t(diff_preview_edit_t *editor)
@@ -942,8 +1046,11 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
     this->goal_edit->installEventFilter(this);
 
     // Connect debug logger to Debug Log tab
-    connect(&logger_t::instance(), &logger_t::entry_added, this,
-            [this](const QString &entry) { this->debug_log_view->appendPlainText(entry); });
+    this->debug_log_connection =
+        connect(&logger_t::instance(), &logger_t::entry_added, this->debug_log_view,
+                [debug_log_view = this->debug_log_view](const QString &entry) {
+                    debug_log_view->appendPlainText(entry);
+                });
     // Load existing log entries
     const auto existing_entries = logger_t::instance().log_entries();
     for (const auto &e : existing_entries)
@@ -982,6 +1089,7 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
 
 agent_dock_widget_t::~agent_dock_widget_t()
 {
+    QObject::disconnect(this->debug_log_connection);
     this->session_controller->save_chat();
 }
 
@@ -1121,9 +1229,10 @@ void agent_dock_widget_t::sync_diff_ui(const QString &diff, bool focusDiffTab,
     this->current_diff = diff;
     this->applied_diff.clear();
     this->revert_patch_btn->setEnabled(false);
+    const QString work_dir = review_project_dir(this->session_controller.get(), this->controller);
 
     auto *diff_preview = static_cast<diff_preview_edit_t *>(this->diff_view);
-    diff_preview->set_diff_text(diff);
+    diff_preview->set_diff_text(diff, work_dir);
     this->apply_patch_btn->setEnabled(!diff.isEmpty() && diff_preview->has_approved_changes());
 
     if (focusDiffTab)
@@ -1135,7 +1244,6 @@ void agent_dock_widget_t::sync_diff_ui(const QString &diff, bool focusDiffTab,
     }
 
     this->diff_file_list->clear();
-    const QString work_dir = review_project_dir(this->session_controller.get(), this->controller);
 
     if (!diff.isEmpty())
     {
@@ -1162,8 +1270,9 @@ void agent_dock_widget_t::sync_diff_ui(const QString &diff, bool focusDiffTab,
         disconnect(this->diff_file_list, &QListWidget::itemClicked, nullptr, nullptr);
         connect(this->diff_file_list, &QListWidget::itemClicked, this, [](QListWidgetItem *item) {
             const QString absPath = item->data(Qt::UserRole).toString();
-            Core::EditorManager::openEditorAt(
-                Utils::Link(Utils::FilePath::fromString(absPath), 0, 0));
+            const Utils::FilePath file_path = Utils::FilePath::fromString(absPath);
+            Core::EditorManager::openEditorAt(Utils::Link(file_path, 0, 0),
+                                              diff_editor_id_for_file_path(file_path));
         });
     }
 
@@ -1646,6 +1755,11 @@ void agent_dock_widget_t::setup_ui()
     }
     this->ui->diffViewPlaceholder->deleteLater();
     this->diff_view = diff_preview;
+    diff_preview->set_navigation_callback([](const QString &absolute_file_path, int line) {
+        const Utils::FilePath file_path = Utils::FilePath::fromString(absolute_file_path);
+        Core::EditorManager::openEditorAt(Utils::Link(file_path, qMax(1, line), 0),
+                                          diff_editor_id_for_file_path(file_path));
+    });
 
     this->actions_log_model = new actions_log_model_t(this);
     this->actions_log_delegate = new actions_log_delegate_t(this->log_view);

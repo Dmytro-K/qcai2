@@ -1590,15 +1590,19 @@ void agent_controller_t::handle_response(const QString &response, const QString 
                     Diff::extract_and_create_new_files(parsed.diff, QString(), /*dryRun=*/true);
                 const QString cleanDiff = nf.remaining_diff.trimmed();
                 this->final_diff_preview = Diff::normalize(cleanDiff);
-                if (inline_refinement_enabled == true && !this->final_diff_preview.isEmpty())
+                if (this->final_diff_preview.isEmpty() == false)
                 {
-                    this->run_state_machine.await_inline_diff_review();
-                    this->pending_final_summary = parsed.summary;
                     emit this->diff_available(this->final_diff_preview);
-                    emit this->log_message(
-                        QStringLiteral("📝 Review the proposed inline diff. Resolve the hunks to "
-                                       "finish, or reject changes to ask for a revised patch."));
-                    break;
+                    if (inline_refinement_enabled == true)
+                    {
+                        this->run_state_machine.await_inline_diff_review();
+                        this->pending_final_summary = parsed.summary;
+                        emit this->log_message(
+                            QStringLiteral("📝 Review the proposed inline diff. Resolve the hunks "
+                                           "to finish, or reject changes to ask for a revised "
+                                           "patch."));
+                        break;
+                    }
                 }
             }
             this->pending_final_summary.clear();

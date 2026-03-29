@@ -734,6 +734,7 @@ private slots:
     void steering_while_reviewing_inline_diff_clears_diff_and_restarts();
     void inline_apply_patch_approval_uses_reviewed_diff_without_rerunning_tool();
     void dry_run_apply_patch_tool_call_is_blocked_and_shows_preview();
+    void final_diff_without_inline_refinement_still_emits_preview();
     void decision_request_enters_waiting_state();
     void decision_request_without_id_gets_generated();
     void invalid_decision_request_retries_without_waiting();
@@ -1114,6 +1115,39 @@ void tst_agent_controller_soft_steer_t::
     provider.finish(
         QStringLiteral("{\"type\":\"final\",\"summary\":\"Dry-run summary\",\"diff\":\"\"}"));
     QTRY_COMPARE(stopped_spy.count(), 1);
+}
+
+void tst_agent_controller_soft_steer_t::final_diff_without_inline_refinement_still_emits_preview()
+{
+    test_settings.inline_diff_refinement_enabled = false;
+
+    fake_provider_t provider;
+    tool_registry_t registry;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+
+    QSignalSpy diff_spy(&controller, &agent_controller_t::diff_available);
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+
+    controller.start(QStringLiteral("Show final diff"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    QCOMPARE(provider.requests.size(), 1);
+
+    const QString diff =
+        QStringLiteral("--- a/file.cpp\n+++ b/file.cpp\n@@ -1 +1 @@\n-old\n+new\n");
+    const QString response = QString::fromUtf8(
+        QJsonDocument(QJsonObject{{QStringLiteral("type"), QStringLiteral("final")},
+                                  {QStringLiteral("summary"), QStringLiteral("Changed file")},
+                                  {QStringLiteral("diff"), diff}})
+            .toJson(QJsonDocument::Compact));
+    provider.finish(response);
+
+    QTRY_COMPARE(diff_spy.count(), 1);
+    QCOMPARE(diff_spy.at(0).at(0).toString(), diff.trimmed());
+    QTRY_COMPARE(stopped_spy.count(), 1);
+    QCOMPARE(controller.current_run_state(), agent_run_state_machine_t::state_t::COMPLETED);
 }
 
 void tst_agent_controller_soft_steer_t::decision_request_enters_waiting_state()
