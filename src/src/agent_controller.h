@@ -403,6 +403,39 @@ private:
     QString build_system_prompt() const;
 
     /**
+     * Builds the dedicated compaction system prompt used by hidden compact requests.
+     */
+    QString build_compaction_system_prompt() const;
+
+    /**
+     * Builds request-scoped dynamic system messages for the current editor and request.
+     * @param include_request_context True to include linked-file/request-context text.
+     */
+    QStringList build_dynamic_system_messages(bool include_request_context) const;
+
+    /**
+     * Returns true while the current provider request is an explicit or hidden compaction request.
+     */
+    bool is_compaction_request_active() const;
+
+    /**
+     * Returns true when the run should compact before sending the next normal model request.
+     */
+    bool should_start_mid_run_auto_compaction() const;
+
+    /**
+     * Starts one hidden compaction request and resumes the run after it completes.
+     * @return True when the hidden compaction request was dispatched.
+     */
+    bool start_mid_run_auto_compaction();
+
+    /**
+     * Rebuilds prompt-visible messages from persistent chat context after compaction.
+     * @return True when prompt reconstruction succeeded.
+     */
+    bool rebuild_messages_from_persistent_context(QString *error);
+
+    /**
      * Arms the inactivity watchdog for an in-flight provider request.
      */
     void arm_provider_watchdog();
@@ -609,6 +642,9 @@ private:
     /** Accumulated provider usage across all model requests in the current run. */
     provider_usage_t accumulated_usage;
 
+    /** Usage counters reported by the most recent normal model request. */
+    provider_usage_t last_provider_request_usage;
+
     /** Optional per-request Markdown logger for the current run. */
     std::unique_ptr<request_detailed_log_t> detailed_request_log;
 
@@ -692,6 +728,9 @@ private:
 
     /** Tracks whether the current request has produced any visible activity yet. */
     bool provider_activity_seen = false;
+
+    /** True while a hidden mid-run compaction request is in flight. */
+    bool mid_run_compaction_in_progress = false;
 };
 
 }  // namespace qcai2

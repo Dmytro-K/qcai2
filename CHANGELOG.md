@@ -7,6 +7,7 @@
 ### Changed
 
 - Fixed Copilot completion no-timeout setting
+- Run autocompation between iterations
 
 ## [0.0.10] - 2026-03-28
 

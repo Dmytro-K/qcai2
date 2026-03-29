@@ -1,4 +1,5 @@
 #include "../src/agent_controller.h"
+#include "../src/commands/compact_command.h"
 #include "../src/context/chat_context_manager.h"
 #include "../src/mcp/mcp_tool_manager.h"
 #include "../src/settings/settings.h"
@@ -26,6 +27,10 @@ int persisted_user_message_count = 0;
 int persisted_assistant_message_count = 0;
 int persisted_compaction_summary_count = 0;
 QString last_persisted_compaction_summary;
+QList<context_envelope_t> queued_context_envelopes;
+QStringList captured_envelope_system_instructions;
+QList<QStringList> captured_envelope_dynamic_system_messages;
+QList<context_request_kind_t> captured_envelope_request_kinds;
 
 QStringList message_contents(const QList<chat_message_t> &messages, const QString &role)
 {
@@ -196,11 +201,90 @@ public:
     int execute_count = 0;
 };
 
+class static_result_tool_t final : public i_tool_t
+{
+public:
+    QString name() const override
+    {
+        return QStringLiteral("static_result_tool");
+    }
+
+    QString description() const override
+    {
+        return QStringLiteral("Returns one fixed result.");
+    }
+
+    QJsonObject args_schema() const override
+    {
+        return QJsonObject{};
+    }
+
+    QString execute(const QJsonObject & /*args*/, const QString & /*work_dir*/) override
+    {
+        ++this->execute_count;
+        return QStringLiteral("static-tool-result");
+    }
+
+    int execute_count = 0;
+};
+
 }  // namespace
 
 settings_t &settings()
 {
     return test_settings;
+}
+
+QString compact_prompt_text(const QString &focus)
+{
+    QString prompt = QStringLiteral("compact prompt");
+    if (focus.trimmed().isEmpty() == false)
+    {
+        prompt += QStringLiteral(": %1").arg(focus.trimmed());
+    }
+    return prompt;
+}
+
+chat_context_manager_t::chat_context_manager_t(QObject *parent) : QObject(parent)
+{
+}
+
+const QMetaObject chat_context_manager_t::staticMetaObject = QObject::staticMetaObject;
+
+const QMetaObject *chat_context_manager_t::metaObject() const
+{
+    return &QObject::staticMetaObject;
+}
+
+void *chat_context_manager_t::qt_metacast(const char *clname)
+{
+    return QObject::qt_metacast(clname);
+}
+
+int chat_context_manager_t::qt_metacall(QMetaObject::Call call, int id, void **arguments)
+{
+    return QObject::qt_metacall(call, id, arguments);
+}
+
+editor_context_t::editor_context_t(QObject *parent) : QObject(parent)
+{
+}
+
+const QMetaObject editor_context_t::staticMetaObject = QObject::staticMetaObject;
+
+const QMetaObject *editor_context_t::metaObject() const
+{
+    return &QObject::staticMetaObject;
+}
+
+void *editor_context_t::qt_metacast(const char *clname)
+{
+    return QObject::qt_metacast(clname);
+}
+
+int editor_context_t::qt_metacall(QMetaObject::Call call, int id, void **arguments)
+{
+    return QObject::qt_metacall(call, id, arguments);
 }
 
 prompt_instruction_options_t prompt_instruction_options(const settings_t &settings)
@@ -469,17 +553,22 @@ bool chat_context_manager_t::append_artifact(const QString & /*run_id*/, const Q
     return true;
 }
 
-context_envelope_t
-chat_context_manager_t::build_context_envelope(context_request_kind_t /*kind*/,
-                                               const QString & /*system_instruction*/,
-                                               const QStringList & /*dynamic_system_messages*/,
-                                               int /*max_output_tokens*/, QString *error) const
+context_envelope_t chat_context_manager_t::build_context_envelope(
+    context_request_kind_t kind, const QString &system_instruction,
+    const QStringList &dynamic_system_messages, int /*max_output_tokens*/, QString *error) const
 {
+    captured_envelope_system_instructions.append(system_instruction);
+    captured_envelope_dynamic_system_messages.append(dynamic_system_messages);
+    captured_envelope_request_kinds.append(kind);
     if (error != nullptr)
     {
         error->clear();
     }
-    return {};
+    if (queued_context_envelopes.isEmpty() == true)
+    {
+        return {};
+    }
+    return queued_context_envelopes.takeFirst();
 }
 
 QString chat_context_manager_t::build_completion_context_block(const QString & /*file_path*/,
@@ -644,6 +733,7 @@ private slots:
     void steering_queued_while_waiting_for_decision_applies_after_answer();
     void decision_double_submit_is_blocked();
     void compaction_persists_summary_without_chat_history_or_stream_echo();
+    void mid_run_auto_compaction_rebuilds_prompt_and_continues();
 };
 
 void tst_agent_controller_soft_steer_t::init()
@@ -659,6 +749,10 @@ void tst_agent_controller_soft_steer_t::init()
     persisted_assistant_message_count = 0;
     persisted_compaction_summary_count = 0;
     last_persisted_compaction_summary.clear();
+    queued_context_envelopes.clear();
+    captured_envelope_system_instructions.clear();
+    captured_envelope_dynamic_system_messages.clear();
+    captured_envelope_request_kinds.clear();
     test_editor_snapshot = {};
 }
 
@@ -1311,6 +1405,101 @@ void tst_agent_controller_soft_steer_t::
     QVERIFY(contains_text(visible_logs, QStringLiteral("🗜 Compaction completed.")));
     QVERIFY(contains_text(visible_logs, QStringLiteral("Compact this conversation")) == false);
     QVERIFY(contains_text(visible_logs, QStringLiteral("secret compact draft")) == false);
+}
+
+void tst_agent_controller_soft_steer_t::mid_run_auto_compaction_rebuilds_prompt_and_continues()
+{
+    test_settings.auto_compact_enabled = true;
+    test_settings.auto_compact_threshold_tokens = 50;
+
+    fake_provider_t provider;
+    tool_registry_t registry;
+    chat_context_manager_t chat_context_manager;
+    editor_context_t editor_context;
+    agent_controller_t controller;
+    controller.set_provider(&provider);
+    controller.set_tool_registry(&registry);
+    controller.set_chat_context_manager(&chat_context_manager);
+    controller.set_editor_context(&editor_context);
+
+    test_editor_snapshot.project_dir = QStringLiteral("/tmp/project");
+    test_editor_snapshot.project_file_path = QStringLiteral("/tmp/project/project.qtc");
+    test_editor_snapshot.file_path = QStringLiteral("/tmp/project/src/main.cpp");
+
+    auto tool = std::make_shared<static_result_tool_t>();
+    registry.register_tool(tool);
+
+    QSignalSpy iteration_spy(&controller, &agent_controller_t::iteration_changed);
+    QSignalSpy stopped_spy(&controller, &agent_controller_t::stopped);
+    QSignalSpy stream_spy(&controller, &agent_controller_t::streaming_token);
+    QSignalSpy log_spy(&controller, &agent_controller_t::log_message);
+
+    controller.start(QStringLiteral("Need a two-step answer"), true,
+                     agent_controller_t::run_mode_t::AGENT, QStringLiteral("fake-model"),
+                     QStringLiteral("off"), QStringLiteral("off"));
+    QCOMPARE(provider.requests.size(), 1);
+
+    captured_envelope_system_instructions.clear();
+    captured_envelope_dynamic_system_messages.clear();
+    captured_envelope_request_kinds.clear();
+
+    context_envelope_t compaction_envelope;
+    compaction_envelope.provider_messages = {
+        {QStringLiteral("system"), QStringLiteral("compaction envelope marker")},
+        {QStringLiteral("user"), QStringLiteral("compaction request marker")},
+    };
+    queued_context_envelopes.append(compaction_envelope);
+
+    context_envelope_t rebuilt_envelope;
+    rebuilt_envelope.provider_messages = {
+        {QStringLiteral("system"), QStringLiteral("rebuilt prompt marker")},
+        {QStringLiteral("user"), QStringLiteral("rebuilt user marker")},
+    };
+    queued_context_envelopes.append(rebuilt_envelope);
+
+    provider.finish(
+        QStringLiteral("{\"type\":\"tool_call\",\"name\":\"static_result_tool\",\"args\":{}}"), {},
+        provider_usage_t{60, 12, 0, 0, -1, -1.0, -1, -1});
+
+    QTRY_COMPARE(provider.requests.size(), 2);
+    QCOMPARE(tool->execute_count, 1);
+    QCOMPARE(iteration_spy.count(), 1);
+    QCOMPARE(persisted_compaction_summary_count, 0);
+    QVERIFY(captured_envelope_system_instructions.size() >= 1);
+    QVERIFY(captured_envelope_system_instructions.at(0).contains(
+        QStringLiteral("You are compacting the existing conversation context")));
+    const QStringList compaction_user_messages =
+        message_contents(provider.requests.at(1).messages, QStringLiteral("user"));
+    QVERIFY(compaction_user_messages.contains(QStringLiteral("compaction request marker")));
+    QCOMPARE(compaction_user_messages.constLast(), compact_prompt_text());
+
+    provider.stream(QStringLiteral("hidden compact draft"));
+    provider.finish(QStringLiteral(
+        "{\"type\":\"final\",\"summary\":\"## Compacted\\n- important fact\\n\",\"diff\":\"\"}"));
+
+    QTRY_COMPARE(provider.requests.size(), 3);
+    QCOMPARE(persisted_compaction_summary_count, 1);
+    QCOMPARE(last_persisted_compaction_summary, QStringLiteral("## Compacted\n- important fact"));
+    QCOMPARE(iteration_spy.count(), 2);
+    QVERIFY(captured_envelope_system_instructions.size() >= 2);
+    QVERIFY(captured_envelope_system_instructions.at(1).contains(
+                QStringLiteral("You are compacting the existing conversation context")) == false);
+    QVERIFY(message_contents(provider.requests.at(2).messages, QStringLiteral("system"))
+                .contains(QStringLiteral("rebuilt prompt marker")));
+    QCOMPARE(stream_spy.count(), 0);
+
+    provider.finish(QStringLiteral("{\"type\":\"final\",\"summary\":\"Done\",\"diff\":\"\"}"));
+
+    QTRY_COMPARE(stopped_spy.count(), 1);
+
+    QStringList visible_logs;
+    for (const QList<QVariant> &entry : log_spy)
+    {
+        visible_logs.append(entry.at(0).toString());
+    }
+    QVERIFY(contains_text(visible_logs, QStringLiteral("🗜 Compaction started.")));
+    QVERIFY(contains_text(visible_logs, QStringLiteral("🗜 Compaction completed.")));
+    QVERIFY(contains_text(visible_logs, QStringLiteral("hidden compact draft")) == false);
 }
 
 }  // namespace qcai2
