@@ -271,6 +271,7 @@ public:
         this->maxToolsSpin = this->ui->maxToolsSpin;
         this->maxDiffSpin = this->ui->maxDiffSpin;
         this->maxFilesSpin = this->ui->maxFilesSpin;
+        this->linkedFilesIncludeCurrentFileCheck = this->ui->linkedFilesIncludeCurrentFileCheck;
         this->dryRunCheck = this->ui->dryRunCheck;
         this->autoCompactCheck = this->ui->autoCompactCheck;
         this->autoCompactThresholdSpin = this->ui->autoCompactThresholdSpin;
@@ -552,6 +553,8 @@ public:
         this->maxDiffSpin->set_value(s.max_diff_lines);
         this->maxFilesSpin->set_value(s.max_changed_files);
 
+        this->linkedFilesIncludeCurrentFileCheck->setChecked(
+            s.linked_files_include_current_file_by_default);
         this->dryRunCheck->setChecked(s.dry_run_default);
         this->autoCompactCheck->setChecked(s.auto_compact_enabled);
         this->autoCompactThresholdSpin->set_value(s.auto_compact_threshold_tokens);
@@ -1494,6 +1497,7 @@ private:
     QLineEdit *ollamaUrlEdit;
     QComboBox *ollamaModelCombo;
     settings_spin_box_t *maxIterSpin, *maxToolsSpin, *maxDiffSpin, *maxFilesSpin;
+    QCheckBox *linkedFilesIncludeCurrentFileCheck;
     QCheckBox *dryRunCheck;
     QCheckBox *autoCompactCheck;
     settings_spin_box_t *autoCompactThresholdSpin;
