@@ -85,6 +85,9 @@ struct settings_t
     /** Maximum allowed changed files before approval is required. Set to 0 for no file limit. */
     int max_changed_files = 10;
 
+    /** Includes the current file in linked-files context by default when true. */
+    bool linked_files_include_current_file_by_default = false;
+
     /** Starts the agent in dry-run mode by default when true. */
     bool dry_run_default = true;
 
@@ -290,6 +293,28 @@ using mcp_server_connection_states_t = QMap<QString, mcp_server_connection_state
  * @return Shared settings instance.
  */
 settings_t &settings();
+
+/**
+ * Broadcasts runtime settings updates to already-open UI/controllers that must
+ * react immediately after Apply.
+ */
+class settings_change_notifier_t : public QObject
+{
+    Q_OBJECT
+public:
+    /** Emits @ref settings_changed for already-open runtime consumers. */
+    void notify_settings_changed();
+
+signals:
+    /** Emitted after settings were applied and saved. */
+    void settings_changed();
+};
+
+/**
+ * Returns the process-wide settings change notifier singleton.
+ * @return Shared notifier instance.
+ */
+settings_change_notifier_t &settings_change_notifier();
 
 mcp_server_connection_states_t load_mcp_server_connection_states(QString *error = nullptr);
 bool save_mcp_server_connection_states(const mcp_server_connection_states_t &states,

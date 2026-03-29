@@ -178,6 +178,7 @@ class settings_widget_t : public Core::IOptionsPageWidget
         int max_tool_calls = 0;
         int max_diff_lines = 0;
         int max_changed_files = 0;
+        bool linked_files_include_current_file_by_default = false;
         bool dry_run_default = false;
         bool ai_completion_enabled = false;
         bool detailed_completion_logging = false;
@@ -271,6 +272,7 @@ public:
         this->maxToolsSpin = this->ui->maxToolsSpin;
         this->maxDiffSpin = this->ui->maxDiffSpin;
         this->maxFilesSpin = this->ui->maxFilesSpin;
+        this->linkedFilesIncludeCurrentFileCheck = this->ui->linkedFilesIncludeCurrentFileCheck;
         this->dryRunCheck = this->ui->dryRunCheck;
         this->autoCompactCheck = this->ui->autoCompactCheck;
         this->autoCompactThresholdSpin = this->ui->autoCompactThresholdSpin;
@@ -552,6 +554,8 @@ public:
         this->maxDiffSpin->set_value(s.max_diff_lines);
         this->maxFilesSpin->set_value(s.max_changed_files);
 
+        this->linkedFilesIncludeCurrentFileCheck->setChecked(
+            s.linked_files_include_current_file_by_default);
         this->dryRunCheck->setChecked(s.dry_run_default);
         this->autoCompactCheck->setChecked(s.auto_compact_enabled);
         this->autoCompactThresholdSpin->set_value(s.auto_compact_threshold_tokens);
@@ -775,6 +779,9 @@ public:
         connect(this->maxDiffSpin, &settings_spin_box_t::value_changed, Utils::checkSettingsDirty);
         connect(this->maxFilesSpin, &settings_spin_box_t::value_changed,
                 Utils::checkSettingsDirty);
+        installCheckSettingsDirtyTrigger(this->linkedFilesIncludeCurrentFileCheck);
+        connect(this->linkedFilesIncludeCurrentFileCheck, &QCheckBox::toggled,
+                Utils::checkSettingsDirty);
         installCheckSettingsDirtyTrigger(this->dryRunCheck);
         installCheckSettingsDirtyTrigger(this->autoCompactCheck);
         connect(this->autoCompactThresholdSpin, &settings_spin_box_t::value_changed,
@@ -918,6 +925,7 @@ public:
         logger_t::instance().set_enabled(s.debug_logging);
         vector_search_service().apply_settings(s);
         this->refreshVectorSearchStatusFromService();
+        settings_change_notifier().notify_settings_changed();
 
         QString error;
         if ((qdrant_support_enabled == true) && (s.vector_search_enabled == true) &&
@@ -971,6 +979,8 @@ private:
         s.max_tool_calls = this->maxToolsSpin->value();
         s.max_diff_lines = this->maxDiffSpin->value();
         s.max_changed_files = this->maxFilesSpin->value();
+        s.linked_files_include_current_file_by_default =
+            this->linkedFilesIncludeCurrentFileCheck->isChecked();
         s.dry_run_default = this->dryRunCheck->isChecked();
         s.auto_compact_enabled = this->autoCompactCheck->isChecked();
         s.auto_compact_threshold_tokens = this->autoCompactThresholdSpin->value();
@@ -1290,6 +1300,7 @@ private:
             this->maxToolsSpin->value(),
             this->maxDiffSpin->value(),
             this->maxFilesSpin->value(),
+            this->linkedFilesIncludeCurrentFileCheck->isChecked(),
             this->dryRunCheck->isChecked(),
             this->aiCompletionCheck->isChecked(),
             this->detailedCompletionLoggingCheck->isChecked(),
@@ -1382,6 +1393,8 @@ private:
         this->maxToolsSpin->set_value(snap.max_tool_calls);
         this->maxDiffSpin->set_value(snap.max_diff_lines);
         this->maxFilesSpin->set_value(snap.max_changed_files);
+        this->linkedFilesIncludeCurrentFileCheck->setChecked(
+            snap.linked_files_include_current_file_by_default);
 
         this->dryRunCheck->setChecked(snap.dry_run_default);
         this->autoCompactCheck->setChecked(snap.auto_compact_enabled);
@@ -1494,6 +1507,7 @@ private:
     QLineEdit *ollamaUrlEdit;
     QComboBox *ollamaModelCombo;
     settings_spin_box_t *maxIterSpin, *maxToolsSpin, *maxDiffSpin, *maxFilesSpin;
+    QCheckBox *linkedFilesIncludeCurrentFileCheck;
     QCheckBox *dryRunCheck;
     QCheckBox *autoCompactCheck;
     settings_spin_box_t *autoCompactThresholdSpin;

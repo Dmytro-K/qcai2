@@ -310,6 +310,10 @@ void settings_t::load()
     max_tool_calls = s.value("maxToolCalls", max_tool_calls).toInt();
     max_diff_lines = s.value("maxDiffLines", max_diff_lines).toInt();
     max_changed_files = s.value("maxChangedFiles", max_changed_files).toInt();
+    linked_files_include_current_file_by_default =
+        s.value("linkedFilesIncludeCurrentFileByDefault",
+                linked_files_include_current_file_by_default)
+            .toBool();
 
     dry_run_default = s.value("dryRunDefault", dry_run_default).toBool();
     auto_compact_enabled = s.value("autoCompactEnabled", auto_compact_enabled).toBool();
@@ -478,6 +482,8 @@ void settings_t::save() const
     s.setValue("maxToolCalls", max_tool_calls);
     s.setValue("maxDiffLines", max_diff_lines);
     s.setValue("maxChangedFiles", max_changed_files);
+    s.setValue("linkedFilesIncludeCurrentFileByDefault",
+               linked_files_include_current_file_by_default);
 
     s.setValue("dryRunDefault", dry_run_default);
     s.setValue("autoCompactEnabled", auto_compact_enabled);
@@ -583,6 +589,17 @@ settings_t &settings()
 {
     static settings_t s;
     return s;
+}
+
+void settings_change_notifier_t::notify_settings_changed()
+{
+    emit this->settings_changed();
+}
+
+settings_change_notifier_t &settings_change_notifier()
+{
+    static settings_change_notifier_t notifier;
+    return notifier;
 }
 
 mcp_server_connection_states_t load_mcp_server_connection_states(QString *error)

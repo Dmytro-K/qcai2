@@ -3,6 +3,7 @@
 #include "agent_dock_linked_files_controller.h"
 
 #include "../session/agent_dock_session_controller.h"
+#include "../settings/settings.h"
 #include "../ui/agent_dock_widget.h"
 
 #include <QDir>
@@ -187,6 +188,11 @@ QString agent_dock_linked_files_controller_t::current_editor_linked_file() const
 
 QString agent_dock_linked_files_controller_t::default_linked_file() const
 {
+    if (settings().linked_files_include_current_file_by_default == false)
+    {
+        return {};
+    }
+
     const QString normalized = this->current_editor_linked_file();
     if (((normalized.isEmpty() ||
           has_ignored_linked_path_prefix(this->ignored_linked_file_paths, normalized) ||

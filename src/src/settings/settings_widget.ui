@@ -1253,6 +1253,13 @@
          </property>
          <layout class="QVBoxLayout" name="behaviorLayout">
           <item>
+           <widget class="QCheckBox" name="linkedFilesIncludeCurrentFileCheck">
+            <property name="text">
+             <string>Include current file by default in linked files</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="dryRunCheck">
             <property name="text">
              <string>Dry-run mode by default</string>
