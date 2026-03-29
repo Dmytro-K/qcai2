@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.11] - 2026-03-29
+
+### Added
+
+### Changed
+
+- Fixed Copilot completion no-timeout setting
+
 ## [0.0.10] - 2026-03-28
 
 ### Added

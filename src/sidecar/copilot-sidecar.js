@@ -276,6 +276,66 @@ export function shouldReuseSessionForComplete(messages, params = {}) {
     return isStatelessCompletionPrompt(messages) === false;
 }
 
+function sessionIdleTimeoutError(timeoutMs) {
+    return new Error(`Timeout after ${timeoutMs}ms waiting for session.idle`);
+}
+
+export async function sendAndWaitForSessionIdle(session, messageOptions, timeoutMs) {
+    return await new Promise((resolve, reject) => {
+        let settled = false;
+        let lastAssistantMessage;
+        let timeoutId;
+
+        const cleanup = () => {
+            if (timeoutId !== undefined) {
+                clearTimeout(timeoutId);
+            }
+            unsubscribeAssistantMessage();
+            unsubscribeIdle();
+            unsubscribeError();
+        };
+
+        const settleResolve = (value) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            resolve(value);
+        };
+
+        const settleReject = (error) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            reject(error);
+        };
+
+        const unsubscribeAssistantMessage = session.on("assistant.message", (event) => {
+            lastAssistantMessage = event;
+        });
+        const unsubscribeIdle = session.on("session.idle", () => {
+            settleResolve(lastAssistantMessage);
+        });
+        const unsubscribeError = session.on("session.error", (event) => {
+            const error = new Error(event?.data?.message || "Unknown session error");
+            if (typeof event?.data?.stack === "string" && event.data.stack.length > 0) {
+                error.stack = event.data.stack;
+            }
+            settleReject(error);
+        });
+
+        Promise.resolve(session.send(messageOptions)).catch(settleReject);
+        if (timeoutMs > 0) {
+            timeoutId = setTimeout(() => {
+                settleReject(sessionIdleTimeoutError(timeoutMs));
+            }, timeoutMs);
+        }
+    });
+}
+
 // ── Handlers ───────────────────────────────────────────────────
 
 let clientStarting = null; // promise for in-progress start
@@ -469,9 +529,11 @@ async function handleComplete(id, params) {
             "request.send_started",
             { message: completionTimeoutSec > 0 ? `timeout_ms=${completionTimeoutSec * 1000}` : "timeout_ms=none" },
         );
-        const response = completionTimeoutSec > 0
-            ? await session.sendAndWait(messageOptions, completionTimeoutSec * 1000)
-            : await session.sendAndWait(messageOptions);
+        const response = await sendAndWaitForSessionIdle(
+            session,
+            messageOptions,
+            completionTimeoutSec > 0 ? completionTimeoutSec * 1000 : 0,
+        );
         sendProgress(id, "request_started", "request.send_completed");
         unsubscribe();
         unsubscribeToolStart();
