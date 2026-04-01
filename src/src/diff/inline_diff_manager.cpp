@@ -3,6 +3,7 @@
 #include "../util/diff.h"
 #include "../util/logger.h"
 #include "diff_hunk_anchor.h"
+#include "diff_preview_text_edit.h"
 
 #include <coreplugin/coreconstants.h>
 #include <coreplugin/editormanager/documentmodel.h>
@@ -22,6 +23,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QStyle>
@@ -297,35 +299,8 @@ public:
         root->setContentsMargins(2, 2, 2, 2);
         root->setSpacing(2);
 
-        const QFont codeFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-        for (const QString &line : previewLines)
-        {
-            auto *row = new QLabel(line, this);
-            row->setFont(codeFont);
-            row->setTextFormat(Qt::PlainText);
-            row->setTextInteractionFlags(Qt::TextSelectableByMouse);
-            row->setWordWrap(false);
-            row->setMargin(0);
-
-            QString style =
-                QStringLiteral("QLabel { border-radius: 3px; padding: 1px 5px; "
-                               "background: palette(alternate-base); color: palette(text); }");
-            if (line.startsWith(QLatin1Char('+')) && !line.startsWith(QStringLiteral("+++")))
-            {
-                style = QStringLiteral("QLabel { border-radius: 3px; padding: 1px 5px; "
-                                       "background: rgba(70, 160, 95, 44); color: palette(text); "
-                                       "border-left: 3px solid #4aa36a; }");
-            }
-            else if (line.startsWith(QLatin1Char('-')) && !line.startsWith(QStringLiteral("---")))
-            {
-                style = QStringLiteral("QLabel { border-radius: 3px; padding: 1px 5px; "
-                                       "background: rgba(190, 80, 80, 44); color: palette(text); "
-                                       "border-left: 3px solid #c06161; }");
-            }
-
-            row->setStyleSheet(style);
-            root->addWidget(row);
-        }
+        auto *preview = new diff_preview_text_edit_t(previewLines, this);
+        root->addWidget(preview);
 
         auto *buttonsRow = new QHBoxLayout;
         buttonsRow->setContentsMargins(0, 0, 0, 0);
