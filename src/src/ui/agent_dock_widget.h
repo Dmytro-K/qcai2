@@ -181,6 +181,12 @@ private:
     void update_run_state(bool running);
 
     /**
+     * Refreshes status-label styling so active requests remain readable.
+     * @param running True when a request is currently active.
+     */
+    void update_request_status_visuals(bool running);
+
+    /**
      * Executes a slash command locally when the goal starts with `/`.
      * @param goal Trimmed goal text from the editor.
      * @return True when the input was treated as a slash command.

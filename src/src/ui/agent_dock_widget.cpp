@@ -85,6 +85,45 @@ int bounded_int(qsizetype value)
     return static_cast<int>(std::min(value, qsizetype(std::numeric_limits<int>::max())));
 }
 
+QColor fallback_request_accent_color()
+{
+    return QColor(QStringLiteral("#2f7cf6"));
+}
+
+QString request_status_label_stylesheet(bool running)
+{
+    const QPalette palette = QGuiApplication::palette();
+    if (running == false)
+    {
+        return QStringLiteral("font-weight: bold; color: %1; padding: 0px 2px;")
+            .arg(palette.color(QPalette::Mid).name(QColor::HexRgb));
+    }
+
+    const bool is_dark = palette.color(QPalette::Base).lightness() < 128;
+    const QColor text =
+        is_dark ? QColor(QStringLiteral("#ff8fc7")) : QColor(QStringLiteral("#c2187a"));
+
+    return QStringLiteral("font-weight: 700; color: %1;").arg(text.name(QColor::HexRgb));
+}
+
+QString request_duration_label_stylesheet(bool running)
+{
+    const QPalette palette = QGuiApplication::palette();
+    if (running == false)
+    {
+        return QStringLiteral("color: %1; padding: 0px 2px;")
+            .arg(palette.color(QPalette::Mid).name(QColor::HexRgb));
+    }
+
+    const QColor accent = palette.color(QPalette::Highlight).isValid() == true
+                              ? palette.color(QPalette::Highlight)
+                              : fallback_request_accent_color();
+    const QColor text = accent.lightness() < 128 ? accent.lighter(150) : accent.darker(125);
+
+    return QStringLiteral("font-weight: 600; color: %1; padding: 0px 2px;")
+        .arg(text.name(QColor::HexRgb));
+}
+
 Utils::Id diff_editor_id_for_file_path(const Utils::FilePath &file_path)
 {
     Q_UNUSED(file_path);
@@ -1046,11 +1085,8 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
     this->goal_edit->installEventFilter(this);
 
     // Connect debug logger to Debug Log tab
-    this->debug_log_connection =
-        connect(&logger_t::instance(), &logger_t::entry_added, this->debug_log_view,
-                [debug_log_view = this->debug_log_view](const QString &entry) {
-                    debug_log_view->appendPlainText(entry);
-                });
+    connect(&logger_t::instance(), &logger_t::entry_added, this,
+            [this](const QString &entry) { this->debug_log_view->appendPlainText(entry); });
     // Load existing log entries
     const auto existing_entries = logger_t::instance().log_entries();
     for (const auto &e : existing_entries)
@@ -1084,12 +1120,14 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
                 [this](Core::IEditor *) { this->linked_files_controller->refresh_ui(); });
     }
 
+    connect(&settings_change_notifier(), &settings_change_notifier_t::settings_changed, this,
+            [this]() { this->linked_files_controller->refresh_ui(); });
+
     this->session_controller->refresh_project_selector();
 }
 
 agent_dock_widget_t::~agent_dock_widget_t()
 {
-    QObject::disconnect(this->debug_log_connection);
     this->session_controller->save_chat();
 }
 
@@ -1656,7 +1694,6 @@ void agent_dock_widget_t::setup_ui()
     this->request_duration_label = new QLabel(this);
     this->request_duration_label->setObjectName(QStringLiteral("requestDurationLabel"));
     this->request_duration_label->setAlignment(Qt::AlignHCenter);
-    this->request_duration_label->setStyleSheet(QStringLiteral("color: #888; padding: 0px 2px;"));
     this->request_duration_label->setVisible(false);
     this->request_duration_label->setText(format_request_duration_label(0));
     this->decision_request_widget = new decision_request_widget_t(this);
@@ -1678,6 +1715,7 @@ void agent_dock_widget_t::setup_ui()
                                       this->queue_btn);
     this->ui->btnColumn->insertWidget(this->ui->btnColumn->indexOf(clear_debug_btn) + 1,
                                       this->request_duration_label);
+    this->update_request_status_visuals(false);
     connect(this->decision_request_widget, &decision_request_widget_t::option_submitted, this,
             &agent_dock_widget_t::submit_decision_option);
     connect(this->decision_request_widget, &decision_request_widget_t::freeform_submitted, this,
@@ -1999,6 +2037,21 @@ void agent_dock_widget_t::update_run_state(bool running)
     else
     {
         this->stop_request_duration_display();
+    }
+
+    this->update_request_status_visuals(running);
+}
+
+void agent_dock_widget_t::update_request_status_visuals(bool running)
+{
+    if (this->status_label != nullptr)
+    {
+        this->status_label->setStyleSheet(request_status_label_stylesheet(running));
+    }
+
+    if (this->request_duration_label != nullptr)
+    {
+        this->request_duration_label->setStyleSheet(request_duration_label_stylesheet(running));
     }
 }
 
