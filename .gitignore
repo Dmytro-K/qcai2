@@ -71,6 +71,7 @@ package-lock.json
 .kateproject.build
 /.qcai2/
 /.qcai2_buk/
+/.abacusai/
 
 build
 .cache/
