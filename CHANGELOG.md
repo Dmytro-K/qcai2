@@ -4,11 +4,15 @@
 
 ### Added
 
+- Added visible color for status line
+- Added setting for linking current file by default
+
 ### Changed
 
 - Fixed Copilot completion no-timeout setting
 - Run autocompation between iterations
 - Fix read_file show in Actions Log
+- Fixes for inline diff
 
 ## [0.0.10] - 2026-03-28
 
