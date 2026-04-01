@@ -724,6 +724,8 @@ add_qtc_plugin(qcai2
     src/src/completion/ghost_text_manager.cpp
     src/src/diff/diff_hunk_anchor.h
     src/src/diff/diff_hunk_anchor.cpp
+    src/src/diff/diff_hunk_text_edit.h
+    src/src/diff/diff_hunk_text_edit.cpp
     src/src/diff/diff_preview_text_edit.h
     src/src/diff/diff_preview_text_edit.cpp
     src/src/diff/inline_diff_manager.h

@@ -3,6 +3,7 @@
 #include "../util/diff.h"
 #include "../util/logger.h"
 #include "diff_hunk_anchor.h"
+#include "diff_hunk_text_edit.h"
 #include "diff_preview_text_edit.h"
 
 #include <coreplugin/coreconstants.h>
@@ -13,6 +14,7 @@
 #include <texteditor/textdocument.h>
 #include <texteditor/texteditor.h>
 #include <texteditor/textmark.h>
+#include <utils/changeset.h>
 
 #include <QAction>
 #include <QApplication>
@@ -1019,6 +1021,53 @@ void inline_diff_manager_t::track_document(TextEditor::TextDocument *document)
             this->reattach_widgets_for_document(document);
             this->resume_annotations_after_reload(file_path);
         });
+    connect(
+        document, &TextEditor::TextDocument::contentsChangedWithPosition, this,
+        [this, document](int position, int chars_removed, int chars_added) {
+            Q_UNUSED(position);
+            Q_UNUSED(chars_removed);
+            Q_UNUSED(chars_added);
+
+            const QString file_path =
+                QDir(this->project_dir).relativeFilePath(document->filePath().toUrlishString());
+            if (file_path.isEmpty() == true)
+            {
+                return;
+            }
+
+            if (this->internal_document_change_files.contains(file_path) == true)
+            {
+                trace_inline_diff(
+                    QStringLiteral("document contentsChanged ignored internal file=%1")
+                        .arg(file_path));
+                return;
+            }
+
+            if (this->has_unresolved_hunks_for_file(file_path) == false ||
+                this->pending_local_edit_invalidation_files.contains(file_path) == true)
+            {
+                return;
+            }
+
+            trace_inline_diff(
+                QStringLiteral("document contentsChanged scheduling local invalidation file=%1")
+                    .arg(file_path));
+            this->pending_local_edit_invalidation_files.insert(file_path);
+            const int generation = this->diff_generation;
+            QTimer::singleShot(0, this, [this, file_path, generation]() {
+                this->pending_local_edit_invalidation_files.remove(file_path);
+                if (generation != this->diff_generation)
+                {
+                    return;
+                }
+                if (this->internal_document_change_files.contains(file_path) == true ||
+                    this->has_unresolved_hunks_for_file(file_path) == false)
+                {
+                    return;
+                }
+                this->invalidate_hunks_for_file(file_path);
+            });
+        });
     connect(document, &QObject::destroyed, this, [this]() {
         trace_inline_diff(QStringLiteral("tracked document destroyed"));
         for (auto it = this->tracked_documents.begin(); it != this->tracked_documents.end();)
@@ -1250,9 +1299,10 @@ void inline_diff_manager_t::invalidate_hunks_for_file(const QString &file_path)
     }
 
     this->pending_mark_reattach_files.remove(file_path);
+    this->pending_local_edit_invalidation_files.remove(file_path);
     QCAI_WARN("InlineDiff",
               QStringLiteral("Invalidated %1 unresolved inline diff hunk(s) for %2 after "
-                             "external document reload")
+                             "document contents changed")
                   .arg(invalidated_indexes.size())
                   .arg(file_path));
 
@@ -1302,8 +1352,14 @@ void flush_pending_layout_updates_for_file(const QString &project_dir, const QSt
 int inline_diff_manager_t::current_document_anchor_line(int index) const
 {
     const auto &hunk = this->hunks[std::size_t(index)].hunk;
-    int line = base_anchor_line_for_hunk(hunk);
+    int line = base_anchor_line_for_hunk(hunk) + this->current_document_line_delta_before(index);
+    return qMax(1, line);
+}
 
+int inline_diff_manager_t::current_document_line_delta_before(int index) const
+{
+    const auto &hunk = this->hunks[std::size_t(index)].hunk;
+    int line_delta = 0;
     for (int i = 0; i < index; ++i)
     {
         if (this->accepted.contains(i) == false)
@@ -1317,10 +1373,10 @@ int inline_diff_manager_t::current_document_anchor_line(int index) const
             continue;
         }
 
-        line += accepted_hunk.count_new - accepted_hunk.count_old;
+        line_delta += accepted_hunk.count_new - accepted_hunk.count_old;
     }
 
-    return qMax(1, line);
+    return line_delta;
 }
 
 void inline_diff_manager_t::refresh_marks_for_file(const QString &file_path)
@@ -1411,22 +1467,57 @@ void inline_diff_manager_t::accept_hunk(int hunkIndex)
     }
 
     const auto &h = this->hunks[std::size_t(hunkIndex)].hunk;
-    const QString patchText = Diff::normalize(h.full_patch);
+    const QString abs_path = QDir(this->project_dir).absoluteFilePath(h.file_path);
+    const Utils::FilePath file_path = Utils::FilePath::fromString(abs_path);
+    TextEditor::TextDocument *text_document = nullptr;
+    const QList<Core::IEditor *> editors = text_widget_editors_for_file_path(file_path);
+    for (Core::IEditor *editor : editors)
+    {
+        text_document = text_document_for_editor(editor);
+        if (text_document != nullptr)
+        {
+            break;
+        }
+    }
+
+    if (text_document == nullptr)
+    {
+        QCAI_WARN("InlineDiff",
+                  QStringLiteral("Failed to accept hunk %1: no open text document for %2")
+                      .arg(hunkIndex)
+                      .arg(h.file_path));
+        return;
+    }
+
+    QString error_message;
+    const auto edit = build_hunk_text_edit(h, this->current_document_line_delta_before(hunkIndex),
+                                           text_document->plainText(), &error_message);
+    if (edit.has_value() == false)
+    {
+        QCAI_WARN("InlineDiff", QStringLiteral("Failed to accept hunk %1 in %2: %3")
+                                    .arg(hunkIndex)
+                                    .arg(h.file_path)
+                                    .arg(error_message));
+        return;
+    }
 
     this->detach_widgets_for_file(h.file_path);
     this->detach_marks_for_file(h.file_path);
     flush_pending_layout_updates_for_file(this->project_dir, h.file_path);
 
-    this->pending_mark_reattach_files.insert(h.file_path);
-
-    QString errorMsg;
-    if (!Diff::apply_patch(patchText, this->project_dir, false, errorMsg))
+    this->internal_document_change_files.insert(h.file_path);
+    Utils::ChangeSet change_set;
+    change_set.replace(edit->start_position, edit->end_position, edit->replacement_text);
+    const bool applied = text_document->applyChangeSet(change_set);
+    this->internal_document_change_files.remove(h.file_path);
+    if (applied == false)
     {
-        this->pending_mark_reattach_files.remove(h.file_path);
         this->reattach_marks_for_file(h.file_path);
         this->reattach_widgets_for_file(h.file_path);
         QCAI_WARN("InlineDiff",
-                  QStringLiteral("Failed to apply hunk %1: %2").arg(hunkIndex).arg(errorMsg));
+                  QStringLiteral("Failed to apply hunk %1 in %2 through editor change set")
+                      .arg(hunkIndex)
+                      .arg(h.file_path));
         return;
     }
 
@@ -1435,7 +1526,6 @@ void inline_diff_manager_t::accept_hunk(int hunkIndex)
 
     this->resolved.insert(hunkIndex);
     this->accepted.insert(hunkIndex);
-    this->refresh_marks_for_file(h.file_path);
     for (auto &entry : this->hunks[std::size_t(hunkIndex)].widget_handles)
     {
         destroy_widget_handle(entry);
@@ -1443,6 +1533,9 @@ void inline_diff_manager_t::accept_hunk(int hunkIndex)
     this->hunks[std::size_t(hunkIndex)].widget_handles.clear();
     delete this->hunks[std::size_t(hunkIndex)].mark;
     this->hunks[std::size_t(hunkIndex)].mark = nullptr;
+    this->reattach_marks_for_file(h.file_path);
+    this->reattach_widgets_for_file(h.file_path);
+    this->refresh_marks_for_file(h.file_path);
     emit this->diff_changed(this->remaining_diff());
     emit this->hunk_accepted(hunkIndex, h.file_path);
     if (((this->resolved.size() == qsizetype(this->hunks.size())) == true))
@@ -1558,6 +1651,12 @@ void inline_diff_manager_t::clear_all()
         }
     }
     this->tracked_documents.clear();
+    this->pending_mark_reattach_files.clear();
+    this->pending_external_reload_invalidation_files.clear();
+    this->pending_local_edit_invalidation_files.clear();
+    this->internal_document_change_files.clear();
+    this->reload_annotation_hidden_files.clear();
+    this->annotations_hidden_by_reload = false;
 
     for (auto &entry : this->hunks)
     {

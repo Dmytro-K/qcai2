@@ -308,8 +308,8 @@ private:
     void reattach_marks_for_file(const QString &file_path);
 
     /**
-     * Invalidates unresolved hunks for one file after an external document reload made
-     * their anchors and patch context stale.
+     * Invalidates unresolved hunks for one file after document changes made their anchors and
+     * patch context stale.
      * @param file_path Relative file path whose unresolved hunks should be rejected.
      */
     void invalidate_hunks_for_file(const QString &file_path);
@@ -320,6 +320,12 @@ private:
      * @param index Hunk index.
      */
     int current_document_anchor_line(int index) const;
+
+    /**
+     * Returns the cumulative line-count delta from earlier accepted hunks in the same file.
+     * @param index Current hunk index.
+     */
+    int current_document_line_delta_before(int index) const;
 
     /**
      * Repositions unresolved marks for one file after earlier accepted hunks changed
@@ -364,6 +370,12 @@ private:
 
     /** Files whose unresolved hunks must be invalidated after an external reload finishes. */
     QSet<QString> pending_external_reload_invalidation_files;
+
+    /** Files whose local non-plugin edits must invalidate remaining unresolved hunks. */
+    QSet<QString> pending_local_edit_invalidation_files;
+
+    /** Files currently being edited internally while accepting one diff hunk. */
+    QSet<QString> internal_document_change_files;
 
     /** Files whose reload currently keeps inline annotations temporarily hidden. */
     QSet<QString> reload_annotation_hidden_files;

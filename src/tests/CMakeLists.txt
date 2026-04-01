@@ -279,6 +279,22 @@ target_link_libraries(tst_qcai2_diff_hunk_anchor PRIVATE
 )
 qcai2_register_test(qcai2_diff_hunk_anchor tst_qcai2_diff_hunk_anchor)
 
+add_executable(tst_qcai2_diff_hunk_text_edit
+    tst_diff_hunk_text_edit.cpp
+    ../src/diff/diff_hunk_text_edit.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_diff_hunk_text_edit)
+
+target_include_directories(tst_qcai2_diff_hunk_text_edit PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_diff_hunk_text_edit PRIVATE
+    Qt::Core
+    Qt::Test
+)
+qcai2_register_test(qcai2_diff_hunk_text_edit tst_qcai2_diff_hunk_text_edit)
+
 add_executable(tst_qcai2_diff_preview_text_edit
     tst_diff_preview_text_edit.cpp
     ../src/diff/diff_preview_text_edit.cpp
