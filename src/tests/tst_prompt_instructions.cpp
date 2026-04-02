@@ -60,6 +60,7 @@ private slots:
     void appends_standard_ai_instruction_files_after_project_rules();
     void appends_recursive_github_instruction_files_in_sorted_order();
     void disabled_standard_ai_instruction_sources_are_skipped();
+    void local_agents_file_can_be_disabled_independently();
     void omits_global_prompt_when_project_requests_it();
     void appends_system_messages_in_order();
     void autocomplete_uses_only_autocomplete_md();
@@ -117,6 +118,8 @@ void tst_prompt_instructions_t::appends_standard_ai_instruction_files_after_proj
                             QStringLiteral("Project rules here")));
     QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.md")),
                             QStringLiteral("Agent instructions")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.local.md")),
+                            QStringLiteral("Local agent instructions")));
     QVERIFY(write_text_file(
         QDir(temp_dir.path()).filePath(QStringLiteral(".github/copilot-instructions.md")),
         QStringLiteral("Copilot instructions")));
@@ -129,9 +132,10 @@ void tst_prompt_instructions_t::appends_standard_ai_instruction_files_after_proj
     const QStringList instructions =
         configured_system_instructions(temp_dir.path(), default_instruction_options(), &error);
     const QStringList expected_instructions = {
-        QStringLiteral("Global prompt"),       QStringLiteral("Project rules here"),
-        QStringLiteral("Agent instructions"),  QStringLiteral("Copilot instructions"),
-        QStringLiteral("Claude instructions"), QStringLiteral("Gemini instructions")};
+        QStringLiteral("Global prompt"),        QStringLiteral("Project rules here"),
+        QStringLiteral("Agent instructions"),   QStringLiteral("Local agent instructions"),
+        QStringLiteral("Copilot instructions"), QStringLiteral("Claude instructions"),
+        QStringLiteral("Gemini instructions")};
 
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(instructions, expected_instructions);
@@ -172,6 +176,8 @@ void tst_prompt_instructions_t::disabled_standard_ai_instruction_sources_are_ski
 
     QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.md")),
                             QStringLiteral("Agent instructions")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.local.md")),
+                            QStringLiteral("Local agent instructions")));
     QVERIFY(write_text_file(
         QDir(temp_dir.path()).filePath(QStringLiteral(".github/copilot-instructions.md")),
         QStringLiteral("Copilot instructions")));
@@ -185,6 +191,7 @@ void tst_prompt_instructions_t::disabled_standard_ai_instruction_sources_are_ski
 
     prompt_instruction_options_t s = default_instruction_options();
     s.load_agents_md = false;
+    s.load_agents_local_md = false;
     s.load_claude_md = false;
     s.load_github_instructions_dir = false;
 
@@ -193,6 +200,28 @@ void tst_prompt_instructions_t::disabled_standard_ai_instruction_sources_are_ski
     const QStringList expected_instructions = {QStringLiteral("Global prompt"),
                                                QStringLiteral("Copilot instructions"),
                                                QStringLiteral("Gemini instructions")};
+
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(instructions, expected_instructions);
+}
+
+void tst_prompt_instructions_t::local_agents_file_can_be_disabled_independently()
+{
+    QTemporaryDir temp_dir;
+    QVERIFY(temp_dir.isValid());
+
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.md")),
+                            QStringLiteral("Agent instructions")));
+    QVERIFY(write_text_file(QDir(temp_dir.path()).filePath(QStringLiteral("AGENTS.local.md")),
+                            QStringLiteral("Local agent instructions")));
+
+    prompt_instruction_options_t s = default_instruction_options();
+    s.load_agents_local_md = false;
+
+    QString error;
+    const QStringList instructions = configured_system_instructions(temp_dir.path(), s, &error);
+    const QStringList expected_instructions = {QStringLiteral("Global prompt"),
+                                               QStringLiteral("Agent instructions")};
 
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(instructions, expected_instructions);

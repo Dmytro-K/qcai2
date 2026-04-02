@@ -1096,6 +1096,13 @@
             </widget>
            </item>
            <item>
+            <widget class="QCheckBox" name="loadAgentsLocalMdCheck">
+             <property name="text">
+              <string>Load `AGENTS.local.md`</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="QCheckBox" name="loadGithubCopilotInstructionsCheck">
              <property name="text">
               <string>Load `.github/copilot-instructions.md`</string>

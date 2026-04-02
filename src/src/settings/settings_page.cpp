@@ -221,6 +221,7 @@ class settings_widget_t : public Core::IOptionsPageWidget
         bool detailed_request_logging = false;
         QString system_prompt;
         bool load_agents_md = false;
+        bool load_agents_local_md = false;
         bool load_github_copilot_instructions = false;
         bool load_claude_md = false;
         bool load_gemini_md = false;
@@ -390,6 +391,7 @@ public:
         this->detailedRequestLoggingCheck = this->ui->detailedRequestLoggingCheck;
         this->systemPromptEdit = this->ui->systemPromptEdit;
         this->loadAgentsMdCheck = this->ui->loadAgentsMdCheck;
+        this->loadAgentsLocalMdCheck = this->ui->loadAgentsLocalMdCheck;
         this->loadGithubCopilotInstructionsCheck = this->ui->loadGithubCopilotInstructionsCheck;
         this->loadClaudeMdCheck = this->ui->loadClaudeMdCheck;
         this->loadGeminiMdCheck = this->ui->loadGeminiMdCheck;
@@ -699,6 +701,7 @@ public:
         this->detailedRequestLoggingCheck->setChecked(s.detailed_request_logging);
         this->systemPromptEdit->setPlainText(s.system_prompt);
         this->loadAgentsMdCheck->setChecked(s.load_agents_md);
+        this->loadAgentsLocalMdCheck->setChecked(s.load_agents_local_md);
         this->loadGithubCopilotInstructionsCheck->setChecked(s.load_github_copilot_instructions);
         this->loadClaudeMdCheck->setChecked(s.load_claude_md);
         this->loadGeminiMdCheck->setChecked(s.load_gemini_md);
@@ -831,6 +834,7 @@ public:
         installCheckSettingsDirtyTrigger(this->debugLoggingCheck);
         installCheckSettingsDirtyTrigger(this->detailedRequestLoggingCheck);
         installCheckSettingsDirtyTrigger(this->loadAgentsMdCheck);
+        installCheckSettingsDirtyTrigger(this->loadAgentsLocalMdCheck);
         installCheckSettingsDirtyTrigger(this->loadGithubCopilotInstructionsCheck);
         installCheckSettingsDirtyTrigger(this->loadClaudeMdCheck);
         installCheckSettingsDirtyTrigger(this->loadGeminiMdCheck);
@@ -903,6 +907,7 @@ public:
         candidate.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
         candidate.system_prompt = this->systemPromptEdit->toPlainText().trimmed();
         candidate.load_agents_md = this->loadAgentsMdCheck->isChecked();
+        candidate.load_agents_local_md = this->loadAgentsLocalMdCheck->isChecked();
         candidate.load_github_copilot_instructions =
             this->loadGithubCopilotInstructionsCheck->isChecked();
         candidate.load_claude_md = this->loadClaudeMdCheck->isChecked();
@@ -1032,6 +1037,7 @@ private:
         s.detailed_request_logging = this->detailedRequestLoggingCheck->isChecked();
         s.system_prompt = this->systemPromptEdit->toPlainText().trimmed();
         s.load_agents_md = this->loadAgentsMdCheck->isChecked();
+        s.load_agents_local_md = this->loadAgentsLocalMdCheck->isChecked();
         s.load_github_copilot_instructions = this->loadGithubCopilotInstructionsCheck->isChecked();
         s.load_claude_md = this->loadClaudeMdCheck->isChecked();
         s.load_gemini_md = this->loadGeminiMdCheck->isChecked();
@@ -1343,6 +1349,7 @@ private:
             this->detailedRequestLoggingCheck->isChecked(),
             this->systemPromptEdit->toPlainText().trimmed(),
             this->loadAgentsMdCheck->isChecked(),
+            this->loadAgentsLocalMdCheck->isChecked(),
             this->loadGithubCopilotInstructionsCheck->isChecked(),
             this->loadClaudeMdCheck->isChecked(),
             this->loadGeminiMdCheck->isChecked(),
@@ -1465,6 +1472,7 @@ private:
         this->detailedRequestLoggingCheck->setChecked(snap.detailed_request_logging);
         this->systemPromptEdit->setPlainText(snap.system_prompt);
         this->loadAgentsMdCheck->setChecked(snap.load_agents_md);
+        this->loadAgentsLocalMdCheck->setChecked(snap.load_agents_local_md);
         this->loadGithubCopilotInstructionsCheck->setChecked(
             snap.load_github_copilot_instructions);
         this->loadClaudeMdCheck->setChecked(snap.load_claude_md);
@@ -1567,6 +1575,7 @@ private:
     QCheckBox *detailedRequestLoggingCheck;
     QPlainTextEdit *systemPromptEdit;
     QCheckBox *loadAgentsMdCheck;
+    QCheckBox *loadAgentsLocalMdCheck;
     QCheckBox *loadGithubCopilotInstructionsCheck;
     QCheckBox *loadClaudeMdCheck;
     QCheckBox *loadGeminiMdCheck;

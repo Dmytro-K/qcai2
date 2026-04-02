@@ -14,7 +14,10 @@ struct settings_t;
 struct prompt_instruction_options_t
 {
     QString global_prompt;
+    /** Loads project-root `AGENTS.md` when true. */
     bool load_agents_md = true;
+    /** Loads project-root `AGENTS.local.md` when true. */
+    bool load_agents_local_md = true;
     bool load_github_copilot_instructions = true;
     bool load_claude_md = true;
     bool load_gemini_md = true;

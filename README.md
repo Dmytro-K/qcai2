@@ -26,6 +26,7 @@
 - [x] Debugger integration
 - [x] Web search tool
 - [x] Image/screenshot attachment
+- [x] Machine-local file AGENTS.local.md
 - [ ] Skills
 - [ ] Semantic search over chat history
 - [ ] Semantic search over code

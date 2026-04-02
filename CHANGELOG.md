@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.11] - 2026-03-29
+## [0.0.11] - 2026-04-02
 
 ### Added
 
@@ -8,6 +8,7 @@
 - Added setting for linking current file by default
 - Added support of Undo/Redo applied diff changes
 - Added model thinking progress log
+- Added reading AGENTS.local.md
 
 ### Changed
 

@@ -29,6 +29,10 @@ QStringList standard_instruction_file_paths(const QString &project_root,
     {
         paths.append(project_dir.filePath(QStringLiteral("AGENTS.md")));
     }
+    if (options.load_agents_local_md == true)
+    {
+        paths.append(project_dir.filePath(QStringLiteral("AGENTS.local.md")));
+    }
     if (options.load_github_copilot_instructions == true)
     {
         paths.append(project_dir.filePath(QStringLiteral(".github/copilot-instructions.md")));

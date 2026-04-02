@@ -263,6 +263,7 @@ prompt_instruction_options_t prompt_instruction_options(const settings_t &settin
     return {
         settings.system_prompt,
         settings.load_agents_md,
+        settings.load_agents_local_md,
         settings.load_github_copilot_instructions,
         settings.load_claude_md,
         settings.load_gemini_md,
@@ -327,6 +328,7 @@ void settings_t::load()
         s.value("detailedRequestLogging", detailed_request_logging).toBool();
     system_prompt = s.value("systemPrompt", system_prompt).toString();
     load_agents_md = s.value("loadAgentsMd", load_agents_md).toBool();
+    load_agents_local_md = s.value("loadAgentsLocalMd", load_agents_local_md).toBool();
     load_github_copilot_instructions =
         s.value("loadGithubCopilotInstructions", load_github_copilot_instructions).toBool();
     load_claude_md = s.value("loadClaudeMd", load_claude_md).toBool();
@@ -494,6 +496,7 @@ void settings_t::save() const
     s.setValue("detailedRequestLogging", detailed_request_logging);
     s.setValue("systemPrompt", system_prompt);
     s.setValue("loadAgentsMd", load_agents_md);
+    s.setValue("loadAgentsLocalMd", load_agents_local_md);
     s.setValue("loadGithubCopilotInstructions", load_github_copilot_instructions);
     s.setValue("loadClaudeMd", load_claude_md);
     s.setValue("loadGeminiMd", load_gemini_md);
