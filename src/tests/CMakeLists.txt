@@ -198,6 +198,27 @@ target_link_libraries(tst_qcai2_actions_log_delegate PRIVATE
 )
 qcai2_register_test(qcai2_actions_log_delegate tst_qcai2_actions_log_delegate)
 
+add_executable(tst_qcai2_actions_log_view
+    tst_actions_log_view.cpp
+    ../src/ui/actions_log_links.cpp
+    ../src/ui/actions_log_model.cpp
+    ../src/ui/actions_log_delegate.cpp
+    ../src/ui/actions_log_view.cpp
+)
+
+qcai2_enable_linker_map(tst_qcai2_actions_log_view)
+
+target_include_directories(tst_qcai2_actions_log_view PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_link_libraries(tst_qcai2_actions_log_view PRIVATE
+    Qt::Core
+    Qt::Gui
+    Qt::Widgets
+    Qt::Test
+)
+qcai2_register_test(qcai2_actions_log_view tst_qcai2_actions_log_view)
+
 add_executable(tst_qcai2_actions_log_links
     tst_actions_log_links.cpp
     ../src/ui/actions_log_links.cpp

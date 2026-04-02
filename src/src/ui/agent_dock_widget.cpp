@@ -13,6 +13,7 @@
 #include "../util/logger.h"
 #include "../util/migration.h"
 #include "actions_log_links.h"
+#include "actions_log_view.h"
 #include "auto_hiding_list_widget.h"
 #include "debugger_status_widget.h"
 #include "decision_request_widget.h"
@@ -1205,62 +1206,6 @@ void agent_dock_widget_t::scroll_log_views_to_bottom()
     this->raw_markdown_view->ensureCursorVisible();
 }
 
-void agent_dock_widget_t::set_actions_log_active_row(const QModelIndex &current,
-                                                     const QModelIndex &previous)
-{
-    if (this->log_view == nullptr)
-    {
-        return;
-    }
-
-    if (previous.isValid() == true)
-    {
-        this->log_view->closePersistentEditor(previous);
-    }
-
-    if (current.isValid() == false)
-    {
-        this->actions_log_active_row = -1;
-        return;
-    }
-
-    this->actions_log_active_row = current.row();
-    this->log_view->openPersistentEditor(current);
-}
-
-void agent_dock_widget_t::restore_actions_log_active_row()
-{
-    if (this->log_view == nullptr || this->actions_log_model == nullptr)
-    {
-        return;
-    }
-
-    const int row_count = this->actions_log_model->rowCount();
-    if (row_count <= 0)
-    {
-        this->actions_log_active_row = -1;
-        return;
-    }
-
-    const int target_row = std::clamp(
-        this->actions_log_active_row >= 0 ? this->actions_log_active_row : row_count - 1, 0,
-        row_count - 1);
-    const QModelIndex target_index = this->actions_log_model->index(target_row, 0);
-    if (target_index.isValid() == false)
-    {
-        return;
-    }
-
-    if (this->log_view->currentIndex() != target_index)
-    {
-        this->log_view->setCurrentIndex(target_index);
-        return;
-    }
-
-    this->actions_log_active_row = target_row;
-    this->log_view->openPersistentEditor(target_index);
-}
-
 void agent_dock_widget_t::sync_diff_ui(const QString &diff, bool focusDiffTab,
                                        bool refreshInlineMarkers)
 {
@@ -1342,7 +1287,6 @@ void agent_dock_widget_t::clear_chat_state()
     this->streaming_response_raw.clear();
     this->last_committed_streaming_markdown.clear();
     this->is_streaming = false;
-    this->actions_log_active_row = -1;
     this->plan_list->clear();
     this->inline_diff_manager->clear_all();
     static_cast<diff_preview_edit_t *>(this->diff_view)->set_diff_text(QString());
@@ -1674,6 +1618,27 @@ void agent_dock_widget_t::setup_ui()
     this->plan_page = this->ui->planPage;
     this->actions_log_page = this->ui->actionsLogPage;
     this->plan_list = this->ui->planList;
+    if (this->ui->logView != nullptr)
+    {
+        auto *replacement_log_view = new actions_log_view_t(this->ui->logView->parentWidget());
+        replacement_log_view->setObjectName(this->ui->logView->objectName());
+        replacement_log_view->setAlternatingRowColors(this->ui->logView->alternatingRowColors());
+        replacement_log_view->setSelectionMode(this->ui->logView->selectionMode());
+        replacement_log_view->setSelectionBehavior(this->ui->logView->selectionBehavior());
+        replacement_log_view->setFrameShape(this->ui->logView->frameShape());
+        replacement_log_view->setFrameShadow(this->ui->logView->frameShadow());
+        replacement_log_view->setSizePolicy(this->ui->logView->sizePolicy());
+        replacement_log_view->setMinimumSize(this->ui->logView->minimumSize());
+        replacement_log_view->setMaximumSize(this->ui->logView->maximumSize());
+        replacement_log_view->setFocusPolicy(this->ui->logView->focusPolicy());
+        if (QWidget *parent_widget = this->ui->logView->parentWidget();
+            parent_widget != nullptr && parent_widget->layout() != nullptr)
+        {
+            parent_widget->layout()->replaceWidget(this->ui->logView, replacement_log_view);
+        }
+        delete this->ui->logView;
+        this->ui->logView = replacement_log_view;
+    }
     this->log_view = this->ui->logView;
     this->raw_markdown_view = this->ui->rawMarkdownView;
     this->diff_file_list = this->ui->diffFileList;
@@ -1814,14 +1779,6 @@ void agent_dock_widget_t::setup_ui()
     this->log_view->setResizeMode(QListView::Adjust);
     this->log_view->setEditTriggers(QAbstractItemView::NoEditTriggers);
     this->log_view->setStyleSheet(QStringLiteral("QListView { padding: 4px; }"));
-    connect(this->log_view->selectionModel(), &QItemSelectionModel::currentChanged, this,
-            &agent_dock_widget_t::set_actions_log_active_row);
-    connect(this->actions_log_model, &QAbstractItemModel::modelReset, this,
-            &agent_dock_widget_t::restore_actions_log_active_row);
-    connect(this->actions_log_model, &QAbstractItemModel::rowsInserted, this,
-            [this](const QModelIndex &, int, int) { this->restore_actions_log_active_row(); });
-    connect(this->actions_log_model, &QAbstractItemModel::rowsRemoved, this,
-            [this](const QModelIndex &, int, int) { this->restore_actions_log_active_row(); });
     this->raw_markdown_view->setFont(QFont(QStringLiteral("monospace"), 9));
     this->approval_preview_view->setFont(QFont(QStringLiteral("monospace"), 9));
     this->debug_log_view->setFont(QFont(QStringLiteral("monospace"), 9));

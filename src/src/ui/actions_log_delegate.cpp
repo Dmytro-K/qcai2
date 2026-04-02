@@ -11,9 +11,9 @@
 #include <QAbstractTextDocumentLayout>
 #include <QApplication>
 #include <QFrame>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QShortcut>
 #include <QStyle>
 #include <QTextBrowser>
 #include <QTextDocument>
@@ -27,6 +27,46 @@ namespace
 
 constexpr int horizontal_padding = 8;
 constexpr int vertical_padding = 6;
+
+class actions_log_text_browser_t final : public QTextBrowser
+{
+public:
+    explicit actions_log_text_browser_t(QWidget *parent = nullptr) : QTextBrowser(parent)
+    {
+    }
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override
+    {
+        if (event == nullptr)
+        {
+            QTextBrowser::keyPressEvent(event);
+            return;
+        }
+
+        if (event->matches(QKeySequence::Copy) == true)
+        {
+            if (this->textCursor().hasSelection() == true)
+            {
+                this->copy();
+                event->accept();
+                return;
+            }
+
+            event->ignore();
+            return;
+        }
+
+        if (event->matches(QKeySequence::SelectAll) == true)
+        {
+            this->selectAll();
+            event->accept();
+            return;
+        }
+
+        QTextBrowser::keyPressEvent(event);
+    }
+};
 
 void configure_document(QTextDocument *document, const QStyleOptionViewItem &option,
                         const QString &markdown, int text_width)
@@ -74,14 +114,6 @@ void configure_editor(QTextBrowser *editor)
     editor->setContextMenuPolicy(Qt::DefaultContextMenu);
     editor->setStyleSheet(
         QStringLiteral("QTextBrowser { background: transparent; border: none; }"));
-
-    auto *copy_shortcut = new QShortcut(QKeySequence::Copy, editor);
-    copy_shortcut->setContext(Qt::WidgetShortcut);
-    QObject::connect(copy_shortcut, &QShortcut::activated, editor, &QTextBrowser::copy);
-
-    auto *select_all_shortcut = new QShortcut(QKeySequence::SelectAll, editor);
-    select_all_shortcut->setContext(Qt::WidgetShortcut);
-    QObject::connect(select_all_shortcut, &QShortcut::activated, editor, &QTextBrowser::selectAll);
 }
 
 QString anchor_at_position(const QStyleOptionViewItem &option, const QModelIndex &index,
@@ -165,7 +197,7 @@ QWidget *actions_log_delegate_t::createEditor(QWidget *parent, const QStyleOptio
     Q_UNUSED(option);
     Q_UNUSED(index);
 
-    auto *editor = new QTextBrowser(parent);
+    auto *editor = new actions_log_text_browser_t(parent);
     configure_editor(editor);
     QObject::connect(editor, &QTextBrowser::anchorClicked, editor, [this](const QUrl &url) {
         if (this->link_activated_handler)

@@ -350,18 +350,6 @@ private:
     void scroll_log_views_to_bottom();
 
     /**
-     * Switches the one interactive Actions Log row that hosts a selectable rich-text editor.
-     * @param current Newly current row.
-     * @param previous Previously current row.
-     */
-    void set_actions_log_active_row(const QModelIndex &current, const QModelIndex &previous);
-
-    /**
-     * Restores the interactive Actions Log row after model resets or row insertions.
-     */
-    void restore_actions_log_active_row();
-
-    /**
      * Resets the bottom usage label for a new run or cleared chat state.
      */
     void reset_usage_display(const QString &provider_id = {}, const QString &model_name = {});
@@ -479,9 +467,6 @@ private:
 
     /** True while streaming tokens are being appended incrementally. */
     bool is_streaming = false;
-
-    /** Row that should keep the selectable Actions Log editor open, or -1 when none is active. */
-    int actions_log_active_row = -1;
 
     /** Provider identifier and model name for the current run's usage display. */
     QString usage_provider_id;

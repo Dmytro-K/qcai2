@@ -558,6 +558,8 @@ add_qtc_plugin(qcai2
     src/src/ui/actions_log_links.cpp
     src/src/ui/actions_log_delegate.h
     src/src/ui/actions_log_delegate.cpp
+    src/src/ui/actions_log_view.h
+    src/src/ui/actions_log_view.cpp
     src/src/ui/auto_hiding_list_widget.h
     src/src/ui/auto_hiding_list_widget.cpp
     src/src/ui/decision_request_widget.h
