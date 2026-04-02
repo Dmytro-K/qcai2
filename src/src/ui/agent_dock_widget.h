@@ -329,9 +329,15 @@ private:
     QString current_log_markdown() const;
 
     /**
-     * Returns the committed log blocks followed by the current streaming preview block, if any.
+     * Returns the committed log blocks that should be persisted for the active conversation.
      */
     QStringList current_log_markdown_blocks() const;
+
+    /**
+     * Returns the committed log blocks plus the current live streaming previews for UI/debug
+     * views.
+     */
+    QStringList current_visible_log_markdown_blocks() const;
 
     /**
      * Replaces the raw-markdown debug tab with the current combined Actions Log markdown.
@@ -343,6 +349,16 @@ private:
      * @param markdown_block Block to append.
      */
     void append_raw_markdown_block(const QString &markdown_block);
+
+    /**
+     * Returns the current live streaming preview blocks in visual order.
+     */
+    QStringList current_streaming_markdown_blocks() const;
+
+    /**
+     * Rebuilds the model's live streaming rows from the current thinking/response buffers.
+     */
+    void sync_actions_log_streaming_entries();
 
     /**
      * Scrolls both Actions Log views to the newest entry.
@@ -454,19 +470,37 @@ private:
     QStringList log_markdown_blocks;
 
     /** Streaming log text buffered until the throttle timer fires. */
-    QString streaming_markdown;
+    QString streaming_response_markdown;
 
     /** Raw provider stream buffered so JSON envelopes can be decoded for display. */
     QString streaming_response_raw;
 
-    /** Most recent streamed answer already committed into the actions log. */
-    QString last_committed_streaming_markdown;
+    /** Raw model thinking text currently shown as a live Actions Log block. */
+    QString streaming_reasoning_raw;
+
+    /** Rendered model thinking markdown currently shown as a live Actions Log block. */
+    QString streaming_reasoning_markdown;
+
+    /** Most recent streamed response draft already committed into the actions log. */
+    QString last_committed_streaming_response_markdown;
 
     /** True while the conversations combo is being repopulated programmatically. */
     bool conversation_list_refreshing = false;
 
     /** True while streaming tokens are being appended incrementally. */
     bool is_streaming = false;
+
+    /**
+     * Tracks which live stream kind was updated most recently so new reasoning after a response
+     * starts a fresh sequential block instead of being reordered ahead of it.
+     */
+    enum class streaming_phase_t : std::uint8_t
+    {
+        NONE,
+        THINKING,
+        RESPONSE
+    };
+    streaming_phase_t last_streaming_phase = streaming_phase_t::NONE;
 
     /** Provider identifier and model name for the current run's usage display. */
     QString usage_provider_id;

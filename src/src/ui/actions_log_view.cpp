@@ -47,6 +47,17 @@ void actions_log_view_t::setModel(QAbstractItemModel *model)
                                            }));
     this->model_connections.append(connect(model, &QAbstractItemModel::layoutChanged, this,
                                            &actions_log_view_t::rebuild_persistent_editors));
+    this->model_connections.append(connect(
+        model, &QAbstractItemModel::dataChanged, this,
+        [this](const QModelIndex &top_left, const QModelIndex &bottom_right, const QList<int> &) {
+            if (top_left.isValid() == false || bottom_right.isValid() == false ||
+                top_left.parent().isValid() == true || bottom_right.parent().isValid() == true)
+            {
+                return;
+            }
+
+            this->refresh_layout_for_rows(top_left.row(), bottom_right.row());
+        }));
 
     this->rebuild_persistent_editors();
 }
@@ -113,6 +124,19 @@ void actions_log_view_t::prune_invalid_persistent_editors()
         }
         ++it;
     }
+}
+
+void actions_log_view_t::refresh_layout_for_rows(int first_row, int last_row)
+{
+    if (this->model() == nullptr || first_row > last_row)
+    {
+        return;
+    }
+
+    this->open_persistent_editors_for_rows(first_row, last_row);
+    this->doItemsLayout();
+    this->updateGeometries();
+    this->viewport()->update();
 }
 
 }  // namespace qcai2

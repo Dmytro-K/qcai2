@@ -11,7 +11,7 @@ class tst_actions_log_model_t : public QObject
 
 private slots:
     void append_committed_entries_preserves_order();
-    void streaming_entry_lifecycle_updates_last_row();
+    void streaming_entries_lifecycle_updates_trailing_rows();
     void selected_raw_markdown_joins_rows_in_visual_order();
 };
 
@@ -30,31 +30,43 @@ void tst_actions_log_model_t::append_committed_entries_preserves_order()
     QVERIFY(model.data(model.index(0, 0), actions_log_model_t::STREAMING_ROLE).toBool() == false);
 }
 
-void tst_actions_log_model_t::streaming_entry_lifecycle_updates_last_row()
+void tst_actions_log_model_t::streaming_entries_lifecycle_updates_trailing_rows()
 {
     actions_log_model_t model;
     model.append_committed_entry(QStringLiteral("committed raw"),
                                  QStringLiteral("committed rendered"));
 
-    model.set_streaming_entry(QStringLiteral("stream raw 1"), QStringLiteral("stream rendered 1"));
-    QCOMPARE(model.rowCount(), 2);
+    model.set_streaming_entries(
+        {QStringLiteral("thinking raw"), QStringLiteral("draft raw")},
+        {QStringLiteral("thinking rendered"), QStringLiteral("draft rendered")});
+    QCOMPARE(model.rowCount(), 3);
     QVERIFY(model.data(model.index(1, 0), actions_log_model_t::STREAMING_ROLE).toBool());
+    QVERIFY(model.data(model.index(2, 0), actions_log_model_t::STREAMING_ROLE).toBool());
     QCOMPARE(model.data(model.index(1, 0), actions_log_model_t::RAW_MARKDOWN_ROLE).toString(),
-             QStringLiteral("stream raw 1"));
+             QStringLiteral("thinking raw"));
+    QCOMPARE(model.data(model.index(2, 0), actions_log_model_t::RAW_MARKDOWN_ROLE).toString(),
+             QStringLiteral("draft raw"));
 
-    model.set_streaming_entry(QStringLiteral("stream raw 2"), QStringLiteral("stream rendered 2"));
+    model.set_streaming_entries({QStringLiteral("thinking raw 2")},
+                                {QStringLiteral("thinking rendered 2")});
     QCOMPARE(model.rowCount(), 2);
     QCOMPARE(model.data(model.index(1, 0), actions_log_model_t::RAW_MARKDOWN_ROLE).toString(),
-             QStringLiteral("stream raw 2"));
+             QStringLiteral("thinking raw 2"));
 
-    model.commit_streaming_entry(QStringLiteral("final raw"), QStringLiteral("final rendered"));
-    QCOMPARE(model.rowCount(), 2);
+    model.commit_streaming_entries(
+        {QStringLiteral("final raw 1"), QStringLiteral("final raw 2")},
+        {QStringLiteral("final rendered 1"), QStringLiteral("final rendered 2")});
+    QCOMPARE(model.rowCount(), 3);
     QVERIFY(model.data(model.index(1, 0), actions_log_model_t::STREAMING_ROLE).toBool() == false);
     QCOMPARE(model.data(model.index(1, 0), actions_log_model_t::RAW_MARKDOWN_ROLE).toString(),
-             QStringLiteral("final raw"));
+             QStringLiteral("final raw 1"));
+    QCOMPARE(model.data(model.index(2, 0), actions_log_model_t::RAW_MARKDOWN_ROLE).toString(),
+             QStringLiteral("final raw 2"));
 
-    model.clear_streaming_entry();
-    QCOMPARE(model.rowCount(), 2);
+    model.set_streaming_entries({QStringLiteral("tail raw")}, {QStringLiteral("tail rendered")});
+    QCOMPARE(model.rowCount(), 4);
+    model.clear_streaming_entries();
+    QCOMPARE(model.rowCount(), 3);
 }
 
 void tst_actions_log_model_t::selected_raw_markdown_joins_rows_in_visual_order()

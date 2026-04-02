@@ -298,6 +298,12 @@ signals:
     void streaming_token(const QString &token);
 
     /**
+     * Streams provider reasoning text while the model is still thinking.
+     * @param token Streamed reasoning text chunk.
+     */
+    void reasoning_token(const QString &token);
+
+    /**
      * Publishes provider token-usage counters for one completed model request.
      * @param usage Usage counters returned by the provider.
      * @param durationMs Wall-clock duration of the completed request in milliseconds.

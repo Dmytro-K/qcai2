@@ -2310,6 +2310,13 @@ void agent_controller_t::handle_provider_stream_delta(const QString &delta)
 
 void agent_controller_t::handle_provider_progress_event(const provider_raw_event_t &event)
 {
+    if (this->is_compaction_request_active() == false &&
+        event.kind == provider_raw_event_kind_t::REASONING_DELTA &&
+        event.message.isEmpty() == false)
+    {
+        emit this->reasoning_token(event.message);
+    }
+
     if (this->progress_tracker == nullptr)
     {
         return;

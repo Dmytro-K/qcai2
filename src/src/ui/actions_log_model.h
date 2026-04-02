@@ -12,7 +12,7 @@ namespace qcai2
 {
 
 /**
- * Stores Actions Log entries as separate committed and optional streaming rows.
+ * Stores Actions Log entries as separate committed and optional trailing streaming rows.
  */
 class actions_log_model_t final : public QAbstractListModel
 {
@@ -72,24 +72,26 @@ public:
     void append_committed_entry(const QString &raw_markdown, const QString &rendered_markdown);
 
     /**
-     * Replaces or creates the trailing streaming preview row.
-     * @param raw_markdown Current streaming markdown preview.
-     * @param rendered_markdown Preprocessed streaming markdown preview.
+     * Replaces the trailing streaming preview rows.
+     * @param raw_markdown_blocks Current streaming markdown previews in visual order.
+     * @param rendered_markdown_blocks Preprocessed streaming markdown previews.
      */
-    void set_streaming_entry(const QString &raw_markdown, const QString &rendered_markdown);
+    void set_streaming_entries(const QStringList &raw_markdown_blocks,
+                               const QStringList &rendered_markdown_blocks);
 
     /**
-     * Removes the trailing streaming preview row, if present.
+     * Removes all trailing streaming preview rows.
      */
-    void clear_streaming_entry();
+    void clear_streaming_entries();
 
     /**
-     * Converts the trailing streaming row into one committed row, or appends a committed row when
-     * no preview row exists.
-     * @param raw_markdown Stored raw markdown block.
-     * @param rendered_markdown Preprocessed markdown block for rendering.
+     * Converts the trailing streaming rows into committed rows, or appends committed rows when no
+     * preview rows exist.
+     * @param raw_markdown_blocks Stored raw markdown blocks.
+     * @param rendered_markdown_blocks Preprocessed markdown blocks for rendering.
      */
-    void commit_streaming_entry(const QString &raw_markdown, const QString &rendered_markdown);
+    void commit_streaming_entries(const QStringList &raw_markdown_blocks,
+                                  const QStringList &rendered_markdown_blocks);
 
     /**
      * Joins the raw markdown of selected rows in visual order.
@@ -120,8 +122,11 @@ private:
     entry_t make_entry(const QString &raw_markdown, const QString &rendered_markdown,
                        bool streaming) const;
 
-    /** Stored Actions Log rows in visual order. */
-    QList<entry_t> entries;
+    /** Stored committed Actions Log rows in visual order. */
+    QList<entry_t> committed_entries;
+
+    /** Temporary trailing streaming preview rows shown after committed entries. */
+    QList<entry_t> streaming_entries;
 
     /** Monotonic counter used to generate stable row ids. */
     mutable qsizetype next_entry_id = 1;

@@ -7,6 +7,7 @@
 - Added visible color for status line
 - Added setting for linking current file by default
 - Added support of Undo/Redo applied diff changes
+- Added model thinking progress log
 
 ### Changed
 

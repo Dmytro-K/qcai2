@@ -52,6 +52,13 @@ private:
      */
     void prune_invalid_persistent_editors();
 
+    /**
+     * Recomputes row layout and persistent-editor geometry after in-place row updates.
+     * @param first_row First changed top-level row.
+     * @param last_row Last changed top-level row.
+     */
+    void refresh_layout_for_rows(int first_row, int last_row);
+
     /** Indexes whose row editors are currently kept persistent. */
     QList<QPersistentModelIndex> persistent_editor_indexes;
 

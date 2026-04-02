@@ -1330,8 +1330,12 @@ void agent_dock_session_controller_t::restore_current_conversation_state_file()
             this->dock.log_markdown_blocks.last() += QStringLiteral("\n```\n");
             this->dock.log_markdown = this->dock.log_markdown_blocks.join(QStringLiteral("\n\n"));
         }
-        this->dock.streaming_markdown.clear();
+        this->dock.streaming_response_markdown.clear();
         this->dock.streaming_response_raw.clear();
+        this->dock.streaming_reasoning_raw.clear();
+        this->dock.streaming_reasoning_markdown.clear();
+        this->dock.last_committed_streaming_response_markdown.clear();
+        this->dock.last_streaming_phase = agent_dock_widget_t::streaming_phase_t::NONE;
         this->dock.render_log();
     }
 

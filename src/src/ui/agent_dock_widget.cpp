@@ -125,6 +125,45 @@ QString request_duration_label_stylesheet(bool running)
         .arg(text.name(QColor::HexRgb));
 }
 
+QString as_indented_code_block(const QString &text)
+{
+    if (text.isEmpty() == true)
+    {
+        return {};
+    }
+
+    const QStringList lines = text.split(QLatin1Char('\n'));
+    QStringList indented_lines;
+    indented_lines.reserve(lines.size());
+    for (const QString &line : lines)
+    {
+        indented_lines.append(QStringLiteral("    %1").arg(line));
+    }
+    return indented_lines.join(QLatin1Char('\n'));
+}
+
+QString thinking_markdown_preview(const QString &raw)
+{
+    const QString trimmed = raw.trimmed();
+    if (trimmed.isEmpty() == true)
+    {
+        return {};
+    }
+
+    return QStringLiteral("**Thinking**\n\n%1").arg(as_indented_code_block(trimmed));
+}
+
+QString response_draft_markdown_preview(const QString &raw)
+{
+    const QString preview = streaming_response_markdown_preview(raw).trimmed();
+    if (preview.isEmpty() == true)
+    {
+        return {};
+    }
+
+    return QStringLiteral("**Response draft**\n\n%1").arg(preview);
+}
+
 Utils::Id diff_editor_id_for_file_path(const Utils::FilePath &file_path)
 {
     Q_UNUSED(file_path);
@@ -990,16 +1029,37 @@ agent_dock_widget_t::agent_dock_widget_t(agent_controller_t *controller,
                         .arg(applied_message_count == 1 ? QString() : QStringLiteral("s")));
                 this->status_label->setText(QStringLiteral("Soft steer applied."));
             });
+    connect(this->controller, &agent_controller_t::reasoning_token, this,
+            [this](const QString &token) {
+                if (token.isEmpty() == true)
+                {
+                    return;
+                }
+
+                if (this->last_streaming_phase == streaming_phase_t::RESPONSE &&
+                    this->streaming_response_markdown.isEmpty() == false)
+                {
+                    this->flush_streaming_markdown();
+                }
+
+                this->streaming_reasoning_raw += token;
+                this->streaming_reasoning_markdown =
+                    thinking_markdown_preview(this->streaming_reasoning_raw);
+                this->last_streaming_phase = streaming_phase_t::THINKING;
+                this->is_streaming = this->current_streaming_markdown_blocks().isEmpty() == false;
+                if (this->render_throttle->isActive() == false)
+                {
+                    this->render_throttle->start();
+                }
+            });
     connect(this->controller, &agent_controller_t::streaming_token, this,
             [this](const QString &token) {
                 this->streaming_response_raw += token;
-                this->streaming_markdown =
-                    streaming_response_markdown_preview(this->streaming_response_raw);
-                if (!this->is_streaming)
-                {
-                    this->is_streaming = true;
-                }
-                if (!this->render_throttle->isActive())
+                this->streaming_response_markdown =
+                    response_draft_markdown_preview(this->streaming_response_raw);
+                this->last_streaming_phase = streaming_phase_t::RESPONSE;
+                this->is_streaming = this->current_streaming_markdown_blocks().isEmpty() == false;
+                if (this->render_throttle->isActive() == false)
                 {
                     this->render_throttle->start();
                 }
@@ -1152,21 +1212,28 @@ void agent_dock_widget_t::queue_current_request()
 
 QString agent_dock_widget_t::current_log_markdown() const
 {
-    return this->current_log_markdown_blocks().join(QStringLiteral("\n\n"));
+    return this->current_visible_log_markdown_blocks().join(QStringLiteral("\n\n"));
 }
 
 QStringList agent_dock_widget_t::current_log_markdown_blocks() const
 {
     QStringList blocks;
-    blocks.reserve(this->log_markdown_blocks.size() +
-                   (this->streaming_markdown.isEmpty() ? 0 : 1));
+    blocks.reserve(this->log_markdown_blocks.size());
     for (const QString &block : std::as_const(this->log_markdown_blocks))
     {
         blocks.append(redact_read_file_payloads(block));
     }
-    if (this->streaming_markdown.isEmpty() == false)
+    return blocks;
+}
+
+QStringList agent_dock_widget_t::current_visible_log_markdown_blocks() const
+{
+    QStringList blocks = this->current_log_markdown_blocks();
+    const QStringList streaming_blocks = this->current_streaming_markdown_blocks();
+    blocks.reserve(blocks.size() + streaming_blocks.size());
+    for (const QString &block : streaming_blocks)
     {
-        blocks.append(redact_read_file_payloads(this->streaming_markdown));
+        blocks.append(redact_read_file_payloads(block));
     }
     return blocks;
 }
@@ -1190,6 +1257,33 @@ void agent_dock_widget_t::append_raw_markdown_block(const QString &markdown_bloc
         cursor.insertText(QStringLiteral("\n\n"));
     }
     cursor.insertText(markdown_block);
+}
+
+QStringList agent_dock_widget_t::current_streaming_markdown_blocks() const
+{
+    QStringList blocks;
+    if (this->streaming_reasoning_markdown.isEmpty() == false)
+    {
+        blocks.append(this->streaming_reasoning_markdown);
+    }
+    if (this->streaming_response_markdown.isEmpty() == false)
+    {
+        blocks.append(this->streaming_response_markdown);
+    }
+    return blocks;
+}
+
+void agent_dock_widget_t::sync_actions_log_streaming_entries()
+{
+    const QStringList visible_streaming_blocks = this->current_streaming_markdown_blocks();
+    QStringList rendered_streaming_blocks;
+    rendered_streaming_blocks.reserve(visible_streaming_blocks.size());
+    for (const QString &block : visible_streaming_blocks)
+    {
+        rendered_streaming_blocks.append(this->render_actions_log_markdown(block));
+    }
+    this->actions_log_model->set_streaming_entries(visible_streaming_blocks,
+                                                   rendered_streaming_blocks);
 }
 
 void agent_dock_widget_t::scroll_log_views_to_bottom()
@@ -1283,10 +1377,13 @@ void agent_dock_widget_t::clear_chat_state()
     this->raw_markdown_view->clear();
     this->log_markdown.clear();
     this->log_markdown_blocks.clear();
-    this->streaming_markdown.clear();
+    this->streaming_response_markdown.clear();
     this->streaming_response_raw.clear();
-    this->last_committed_streaming_markdown.clear();
+    this->streaming_reasoning_raw.clear();
+    this->streaming_reasoning_markdown.clear();
+    this->last_committed_streaming_response_markdown.clear();
     this->is_streaming = false;
+    this->last_streaming_phase = streaming_phase_t::NONE;
     this->plan_list->clear();
     this->inline_diff_manager->clear_all();
     static_cast<diff_preview_edit_t *>(this->diff_view)->set_diff_text(QString());
@@ -2124,7 +2221,7 @@ void agent_dock_widget_t::start_request(const queued_request_t &request,
     }
 
     this->reset_usage_display(settings().provider, request.model_name);
-    this->last_committed_streaming_markdown.clear();
+    this->last_committed_streaming_response_markdown.clear();
     this->controller->set_request_context(request_to_start.request_context,
                                           request_to_start.linked_files,
                                           resolved_image_attachments);
@@ -2368,14 +2465,15 @@ void agent_dock_widget_t::on_log_message(const QString &msg)
     static const QString final_prefix = QStringLiteral("✅ Agent finished: ");
     static const QString proposal_prefix = QStringLiteral("📝 Agent proposed changes: ");
     const auto matches_streamed_summary = [this, &text](const QString &prefix) {
-        return text.startsWith(prefix) && text.mid(prefix.size()).trimmed() ==
-                                              this->last_committed_streaming_markdown.trimmed();
+        return text.startsWith(prefix) &&
+               text.mid(prefix.size()).trimmed() ==
+                   this->last_committed_streaming_response_markdown.trimmed();
     };
     const bool suppress_streamed_final_echo =
         matches_streamed_summary(final_prefix) || matches_streamed_summary(proposal_prefix);
     if (suppress_streamed_final_echo)
     {
-        this->last_committed_streaming_markdown.clear();
+        this->last_committed_streaming_response_markdown.clear();
         return;
     }
 
@@ -2535,32 +2633,40 @@ void agent_dock_widget_t::open_actions_log_link(const QString &href)
 
 void agent_dock_widget_t::flush_streaming_markdown()
 {
-    if (this->streaming_markdown.isEmpty() && this->streaming_response_raw.isEmpty())
+    const QStringList streaming_blocks = this->current_streaming_markdown_blocks();
+    if (streaming_blocks.isEmpty() == true)
     {
         return;
     }
 
-    if (this->streaming_markdown.isEmpty() == false)
+    QStringList visible_streaming_blocks;
+    QStringList rendered_streaming_blocks;
+    visible_streaming_blocks.reserve(streaming_blocks.size());
+    rendered_streaming_blocks.reserve(streaming_blocks.size());
+    for (const QString &block : streaming_blocks)
     {
-        const QString flushed_markdown = redact_read_file_payloads(this->streaming_markdown);
-        this->last_committed_streaming_markdown = flushed_markdown;
+        const QString visible_block = redact_read_file_payloads(block);
+        visible_streaming_blocks.append(visible_block);
+        rendered_streaming_blocks.append(this->render_actions_log_markdown(visible_block));
         if (!this->log_markdown.isEmpty())
         {
             this->log_markdown += QStringLiteral("\n\n");
         }
-        this->log_markdown += flushed_markdown;
-        this->log_markdown_blocks.append(flushed_markdown);
-        this->session_controller->append_current_conversation_log_entry(flushed_markdown);
-        this->actions_log_model->commit_streaming_entry(
-            flushed_markdown, this->render_actions_log_markdown(flushed_markdown));
+        this->log_markdown += visible_block;
+        this->log_markdown_blocks.append(visible_block);
+        this->session_controller->append_current_conversation_log_entry(visible_block);
     }
-    else
-    {
-        this->actions_log_model->clear_streaming_entry();
-    }
-    this->streaming_markdown.clear();
+    this->actions_log_model->commit_streaming_entries(visible_streaming_blocks,
+                                                      rendered_streaming_blocks);
+
+    this->last_committed_streaming_response_markdown = redact_read_file_payloads(
+        streaming_response_markdown_preview(this->streaming_response_raw));
+    this->streaming_response_markdown.clear();
     this->streaming_response_raw.clear();
+    this->streaming_reasoning_raw.clear();
+    this->streaming_reasoning_markdown.clear();
     this->is_streaming = false;
+    this->last_streaming_phase = streaming_phase_t::NONE;
     this->sync_raw_markdown_view();
     this->scroll_log_views_to_bottom();
 }
@@ -2572,11 +2678,14 @@ void agent_dock_widget_t::discard_streaming_markdown()
         this->render_throttle->stop();
     }
 
-    this->streaming_markdown.clear();
+    this->streaming_response_markdown.clear();
     this->streaming_response_raw.clear();
+    this->streaming_reasoning_raw.clear();
+    this->streaming_reasoning_markdown.clear();
     this->is_streaming = false;
-    this->last_committed_streaming_markdown.clear();
-    this->actions_log_model->clear_streaming_entry();
+    this->last_committed_streaming_response_markdown.clear();
+    this->last_streaming_phase = streaming_phase_t::NONE;
+    this->actions_log_model->clear_streaming_entries();
     this->sync_raw_markdown_view();
 }
 
@@ -2584,8 +2693,7 @@ void agent_dock_widget_t::render_log()
 {
     if (this->is_streaming)
     {
-        this->actions_log_model->set_streaming_entry(
-            this->streaming_markdown, this->render_actions_log_markdown(this->streaming_markdown));
+        this->sync_actions_log_streaming_entries();
         this->sync_raw_markdown_view();
         this->scroll_log_views_to_bottom();
         return;
@@ -2596,8 +2704,7 @@ void agent_dock_widget_t::render_log()
 
 void agent_dock_widget_t::render_log_full()
 {
-    const QStringList visible_blocks =
-        this->current_log_markdown_blocks().mid(0, this->log_markdown_blocks.size());
+    const QStringList visible_blocks = this->current_log_markdown_blocks();
     QStringList rendered_blocks;
     rendered_blocks.reserve(visible_blocks.size());
     for (const QString &block : visible_blocks)
@@ -2605,10 +2712,9 @@ void agent_dock_widget_t::render_log_full()
         rendered_blocks.append(this->render_actions_log_markdown(block));
     }
     this->actions_log_model->set_committed_entries(visible_blocks, rendered_blocks);
-    if (this->streaming_markdown.isEmpty() == false)
+    if (this->current_streaming_markdown_blocks().isEmpty() == false)
     {
-        this->actions_log_model->set_streaming_entry(
-            this->streaming_markdown, this->render_actions_log_markdown(this->streaming_markdown));
+        this->sync_actions_log_streaming_entries();
     }
     this->sync_raw_markdown_view();
     this->scroll_log_views_to_bottom();
@@ -2782,7 +2888,7 @@ void agent_dock_widget_t::on_stopped(const QString &summary)
     {
         this->render_throttle->stop();
     }
-    if (!this->streaming_markdown.isEmpty() || !this->streaming_response_raw.isEmpty())
+    if (this->current_streaming_markdown_blocks().isEmpty() == false)
     {
         this->flush_streaming_markdown();
     }
@@ -2881,10 +2987,13 @@ bool agent_dock_widget_t::eventFilter(QObject *obj, QEvent *event)
             this->raw_markdown_view->clear();
             this->log_markdown.clear();
             this->log_markdown_blocks.clear();
-            this->streaming_markdown.clear();
+            this->streaming_response_markdown.clear();
             this->streaming_response_raw.clear();
-            this->last_committed_streaming_markdown.clear();
+            this->streaming_reasoning_raw.clear();
+            this->streaming_reasoning_markdown.clear();
+            this->last_committed_streaming_response_markdown.clear();
             this->is_streaming = false;
+            this->last_streaming_phase = streaming_phase_t::NONE;
             this->session_controller->save_chat();
             return true;
         }
